@@ -1,0 +1,32 @@
+{
+  "name": "taker-app",
+  "version": "1.0.0",
+  "description": "Staging area for the demo taker-app",
+  "main": "index.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "concurrently \"npm run tailwind:watch\" \"npm run start\"",
+    "tailwind:watch": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css --watch",
+    "build:css": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/citadel-tech/taker-app.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/citadel-tech/taker-app/issues"
+  },
+  "homepage": "https://github.com/citadel-tech/taker-app#readme",
+  "devDependencies": {
+    "concurrently": "^9.2.1",
+    "electron": "^27.0.0",
+    "electron-reloader": "^1.2.3"
+  },
+  "dependencies": {
+    "@tailwindcss/cli": "^4.1.14",
+    "tailwindcss": "^4.1.14"
+  }
+}

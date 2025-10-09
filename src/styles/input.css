@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bitcoin-orange: #FF6B35;
+  --color-dark-bg: #0f1419;
+  --color-dark-surface: #1a2332;
+  --color-dark-card: #242d3d;
+  --color-text-muted: #8b95a8;
+}
