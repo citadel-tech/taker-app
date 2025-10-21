@@ -1,8 +1,8 @@
 export function ReceiveComponent(container) {
-    const content = document.createElement('div');
-    content.id = 'receive-content';
-    
-    content.innerHTML = `
+  const content = document.createElement('div');
+  content.id = 'receive-content';
+
+  content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Receive Bitcoin</h2>
         <p class="text-gray-400 mb-8">Generate a new address to receive BTC</p>
 
@@ -71,7 +71,7 @@ export function ReceiveComponent(container) {
                         <div class="bg-[#0f1419] rounded-lg p-3">
                             <div class="flex justify-between items-center mb-1">
                                 <span class="font-mono text-sm text-gray-300">bc1qxy2...hx0wlh</span>
-                                <span class="text-xs text-green-400">Active</span>
+                                <span class="text-xs text-green-400">Current</span>
                             </div>
                             <p class="text-xs text-gray-500">Used 0 times</p>
                         </div>
@@ -92,10 +92,25 @@ export function ReceiveComponent(container) {
                             <p class="text-xs text-gray-500">Used 1 time • 0.10 BTC received</p>
                         </div>
                     </div>
+                    
+                    <button id="view-all-addresses" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
+                        View All Addresses →
+                    </button>
                 </div>
             </div>
         </div>
     `;
-    
-    container.appendChild(content);
+
+  container.appendChild(content);
+
+  // Add view all addresses handler
+  const viewAllButton = content.querySelector('#view-all-addresses');
+  if (viewAllButton) {
+    viewAllButton.addEventListener('click', () => {
+      import('./AddressList.js').then((module) => {
+        container.innerHTML = '';
+        module.AddressListComponent(container);
+      });
+    });
+  }
 }

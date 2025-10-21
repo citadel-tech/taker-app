@@ -1,8 +1,8 @@
 export function WalletComponent(container) {
-    const content = document.createElement('div');
-    content.id = 'wallet-content';
-    
-    content.innerHTML = `
+  const content = document.createElement('div');
+  content.id = 'wallet-content';
+
+  content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Wallet</h2>
         <p class="text-gray-400 mb-8">Your Bitcoin balance and transaction history</p>
 
@@ -33,43 +33,49 @@ export function WalletComponent(container) {
             </div>
         </div>
 
-        <!-- UTXOs Section -->
-        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-300">UTXOs</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-gray-700">
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Vout</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">a1b2c3d4...e5f6</td>
-                            <td class="py-3 px-4 text-gray-300">0</td>
-                            <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
-                            <td class="py-3 px-4 text-gray-300">142</td>
-                        </tr>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">7g8h9i0j...k1l2</td>
-                            <td class="py-3 px-4 text-gray-300">1</td>
-                            <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
-                            <td class="py-3 px-4 text-gray-300">89</td>
-                        </tr>
-                        <tr class="hover:bg-[#242d3d]">
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">m3n4o5p6...q7r8</td>
-                            <td class="py-3 px-4 text-gray-300">0</td>
-                            <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
-                            <td class="py-3 px-4 text-gray-300">23</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
+       <!-- UTXOs Section -->
+<div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+    <h3 class="text-xl font-semibold mb-4 text-gray-300">UTXOs</h3>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-700">
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Vout</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Type</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                    <td class="py-3 px-4 font-mono text-sm text-gray-300">a1b2c3d4...e5f6</td>
+                    <td class="py-3 px-4 text-gray-300">0</td>
+                    <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
+                    <td class="py-3 px-4 text-gray-300">142</td>
+                    <td class="py-3 px-4 text-green-400">Regular</td>
+                </tr>
+                <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                    <td class="py-3 px-4 font-mono text-sm text-gray-300">7g8h9i0j...k1l2</td>
+                    <td class="py-3 px-4 text-gray-300">1</td>
+                    <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
+                    <td class="py-3 px-4 text-gray-300">89</td>
+                    <td class="py-3 px-4 text-green-400">Regular</td>
+                </tr>
+                <tr class="hover:bg-[#242d3d]">
+                    <td class="py-3 px-4 font-mono text-sm text-gray-300">m3n4o5p6...q7r8</td>
+                    <td class="py-3 px-4 text-gray-300">0</td>
+                    <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
+                    <td class="py-3 px-4 text-gray-300">23</td>
+                    <td class="py-3 px-4 text-blue-400">Swap</td>
+                </tr>
+            </tbody>
+        </table>
+<button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
+    View All UTXOs →
+</button>
+    </div>
+</div>
         <!-- Recent Transactions -->
         <div class="bg-[#1a2332] rounded-lg p-6">
             <h3 class="text-xl font-semibold mb-4 text-gray-300">Recent Transactions</h3>
@@ -107,6 +113,17 @@ export function WalletComponent(container) {
             </div>
         </div>
     `;
-    
-    container.appendChild(content);
+
+  container.appendChild(content);
+
+  // Add view all UTXOs handler
+  const viewAllButton = content.querySelector('#view-all-utxos');
+  if (viewAllButton) {
+    viewAllButton.addEventListener('click', () => {
+      import('./UtxoList.js').then((module) => {
+        container.innerHTML = '';
+        module.UtxoListComponent(container);
+      });
+    });
+  }
 }
