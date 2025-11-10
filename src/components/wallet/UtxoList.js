@@ -2,10 +2,85 @@ export function UtxoListComponent(container) {
   const content = document.createElement('div');
   content.id = 'utxo-list-content';
 
+  // State for UTXO selection
+  let selectedUtxos = [];
+
+  // UTXO data matching the table rows
+  const utxos = [
+    { txid: 'a1b2c3d4e5f6', vout: 0, amount: 5000000, type: 'Regular' },
+    { txid: '7g8h9i0j1k2l', vout: 1, amount: 10000000, type: 'Regular' },
+    { txid: 'm3n4o5p6q7r8', vout: 0, amount: 5000000, type: 'Swap' },
+    { txid: 'u1v2w3x4y5z6', vout: 2, amount: 3000000, type: 'Regular' },
+    { txid: 'c9d0e1f2g3h4', vout: 1, amount: 2000000, type: 'Regular' },
+    { txid: 'k7l8m9n0o1p2', vout: 0, amount: 1500000, type: 'Regular' },
+  ];
+
+  function toggleUtxoSelection(index) {
+    const utxoIndex = selectedUtxos.indexOf(index);
+    if (utxoIndex > -1) {
+      selectedUtxos.splice(utxoIndex, 1);
+    } else {
+      selectedUtxos.push(index);
+    }
+
+    updateSelectionUI();
+  }
+
+  function updateSelectionUI() {
+    // Update checkboxes
+    utxos.forEach((_, index) => {
+      const checkbox = content.querySelector(`#utxo-checkbox-${index}`);
+      if (checkbox) {
+        checkbox.checked = selectedUtxos.includes(index);
+      }
+    });
+
+    // Update master checkbox
+    const selectAllCheckbox = content.querySelector('#select-all-utxos');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.checked = selectedUtxos.length === utxos.length;
+      selectAllCheckbox.indeterminate = selectedUtxos.length > 0 && selectedUtxos.length < utxos.length;
+    }
+
+    // Update action buttons visibility
+    const actionButtons = content.querySelector('#utxo-actions');
+    const selectionCount = content.querySelector('#selection-count');
+    
+    if (selectedUtxos.length > 0) {
+      actionButtons.classList.remove('hidden');
+      selectionCount.textContent = selectedUtxos.length;
+    } else {
+      actionButtons.classList.add('hidden');
+    }
+  }
+
+  function selectAllUtxos() {
+    if (selectedUtxos.length === utxos.length) {
+      selectedUtxos = [];
+    } else {
+      selectedUtxos = Array.from({length: utxos.length}, (_, i) => i);
+    }
+    updateSelectionUI();
+  }
+
+  function sendWithSelectedUtxos() {
+    import('../send/Send.js').then((module) => {
+      container.innerHTML = '';
+      module.SendComponent(container, selectedUtxos);
+    });
+  }
+
+  function swapWithSelectedUtxos() {
+    import('../swap/Swap.js').then((module) => {
+      container.innerHTML = '';
+      module.SwapComponent(container, selectedUtxos);
+    });
+  }
+
   content.innerHTML = `
         <div class="mb-6">
             <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4">
-                ← Back to Wallet
+                â† Back to Wallet
             </button>
             <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All UTXOs</h2>
             <p class="text-gray-400">Complete list of unspent transaction outputs</p>
@@ -35,12 +110,27 @@ export function UtxoListComponent(container) {
         <div class="bg-[#1a2332] rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-semibold text-gray-300">UTXO Details</h3>
+                <!-- Selection Actions -->
+                <div id="utxo-actions" class="hidden flex gap-2">
+                    <span class="text-sm text-gray-400">
+                        <span id="selection-count">0</span> selected
+                    </span>
+                    <button id="send-selected" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-3 py-1 rounded text-sm font-semibold transition-colors">
+                        Send
+                    </button>
+                    <button id="swap-selected" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded text-sm font-semibold transition-colors">
+                        Swap
+                    </button>
+                </div>
             </div>
 
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">
+                                <input type="checkbox" id="select-all-utxos" class="w-4 h-4 accent-[#FF6B35]" />
+                            </th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Vout</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
@@ -51,6 +141,9 @@ export function UtxoListComponent(container) {
                     </thead>
                     <tbody>
                         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                            <td class="py-3 px-4">
+                                <input type="checkbox" id="utxo-checkbox-0" class="w-4 h-4 accent-[#FF6B35]" />
+                            </td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">a1b2c3d4e5f6...7890</td>
                             <td class="py-3 px-4 text-gray-300">0</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
@@ -59,6 +152,9 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4 text-green-400">Regular</td>
                         </tr>
                         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                            <td class="py-3 px-4">
+                                <input type="checkbox" id="utxo-checkbox-1" class="w-4 h-4 accent-[#FF6B35]" />
+                            </td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">7g8h9i0j1k2l...3m4n</td>
                             <td class="py-3 px-4 text-gray-300">1</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
@@ -67,6 +163,9 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4 text-green-400">Regular</td>
                         </tr>
                         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                            <td class="py-3 px-4">
+                                <input type="checkbox" id="utxo-checkbox-2" class="w-4 h-4 accent-[#FF6B35]" />
+                            </td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">m3n4o5p6q7r8...s9t0</td>
                             <td class="py-3 px-4 text-gray-300">0</td>
                             <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
@@ -75,6 +174,9 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4 text-blue-400">Swap</td>
                         </tr>
                         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                            <td class="py-3 px-4">
+                                <input type="checkbox" id="utxo-checkbox-3" class="w-4 h-4 accent-[#FF6B35]" />
+                            </td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">u1v2w3x4y5z6...a7b8</td>
                             <td class="py-3 px-4 text-gray-300">2</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.03000000</td>
@@ -83,6 +185,9 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4 text-green-400">Regular</td>
                         </tr>
                         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                            <td class="py-3 px-4">
+                                <input type="checkbox" id="utxo-checkbox-4" class="w-4 h-4 accent-[#FF6B35]" />
+                            </td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">c9d0e1f2g3h4...i5j6</td>
                             <td class="py-3 px-4 text-gray-300">1</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.02000000</td>
@@ -91,6 +196,9 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4 text-green-400">Regular</td>
                         </tr>
                         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+                            <td class="py-3 px-4">
+                                <input type="checkbox" id="utxo-checkbox-5" class="w-4 h-4 accent-[#FF6B35]" />
+                            </td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">k7l8m9n0o1p2...q3r4</td>
                             <td class="py-3 px-4 text-gray-300">0</td>
                             <td class="py-3 px-4 text-yellow-400 font-mono">0.01500000</td>
@@ -106,10 +214,35 @@ export function UtxoListComponent(container) {
 
   container.appendChild(content);
 
+  // Add individual UTXO selection handlers
+  utxos.forEach((_, index) => {
+    const checkbox = content.querySelector(`#utxo-checkbox-${index}`);
+    if (checkbox) {
+      checkbox.addEventListener('change', () => toggleUtxoSelection(index));
+    }
+  });
+
+  // Add select all handler
+  const selectAllCheckbox = content.querySelector('#select-all-utxos');
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', selectAllUtxos);
+  }
+
+  // Add action button handlers
+  const sendButton = content.querySelector('#send-selected');
+  if (sendButton) {
+    sendButton.addEventListener('click', sendWithSelectedUtxos);
+  }
+
+  const swapButton = content.querySelector('#swap-selected');
+  if (swapButton) {
+    swapButton.addEventListener('click', swapWithSelectedUtxos);
+  }
+
   // Add back button handler
   const backButton = content.querySelector('#back-to-wallet');
   backButton.addEventListener('click', () => {
-    const walletModule = import('../wallet/Wallet.js');
+    const walletModule = import('./Wallet.js');
     walletModule.then((module) => {
       container.innerHTML = '';
       module.WalletComponent(container);

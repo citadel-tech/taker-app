@@ -57,8 +57,8 @@ export function ReceiveComponent(container) {
                         </div>
                     </div>
 
-                    <div class="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <p class="text-xs text-blue-400">
+                    <div class="mt-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                        <p class="text-xs text-red-400">
                             ⓘ Each address can be reused, but generating new addresses improves privacy
                         </p>
                     </div>

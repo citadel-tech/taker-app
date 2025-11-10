@@ -1,4 +1,4 @@
-export function SwapComponent(container) {
+export function SwapComponent(container, preSelectedUtxos = null, preSelectedMakers = null) {
   const content = document.createElement('div');
   content.id = 'swap-content';
 
@@ -6,9 +6,9 @@ export function SwapComponent(container) {
   let swapAmount = 0;
   let amountUnit = 'sats';
   let numberOfHops = 3;
-  let selectionMode = 'auto';
-  let selectedUtxos = [];
-  let selectedMakers = [];
+  let selectionMode = (preSelectedUtxos && preSelectedUtxos.length > 0) || (preSelectedMakers && preSelectedMakers.length > 0) ? 'manual' : 'auto';
+  let selectedUtxos = preSelectedUtxos || [];
+  let selectedMakers = preSelectedMakers ? preSelectedMakers.map((_, index) => index) : [];
   let networkFeeRate = 5; // sats/vB
 
   const availableUtxos = [
@@ -18,34 +18,24 @@ export function SwapComponent(container) {
     { txid: 'u1v2w3x4y5z6', vout: 2, amount: 3000000, type: 'Regular' },
   ];
 
-  const availableMakers = [
+  const availableMakers = preSelectedMakers || [
     {
-      address: 'ewaexd2es2uzr34wp26c',
-      fee: 10.0,
+      address: 'ewaexd2es2uzr34wp26cj5zgph7bug7zh',
+      baseFee: 100,
+      volumeFee: 10.0,
+      timeFee: 0.50,
       minSize: 10000,
       maxSize: 49890356,
       bond: 50000,
     },
     {
-      address: 'h2cxriyylj7uefzd65rf',
-      fee: 10.0,
+      address: 'h2cxriyylj7uefzd65rfejyfrbd2hyt37h',
+      baseFee: 100,
+      volumeFee: 10.0,
+      timeFee: 0.50,
       minSize: 10000,
       maxSize: 49908736,
       bond: 50000,
-    },
-    {
-      address: 'abc123xyz789d6gh8ijk',
-      fee: 12.5,
-      minSize: 5000,
-      maxSize: 30000000,
-      bond: 35000,
-    },
-    {
-      address: 'def456uvw012e3fg9klm',
-      fee: 9.0,
-      minSize: 15000,
-      maxSize: 60000000,
-      bond: 75000,
     },
   ];
 
@@ -458,7 +448,7 @@ export function SwapComponent(container) {
                                                 <input type="checkbox" id="maker-checkbox-${index}" class="w-4 h-4 accent-[#FF6B35]" />
                                             </td>
                                             <td class="py-3 px-2 font-mono text-xs text-gray-300">${maker.address}...</td>
-                                            <td class="py-3 px-2 text-xs text-blue-400">${maker.fee}%</td>
+                                            <td class="py-3 px-2 text-xs text-blue-400">${maker.volumeFee}%</td>
                                             <td class="py-3 px-2 text-xs text-yellow-400">${maker.minSize.toLocaleString()} / ${(maker.maxSize / 1000000).toFixed(1)}M</td>
                                             <td class="py-3 px-2 text-xs text-purple-400">${maker.bond.toLocaleString()}</td>
                                         </tr>
@@ -634,6 +624,42 @@ export function SwapComponent(container) {
   });
 
   // INITIALIZE
+  if ((preSelectedUtxos && preSelectedUtxos.length > 0) || (preSelectedMakers && preSelectedMakers.length > 0)) {
+    // Set manual mode
+    toggleSelectionMode('manual');
+    
+    // Initialize UTXO selections
+    if (preSelectedUtxos && preSelectedUtxos.length > 0) {
+      selectedUtxos.forEach(index => {
+        const checkbox = content.querySelector('#utxo-' + index);
+        if (checkbox) {
+          checkbox.checked = true;
+        }
+      });
+      content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
+      checkUtxoTypeWarning();
+    }
+    
+    // Initialize maker selections
+    if (preSelectedMakers && preSelectedMakers.length > 0) {
+      selectedMakers.forEach(index => {
+        const checkbox = content.querySelector('#maker-checkbox-' + index);
+        if (checkbox) {
+          checkbox.checked = true;
+        }
+      });
+      content.querySelector('#selected-makers-count').textContent = selectedMakers.length;
+      const hops = selectedMakers.length + 1;
+      content.querySelector('#calculated-hops').textContent = hops;
+    }
+    
+    // Set swap amount to total of selected UTXOs if UTXOs are selected
+    if (selectedUtxos.length > 0) {
+      swapAmount = getSelectedUtxosTotal();
+      content.querySelector('#swap-amount-input').value = swapAmount;
+    }
+  }
+  
   fetchNetworkFees();
   updateSummary();
 }

@@ -111,7 +111,7 @@ export function RecoveryComponent(container) {
                                 </div>
                                 <span class="text-xs text-green-400">✓ Success</span>
                             </div>
-                            <p class="text-xs text-gray-400">Hashlock spend successful</p>
+                            <p class="text-xs text-gray-400">Contract broadcast → Hashlock claimed</p>
                         </div>
                     </div>
                 </div>
@@ -172,7 +172,7 @@ export function RecoveryComponent(container) {
                     <h3 class="text-lg font-semibold text-gray-300 mb-4">Manual Recovery</h3>
                     <p class="text-sm text-gray-400 mb-4">If automatic recovery fails, you can manually recover funds</p>
                     <button class="w-full bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-3 rounded-lg transition-colors border border-gray-700">
-                        Manual Recovery Tool
+                        Manually Trigger Recovery
                     </button>
                 </div>
             </div>

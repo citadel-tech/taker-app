@@ -1,6 +1,96 @@
 export function Market(container) {
     const content = document.createElement('div');
     content.id = 'market-content';
+
+    // MAKER DATA
+    const makers = [
+        {
+            address: 'ewaexd2es2uzr34wp26cj5zgph7bug7zh',
+            baseFee: 100,
+            volumeFee: 10.00,
+            timeFee: 0.50,
+            minSize: 10000,
+            maxSize: 49890356,
+            bond: 50000
+        },
+        {
+            address: 'h2cxriyylj7uefzd65rfejyfrbd2hyt37h',
+            baseFee: 100,
+            volumeFee: 10.00,
+            timeFee: 0.50,
+            minSize: 10000,
+            maxSize: 49908736,
+            bond: 50000
+        }
+    ];
+
+    let selectedMakers = [];
+
+    // SELECTION FUNCTIONS
+    function toggleMakerSelection(index) {
+        const makerIndex = selectedMakers.indexOf(index);
+        if (makerIndex > -1) {
+            selectedMakers.splice(makerIndex, 1);
+        } else {
+            selectedMakers.push(index);
+        }
+        updateSelectionUI();
+    }
+
+    function updateSelectionUI() {
+        // Update individual checkboxes
+        makers.forEach((_, index) => {
+            const checkbox = content.querySelector(`#maker-${index}`);
+            if (checkbox) {
+                checkbox.checked = selectedMakers.includes(index);
+            }
+        });
+
+        // Update select all checkbox
+        const selectAllCheckbox = content.querySelector('#select-all-makers');
+        if (selectAllCheckbox) {
+            if (selectedMakers.length === 0) {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = false;
+            } else if (selectedMakers.length === makers.length) {
+                selectAllCheckbox.checked = true;
+                selectAllCheckbox.indeterminate = false;
+            } else {
+                selectAllCheckbox.checked = false;
+                selectAllCheckbox.indeterminate = true;
+            }
+        }
+
+        // Update action buttons
+        const actionButtons = content.querySelector('#maker-actions');
+        const selectedCount = content.querySelector('#selected-makers-count');
+        
+        if (selectedMakers.length > 0) {
+            actionButtons.classList.remove('hidden');
+            selectedCount.textContent = selectedMakers.length;
+        } else {
+            actionButtons.classList.add('hidden');
+        }
+    }
+
+    function selectAllMakers() {
+        const selectAllCheckbox = content.querySelector('#select-all-makers');
+        if (selectAllCheckbox.checked) {
+            selectedMakers = makers.map((_, index) => index);
+        } else {
+            selectedMakers = [];
+        }
+        updateSelectionUI();
+    }
+
+    function swapWithSelectedMakers() {
+        const selectedMakerData = selectedMakers.map(index => makers[index]);
+        
+        import('../swap/Swap.js').then((module) => {
+            container.innerHTML = '';
+            module.SwapComponent(container, null, selectedMakerData);
+        });
+    }
     
     content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
@@ -28,8 +118,22 @@ export function Market(container) {
 
         <!-- Market Table -->
         <div class="bg-[#1a2332] rounded-lg overflow-hidden">
+            <!-- Action Buttons -->
+            <div id="maker-actions" class="hidden bg-[#FF6B35] p-4 flex justify-between items-center">
+                <span class="text-white font-semibold">
+                    <span id="selected-makers-count">0</span> makers selected
+                </span>
+                <button id="swap-with-makers" class="bg-white text-[#FF6B35] px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+                    Swap with Selected →
+                </button>
+            </div>
+
             <!-- Table Header -->
-            <div class="grid grid-cols-7 gap-4 bg-[#FF6B35] p-4">
+            <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4">
+                <div class="flex items-center">
+                    <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
+                    <span class="font-semibold text-sm">Select</span>
+                </div>
                 <div>
                     <div class="font-semibold">Address</div>
                     <div class="text-sm opacity-80">Maker Address</div>
@@ -62,33 +166,43 @@ export function Market(container) {
 
             <!-- Table Rows -->
             <div class="divide-y divide-gray-700">
-                <div class="grid grid-cols-7 gap-4 p-4 hover:bg-[#242d3d] cursor-pointer transition-colors">
-                    <div class="text-gray-300 font-mono text-sm truncate">ewaexd2es2uzr34wp26cj5zgph7bug7zh...</div>
-                    <div class="text-green-400">100</div>
-                    <div class="text-blue-400">10.00%</div>
-                    <div class="text-cyan-400">0.50%</div>
-                    <div class="text-yellow-400">10,000</div>
-                    <div class="text-yellow-400">49,890,356</div>
-                    <div class="text-purple-400">50,000</div>
-                </div>
-                
-                <div class="grid grid-cols-7 gap-4 p-4 hover:bg-[#242d3d] cursor-pointer transition-colors">
-                    <div class="text-gray-300 font-mono text-sm truncate">h2cxriyylj7uefzd65rfejyfrbd2hyt37h...</div>
-                    <div class="text-green-400">100</div>
-                    <div class="text-blue-400">10.00%</div>
-                    <div class="text-cyan-400">0.50%</div>
-                    <div class="text-yellow-400">10,000</div>
-                    <div class="text-yellow-400">49,908,736</div>
-                    <div class="text-purple-400">50,000</div>
-                </div>
+                ${makers.map((maker, index) => `
+                    <div class="grid grid-cols-8 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
+                        <div class="flex items-center">
+                            <input type="checkbox" id="maker-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+                        </div>
+                        <div class="text-gray-300 font-mono text-sm truncate">${maker.address}...</div>
+                        <div class="text-green-400">${maker.baseFee}</div>
+                        <div class="text-blue-400">${maker.volumeFee}%</div>
+                        <div class="text-cyan-400">${maker.timeFee}%</div>
+                        <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
+                        <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
+                        <div class="text-purple-400">${maker.bond.toLocaleString()}</div>
+                    </div>
+                `).join('')}
             </div>
 
             <!-- Footer -->
             <div class="p-4 text-center text-gray-400 text-sm border-t border-gray-700">
-                Showing 2 active offers • 2:18:11 PM
+                Showing 2 active offers â€¢ 2:18:11 PM
             </div>
         </div>
     `;
     
     container.appendChild(content);
+
+    // EVENT LISTENERS
+    
+    // Select all checkbox
+    content.querySelector('#select-all-makers').addEventListener('change', selectAllMakers);
+    
+    // Individual maker checkboxes
+    makers.forEach((_, index) => {
+        content.querySelector(`#maker-${index}`).addEventListener('change', () => {
+            toggleMakerSelection(index);
+        });
+    });
+    
+    // Swap with selected makers button
+    content.querySelector('#swap-with-makers').addEventListener('click', swapWithSelectedMakers);
 }
