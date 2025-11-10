@@ -1,10 +1,20 @@
 export function WalletComponent(container) {
-  const content = document.createElement('div');
-  content.id = 'wallet-content';
+    const content = document.createElement('div');
+    content.id = 'wallet-content';
 
-  content.innerHTML = `
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Wallet</h2>
-        <p class="text-gray-400 mb-8">Your Bitcoin balance and transaction history</p>
+    content.innerHTML = `
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Wallet</h2>
+                <p class="text-gray-400">Your Bitcoin balance and transaction history</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="bitcoind-status" class="flex items-center space-x-2 px-3 py-2 bg-[#1a2332] rounded-lg hover:bg-[#242d3d] transition-colors cursor-pointer">
+                    <div id="status-indicator" class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <span id="status-text" class="text-sm text-gray-300">Bitcoin Core</span>
+                </button>
+            </div>
+        </div>
 
         <!-- Balance Card -->
         <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
@@ -114,16 +124,58 @@ export function WalletComponent(container) {
         </div>
     `;
 
-  container.appendChild(content);
+    container.appendChild(content);
 
-  // Add view all UTXOs handler
-  const viewAllButton = content.querySelector('#view-all-utxos');
-  if (viewAllButton) {
-    viewAllButton.addEventListener('click', () => {
-      import('./UtxoList.js').then((module) => {
-        container.innerHTML = '';
-        module.UtxoListComponent(container);
-      });
+
+    const statusIndicator = content.querySelector('#status-indicator');
+    const statusText = content.querySelector('#status-text');
+
+    function isBitcoindRunning() {
+        try {
+            const { execSync } = require('child_process');
+            execSync('pgrep bitcoind', { stdio: 'ignore' });
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async function updateBitcoindStatus() {
+        try {
+            const isRunning = isBitcoindRunning();
+            console.log("Bitcoind running: ", isRunning);
+
+            if (isRunning) {
+                statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+                statusText.textContent = 'Bitcoind (Running)';
+                statusText.className = 'text-sm text-green-400';
+            } else {
+                statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+                statusText.textContent = 'Bitcoind (Stopped)';
+                statusText.className = 'text-sm text-red-400';
+            }
+        } catch (error) {
+            statusIndicator.className = 'w-3 h-3 rounded-full bg-yellow-500';
+            statusText.textContent = 'Bitcoind (Unknown)';
+            statusText.className = 'text-sm text-yellow-400';
+        }
+    }
+
+    updateBitcoindStatus();
+    const statusButton = content.querySelector('#bitcoind-status');
+    statusButton.addEventListener('click', () => {
+        console.log('Checking Bitcoind status...');
+        updateBitcoindStatus();
     });
-  }
+
+
+    const viewAllButton = content.querySelector('#view-all-utxos');
+    if (viewAllButton) {
+        viewAllButton.addEventListener('click', () => {
+            import('./UtxoList.js').then((module) => {
+                container.innerHTML = '';
+                module.UtxoListComponent(container);
+            });
+        });
+    }
 }

@@ -1,0 +1,154 @@
+const { app, BrowserWindow, ipcMain } = require('electron');
+const path = require('path');
+const { execSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const http = require('http');
+
+try { require('electron-reloader')(module, { watchRenderer: true }); } catch (_) { }
+
+let bitcoindProcess = null;
+const RPC_PORT = 18443;
+const WALLET_NAME = 'taker';
+
+async function startBitcoind() {
+  try {
+    execSync('pkill bitcoind || true');
+  } catch (c) {
+    console.log("Killed process { c }")
+  }
+
+  const dataDir = path.join(os.tmpdir(), 'coinswap_taker_app');
+  if (fs.existsSync(dataDir)) {
+    fs.rmSync(dataDir, { recursive: true, force: true });
+  }
+  const bitcoinDataDir = path.join(dataDir, '.bitcoin');
+  fs.mkdirSync(bitcoinDataDir, { recursive: true });
+
+  console.log('Starting Bitcoin Core in regtest mode...');
+
+  const exePath = path.join(__dirname, './bin/bitcoin-28.1/bitcoind');
+  const daemonCmd = `${exePath} -daemon -regtest -wallet=taker.dat -server -rest -txindex=1 -datadir="${bitcoinDataDir}" -rpcallowip=127.0.0.1 -rpcbind=127.0.0.1`;
+
+  try {
+    execSync(daemonCmd, { stdio: 'inherit' });
+    console.log('Bitcoin Core daemon started');
+  } catch (err) {
+    console.error('Failed to start bitcoind:', err);
+    throw err;
+  }
+
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Bitcoind startup timeout')), 30000);
+    const interval = setInterval(() => {
+      const cookieFile = path.join(bitcoinDataDir, 'regtest', '.cookie');
+      if (fs.existsSync(cookieFile)) {
+        clearInterval(interval);
+        clearTimeout(timeout);
+        setTimeout(resolve, 2000);
+      }
+    }, 500);
+  });
+
+  console.log('Bitcoin Core started');
+
+  const cookieFile = path.join(bitcoinDataDir, 'regtest', '.cookie');
+  const cookie = fs.readFileSync(cookieFile, 'utf8').trim();
+  const [username, password] = cookie.split(':');
+
+  const rpcUrl = `http://127.0.0.1:${RPC_PORT}`;
+
+  const miningAddress = await rpcCall(rpcUrl, username, password, 'getnewaddress', ['', 'legacy']);
+  await rpcCall(rpcUrl, username, password, 'generatetoaddress', [101, miningAddress]);
+
+  console.log('Regtest ready: 101 blocks mined');
+
+  return { rpcUrl, cookieFile, walletName: WALLET_NAME };
+}
+
+function rpcCall(url, username, password, method, params = []) {
+  return new Promise((resolve, reject) => {
+    const postData = JSON.stringify({
+      jsonrpc: '2.0',
+      id: 1,
+      method,
+      params
+    });
+
+    const auth = Buffer.from(`${username}:${password}`).toString('base64');
+    const options = {
+      hostname: '127.0.0.1',
+      port: RPC_PORT,
+      path: '/',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`,
+        'Content-Length': Buffer.byteLength(postData)
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => {
+        try {
+          const response = JSON.parse(data);
+          if (response.error) {
+            reject(new Error(response.error.message));
+          } else {
+            resolve(response.result);
+          }
+        } catch (err) {
+          reject(err);
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.write(postData);
+    req.end();
+  });
+}
+
+function stopBitcoind() {
+  if (bitcoindProcess) {
+    bitcoindProcess.kill();
+    console.log('Bitcoin Core stopped');
+  }
+}
+
+function createWindow(bitcoindConfig) {
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  win.loadFile(path.join(__dirname, 'src', 'index.html'));
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.send('bitcoind-ready', bitcoindConfig);
+  });
+}
+
+app.whenReady().then(async () => {
+  try {
+    const config = await startBitcoind();
+    createWindow(config);
+  } catch (err) {
+    console.error('Failed to start Bitcoin Core:', err);
+    app.quit();
+  }
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
+});
+
+app.on('before-quit', () => {
+  stopBitcoind();
+});

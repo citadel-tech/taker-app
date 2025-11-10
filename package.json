@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "concurrently \"npm run tailwind:watch\" \"npm run start\"",
+    "bitcoind": "node src/bitcoind",
     "tailwind:watch": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css --watch",
     "build:css": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css",
     "test": "echo \"Error: no test specified\" && exit 1"
