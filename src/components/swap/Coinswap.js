@@ -1,39 +1,64 @@
+import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
+
 export function CoinswapComponent(container, swapConfig) {
   const content = document.createElement('div');
   content.id = 'coinswap-content';
 
   // STATE
   let currentStep = 0;
-  let startTime = Date.now();
-  let logMessages = [];
+  let startTime = swapConfig.startTime || Date.now();
+  let logMessages = swapConfig.logMessages || [];
+  
+  // Restore progress from localStorage if available
+  const savedProgress = SwapStateManager.getSwapProgress();
+  if (savedProgress) {
+    currentStep = savedProgress.currentStep || 0;
+    startTime = savedProgress.startTime || startTime;
+    logMessages = savedProgress.logMessages || [];
+  }
+
   const swapData = {
     amount: swapConfig.amount,
     makers: swapConfig.makers,
     hops: swapConfig.hops,
-    transactions: [],
+    transactions: savedProgress?.transactions || [],
   };
 
-  for (let i = 0; i < swapData.hops; i++) {
-    swapData.transactions.push({
-      id: `tx${i}`,
-      txid: '',
-      status: 'pending',
-      confirmations: 0,
-      timestamp: null,
-      fee: Math.floor(Math.random() * 500) + 300,
-      maker:
-        i === 0
-          ? null
-          : swapConfig.selectedMakers
-            ? swapConfig.selectedMakers[i - 1].address
-            : `maker${i}`,
-      size: 250 + Math.floor(Math.random() * 100),
-    });
+  // Initialize transactions if not restored from saved state
+  if (!savedProgress?.transactions || savedProgress.transactions.length === 0) {
+    for (let i = 0; i < swapData.hops; i++) {
+      swapData.transactions.push({
+        id: `tx${i}`,
+        txid: '',
+        status: 'pending',
+        confirmations: 0,
+        timestamp: null,
+        fee: Math.floor(Math.random() * 500) + 300,
+        maker:
+          i === 0
+            ? null
+            : swapConfig.selectedMakers
+              ? swapConfig.selectedMakers[i - 1].address
+              : `maker${i}`,
+        size: 250 + Math.floor(Math.random() * 100),
+      });
+    }
   }
 
   const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
 
   // FUNCTIONS
+
+  function saveProgress() {
+    const progressData = {
+      currentStep,
+      startTime,
+      logMessages,
+      transactions: swapData.transactions,
+      lastUpdated: Date.now()
+    };
+    SwapStateManager.saveSwapProgress(progressData);
+  }
 
   function addLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
@@ -44,6 +69,9 @@ export function CoinswapComponent(container, swapConfig) {
     if (logContainer) {
       updateLogs();
     }
+    
+    // Save progress whenever log is updated
+    saveProgress();
   }
 
   function updateLogs() {
@@ -71,14 +99,26 @@ export function CoinswapComponent(container, swapConfig) {
   }
 
   function startSwap() {
-    currentStep = 1;
-    addLog('Starting coinswap protocol...', 'info');
-    addLog(
-      `Swapping ${(swapData.amount / 100000000).toFixed(8)} BTC through ${swapData.makers} makers`,
-      'info'
-    );
+    if (currentStep === 0) {
+      currentStep = 1;
+      addLog('Starting coinswap protocol...', 'info');
+      addLog(
+        `Swapping ${(swapData.amount / 100000000).toFixed(8)} BTC through ${swapData.makers} makers`,
+        'info'
+      );
+      
+      // Mark swap as in progress
+      SwapStateManager.saveSwapProgress({
+        currentStep: 1,
+        startTime,
+        logMessages,
+        transactions: swapData.transactions,
+        status: 'in_progress'
+      });
+    }
+    
     setInterval(updateElapsedTime, 1000);
-    processHop(0);
+    processHop(currentStep - 1);
   }
 
   function processHop(hopIndex) {
@@ -90,10 +130,19 @@ export function CoinswapComponent(container, swapConfig) {
     const tx = swapData.transactions[hopIndex];
     const hopNum = hopIndex + 1;
 
+    // Skip if this hop is already completed
+    if (tx.status === 'confirmed') {
+      currentStep++;
+      saveProgress();
+      setTimeout(() => processHop(hopIndex + 1), 100);
+      return;
+    }
+
     addLog(`Hop ${hopNum}/${swapData.hops}: Preparing transaction...`, 'info');
 
     tx.status = 'broadcasting';
     updateUI();
+    saveProgress();
 
     setTimeout(() => {
       tx.txid = generateFakeTxid();
@@ -110,6 +159,7 @@ export function CoinswapComponent(container, swapConfig) {
         );
       }
       updateUI();
+      saveProgress();
 
       let confirmCount = 0;
       const confirmInterval = setInterval(() => {
@@ -120,12 +170,14 @@ export function CoinswapComponent(container, swapConfig) {
           'info'
         );
         updateUI();
+        saveProgress();
 
         if (confirmCount >= 3) {
           clearInterval(confirmInterval);
           tx.status = 'confirmed';
           addLog(`Hop ${hopNum}: Transaction confirmed!`, 'success');
           updateUI();
+          saveProgress();
 
           setTimeout(() => {
             currentStep++;
@@ -143,6 +195,9 @@ export function CoinswapComponent(container, swapConfig) {
     content.querySelector('#swap-status-text').className =
       'text-2xl font-bold text-green-400';
     content.querySelector('#complete-button').classList.remove('hidden');
+    
+    // Mark swap as completed and clear saved state
+    SwapStateManager.completeSwap();
   }
 
   function generateFakeTxid() {
@@ -426,6 +481,7 @@ export function CoinswapComponent(container, swapConfig) {
             </button>
             <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap in Progress</h2>
             <p id="swap-status-text" class="text-gray-400 text-xl">Executing swap through ${swapData.makers} makers...</p>
+            ${savedProgress ? `<p class="text-blue-400 text-sm mt-2">⚡ Restored from saved progress (${formatElapsedTime(Date.now() - savedProgress.startTime)} ago)</p>` : ''}
         </div>
 
         <!-- Flow Diagram -->
@@ -476,7 +532,7 @@ export function CoinswapComponent(container, swapConfig) {
                 <div class="space-y-3 mb-4">
                     <div class="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <p class="text-sm text-blue-400">
-                            ⓘ Do not close this window
+                            ℹ Do not close this window
                         </p>
                     </div>
                     <div class="p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
@@ -484,6 +540,13 @@ export function CoinswapComponent(container, swapConfig) {
                             🔒 Funds protected by HTLCs
                         </p>
                     </div>
+                    ${savedProgress ? `
+                    <div class="p-3 bg-green-500/10 border border-green-500/30 rounded-lg">
+                        <p class="text-sm text-green-400">
+                            💾 Progress automatically saved
+                        </p>
+                    </div>
+                    ` : ''}
                 </div>
             </div>
         </div>
@@ -512,6 +575,8 @@ export function CoinswapComponent(container, swapConfig) {
   // EVENT LISTENERS
 
   content.querySelector('#back-to-swap').addEventListener('click', () => {
+    // Save current progress before navigating away
+    saveProgress();
     import('./Swap.js').then((module) => {
       container.innerHTML = '';
       module.SwapComponent(container);
@@ -524,5 +589,20 @@ export function CoinswapComponent(container, swapConfig) {
       .addEventListener('click', () => showTxDetails(i));
   }
 
-  setTimeout(() => startSwap(), 500);
+  // Initialize logs if restored
+  if (logMessages.length > 0) {
+    updateLogs();
+  }
+
+  // Auto-start or continue the swap process
+  if (savedProgress && savedProgress.currentStep > 0) {
+    setInterval(updateElapsedTime, 1000);
+    updateUI();
+    // Continue from where we left off
+    if (currentStep <= swapData.hops) {
+      setTimeout(() => processHop(currentStep - 1), 1000);
+    }
+  } else {
+    setTimeout(() => startSwap(), 500);
+  }
 }

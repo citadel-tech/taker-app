@@ -207,6 +207,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
     
     const remaining = Math.max(0, availableForSpending - total); // Ensure remaining is never negative
 
+    // Calculate technical details
+    const numInputs = selectionMode === 'manual' ? Math.max(1, selectedUtxos.length) : 1;
+    const actualTxSize = Math.ceil(10.5 + 68 * numInputs + 31 * 2); // P2WPKH estimation
+    const changeAmount = remaining;
+    const confTime = selectedFeeRate >= 15 ? '~10 min' : selectedFeeRate >= 7 ? '~20 min' : '~60+ min';
+    const priority = selectedFeeRate >= 15 ? 'High' : selectedFeeRate >= 7 ? 'Medium' : 'Low';
+
     // Update amount conversions
     const amountBtc = amountSats / 100000000;
     const amountUsd = (amountSats / 100000000) * btcPrice;
@@ -227,6 +234,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
     content.querySelector('#summary-fee').textContent = '~' + fee.toLocaleString() + ' sats';
     content.querySelector('#summary-total').textContent = Math.floor(total).toLocaleString() + ' sats';
     content.querySelector('#summary-total-usd').textContent = '≈ $' + ((total * btcPrice) / 100000000).toFixed(2);
+
+    // Update technical details
+    content.querySelector('#tx-size').textContent = actualTxSize + ' vB';
+    content.querySelector('#tx-inputs').textContent = numInputs;
+    content.querySelector('#change-amount').textContent = changeAmount.toLocaleString() + ' sats';
+    content.querySelector('#conf-time').textContent = confTime;
+    content.querySelector('#priority-level').textContent = priority;
 
     content.querySelector('#summary-remaining').textContent = Math.floor(remaining).toLocaleString() + ' sats';
     const remainingBtc = remaining / 100000000;
@@ -391,7 +405,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                         <!-- Warning Message -->
                         <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <p class="text-xs text-yellow-400">
-                                âš  Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per send.
+                                ⚠ Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per send.
                             </p>
                         </div>
                         
@@ -462,10 +476,40 @@ export function SendComponent(container, preSelectedUtxos = null) {
                                 <span id="summary-fee" class="text-sm font-mono text-yellow-400">~980 sats</span>
                             </div>
                             <div class="flex justify-between pt-2 border-t border-gray-700">
-                                <span class="text-sm font-semibold text-gray-300">Total</span>
+                                <span class="text-sm font-semibold text-gray-300">Total Sent</span>
                                 <span id="summary-total" class="text-sm font-mono font-semibold text-[#FF6B35]">980 sats</span>
                             </div>
                             <p id="summary-total-usd" class="text-xs text-gray-500 text-right mt-1">≈ $0.29</p>
+                        </div>
+
+                        <!-- Essential Technical Details -->
+                        <div class="border-t border-gray-700 pt-4">
+                            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">TX Size:</span>
+                                    <span id="tx-size" class="text-white font-mono">140 vB</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Inputs:</span>
+                                    <span id="tx-inputs" class="text-cyan-400 font-mono">1</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Change:</span>
+                                    <span id="change-amount" class="text-purple-400 font-mono">0 sats</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Est. Time:</span>
+                                    <span id="conf-time" class="text-green-400">~20 min</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">Priority:</span>
+                                    <span id="priority-level" class="text-yellow-400">Medium</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-400">RBF:</span>
+                                    <span class="text-blue-400">✓ Enabled</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="border-t border-gray-700 pt-4">
@@ -477,7 +521,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
                     <div class="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <p class="text-xs text-blue-400">
-                            â“˜ Transactions are irreversible. Double-check the address before sending.
+                            ⓘ Transactions are irreversible. Double-check the address before sending.
                         </p>
                     </div>
                 </div>

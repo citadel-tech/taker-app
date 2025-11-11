@@ -11,7 +11,8 @@ export function Market(container) {
             timeFee: 0.50,
             minSize: 10000,
             maxSize: 49890356,
-            bond: 50000
+            bond: 50000,
+            bondTxid: 'a1b2c3d4e5f6789012345678901234567890abcdef123456789012345678901234'
         },
         {
             address: 'h2cxriyylj7uefzd65rfejyfrbd2hyt37h',
@@ -20,11 +21,31 @@ export function Market(container) {
             timeFee: 0.50,
             minSize: 10000,
             maxSize: 49908736,
-            bond: 50000
+            bond: 50000,
+            bondTxid: 'fedcba0987654321098765432109876543210fedcba0987654321098765432101'
         }
     ];
 
     let selectedMakers = [];
+
+    // Global function for viewing fidelity bonds
+    window.viewFidelityBond = (makerAddress) => {
+        const maker = makers.find(m => m.address === makerAddress);
+        if (maker && maker.bondTxid) {
+            const url = `https://mempool.space/tx/${maker.bondTxid}`;
+            // Try to use electron's shell module if available, otherwise use window.open
+            if (typeof require !== 'undefined') {
+                try {
+                    const { shell } = require('electron');
+                    shell.openExternal(url);
+                } catch (error) {
+                    window.open(url, '_blank');
+                }
+            } else {
+                window.open(url, '_blank');
+            }
+        }
+    };
 
     // SELECTION FUNCTIONS
     function toggleMakerSelection(index) {
@@ -160,7 +181,7 @@ export function Market(container) {
                 </div>
                 <div>
                     <div class="font-semibold">Bond</div>
-                    <div class="text-sm opacity-80">Fidelity Bond</div>
+                    <div class="text-sm opacity-80">Click to View</div>
                 </div>
             </div>
 
@@ -177,14 +198,16 @@ export function Market(container) {
                         <div class="text-cyan-400">${maker.timeFee}%</div>
                         <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
                         <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
-                        <div class="text-purple-400">${maker.bond.toLocaleString()}</div>
+                        <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
+                            ${maker.bond.toLocaleString()}
+                        </div>
                     </div>
                 `).join('')}
             </div>
 
             <!-- Footer -->
             <div class="p-4 text-center text-gray-400 text-sm border-t border-gray-700">
-                Showing 2 active offers â€¢ 2:18:11 PM
+                Showing 2 active offers • 2:18:11 PM
             </div>
         </div>
     `;

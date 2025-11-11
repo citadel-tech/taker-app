@@ -1,6 +1,22 @@
+import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
+
+
 export function SwapComponent(container, preSelectedUtxos = null, preSelectedMakers = null) {
   const content = document.createElement('div');
   content.id = 'swap-content';
+
+  // Check for active swap on component load
+  const activeSwap = SwapStateManager.getActiveSwap();
+  const hasActiveSwap = SwapStateManager.hasActiveSwap();
+
+  // If there's an active swap in progress, redirect to coinswap progress
+  if (activeSwap && activeSwap.status === 'in_progress') {
+    import('./Coinswap.js').then((module) => {
+      container.innerHTML = '';
+      module.CoinswapComponent(container, activeSwap);
+    });
+    return;
+  }
 
   // STATE
   let swapAmount = 0;
@@ -10,6 +26,17 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
   let selectedUtxos = preSelectedUtxos || [];
   let selectedMakers = preSelectedMakers ? preSelectedMakers.map((_, index) => index) : [];
   let networkFeeRate = 5; // sats/vB
+
+  // Restore user selections from saved state if available
+  if (activeSwap && activeSwap.userSelections) {
+    const saved = activeSwap.userSelections;
+    swapAmount = saved.swapAmount || 0;
+    amountUnit = saved.amountUnit || 'sats';
+    numberOfHops = saved.numberOfHops || 3;
+    selectionMode = saved.selectionMode || 'auto';
+    selectedUtxos = saved.selectedUtxos || [];
+    selectedMakers = saved.selectedMakers || [];
+  }
 
   const availableUtxos = [
     { txid: 'a1b2c3d4e5f6', vout: 0, amount: 5000000, type: 'Regular' },
@@ -118,7 +145,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
       makerFeeSats: Math.floor(makerFee),
       networkFeeSats: Math.floor(networkFee),
       totalFeeSats: Math.floor(totalFee),
-      totalSats: swapAmount + Math.floor(totalFee),
+      totalSats: swapAmount - Math.floor(totalFee), // Changed from + to -
     };
   }
 
@@ -293,11 +320,76 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
     updateSummary();
   }
 
+  // Save current user selections to localStorage
+  function saveCurrentSelections() {
+    const selections = {
+      swapAmount,
+      amountUnit,
+      numberOfHops,
+      selectionMode,
+      selectedUtxos,
+      selectedMakers,
+      networkFeeRate
+    };
+    SwapStateManager.saveUserSelections(selections);
+  }
+
+  // Function to start coinswap with state persistence
+  function startCoinswap() {
+    const swapConfig = {
+      amount: swapAmount,
+      makers: getNumberOfMakers(),
+      hops: getNumberOfHops(),
+      selectedMakers: selectionMode === 'manual' ? selectedMakers.map((i) => availableMakers[i]) : null,
+      selectedUtxos: selectionMode === 'manual' ? selectedUtxos : null,
+      amountUnit,
+      selectionMode,
+      userSelections: {
+        swapAmount,
+        amountUnit,
+        numberOfHops,
+        selectionMode,
+        selectedUtxos,
+        selectedMakers,
+        networkFeeRate
+      }
+    };
+
+    // Save the swap configuration to localStorage
+    SwapStateManager.saveSwapConfig(swapConfig);
+
+    // Navigate to coinswap progress
+    import('./Coinswap.js').then((module) => {
+      container.innerHTML = '';
+      module.CoinswapComponent(container, swapConfig);
+    });
+  }
+
   // UI
 
   content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap</h2>
         <p class="text-gray-400 mb-8">Perform private Bitcoin swaps through multiple makers</p>
+
+        ${hasActiveSwap && activeSwap.status === 'configured' ? `
+        <!-- Resume Swap Banner -->
+        <div class="mb-6 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+            <div class="flex justify-between items-center">
+                <div>
+                    <p class="text-blue-400 font-semibold mb-1">Previous Swap Configuration Found</p>
+                    <p class="text-gray-400 text-sm">You have a saved swap configuration from ${formatElapsedTime(Date.now() - activeSwap.createdAt)} ago</p>
+                </div>
+                <div class="flex gap-2">
+                    <button id="resume-swap" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-semibold transition-colors">
+                        Resume Swap
+                    </button>
+                    <button id="clear-swap" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded font-semibold transition-colors">
+                        Start Fresh
+                    </button>
+                </div>
+            </div>
+        </div>
+        ` : ''}
 
         <div class="grid grid-cols-3 gap-6">
             <div class="col-span-2 space-y-6">
@@ -326,6 +418,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                 id="swap-amount-input"
                                 type="text" 
                                 placeholder="0" 
+                                value="${swapAmount || ''}"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 pr-20 text-white font-mono text-lg focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <button id="max-swap-btn" class="absolute right-2 top-1/2 -translate-y-1/2 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-1 rounded text-sm font-semibold transition-colors">
@@ -337,12 +430,12 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
 
                     <!-- Selection Mode -->
                     <div class="mb-6">
-                        <label class="block text-sm text-gray-400 mb-2">Selection Mode</label>
+                        <label class="block text-sm text-gray-400 mb-2">UTXO And Maker Selection</label>
                         <div class="flex gap-2">
-                            <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold">
+                            <button id="mode-auto" class="mode-btn flex-1 bg-[#${selectionMode === 'auto' ? 'FF6B35] border-2 border-[#FF6B35' : '0f1419] hover:bg-[#242d3d] border border-gray-700'}] rounded-lg py-3 text-white font-semibold${selectionMode === 'auto' ? '' : ' transition-colors'}">
                                 Auto Select
                             </button>
-                            <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
+                            <button id="mode-manual" class="mode-btn flex-1 bg-[#${selectionMode === 'manual' ? 'FF6B35] border-2 border-[#FF6B35' : '0f1419] hover:bg-[#242d3d] border border-gray-700'}] rounded-lg py-3 text-white font-semibold${selectionMode === 'manual' ? '' : ' transition-colors'}">
                                 Manual Select
                             </button>
                         </div>
@@ -385,7 +478,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                         <!-- Warning Message -->
                         <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <p class="text-xs text-yellow-400">
-                                ⚠ Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
+                                âš  Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
                             </p>
                         </div>
                         
@@ -399,6 +492,9 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                   (utxo.amount / 100000000) *
                                   btcPrice
                                 ).toFixed(2);
+                                // Add timestamps for each UTXO
+                                const timestamps = ['2 hours ago', '1 day ago', '3 days ago', '1 week ago'];
+                                const timestamp = timestamps[index] || '1 month ago';
                                 return `
                                 <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
                                     <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-[#FF6B35]" />
@@ -411,7 +507,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                             </div>
                                         </div>
                                         <div class="flex justify-between items-center mt-1">
-                                            <span class="text-xs text-gray-500">${utxo.amount.toLocaleString()} sats</span>
+                                            <span class="text-xs text-gray-500">${timestamp}</span>
                                             <span class="text-xs ${utxo.type === 'Swap' ? 'text-blue-400' : 'text-green-400'}">${utxo.type}</span>
                                         </div>
                                     </div>
@@ -426,7 +522,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                     <div class="bg-[#1a2332] rounded-lg p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xl font-semibold text-gray-300">Select Makers</h3>
-                            <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> makers → <span id="calculated-hops">1</span> hops</span>
+                            <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> makers â†’ <span id="calculated-hops">1</span> hops</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
@@ -435,7 +531,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                         <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Select</th>
                                         <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Address</th>
                                         <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Fee</th>
-                                        <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Min/Max</th>
+                                        <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Fidelity Amount</th>
                                         <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Bond</th>
                                     </tr>
                                 </thead>
@@ -447,9 +543,17 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                             <td class="py-3 px-2">
                                                 <input type="checkbox" id="maker-checkbox-${index}" class="w-4 h-4 accent-[#FF6B35]" />
                                             </td>
-                                            <td class="py-3 px-2 font-mono text-xs text-gray-300">${maker.address}...</td>
+                                            <td class="py-3 px-2">
+                                                <span class="font-mono text-xs text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${maker.address}')">
+                                                    ${maker.address.substring(0, 20)}...
+                                                </span>
+                                            </td>
                                             <td class="py-3 px-2 text-xs text-blue-400">${maker.volumeFee}%</td>
-                                            <td class="py-3 px-2 text-xs text-yellow-400">${maker.minSize.toLocaleString()} / ${(maker.maxSize / 1000000).toFixed(1)}M</td>
+                                            <td class="py-3 px-2">
+                                                <span class="text-xs text-yellow-400 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${maker.address}')">
+                                                    ${maker.minSize.toLocaleString()} / ${(maker.maxSize / 1000000).toFixed(1)}M
+                                                </span>
+                                            </td>
                                             <td class="py-3 px-2 text-xs text-purple-400">${maker.bond.toLocaleString()}</td>
                                         </tr>
                                     `
@@ -529,9 +633,9 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                     <strong>Privacy Benefits:</strong>
                                 </p>
                                 <ul class="text-xs text-purple-400 space-y-1">
-                                    <li>• Breaks transaction links</li>
-                                    <li>• Multiple mixing hops</li>
-                                    <li>• Enhanced anonymity</li>
+                                    <li>â€¢ Breaks transaction links</li>
+                                    <li>â€¢ Multiple mixing hops</li>
+                                    <li>â€¢ Enhanced anonymity</li>
                                 </ul>
                             </div>
                         </div>

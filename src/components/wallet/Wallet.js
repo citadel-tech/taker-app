@@ -40,8 +40,7 @@ export function WalletComponent(container) {
         <table class="w-full">
             <thead>
                 <tr class="border-b border-gray-700">
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Vout</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid:Vout</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold">Type</th>
@@ -49,22 +48,19 @@ export function WalletComponent(container) {
             </thead>
             <tbody>
                 <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                    <td class="py-3 px-4 font-mono text-sm text-gray-300">a1b2c3d4...e5f6</td>
-                    <td class="py-3 px-4 text-gray-300">0</td>
+                    <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('a1b2c3d4e5f6789012345678901234567890abcdef123456789012345678901234')">a1b2c3d4...e5f6:0</td>
                     <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
                     <td class="py-3 px-4 text-gray-300">142</td>
                     <td class="py-3 px-4 text-green-400">Regular</td>
                 </tr>
                 <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                    <td class="py-3 px-4 font-mono text-sm text-gray-300">7g8h9i0j...k1l2</td>
-                    <td class="py-3 px-4 text-gray-300">1</td>
+                    <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i6j7k8l')">7g8h9i0j...k1l2:1</td>
                     <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
                     <td class="py-3 px-4 text-gray-300">89</td>
                     <td class="py-3 px-4 text-green-400">Regular</td>
                 </tr>
                 <tr class="hover:bg-[#242d3d]">
-                    <td class="py-3 px-4 font-mono text-sm text-gray-300">m3n4o5p6...q7r8</td>
-                    <td class="py-3 px-4 text-gray-300">0</td>
+                    <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4')">m3n4o5p6...q7r8:0</td>
                     <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
                     <td class="py-3 px-4 text-gray-300">23</td>
                     <td class="py-3 px-4 text-blue-400">Swap</td>
@@ -111,10 +107,28 @@ export function WalletComponent(container) {
                     </div>
                 </div>
             </div>
+            <button id="view-all-transactions" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
+                View All Transactions →
+            </button>
         </div>
     `;
 
   container.appendChild(content);
+
+  // Global function for opening transactions on mempool.space
+  window.openTxOnMempool = (txid) => {
+    const url = `https://mempool.space/tx/${txid}`;
+    if (typeof require !== 'undefined') {
+      try {
+        const { shell } = require('electron');
+        shell.openExternal(url);
+      } catch (error) {
+        window.open(url, '_blank');
+      }
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   // Add view all UTXOs handler
   const viewAllButton = content.querySelector('#view-all-utxos');
@@ -123,6 +137,17 @@ export function WalletComponent(container) {
       import('./UtxoList.js').then((module) => {
         container.innerHTML = '';
         module.UtxoListComponent(container);
+      });
+    });
+  }
+
+  // Add view all transactions handler
+  const viewAllTransactionsButton = content.querySelector('#view-all-transactions');
+  if (viewAllTransactionsButton) {
+    viewAllTransactionsButton.addEventListener('click', () => {
+      import('./TransactionsList.js').then((module) => {
+        container.innerHTML = '';
+        module.TransactionsListComponent(container);
       });
     });
   }

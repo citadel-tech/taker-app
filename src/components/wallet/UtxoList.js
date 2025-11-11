@@ -7,12 +7,12 @@ export function UtxoListComponent(container) {
 
   // UTXO data matching the table rows
   const utxos = [
-    { txid: 'a1b2c3d4e5f6', vout: 0, amount: 5000000, type: 'Regular' },
-    { txid: '7g8h9i0j1k2l', vout: 1, amount: 10000000, type: 'Regular' },
-    { txid: 'm3n4o5p6q7r8', vout: 0, amount: 5000000, type: 'Swap' },
-    { txid: 'u1v2w3x4y5z6', vout: 2, amount: 3000000, type: 'Regular' },
-    { txid: 'c9d0e1f2g3h4', vout: 1, amount: 2000000, type: 'Regular' },
-    { txid: 'k7l8m9n0o1p2', vout: 0, amount: 1500000, type: 'Regular' },
+    { txid: 'a1b2c3d4e5f6789012345678901234567890abcdef123456789012345678901234', vout: 0, amount: 5000000, type: 'Regular' },
+    { txid: '7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i6j7k8l', vout: 1, amount: 10000000, type: 'Regular' },
+    { txid: 'm3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4', vout: 0, amount: 5000000, type: 'Swap' },
+    { txid: 'u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2', vout: 2, amount: 3000000, type: 'Regular' },
+    { txid: 'c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9h0', vout: 1, amount: 2000000, type: 'Regular' },
+    { txid: 'k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9h0i1j2k3l4m5n6o7p8', vout: 0, amount: 1500000, type: 'Regular' },
   ];
 
   function toggleUtxoSelection(index) {
@@ -80,7 +80,7 @@ export function UtxoListComponent(container) {
   content.innerHTML = `
         <div class="mb-6">
             <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4">
-                â† Back to Wallet
+                ← Back to Wallet
             </button>
             <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All UTXOs</h2>
             <p class="text-gray-400">Complete list of unspent transaction outputs</p>
@@ -131,8 +131,7 @@ export function UtxoListComponent(container) {
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">
                                 <input type="checkbox" id="select-all-utxos" class="w-4 h-4 accent-[#FF6B35]" />
                             </th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Vout</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid:Vout</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Address</th>
@@ -144,8 +143,7 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4">
                                 <input type="checkbox" id="utxo-checkbox-0" class="w-4 h-4 accent-[#FF6B35]" />
                             </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">a1b2c3d4e5f6...7890</td>
-                            <td class="py-3 px-4 text-gray-300">0</td>
+                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[0].txid}')">a1b2c3d4e5f6...7890:0</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
                             <td class="py-3 px-4 text-gray-300">142</td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qxy2...wlh</td>
@@ -155,8 +153,7 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4">
                                 <input type="checkbox" id="utxo-checkbox-1" class="w-4 h-4 accent-[#FF6B35]" />
                             </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">7g8h9i0j1k2l...3m4n</td>
-                            <td class="py-3 px-4 text-gray-300">1</td>
+                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[1].txid}')">7g8h9i0j1k2l...3m4n:1</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
                             <td class="py-3 px-4 text-gray-300">89</td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qar0...8zt</td>
@@ -166,8 +163,7 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4">
                                 <input type="checkbox" id="utxo-checkbox-2" class="w-4 h-4 accent-[#FF6B35]" />
                             </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">m3n4o5p6q7r8...s9t0</td>
-                            <td class="py-3 px-4 text-gray-300">0</td>
+                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[2].txid}')">m3n4o5p6q7r8...s9t0:0</td>
                             <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
                             <td class="py-3 px-4 text-gray-300">23</td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qw50...3yn</td>
@@ -177,8 +173,7 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4">
                                 <input type="checkbox" id="utxo-checkbox-3" class="w-4 h-4 accent-[#FF6B35]" />
                             </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">u1v2w3x4y5z6...a7b8</td>
-                            <td class="py-3 px-4 text-gray-300">2</td>
+                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[3].txid}')">u1v2w3x4y5z6...a7b8:2</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.03000000</td>
                             <td class="py-3 px-4 text-gray-300">67</td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qm3n...5op</td>
@@ -188,8 +183,7 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4">
                                 <input type="checkbox" id="utxo-checkbox-4" class="w-4 h-4 accent-[#FF6B35]" />
                             </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">c9d0e1f2g3h4...i5j6</td>
-                            <td class="py-3 px-4 text-gray-300">1</td>
+                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[4].txid}')">c9d0e1f2g3h4...i5j6:1</td>
                             <td class="py-3 px-4 text-green-400 font-mono">0.02000000</td>
                             <td class="py-3 px-4 text-gray-300">156</td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qrs7...9tu</td>
@@ -199,8 +193,7 @@ export function UtxoListComponent(container) {
                             <td class="py-3 px-4">
                                 <input type="checkbox" id="utxo-checkbox-5" class="w-4 h-4 accent-[#FF6B35]" />
                             </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">k7l8m9n0o1p2...q3r4</td>
-                            <td class="py-3 px-4 text-gray-300">0</td>
+                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[5].txid}')">k7l8m9n0o1p2...q3r4:0</td>
                             <td class="py-3 px-4 text-yellow-400 font-mono">0.01500000</td>
                             <td class="py-3 px-4 text-yellow-400">2</td>
                             <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qvwx...1yz</td>
@@ -213,6 +206,21 @@ export function UtxoListComponent(container) {
     `;
 
   container.appendChild(content);
+
+  // Global function for opening transactions on mempool.space
+  window.openTxOnMempool = (txid) => {
+    const url = `https://mempool.space/tx/${txid}`;
+    if (typeof require !== 'undefined') {
+      try {
+        const { shell } = require('electron');
+        shell.openExternal(url);
+      } catch (error) {
+        window.open(url, '_blank');
+      }
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   // Add individual UTXO selection handlers
   utxos.forEach((_, index) => {
