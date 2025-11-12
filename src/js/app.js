@@ -6,7 +6,11 @@ import { ReceiveComponent } from '../components/receive/Receive.js';
 import { SwapComponent } from '../components/swap/Swap.js';
 import { RecoveryComponent } from '../components/recovery/Recovery.js';
 import { LogComponent } from '../components/log/Log.js';
+import { SettingsComponent } from '../components/settings/Settings.js';
+import { FirstTimeSetupModal, isSetupComplete, getSavedConfig } from '../components/settings/FirstTimeSetup.js';
 import { SwapStateManager } from '../components/swap/SwapStateManager.js';
+import { ConnectionStatusComponent } from '../components/connection/ConnectionStatus.js';
+import { bitcoindConnection } from '../components/connection/BitcoindConnection.js';
 
 
 // Component map
@@ -18,6 +22,7 @@ const components = {
     'swap': SwapComponent,
     'recovery': RecoveryComponent,
     'log': LogComponent,
+    'settings': SettingsComponent,
 };
 
 // Background swap manager - runs independently of UI components
@@ -108,20 +113,74 @@ function setupNavigation() {
     });
 }
 
-// Initialize app
-document.addEventListener('DOMContentLoaded', () => {
-    console.log('App initializing...');
+// Show first-time setup modal if needed
+function checkFirstTimeSetup() {
+    const config = getSavedConfig();
+    
+    // Show setup if:
+    // 1. No config exists at all, OR
+    // 2. RPC username or password is empty/missing
+    const needsSetup = !config || 
+                      !config.setupComplete || 
+                      !config.rpc ||
+                      !config.rpc.username || 
+                      !config.rpc.password ||
+                      config.rpc.username.trim() === '' ||
+                      config.rpc.password.trim() === '';
+    
+    if (needsSetup) {
+        console.log('ðŸ”§ Setup required (missing RPC credentials), showing setup modal...');
+        const appContainer = document.querySelector('body');
+        
+        FirstTimeSetupModal(appContainer, (config) => {
+            console.log('âœ… Setup completed:', config);
+            
+            // Show success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+            successDiv.innerHTML = `
+                <div class="flex items-center">
+                    <span class="mr-2">âœ“</span>
+                    <span>Setup completed successfully!</span>
+                </div>
+            `;
+            document.body.appendChild(successDiv);
+            
+            setTimeout(() => {
+                successDiv.style.opacity = '0';
+                setTimeout(() => successDiv.remove(), 300);
+            }, 3000);
 
-    const navContainer = document.querySelector('#nav-container');
-    if (navContainer) {
-        NavComponent(navContainer);
-        console.log('Nav rendered');
+            // After setup, immediately try to connect to bitcoind
+            initiateAppStart();
+        });
+        return true; // Setup modal shown
     } else {
-        console.error('Nav container not found!');
+        console.log('âœ… Setup already complete with valid credentials:', config);
+        return false; // Setup not needed
+    }
+}
+
+// Check bitcoind connection and show connection status
+async function checkBitcoindConnection() {
+    console.log('🔌 Checking Bitcoin Core connection...');
+    
+    // Update the connection manager with latest config
+    const config = getSavedConfig();
+    if (config) {
+        bitcoindConnection.updateConfig(config);
     }
 
-    setupNavigation();
+    // Show connection status component
+    const appContainer = document.querySelector('body');
+    ConnectionStatusComponent(appContainer, (connectionInfo) => {
+        console.log('✅ Bitcoin Core connected, starting app...', connectionInfo);
+        startMainApp();
+    });
+}
 
+// Start the main app after bitcoind connection is established
+function startMainApp() {
     // Check for active swap on app start
     const activeSwap = SwapStateManager.getActiveSwap();
     if (activeSwap && activeSwap.status === 'in_progress') {
@@ -159,6 +218,37 @@ document.addEventListener('DOMContentLoaded', () => {
     // Start background manager if there's any active swap
     if (SwapStateManager.hasActiveSwap()) {
         startBackgroundSwapManager();
+    }
+}
+
+// Initiate the app start process (after setup completion)
+function initiateAppStart() {
+    // Small delay to let setup success message show
+    setTimeout(() => {
+        checkBitcoindConnection();
+    }, 1500);
+}
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('App initializing...');
+
+    const navContainer = document.querySelector('#nav-container');
+    if (navContainer) {
+        NavComponent(navContainer);
+        console.log('Nav rendered');
+    } else {
+        console.error('Nav container not found!');
+    }
+
+    setupNavigation();
+
+    // Check for first-time setup first
+    const setupShown = checkFirstTimeSetup();
+    
+    if (!setupShown) {
+        // If setup wasn't shown, proceed to check bitcoind connection
+        checkBitcoindConnection();
     }
 });
 
