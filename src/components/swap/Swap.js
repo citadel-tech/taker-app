@@ -1,16 +1,20 @@
-import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
+import { SwapStateManager } from './SwapStateManager.js';
 
-
-export function SwapComponent(container, preSelectedUtxos = null, preSelectedMakers = null) {
+export function SwapComponent(container) {
+  console.log('🔧 SwapComponent loading...');
+  
   const content = document.createElement('div');
   content.id = 'swap-content';
 
   // Check for active swap on component load
   const activeSwap = SwapStateManager.getActiveSwap();
   const hasActiveSwap = SwapStateManager.hasActiveSwap();
+  
+  console.log('📊 Active swap check:', { activeSwap, hasActiveSwap });
 
   // If there's an active swap in progress, redirect to coinswap progress
   if (activeSwap && activeSwap.status === 'in_progress') {
+    console.log('🔄 Found active swap in progress, redirecting to Coinswap component');
     import('./Coinswap.js').then((module) => {
       container.innerHTML = '';
       module.CoinswapComponent(container, activeSwap);
@@ -22,20 +26,26 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
   let swapAmount = 0;
   let amountUnit = 'sats';
   let numberOfHops = 3;
-  let selectionMode = (preSelectedUtxos && preSelectedUtxos.length > 0) || (preSelectedMakers && preSelectedMakers.length > 0) ? 'manual' : 'auto';
-  let selectedUtxos = preSelectedUtxos || [];
-  let selectedMakers = preSelectedMakers ? preSelectedMakers.map((_, index) => index) : [];
+  let selectionMode = 'auto';
+  let selectedUtxos = [];
+  let selectedMakers = [];
   let networkFeeRate = 5; // sats/vB
 
   // Restore user selections from saved state if available
-  if (activeSwap && activeSwap.userSelections) {
-    const saved = activeSwap.userSelections;
-    swapAmount = saved.swapAmount || 0;
-    amountUnit = saved.amountUnit || 'sats';
-    numberOfHops = saved.numberOfHops || 3;
-    selectionMode = saved.selectionMode || 'auto';
-    selectedUtxos = saved.selectedUtxos || [];
-    selectedMakers = saved.selectedMakers || [];
+  const savedSelections = SwapStateManager.getUserSelections();
+  console.log('🔍 Attempting to restore selections:', savedSelections);
+  
+  if (savedSelections) {
+    console.log('🔄 Restoring saved user selections:', savedSelections);
+    swapAmount = savedSelections.swapAmount || 0;
+    amountUnit = savedSelections.amountUnit || 'sats';
+    numberOfHops = savedSelections.numberOfHops || 3;
+    selectionMode = savedSelections.selectionMode || 'auto';
+    selectedUtxos = savedSelections.selectedUtxos || [];
+    selectedMakers = savedSelections.selectedMakers || [];
+    networkFeeRate = savedSelections.networkFeeRate || 5;
+  } else {
+    console.log('⚠️ No saved selections found, using defaults');
   }
 
   const availableUtxos = [
@@ -45,24 +55,34 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
     { txid: 'u1v2w3x4y5z6', vout: 2, amount: 3000000, type: 'Regular' },
   ];
 
-  const availableMakers = preSelectedMakers || [
+  const availableMakers = [
     {
-      address: 'ewaexd2es2uzr34wp26cj5zgph7bug7zh',
-      baseFee: 100,
-      volumeFee: 10.0,
-      timeFee: 0.50,
+      address: 'ewaexd2es2uzr34wp26c',
+      fee: 10.0,
       minSize: 10000,
       maxSize: 49890356,
       bond: 50000,
     },
     {
-      address: 'h2cxriyylj7uefzd65rfejyfrbd2hyt37h',
-      baseFee: 100,
-      volumeFee: 10.0,
-      timeFee: 0.50,
+      address: 'h2cxriyylj7uefzd65rf',
+      fee: 10.0,
       minSize: 10000,
       maxSize: 49908736,
       bond: 50000,
+    },
+    {
+      address: 'abc123xyz789d6gh8ijk',
+      fee: 12.5,
+      minSize: 5000,
+      maxSize: 30000000,
+      bond: 35000,
+    },
+    {
+      address: 'def456uvw012e3fg9klm',
+      fee: 9.0,
+      minSize: 15000,
+      maxSize: 60000000,
+      bond: 75000,
     },
   ];
 
@@ -145,7 +165,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
       makerFeeSats: Math.floor(makerFee),
       networkFeeSats: Math.floor(networkFee),
       totalFeeSats: Math.floor(totalFee),
-      totalSats: swapAmount - Math.floor(totalFee), // Changed from + to -
+      totalSats: swapAmount - Math.floor(totalFee),
     };
   }
 
@@ -320,6 +340,20 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
     updateSummary();
   }
 
+  // Function to open transaction/address on mempool.space
+  function openTxOnMempool(address) {
+    const url = `https://mempool.space/address/${address}`;
+    if (typeof require !== 'undefined') {
+      const { shell } = require('electron');
+      shell.openExternal(url);
+    } else {
+      window.open(url, '_blank');
+    }
+  }
+
+  // Make it globally available for onclick handlers
+  window.openTxOnMempool = openTxOnMempool;
+
   // Save current user selections to localStorage
   function saveCurrentSelections() {
     const selections = {
@@ -331,38 +365,8 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
       selectedMakers,
       networkFeeRate
     };
+    console.log('💾 Saving current selections:', selections);
     SwapStateManager.saveUserSelections(selections);
-  }
-
-  // Function to start coinswap with state persistence
-  function startCoinswap() {
-    const swapConfig = {
-      amount: swapAmount,
-      makers: getNumberOfMakers(),
-      hops: getNumberOfHops(),
-      selectedMakers: selectionMode === 'manual' ? selectedMakers.map((i) => availableMakers[i]) : null,
-      selectedUtxos: selectionMode === 'manual' ? selectedUtxos : null,
-      amountUnit,
-      selectionMode,
-      userSelections: {
-        swapAmount,
-        amountUnit,
-        numberOfHops,
-        selectionMode,
-        selectedUtxos,
-        selectedMakers,
-        networkFeeRate
-      }
-    };
-
-    // Save the swap configuration to localStorage
-    SwapStateManager.saveSwapConfig(swapConfig);
-
-    // Navigate to coinswap progress
-    import('./Coinswap.js').then((module) => {
-      container.innerHTML = '';
-      module.CoinswapComponent(container, swapConfig);
-    });
   }
 
   // UI
@@ -370,26 +374,6 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
   content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap</h2>
         <p class="text-gray-400 mb-8">Perform private Bitcoin swaps through multiple makers</p>
-
-        ${hasActiveSwap && activeSwap.status === 'configured' ? `
-        <!-- Resume Swap Banner -->
-        <div class="mb-6 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <div class="flex justify-between items-center">
-                <div>
-                    <p class="text-blue-400 font-semibold mb-1">Previous Swap Configuration Found</p>
-                    <p class="text-gray-400 text-sm">You have a saved swap configuration from ${formatElapsedTime(Date.now() - activeSwap.createdAt)} ago</p>
-                </div>
-                <div class="flex gap-2">
-                    <button id="resume-swap" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded font-semibold transition-colors">
-                        Resume Swap
-                    </button>
-                    <button id="clear-swap" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded font-semibold transition-colors">
-                        Start Fresh
-                    </button>
-                </div>
-            </div>
-        </div>
-        ` : ''}
 
         <div class="grid grid-cols-3 gap-6">
             <div class="col-span-2 space-y-6">
@@ -418,7 +402,6 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                 id="swap-amount-input"
                                 type="text" 
                                 placeholder="0" 
-                                value="${swapAmount || ''}"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 pr-20 text-white font-mono text-lg focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <button id="max-swap-btn" class="absolute right-2 top-1/2 -translate-y-1/2 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-1 rounded text-sm font-semibold transition-colors">
@@ -432,10 +415,10 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                     <div class="mb-6">
                         <label class="block text-sm text-gray-400 mb-2">UTXO And Maker Selection</label>
                         <div class="flex gap-2">
-                            <button id="mode-auto" class="mode-btn flex-1 bg-[#${selectionMode === 'auto' ? 'FF6B35] border-2 border-[#FF6B35' : '0f1419] hover:bg-[#242d3d] border border-gray-700'}] rounded-lg py-3 text-white font-semibold${selectionMode === 'auto' ? '' : ' transition-colors'}">
+                            <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold">
                                 Auto Select
                             </button>
-                            <button id="mode-manual" class="mode-btn flex-1 bg-[#${selectionMode === 'manual' ? 'FF6B35] border-2 border-[#FF6B35' : '0f1419] hover:bg-[#242d3d] border border-gray-700'}] rounded-lg py-3 text-white font-semibold${selectionMode === 'manual' ? '' : ' transition-colors'}">
+                            <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
                                 Manual Select
                             </button>
                         </div>
@@ -548,13 +531,17 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
                                                     ${maker.address.substring(0, 20)}...
                                                 </span>
                                             </td>
-                                            <td class="py-3 px-2 text-xs text-blue-400">${maker.volumeFee}%</td>
+                                            <td class="py-3 px-2 text-xs text-blue-400">${maker.fee}%</td>
                                             <td class="py-3 px-2">
                                                 <span class="text-xs text-yellow-400 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${maker.address}')">
                                                     ${maker.minSize.toLocaleString()} / ${(maker.maxSize / 1000000).toFixed(1)}M
                                                 </span>
                                             </td>
-                                            <td class="py-3 px-2 text-xs text-purple-400">${maker.bond.toLocaleString()}</td>
+                                            <td class="py-3 px-2">
+                                                <span class="text-xs text-purple-400 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${maker.address}')">
+                                                    ${maker.bond.toLocaleString()}
+                                                </span>
+                                            </td>
                                         </tr>
                                     `
                                       )
@@ -651,7 +638,10 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
 
   content
     .querySelector('#swap-amount-input')
-    .addEventListener('input', updateSummary);
+    .addEventListener('input', () => {
+      updateSummary();
+      saveCurrentSelections();
+    });
 
   content
     .querySelector('#max-swap-btn')
@@ -659,34 +649,66 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
 
   content
     .querySelector('#unit-sats')
-    .addEventListener('click', () => switchUnit('sats'));
+    .addEventListener('click', () => {
+      switchUnit('sats');
+      saveCurrentSelections();
+    });
   content
     .querySelector('#unit-btc')
-    .addEventListener('click', () => switchUnit('btc'));
+    .addEventListener('click', () => {
+      switchUnit('btc');
+      saveCurrentSelections();
+    });
   content
     .querySelector('#unit-usd')
-    .addEventListener('click', () => switchUnit('usd'));
+    .addEventListener('click', () => {
+      switchUnit('usd');
+      saveCurrentSelections();
+    });
 
   content
     .querySelector('#hop-2')
-    .addEventListener('click', () => setHopCount(2));
+    .addEventListener('click', () => {
+      setHopCount(2);
+      saveCurrentSelections();
+    });
   content
     .querySelector('#hop-3')
-    .addEventListener('click', () => setHopCount(3));
+    .addEventListener('click', () => {
+      setHopCount(3);
+      saveCurrentSelections();
+    });
   content
     .querySelector('#hop-4')
-    .addEventListener('click', () => setHopCount(4));
+    .addEventListener('click', () => {
+      setHopCount(4);
+      saveCurrentSelections();
+    });
   content
     .querySelector('#hop-5')
-    .addEventListener('click', () => setHopCount(5));
+    .addEventListener('click', () => {
+      setHopCount(5);
+      saveCurrentSelections();
+    });
 
   content
     .querySelector('#mode-auto')
-    .addEventListener('click', () => toggleSelectionMode('auto'));
+    .addEventListener('click', () => {
+      toggleSelectionMode('auto');
+      saveCurrentSelections();
+    });
   content
     .querySelector('#mode-manual')
-    .addEventListener('click', () => toggleSelectionMode('manual'));
+    .addEventListener('click', () => {
+      toggleSelectionMode('manual');
+      saveCurrentSelections();
+    });
   content.querySelector('#start-coinswap-btn').addEventListener('click', () => {
+    console.log('🚀 Start Coinswap button clicked');
+    
+    // Make sure we have the latest amount
+    swapAmount = getAmountInSats();
+    
     const swapConfig = {
       amount: swapAmount,
       makers: getNumberOfMakers(),
@@ -695,8 +717,26 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
         selectionMode === 'manual'
           ? selectedMakers.map((i) => availableMakers[i])
           : null,
+      selectedUtxos: selectedUtxos,
+      selectionMode: selectionMode,
+      amountUnit: amountUnit,
+      numberOfHops: numberOfHops,
+      networkFeeRate: networkFeeRate,
+      startTime: Date.now()
     };
 
+    console.log('💾 Saving swap configuration:', swapConfig);
+    
+    // Save the swap configuration to SwapStateManager
+    SwapStateManager.saveSwapConfig(swapConfig);
+    
+    // Start the background manager
+    if (window.appManager) {
+      console.log('🔄 Starting background swap manager');
+      window.appManager.startBackgroundSwapManager();
+    }
+
+    console.log('📍 Navigating to Coinswap component');
     import('./Coinswap.js').then((module) => {
       container.innerHTML = '';
       module.CoinswapComponent(container, swapConfig);
@@ -707,7 +747,10 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
   availableUtxos.forEach((_, index) => {
     content
       .querySelector('#utxo-' + index)
-      .addEventListener('change', () => toggleUtxoSelection(index));
+      .addEventListener('change', () => {
+        toggleUtxoSelection(index);
+        saveCurrentSelections();
+      });
   });
 
   // Maker row click listeners
@@ -716,6 +759,7 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
       if (e.target.type !== 'checkbox') {
         const index = parseInt(row.dataset.makerIndex);
         toggleMakerSelection(index);
+        saveCurrentSelections();
       }
     });
   });
@@ -724,43 +768,68 @@ export function SwapComponent(container, preSelectedUtxos = null, preSelectedMak
   availableMakers.forEach((_, index) => {
     content
       .querySelector('#maker-checkbox-' + index)
-      .addEventListener('change', () => toggleMakerSelection(index));
+      .addEventListener('change', () => {
+        toggleMakerSelection(index);
+        saveCurrentSelections();
+      });
   });
 
   // INITIALIZE
-  if ((preSelectedUtxos && preSelectedUtxos.length > 0) || (preSelectedMakers && preSelectedMakers.length > 0)) {
-    // Set manual mode
+  // Set the correct selection mode first
+  if (selectionMode === 'manual') {
     toggleSelectionMode('manual');
+  }
+  
+  // Restore amount unit selection
+  if (amountUnit !== 'sats') {
+    switchUnit(amountUnit);
+  }
+  
+  // Restore number of hops selection
+  if (numberOfHops !== 3) {
+    setHopCount(numberOfHops);
+  }
+  
+  // Restore UTXO selections
+  if (selectedUtxos.length > 0) {
+    selectedUtxos.forEach(index => {
+      const checkbox = content.querySelector('#utxo-' + index);
+      if (checkbox) {
+        checkbox.checked = true;
+      }
+    });
+    content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
+    checkUtxoTypeWarning();
     
-    // Initialize UTXO selections
-    if (preSelectedUtxos && preSelectedUtxos.length > 0) {
-      selectedUtxos.forEach(index => {
-        const checkbox = content.querySelector('#utxo-' + index);
-        if (checkbox) {
-          checkbox.checked = true;
-        }
-      });
-      content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
-      checkUtxoTypeWarning();
-    }
-    
-    // Initialize maker selections
-    if (preSelectedMakers && preSelectedMakers.length > 0) {
-      selectedMakers.forEach(index => {
-        const checkbox = content.querySelector('#maker-checkbox-' + index);
-        if (checkbox) {
-          checkbox.checked = true;
-        }
-      });
-      content.querySelector('#selected-makers-count').textContent = selectedMakers.length;
-      const hops = selectedMakers.length + 1;
-      content.querySelector('#calculated-hops').textContent = hops;
-    }
-    
-    // Set swap amount to total of selected UTXOs if UTXOs are selected
-    if (selectedUtxos.length > 0) {
+    // Set swap amount from selected UTXOs if in manual mode
+    if (selectionMode === 'manual') {
       swapAmount = getSelectedUtxosTotal();
       content.querySelector('#swap-amount-input').value = swapAmount;
+    }
+  }
+  
+  // Restore maker selections
+  if (selectedMakers.length > 0) {
+    selectedMakers.forEach(index => {
+      const checkbox = content.querySelector('#maker-checkbox-' + index);
+      if (checkbox) {
+        checkbox.checked = true;
+      }
+    });
+    content.querySelector('#selected-makers-count').textContent = selectedMakers.length;
+    const hops = selectedMakers.length + 1;
+    content.querySelector('#calculated-hops').textContent = hops;
+  }
+  
+  // Restore amount input if not from UTXOs
+  if (swapAmount > 0 && selectionMode === 'auto') {
+    const input = content.querySelector('#swap-amount-input');
+    if (amountUnit === 'sats') {
+      input.value = swapAmount;
+    } else if (amountUnit === 'btc') {
+      input.value = (swapAmount / 100000000).toFixed(8);
+    } else if (amountUnit === 'usd') {
+      input.value = ((swapAmount / 100000000) * btcPrice).toFixed(2);
     }
   }
   

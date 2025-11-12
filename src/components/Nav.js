@@ -1,11 +1,25 @@
+import { SwapStateManager, formatElapsedTime } from './swap/SwapStateManager.js';
+
 export function NavComponent(container) {
     const nav = document.createElement('div');
     nav.className = 'w-64 bg-[#1a2332] flex flex-col';
     
+    // Check for active swap
+    const activeSwap = SwapStateManager.getActiveSwap();
+    const hasActiveSwap = SwapStateManager.hasActiveSwap();
+    
     nav.innerHTML = `
         <div class="p-4 border-b border-gray-700">
             <h1 class="text-2xl font-bold text-[#FF6B35]">Coinswap</h1>
-            <p class="text-xs text-gray-400 mt-1">Taker Wallet</p>
+            <div class="flex justify-between items-center mt-1">
+                <p class="text-xs text-gray-400">Taker Wallet</p>
+                ${hasActiveSwap ? `
+                    <div class="flex items-center gap-2">
+                        <div class="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
+                        <span class="text-xs text-orange-400">Swap Active</span>
+                    </div>
+                ` : ''}
+            </div>
         </div>
         
         <nav class="flex-1 p-3 space-y-2 overflow-y-auto">
@@ -37,11 +51,17 @@ export function NavComponent(container) {
                 <span class="text-sm font-semibold">Receive</span>
             </a>
 
-            <a href="#swap" data-nav="swap" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
+            <a href="#swap" data-nav="swap" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg ${hasActiveSwap ? 'bg-orange-500 text-white border-2 border-orange-400 animate-pulse' : 'bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white'} transition-colors relative">
+                ${hasActiveSwap ? `
+                    <div class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce"></div>
+                ` : ''}
                 <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
                 </svg>
                 <span class="text-sm font-semibold">Swap</span>
+                ${hasActiveSwap ? `
+                    <span class="text-xs text-orange-200 mt-1 swap-elapsed-time">${formatElapsedTime(SwapStateManager.getElapsedTime())}</span>
+                ` : ''}
             </a>
 
             <a href="#recovery" data-nav="recovery" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
@@ -69,4 +89,24 @@ export function NavComponent(container) {
     `;
     
     container.appendChild(nav);
+    
+    // Update nav periodically if there's an active swap
+    if (hasActiveSwap) {
+        const updateInterval = setInterval(() => {
+            const currentSwap = SwapStateManager.getActiveSwap();
+            if (!currentSwap || currentSwap.status === 'completed' || currentSwap.status === 'failed') {
+                clearInterval(updateInterval);
+                // Refresh nav component to remove active indicators
+                container.innerHTML = '';
+                NavComponent(container);
+                return;
+            }
+            
+            // Update elapsed time display
+            const elapsedTimeEl = nav.querySelector('.swap-elapsed-time');
+            if (elapsedTimeEl) {
+                elapsedTimeEl.textContent = formatElapsedTime(SwapStateManager.getElapsedTime());
+            }
+        }, 1000);
+    }
 }

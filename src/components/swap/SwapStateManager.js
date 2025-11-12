@@ -1,173 +1,122 @@
-// SwapStateManager.js - Handles persistence of swap state in localStorage
+// SwapStateManager - Handles all swap state persistence to localStorage
 
-export class SwapStateManager {
-  static STORAGE_KEY = 'coinswap_active_swap';
-  static PROGRESS_KEY = 'coinswap_swap_progress';
+const STORAGE_KEYS = {
+  ACTIVE_SWAP: 'coinswap_active_swap',
+  SWAP_PROGRESS: 'coinswap_swap_progress', 
+  USER_SELECTIONS: 'coinswap_user_selections'
+};
 
-  // Save swap configuration when starting a new swap
-  static saveSwapConfig(swapConfig) {
+export const SwapStateManager = {
+  // Swap Configuration Management
+  saveSwapConfig(swapConfig) {
     const swapData = {
       ...swapConfig,
       status: 'configured',
-      createdAt: Date.now(),
-      lastUpdated: Date.now()
+      createdAt: Date.now()
     };
-    
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(swapData));
+    localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(swapData));
     console.log('Swap config saved:', swapData);
-  }
+  },
 
-  // Save swap progress during execution
-  static saveSwapProgress(progressData) {
-    const existingSwap = this.getActiveSwap();
-    if (!existingSwap) return;
+  getActiveSwap() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_SWAP);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Error getting active swap:', error);
+      return null;
+    }
+  },
 
-    const updatedSwap = {
-      ...existingSwap,
-      ...progressData,
-      status: 'in_progress',
-      lastUpdated: Date.now()
-    };
+  hasActiveSwap() {
+    const activeSwap = this.getActiveSwap();
+    return activeSwap && (activeSwap.status === 'in_progress' || activeSwap.status === 'configured');
+  },
 
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedSwap));
-    localStorage.setItem(this.PROGRESS_KEY, JSON.stringify(progressData));
+  // Swap Progress Management
+  saveSwapProgress(progressData) {
+    localStorage.setItem(STORAGE_KEYS.SWAP_PROGRESS, JSON.stringify(progressData));
     console.log('Swap progress saved:', progressData);
-  }
-
-  // Get active swap data
-  static getActiveSwap() {
-    const data = localStorage.getItem(this.STORAGE_KEY);
-    if (!data) return null;
-
-    try {
-      const swap = JSON.parse(data);
-      // Check if swap is still valid (not older than 24 hours)
-      const maxAge = 24 * 60 * 60 * 1000; // 24 hours
-      if (Date.now() - swap.createdAt > maxAge) {
-        this.clearSwapData();
-        return null;
-      }
-      return swap;
-    } catch (error) {
-      console.error('Error parsing swap data:', error);
-      this.clearSwapData();
-      return null;
-    }
-  }
-
-  // Get swap progress data
-  static getSwapProgress() {
-    const data = localStorage.getItem(this.PROGRESS_KEY);
-    if (!data) return null;
-
-    try {
-      return JSON.parse(data);
-    } catch (error) {
-      console.error('Error parsing progress data:', error);
-      return null;
-    }
-  }
-
-  // Check if there's an active swap
-  static hasActiveSwap() {
-    const swap = this.getActiveSwap();
-    return swap && (swap.status === 'configured' || swap.status === 'in_progress');
-  }
-
-  // Mark swap as completed
-  static completeSwap() {
-    const existingSwap = this.getActiveSwap();
-    if (!existingSwap) return;
-
-    const completedSwap = {
-      ...existingSwap,
-      status: 'completed',
-      completedAt: Date.now(),
-      lastUpdated: Date.now()
-    };
-
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(completedSwap));
     
-    // Clear after a short delay to allow user to see completion
-    setTimeout(() => {
-      this.clearSwapData();
-    }, 5000);
-  }
+    // Also update the active swap status
+    const activeSwap = this.getActiveSwap();
+    if (activeSwap) {
+      activeSwap.status = progressData.status || 'in_progress';
+      activeSwap.currentStep = progressData.currentStep;
+      activeSwap.lastUpdated = Date.now();
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(activeSwap));
+    }
+  },
 
-  // Mark swap as failed
-  static failSwap(errorMessage = null) {
-    const existingSwap = this.getActiveSwap();
-    if (!existingSwap) return;
+  getSwapProgress() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.SWAP_PROGRESS);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Error getting swap progress:', error);
+      return null;
+    }
+  },
 
-    const failedSwap = {
-      ...existingSwap,
-      status: 'failed',
-      errorMessage,
-      failedAt: Date.now(),
-      lastUpdated: Date.now()
-    };
+  // User Selections Management
+  saveUserSelections(selections) {
+    localStorage.setItem(STORAGE_KEYS.USER_SELECTIONS, JSON.stringify(selections));
+    console.log('User selections saved:', selections);
+  },
 
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(failedSwap));
-  }
+  getUserSelections() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.USER_SELECTIONS);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Error getting user selections:', error);
+      return null;
+    }
+  },
+
+  clearUserSelections() {
+    localStorage.removeItem(STORAGE_KEYS.USER_SELECTIONS);
+    console.log('User selections cleared');
+  },
+
+  // Swap Completion
+  completeSwap() {
+    const activeSwap = this.getActiveSwap();
+    if (activeSwap) {
+      activeSwap.status = 'completed';
+      activeSwap.completedAt = Date.now();
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(activeSwap));
+    }
+    
+    // Clear progress data but keep active swap for history
+    localStorage.removeItem(STORAGE_KEYS.SWAP_PROGRESS);
+    console.log('Swap marked as completed');
+  },
 
   // Clear all swap data
-  static clearSwapData() {
-    localStorage.removeItem(this.STORAGE_KEY);
-    localStorage.removeItem(this.PROGRESS_KEY);
+  clearSwapData() {
+    localStorage.removeItem(STORAGE_KEYS.ACTIVE_SWAP);
+    localStorage.removeItem(STORAGE_KEYS.SWAP_PROGRESS);
+    localStorage.removeItem(STORAGE_KEYS.USER_SELECTIONS);
     console.log('Swap data cleared');
-  }
+  },
 
-  // Get swap status for UI
-  static getSwapStatus() {
-    const swap = this.getActiveSwap();
-    if (!swap) return 'none';
-    return swap.status;
-  }
-
-  // Get time since swap started (for elapsed time display)
-  static getElapsedTime() {
-    const swap = this.getActiveSwap();
-    if (!swap || !swap.createdAt) return 0;
-    return Date.now() - swap.createdAt;
-  }
-
-  // Save user's manual selections for restoration
-  static saveUserSelections(selections) {
-    const existingSwap = this.getActiveSwap();
-    if (!existingSwap) return;
-
-    const updatedSwap = {
-      ...existingSwap,
-      userSelections: selections,
-      lastUpdated: Date.now()
-    };
-
-    localStorage.setItem(this.STORAGE_KEY, JSON.stringify(updatedSwap));
-  }
-
-  // Get user's saved selections
-  static getUserSelections() {
-    const swap = this.getActiveSwap();
-    return swap?.userSelections || null;
-  }
-
-  // Debug helper - get all swap data
-  static debugGetAllData() {
+  // Utility function for debugging
+  getStorageInfo() {
     return {
       activeSwap: this.getActiveSwap(),
       progress: this.getSwapProgress(),
-      hasActive: this.hasActiveSwap(),
-      status: this.getSwapStatus()
+      selections: this.getUserSelections()
     };
   }
-}
+};
 
-// Helper function to format elapsed time
+// Utility function to format elapsed time
 export function formatElapsedTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-
+  
   if (hours > 0) {
     return `${hours}h ${minutes % 60}m`;
   } else if (minutes > 0) {
@@ -176,3 +125,6 @@ export function formatElapsedTime(milliseconds) {
     return `${seconds}s`;
   }
 }
+
+// Export default for easier importing
+export default SwapStateManager;
