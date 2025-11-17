@@ -1,19 +1,55 @@
 export function UtxoListComponent(container) {
-  const content = document.createElement('div');
-  content.id = 'utxo-list-content';
-
   // State for UTXO selection
   let selectedUtxos = [];
+  let allUtxos = [];
 
-  // UTXO data matching the table rows
-  const utxos = [
-    { txid: 'a1b2c3d4e5f6789012345678901234567890abcdef123456789012345678901234', vout: 0, amount: 5000000, type: 'Regular' },
-    { txid: '7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i6j7k8l', vout: 1, amount: 10000000, type: 'Regular' },
-    { txid: 'm3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4', vout: 0, amount: 5000000, type: 'Swap' },
-    { txid: 'u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2', vout: 2, amount: 3000000, type: 'Regular' },
-    { txid: 'c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9h0', vout: 1, amount: 2000000, type: 'Regular' },
-    { txid: 'k7l8m9n0o1p2q3r4s5t6u7v8w9x0y1z2a3b4c5d6e7f8g9h0i1j2k3l4m5n6o7p8', vout: 0, amount: 1500000, type: 'Regular' },
-  ];
+  // API Functions
+  async function fetchUtxos() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/utxos');
+      const data = await response.json();
+      
+      if (data.success) {
+        return data.utxos || [];
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch UTXOs:', error);
+      return [];
+    }
+  }
+
+  // Helper Functions
+  function satsToBtc(sats) {
+    return (sats / 100000000).toFixed(8);
+  }
+
+  function truncateTxid(txid) {
+    if (typeof txid === 'object' && txid.hex) {
+      txid = txid.hex;
+    }
+    return `${txid.substring(0, 12)}...${txid.substring(-4)}`;
+  }
+
+  function getUtxoTypeColor(spendType) {
+    switch (spendType.toLowerCase()) {
+      case 'regular': return 'green';
+      case 'swap': return 'blue';
+      case 'contract': return 'yellow';
+      case 'fidelity': return 'purple';
+      default: return 'gray';
+    }
+  }
+
+  function calculateStats() {
+    const totalUtxos = allUtxos.length;
+    const totalValue = allUtxos.reduce((sum, utxo) => sum + utxo.utxo.amount, 0);
+    const confirmed = allUtxos.filter(utxo => utxo.utxo.confirmations > 0).length;
+    const unconfirmed = totalUtxos - confirmed;
+
+    return { totalUtxos, totalValue, confirmed, unconfirmed };
+  }
 
   function toggleUtxoSelection(index) {
     const utxoIndex = selectedUtxos.indexOf(index);
@@ -28,7 +64,7 @@ export function UtxoListComponent(container) {
 
   function updateSelectionUI() {
     // Update checkboxes
-    utxos.forEach((_, index) => {
+    allUtxos.forEach((_, index) => {
       const checkbox = content.querySelector(`#utxo-checkbox-${index}`);
       if (checkbox) {
         checkbox.checked = selectedUtxos.includes(index);
@@ -38,8 +74,8 @@ export function UtxoListComponent(container) {
     // Update master checkbox
     const selectAllCheckbox = content.querySelector('#select-all-utxos');
     if (selectAllCheckbox) {
-      selectAllCheckbox.checked = selectedUtxos.length === utxos.length;
-      selectAllCheckbox.indeterminate = selectedUtxos.length > 0 && selectedUtxos.length < utxos.length;
+      selectAllCheckbox.checked = selectedUtxos.length === allUtxos.length;
+      selectAllCheckbox.indeterminate = selectedUtxos.length > 0 && selectedUtxos.length < allUtxos.length;
     }
 
     // Update action buttons visibility
@@ -55,54 +91,156 @@ export function UtxoListComponent(container) {
   }
 
   function selectAllUtxos() {
-    if (selectedUtxos.length === utxos.length) {
+    if (selectedUtxos.length === allUtxos.length) {
       selectedUtxos = [];
     } else {
-      selectedUtxos = Array.from({length: utxos.length}, (_, i) => i);
+      selectedUtxos = Array.from({length: allUtxos.length}, (_, i) => i);
     }
     updateSelectionUI();
   }
 
   function sendWithSelectedUtxos() {
+    const selectedUtxoData = selectedUtxos.map(index => allUtxos[index]);
     import('../send/Send.js').then((module) => {
       container.innerHTML = '';
-      module.SendComponent(container, selectedUtxos);
+      module.SendComponent(container, selectedUtxoData);
     });
   }
 
   function swapWithSelectedUtxos() {
+    const selectedUtxoData = selectedUtxos.map(index => allUtxos[index]);
     import('../swap/Swap.js').then((module) => {
       container.innerHTML = '';
-      module.SwapComponent(container, selectedUtxos);
+      module.SwapComponent(container, selectedUtxoData);
     });
   }
 
+  async function refreshUtxos() {
+    const refreshBtn = content.querySelector('#refresh-utxos-btn');
+    const originalText = refreshBtn.textContent;
+    
+    refreshBtn.textContent = 'Refreshing...';
+    refreshBtn.disabled = true;
+    
+    try {
+      await loadUtxos();
+      
+      refreshBtn.textContent = 'Refreshed!';
+      setTimeout(() => {
+        refreshBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+      }, 2000);
+      
+      console.log('✅ UTXOs refreshed');
+    } catch (error) {
+      refreshBtn.textContent = 'Refresh Failed';
+      setTimeout(() => {
+        refreshBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+      }, 3000);
+      console.error('❌ UTXO refresh failed:', error);
+    }
+  }
+
+  async function loadUtxos() {
+    try {
+      allUtxos = await fetchUtxos();
+      updateStatsDisplay();
+      updateUtxoTable();
+      console.log('✅ UTXOs loaded:', allUtxos.length);
+    } catch (error) {
+      console.error('❌ Failed to load UTXOs:', error);
+      // Show error in table
+      const tableBody = content.querySelector('#utxo-table-body');
+      if (tableBody) {
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-400">Failed to load UTXOs. Please try refreshing.</td></tr>';
+      }
+    }
+  }
+
+  function updateStatsDisplay() {
+    const stats = calculateStats();
+    
+    content.querySelector('#total-utxos').textContent = stats.totalUtxos;
+    content.querySelector('#total-value').textContent = satsToBtc(stats.totalValue);
+    content.querySelector('#confirmed-count').textContent = stats.confirmed;
+    content.querySelector('#unconfirmed-count').textContent = stats.unconfirmed;
+  }
+
+  function updateUtxoTable() {
+    const tableBody = content.querySelector('#utxo-table-body');
+    
+    if (allUtxos.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">No UTXOs found</td></tr>';
+      return;
+    }
+
+    tableBody.innerHTML = allUtxos.map((utxoData, index) => {
+      const utxo = utxoData.utxo;
+      const spendInfo = utxoData.spendInfo;
+      const txidShort = truncateTxid(utxo.txid);
+      const color = getUtxoTypeColor(spendInfo.spendType);
+      const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+      
+      return `
+        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+          <td class="py-3 px-4">
+            <input type="checkbox" id="utxo-checkbox-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+          </td>
+          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+              onclick="openTxOnMempool('${txid}')">${txidShort}:${utxo.vout}</td>
+          <td class="py-3 px-4 text-${color}-400 font-mono">${satsToBtc(utxo.amount)}</td>
+          <td class="py-3 px-4 text-gray-300 ${utxo.confirmations === 0 ? 'text-yellow-400' : ''}">${utxo.confirmations}</td>
+          <td class="py-3 px-4 font-mono text-sm text-gray-300">${utxo.address ? utxo.address.substring(0, 8) + '...' + utxo.address.substring(-3) : '--'}</td>
+          <td class="py-3 px-4 text-${color}-400">${spendInfo.spendType}</td>
+        </tr>
+      `;
+    }).join('');
+
+    // Add event listeners for new checkboxes
+    allUtxos.forEach((_, index) => {
+      const checkbox = content.querySelector(`#utxo-checkbox-${index}`);
+      if (checkbox) {
+        checkbox.addEventListener('change', () => toggleUtxoSelection(index));
+      }
+    });
+  }
+
+  // Create and populate content
+  const content = document.createElement('div');
+  content.id = 'utxo-list-content';
+
   content.innerHTML = `
-        <div class="mb-6">
-            <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4">
-                ← Back to Wallet
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4">
+                    ← Back to Wallet
+                </button>
+                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All UTXOs</h2>
+                <p class="text-gray-400">Complete list of unspent transaction outputs</p>
+            </div>
+            <button id="refresh-utxos-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                Refresh UTXOs
             </button>
-            <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All UTXOs</h2>
-            <p class="text-gray-400">Complete list of unspent transaction outputs</p>
         </div>
 
         <!-- UTXO Stats -->
         <div class="grid grid-cols-4 gap-4 mb-6">
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total UTXOs</p>
-                <p class="text-2xl font-mono text-[#FF6B35]">12</p>
+                <p id="total-utxos" class="text-2xl font-mono text-[#FF6B35]">--</p>
             </div>
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Value</p>
-                <p class="text-2xl font-mono text-green-400">0.20 BTC</p>
+                <p id="total-value" class="text-2xl font-mono text-green-400">-- BTC</p>
             </div>
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Confirmed</p>
-                <p class="text-2xl font-mono text-blue-400">10</p>
+                <p id="confirmed-count" class="text-2xl font-mono text-blue-400">--</p>
             </div>
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Unconfirmed</p>
-                <p class="text-2xl font-mono text-yellow-400">2</p>
+                <p id="unconfirmed-count" class="text-2xl font-mono text-yellow-400">--</p>
             </div>
         </div>
 
@@ -138,67 +276,8 @@ export function UtxoListComponent(container) {
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold">Type</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4">
-                                <input type="checkbox" id="utxo-checkbox-0" class="w-4 h-4 accent-[#FF6B35]" />
-                            </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[0].txid}')">a1b2c3d4e5f6...7890:0</td>
-                            <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
-                            <td class="py-3 px-4 text-gray-300">142</td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qxy2...wlh</td>
-                            <td class="py-3 px-4 text-green-400">Regular</td>
-                        </tr>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4">
-                                <input type="checkbox" id="utxo-checkbox-1" class="w-4 h-4 accent-[#FF6B35]" />
-                            </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[1].txid}')">7g8h9i0j1k2l...3m4n:1</td>
-                            <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
-                            <td class="py-3 px-4 text-gray-300">89</td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qar0...8zt</td>
-                            <td class="py-3 px-4 text-green-400">Regular</td>
-                        </tr>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4">
-                                <input type="checkbox" id="utxo-checkbox-2" class="w-4 h-4 accent-[#FF6B35]" />
-                            </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[2].txid}')">m3n4o5p6q7r8...s9t0:0</td>
-                            <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
-                            <td class="py-3 px-4 text-gray-300">23</td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qw50...3yn</td>
-                            <td class="py-3 px-4 text-blue-400">Swap</td>
-                        </tr>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4">
-                                <input type="checkbox" id="utxo-checkbox-3" class="w-4 h-4 accent-[#FF6B35]" />
-                            </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[3].txid}')">u1v2w3x4y5z6...a7b8:2</td>
-                            <td class="py-3 px-4 text-green-400 font-mono">0.03000000</td>
-                            <td class="py-3 px-4 text-gray-300">67</td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qm3n...5op</td>
-                            <td class="py-3 px-4 text-green-400">Regular</td>
-                        </tr>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4">
-                                <input type="checkbox" id="utxo-checkbox-4" class="w-4 h-4 accent-[#FF6B35]" />
-                            </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[4].txid}')">c9d0e1f2g3h4...i5j6:1</td>
-                            <td class="py-3 px-4 text-green-400 font-mono">0.02000000</td>
-                            <td class="py-3 px-4 text-gray-300">156</td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qrs7...9tu</td>
-                            <td class="py-3 px-4 text-green-400">Regular</td>
-                        </tr>
-                        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                            <td class="py-3 px-4">
-                                <input type="checkbox" id="utxo-checkbox-5" class="w-4 h-4 accent-[#FF6B35]" />
-                            </td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('${utxos[5].txid}')">k7l8m9n0o1p2...q3r4:0</td>
-                            <td class="py-3 px-4 text-yellow-400 font-mono">0.01500000</td>
-                            <td class="py-3 px-4 text-yellow-400">2</td>
-                            <td class="py-3 px-4 font-mono text-sm text-gray-300">bc1qvwx...1yz</td>
-                            <td class="py-3 px-4 text-green-400">Regular</td>
-                        </tr>
+                    <tbody id="utxo-table-body">
+                        <!-- UTXOs will be populated here -->
                     </tbody>
                 </table>
             </div>
@@ -209,7 +288,7 @@ export function UtxoListComponent(container) {
 
   // Global function for opening transactions on mempool.space
   window.openTxOnMempool = (txid) => {
-    const url = `https://mempool.space/tx/${txid}`;
+    const url = `https://mempool.space/signet/tx/${txid}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');
@@ -222,13 +301,8 @@ export function UtxoListComponent(container) {
     }
   };
 
-  // Add individual UTXO selection handlers
-  utxos.forEach((_, index) => {
-    const checkbox = content.querySelector(`#utxo-checkbox-${index}`);
-    if (checkbox) {
-      checkbox.addEventListener('change', () => toggleUtxoSelection(index));
-    }
-  });
+  // Event handlers
+  content.querySelector('#refresh-utxos-btn').addEventListener('click', refreshUtxos);
 
   // Add select all handler
   const selectAllCheckbox = content.querySelector('#select-all-utxos');
@@ -256,4 +330,7 @@ export function UtxoListComponent(container) {
       module.WalletComponent(container);
     });
   });
+
+  // Initialize data
+  loadUtxos();
 }

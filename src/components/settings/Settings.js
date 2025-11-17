@@ -22,7 +22,7 @@ export function SettingsComponent(container) {
                         
                         <div id="seed-display" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                             <div class="flex items-center mb-3">
-                                <span class="text-yellow-400 text-sm">⚠️ Keep this safe and private!</span>
+                                <span class="text-yellow-400 text-sm">âš ï¸ Keep this safe and private!</span>
                             </div>
                             <div class="grid grid-cols-3 gap-2 mb-4">
                                 <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
@@ -234,12 +234,12 @@ export function SettingsComponent(container) {
                             <input 
                                 type="number" 
                                 id="rpc-port-input"
-                                value="8332"
+                                value="18443"
                                 min="1"
                                 max="65535"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
-                            <p class="text-xs text-gray-500 mt-1">Bitcoin Core RPC port (8332 for mainnet, 18332 for testnet)</p>
+                            <p class="text-xs text-gray-500 mt-1">Bitcoin Core RPC port (8332 for mainnet, 18332 for testnet, 18443 for regtest)</p>
                         </div>
                         
                         <div>
@@ -247,7 +247,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="text" 
                                 id="rpc-username-input"
-                                value="bitcoinrpc"
+                                value="user"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <p class="text-xs text-gray-500 mt-1">RPC username from bitcoin.conf</p>
@@ -271,8 +271,11 @@ export function SettingsComponent(container) {
                         
                         <div class="bg-[#0f1419] rounded-lg p-4">
                             <div class="flex justify-between items-center mb-3">
-                                <span class="text-sm text-gray-400">Connection Status</span>
-                                <span id="rpc-status" class="text-sm font-semibold text-yellow-400">Not Connected</span>
+                                <div class="flex items-center">
+                                    <div id="connection-indicator" class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                                    <span class="text-sm text-gray-400">Connection Status</span>
+                                </div>
+                                <span id="rpc-status" class="text-sm font-semibold text-red-400">Not Connected</span>
                             </div>
                             <div class="space-y-2 text-xs">
                                 <div class="flex justify-between">
@@ -294,18 +297,35 @@ export function SettingsComponent(container) {
                             </div>
                         </div>
                         
-                        <button id="test-connection-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                            Test Connection
-                        </button>
+                        <div class="space-y-3">
+                            <button id="test-connection-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                                Test Connection
+                            </button>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="connect-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                    Connect
+                                </button>
+                                <button id="disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" disabled>
+                                    Disconnect
+                                </button>
+                            </div>
+                            
+                            <button id="refresh-status-btn" class="w-full bg-gray-600 hover:bg-gray-700 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm">
+                                Refresh Status
+                            </button>
+                        </div>
                         
                         <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                             <p class="text-xs text-blue-400">
-                                💡 Make sure Bitcoin Core is running with RPC enabled. Add these lines to your bitcoin.conf:
+                                ðŸ’¡ Make sure Bitcoin Core is running with RPC enabled. Add these lines to your bitcoin.conf:
                             </p>
                             <div class="bg-[#0f1419] rounded mt-2 p-2 font-mono text-xs text-gray-300">
+                                regtest=1<br/>
                                 server=1<br/>
-                                rpcuser=bitcoinrpc<br/>
-                                rpcpassword=yourpassword<br/>
+                                rpcuser=user<br/>
+                                rpcpassword=password<br/>
+                                rpcport=18443<br/>
                                 rpcallowip=127.0.0.1
                             </div>
                         </div>
@@ -335,7 +355,7 @@ export function SettingsComponent(container) {
       const savedConfig = localStorage.getItem('coinswap_config');
       if (savedConfig) {
         const config = JSON.parse(savedConfig);
-        console.log('📋 Loading existing config:', config);
+        console.log('ðŸ“‹ Loading existing config:', config);
         
         // Populate RPC fields
         if (config.rpc) {
@@ -409,6 +429,97 @@ export function SettingsComponent(container) {
     }
   });
 
+  // Enhanced connection status management
+  let connectionTimer = null;
+  let isConnected = false;
+
+  function updateConnectionStatus(connected, info = {}) {
+    const indicator = content.querySelector('#connection-indicator');
+    const status = content.querySelector('#rpc-status');
+    const connectBtn = content.querySelector('#connect-btn');
+    const disconnectBtn = content.querySelector('#disconnect-btn');
+    
+    if (connected) {
+      indicator.className = 'w-3 h-3 bg-green-500 rounded-full mr-2';
+      status.textContent = 'Connected';
+      status.className = 'text-sm font-semibold text-green-400';
+      connectBtn.disabled = true;
+      disconnectBtn.disabled = false;
+      isConnected = true;
+      
+      // Update info if provided
+      if (info.version) content.querySelector('#bitcoin-version').textContent = info.version;
+      if (info.network) content.querySelector('#bitcoin-network').textContent = info.network;
+      if (info.blocks) content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
+      if (info.verificationprogress) {
+        const progress = (info.verificationprogress * 100).toFixed(1);
+        content.querySelector('#sync-progress').textContent = `${progress}%`;
+      }
+      
+    } else {
+      indicator.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
+      status.textContent = 'Not Connected';
+      status.className = 'text-sm font-semibold text-red-400';
+      connectBtn.disabled = false;
+      disconnectBtn.disabled = true;
+      isConnected = false;
+      
+      // Clear info
+      content.querySelector('#bitcoin-version').textContent = '--';
+      content.querySelector('#bitcoin-network').textContent = '--';
+      content.querySelector('#block-height').textContent = '--';
+      content.querySelector('#sync-progress').textContent = '--';
+    }
+  }
+
+  async function makeRPCCall(method, params = []) {
+    const host = content.querySelector('#rpc-host-input').value;
+    const port = content.querySelector('#rpc-port-input').value;
+    const username = content.querySelector('#rpc-username-input').value;
+    const password = content.querySelector('#rpc-password-input').value;
+
+    if (!username || !password) {
+      throw new Error('RPC username and password are required');
+    }
+
+    const url = `http://${host}:${port}`;
+    const auth = btoa(`${username}:${password}`);
+    
+    const body = {
+      jsonrpc: "1.0",
+      id: Date.now(),
+      method: method,
+      params: params
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${auth}`
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('Authentication failed - check RPC username/password');
+      } else if (response.status === 404) {
+        throw new Error('Bitcoin Core RPC not found - is bitcoind running?');
+      } else {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    }
+
+    const data = await response.json();
+    
+    if (data.error) {
+      throw new Error(`RPC Error: ${data.error.message}`);
+    }
+    
+    return data.result;
+  }
+
   // Test RPC connection
   content.querySelector('#test-connection-btn').addEventListener('click', async () => {
     const btn = content.querySelector('#test-connection-btn');
@@ -416,24 +527,140 @@ export function SettingsComponent(container) {
     btn.textContent = 'Testing...';
     btn.disabled = true;
 
-    const host = content.querySelector('#rpc-host-input').value;
-    const port = content.querySelector('#rpc-port-input').value;
-    const username = content.querySelector('#rpc-username-input').value;
-    const password = content.querySelector('#rpc-password-input').value;
+    try {
+      const info = await makeRPCCall('getblockchaininfo');
+      const networkInfo = await makeRPCCall('getnetworkinfo');
+      
+      updateConnectionStatus(true, {
+        version: networkInfo.subversion || 'Unknown',
+        network: info.chain,
+        blocks: info.blocks,
+        verificationprogress: info.verificationprogress
+      });
+      
+      console.log('✅ RPC connection successful:', info);
+      
+    } catch (error) {
+      console.error('❌ RPC connection failed:', error);
+      updateConnectionStatus(false);
+      alert(`Connection failed: ${error.message}`);
+    }
 
-    // Simulate RPC test (in real implementation, this would make an actual RPC call)
-    setTimeout(() => {
-      // Mock successful connection
-      content.querySelector('#rpc-status').textContent = 'Connected';
-      content.querySelector('#rpc-status').className = 'text-sm font-semibold text-green-400';
-      content.querySelector('#bitcoin-version').textContent = 'v25.0.0';
-      content.querySelector('#bitcoin-network').textContent = 'mainnet';
-      content.querySelector('#block-height').textContent = '820,123';
-      content.querySelector('#sync-progress').textContent = '100%';
+    btn.textContent = originalText;
+    btn.disabled = false;
+  });
 
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }, 2000);
+  // Connect button
+  content.querySelector('#connect-btn').addEventListener('click', async () => {
+    const btn = content.querySelector('#connect-btn');
+    btn.textContent = 'Connecting...';
+    btn.disabled = true;
+
+    try {
+      // First update and save the configuration
+      const updatedConfig = {
+        rpc: {
+          host: content.querySelector('#rpc-host-input').value,
+          port: parseInt(content.querySelector('#rpc-port-input').value),
+          username: content.querySelector('#rpc-username-input').value,
+          password: content.querySelector('#rpc-password-input').value,
+        },
+        taker: {
+          control_port: parseInt(content.querySelector('#tor-control-port-input').value),
+          socks_port: parseInt(content.querySelector('#tor-socks-port-input').value),
+          tor_auth_password: content.querySelector('#tor-auth-password-input').value,
+          tracker_address: content.querySelector('#tracker-address-input').value,
+        },
+        setupComplete: true,
+        setupDate: new Date().toISOString(),
+        lastModified: new Date().toISOString(),
+      };
+
+      localStorage.setItem('coinswap_config', JSON.stringify(updatedConfig));
+      console.log('💾 Config updated and saved:', updatedConfig);
+
+      // Import and update the BitcoindConnection
+      const { bitcoindConnection } = await import('./BitcoindConnection.js');
+      if (bitcoindConnection) {
+        bitcoindConnection.updateConfig(updatedConfig);
+        
+        // Test the connection
+        const info = await makeRPCCall('getblockchaininfo');
+        const networkInfo = await makeRPCCall('getnetworkinfo');
+        
+        updateConnectionStatus(true, {
+          version: networkInfo.subversion || 'Unknown',
+          network: info.chain,
+          blocks: info.blocks,
+          verificationprogress: info.verificationprogress
+        });
+        
+        // Start status refresh timer
+        if (connectionTimer) clearInterval(connectionTimer);
+        connectionTimer = setInterval(async () => {
+          if (isConnected) {
+            try {
+              const info = await makeRPCCall('getblockchaininfo');
+              content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
+              const progress = (info.verificationprogress * 100).toFixed(1);
+              content.querySelector('#sync-progress').textContent = `${progress}%`;
+            } catch (error) {
+              console.log('Status refresh failed, connection may be lost');
+              updateConnectionStatus(false);
+              if (connectionTimer) {
+                clearInterval(connectionTimer);
+                connectionTimer = null;
+              }
+            }
+          }
+        }, 5000); // Refresh every 5 seconds
+        
+        console.log('✅ Connected and monitoring status');
+      }
+      
+    } catch (error) {
+      console.error('❌ Connection failed:', error);
+      updateConnectionStatus(false);
+      alert(`Connection failed: ${error.message}`);
+    }
+
+    btn.textContent = 'Connect';
+    btn.disabled = false;
+  });
+
+  // Disconnect button
+  content.querySelector('#disconnect-btn').addEventListener('click', () => {
+    if (connectionTimer) {
+      clearInterval(connectionTimer);
+      connectionTimer = null;
+    }
+    updateConnectionStatus(false);
+    console.log('🔌 Disconnected from Bitcoin Core');
+  });
+
+  // Refresh status button
+  content.querySelector('#refresh-status-btn').addEventListener('click', async () => {
+    const btn = content.querySelector('#refresh-status-btn');
+    btn.textContent = 'Refreshing...';
+    btn.disabled = true;
+
+    try {
+      const info = await makeRPCCall('getblockchaininfo');
+      const networkInfo = await makeRPCCall('getnetworkinfo');
+      
+      updateConnectionStatus(true, {
+        version: networkInfo.subversion || 'Unknown',
+        network: info.chain,
+        blocks: info.blocks,
+        verificationprogress: info.verificationprogress
+      });
+    } catch (error) {
+      console.log('Refresh failed:', error.message);
+      updateConnectionStatus(false);
+    }
+
+    btn.textContent = 'Refresh Status';
+    btn.disabled = false;
   });
 
   // Test tracker connection
@@ -491,7 +718,7 @@ export function SettingsComponent(container) {
 
     // Save to localStorage
     localStorage.setItem('coinswap_config', JSON.stringify(updatedConfig));
-    console.log('💾 Settings saved:', updatedConfig);
+    console.log('ðŸ’¾ Settings saved:', updatedConfig);
 
     // Show success feedback
     const btn = content.querySelector('#save-settings-btn');
@@ -518,8 +745,8 @@ export function SettingsComponent(container) {
       
       // Reset RPC fields
       content.querySelector('#rpc-host-input').value = '127.0.0.1';
-      content.querySelector('#rpc-port-input').value = '8332';
-      content.querySelector('#rpc-username-input').value = 'bitcoinrpc';
+      content.querySelector('#rpc-port-input').value = '18443';
+      content.querySelector('#rpc-username-input').value = 'user';
       content.querySelector('#rpc-password-input').value = '';
       
       // Hide status displays

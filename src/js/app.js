@@ -11,6 +11,8 @@ import { FirstTimeSetupModal, isSetupComplete, getSavedConfig } from '../compone
 import { SwapStateManager } from '../components/swap/SwapStateManager.js';
 import { ConnectionStatusComponent } from '../components/connection/ConnectionStatus.js';
 import { bitcoindConnection } from '../components/connection/BitcoindConnection.js';
+import { TakerInitializationComponent } from '../components/taker/TakerInitialization.js';
+
 
 
 // Component map
@@ -30,15 +32,15 @@ let backgroundSwapManager = null;
 
 function startBackgroundSwapManager() {
     if (backgroundSwapManager) return; // Already running
-    
+
     backgroundSwapManager = setInterval(() => {
         const activeSwap = SwapStateManager.getActiveSwap();
-        
+
         if (!activeSwap) {
             stopBackgroundSwapManager();
             return;
         }
-        
+
         if (activeSwap.status === 'completed' || activeSwap.status === 'failed') {
             stopBackgroundSwapManager();
             // Refresh navigation to remove active indicators
@@ -50,7 +52,7 @@ function startBackgroundSwapManager() {
             }
             return;
         }
-        
+
         // Continue swap progression in background
         if (activeSwap.status === 'in_progress') {
             // This keeps the swap logic running even when not on the coinswap page
@@ -116,25 +118,25 @@ function setupNavigation() {
 // Show first-time setup modal if needed
 function checkFirstTimeSetup() {
     const config = getSavedConfig();
-    
+
     // Show setup if:
     // 1. No config exists at all, OR
     // 2. RPC username or password is empty/missing
-    const needsSetup = !config || 
-                      !config.setupComplete || 
-                      !config.rpc ||
-                      !config.rpc.username || 
-                      !config.rpc.password ||
-                      config.rpc.username.trim() === '' ||
-                      config.rpc.password.trim() === '';
-    
+    const needsSetup = !config ||
+        !config.setupComplete ||
+        !config.rpc ||
+        !config.rpc.username ||
+        !config.rpc.password ||
+        config.rpc.username.trim() === '' ||
+        config.rpc.password.trim() === '';
+
     if (needsSetup) {
         console.log('ðŸ”§ Setup required (missing RPC credentials), showing setup modal...');
         const appContainer = document.querySelector('body');
-        
+
         FirstTimeSetupModal(appContainer, (config) => {
             console.log('âœ… Setup completed:', config);
-            
+
             // Show success message
             const successDiv = document.createElement('div');
             successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300';
@@ -145,7 +147,7 @@ function checkFirstTimeSetup() {
                 </div>
             `;
             document.body.appendChild(successDiv);
-            
+
             setTimeout(() => {
                 successDiv.style.opacity = '0';
                 setTimeout(() => successDiv.remove(), 300);
@@ -164,7 +166,7 @@ function checkFirstTimeSetup() {
 // Check bitcoind connection and show connection status
 async function checkBitcoindConnection() {
     console.log('🔌 Checking Bitcoin Core connection...');
-    
+
     // Update the connection manager with latest config
     const config = getSavedConfig();
     if (config) {
@@ -175,6 +177,30 @@ async function checkBitcoindConnection() {
     const appContainer = document.querySelector('body');
     ConnectionStatusComponent(appContainer, (connectionInfo) => {
         console.log('✅ Bitcoin Core connected, starting app...', connectionInfo);
+        checkTakerInitialization();
+    });
+}
+
+async function checkTakerInitialization() {
+    console.log('🔄 Checking Taker initialization...');
+
+    const config = getSavedConfig();
+
+    // Check if taker configuration is available
+    if (!config.taker || !config.taker.tracker_address) {
+        console.log('⚠️ Taker configuration missing, skipping taker initialization');
+        startMainApp();
+        return;
+    }
+
+    // Show taker initialization component
+    const appContainer = document.querySelector('body');
+    TakerInitializationComponent(appContainer, config, (result) => {
+        if (result && result.skipped) {
+            console.log('⏭️ Taker initialization skipped by user');
+        } else {
+            console.log('✅ Taker initialized, starting main app...');
+        }
         startMainApp();
     });
 }
@@ -214,7 +240,7 @@ function startMainApp() {
         renderComponent('wallet');
         console.log('Wallet loaded');
     }
-    
+
     // Start background manager if there's any active swap
     if (SwapStateManager.hasActiveSwap()) {
         startBackgroundSwapManager();
@@ -245,7 +271,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Check for first-time setup first
     const setupShown = checkFirstTimeSetup();
-    
+
     if (!setupShown) {
         // If setup wasn't shown, proceed to check bitcoind connection
         checkBitcoindConnection();

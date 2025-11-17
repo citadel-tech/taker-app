@@ -1,10 +1,232 @@
 export function WalletComponent(container) {
+  // API Functions
+  async function fetchBalance() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/balance');
+      const data = await response.json();
+
+      if (data.success) {
+        return data.balance;
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+      throw error;
+    }
+  }
+
+  async function fetchTransactions() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/transactions?count=5');
+      const data = await response.json();
+
+      if (data.success) {
+        return data.transactions || [];
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch transactions:', error);
+      return [];
+    }
+  }
+
+  async function fetchUtxos() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/utxos');
+      const data = await response.json();
+
+      if (data.success) {
+        return data.utxos || [];
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Failed to fetch UTXOs:', error);
+      return [];
+    }
+  }
+
+  // Helper Functions
+  function satsToBtc(sats) {
+    return (sats / 100000000).toFixed(8);
+  }
+
+  function formatDate(timestamp) {
+    const date = new Date(timestamp * 1000);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours} hours ago`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  }
+
+  function truncateTxid(txid) {
+    if (typeof txid === 'object' && txid.hex) {
+      txid = txid.hex;
+    }
+    return `${txid.substring(0, 8)}...${txid.substring(-4)}`;
+  }
+
+  function getUtxoTypeColor(spendType) {
+    switch (spendType.toLowerCase()) {
+      case 'regular': return 'green';
+      case 'swap': return 'blue';
+      case 'contract': return 'yellow';
+      case 'fidelity': return 'purple';
+      default: return 'gray';
+    }
+  }
+
+  // UI Update Functions
+  async function updateBalance() {
+    try {
+      const balance = await fetchBalance();
+
+      content.querySelector('#regular-balance').textContent = satsToBtc(balance.regular) + ' BTC';
+      content.querySelector('#swap-balance').textContent = satsToBtc(balance.swap) + ' BTC';
+      content.querySelector('#contract-balance').textContent = satsToBtc(balance.contract) + ' BTC';
+      content.querySelector('#spendable-balance').textContent = satsToBtc(balance.spendable) + ' BTC';
+
+      console.log('✅ Balance updated:', balance);
+    } catch (error) {
+      console.error('❌ Balance update failed:', error);
+    }
+  }
+
+  async function updateTransactions() {
+    const transactionsContainer = content.querySelector('#transactions-container');
+
+    try {
+      const transactions = await fetchTransactions();
+
+      if (transactions.length === 0) {
+        transactionsContainer.innerHTML = '<div class="text-center py-4 text-gray-400">No transactions yet</div>';
+      } else {
+        // Sort transactions newest first (by time)
+        const sortedTransactions = transactions.sort((a, b) => b.info.time - a.info.time);
+
+        transactionsContainer.innerHTML = sortedTransactions.map(tx => {
+          const isReceive = tx.detail.amount.sats > 0;
+          return `
+            <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-${isReceive ? 'green' : 'red'}-500/20 rounded-full flex items-center justify-center">
+                  <span class="text-${isReceive ? 'green' : 'red'}-400">${isReceive ? '↓' : '↑'}</span>
+                </div>
+                <div>
+                  <p class="text-white font-mono text-sm">${isReceive ? 'Received' : 'Sent'}</p>
+                  <p class="text-gray-400 text-xs">${formatDate(tx.info.time)}</p>
+                </div>
+              </div>
+              <div class="text-right">
+                <p class="text-${isReceive ? 'green' : 'red'}-400 font-mono">${isReceive ? '+' : ''}${satsToBtc(Math.abs(tx.detail.amount.sats))} BTC</p>
+                <p class="text-gray-400 text-xs">${tx.info.confirmations} confirmations</p>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      console.log('✅ Transactions updated:', transactions.length);
+    } catch (error) {
+      console.error('❌ Transactions update failed:', error);
+      transactionsContainer.innerHTML = '<div class="text-center py-4 text-gray-400">Error loading transactions</div>';
+    }
+  }
+
+  async function updateUtxos() {
+    const utxoTableBody = content.querySelector('#utxo-table-body');
+
+    try {
+      const utxos = await fetchUtxos();
+
+      if (utxos.length === 0) {
+        utxoTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">No UTXOs found</td></tr>';
+      } else {
+        utxoTableBody.innerHTML = utxos.map(utxoData => {
+          const utxo = utxoData.utxo;
+          const spendInfo = utxoData.spendInfo;
+          const txidShort = truncateTxid(utxo.txid);
+          const color = getUtxoTypeColor(spendInfo.spendType);
+
+          return `
+            <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+              <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+                  onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid}')">${txidShort}:${utxo.vout}</td>
+              <td class="py-3 px-4 text-${color}-400 font-mono">${satsToBtc(utxo.amount)}</td>
+              <td class="py-3 px-4 text-gray-300">${utxo.confirmations}</td>
+              <td class="py-3 px-4 text-${color}-400">${spendInfo.spendType}</td>
+            </tr>
+          `;
+        }).join('');
+      }
+
+      console.log('✅ UTXOs updated:', utxos.length);
+    } catch (error) {
+      // Keep original hardcoded UTXOs as fallback
+      utxoTableBody.innerHTML = `
+        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors">No UTXOs</td>
+          <td class="py-3 px-4 text-gray-400 font-mono">--</td>
+          <td class="py-3 px-4 text-gray-400">--</td>
+          <td class="py-3 px-4 text-gray-400">--</td>
+        </tr>
+      `;
+      console.error('❌ UTXO update failed, showing fallback:', error);
+    }
+  }
+
+  async function refreshAllData() {
+    const refreshBtn = content.querySelector('#refresh-all-btn');
+    const originalText = refreshBtn.textContent;
+
+    refreshBtn.textContent = 'Refreshing...';
+    refreshBtn.disabled = true;
+
+    try {
+      await Promise.all([
+        updateBalance(),
+        updateTransactions(),
+        updateUtxos()
+      ]);
+
+      refreshBtn.textContent = 'Refreshed!';
+      setTimeout(() => {
+        refreshBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+      }, 2000);
+
+      console.log('✅ All data refreshed');
+    } catch (error) {
+      refreshBtn.textContent = 'Refresh Failed';
+      setTimeout(() => {
+        refreshBtn.textContent = originalText;
+        refreshBtn.disabled = false;
+      }, 3000);
+      console.error('❌ Refresh failed:', error);
+    }
+  }
+
+  // Create and populate content
   const content = document.createElement('div');
   content.id = 'wallet-content';
 
   content.innerHTML = `
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Wallet</h2>
-        <p class="text-gray-400 mb-8">Your Bitcoin balance and transaction history</p>
+        <div class="flex justify-between items-center mb-8">
+            <div>
+                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Wallet</h2>
+                <p class="text-gray-400">Your Bitcoin balance and transaction history</p>
+            </div>
+            <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                Refresh All Data
+            </button>
+        </div>
 
         <!-- Balance Card -->
         <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
@@ -12,100 +234,55 @@ export function WalletComponent(container) {
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Regular</p>
-                    <p class="text-2xl font-mono text-green-400">0.15000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">≈ $4,500</p>
+                    <p id="regular-balance" class="text-2xl font-mono text-green-400">0.00000000 BTC</p>
+                    <p class="text-xs text-gray-500 mt-1">Regular wallet coins</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Swap</p>
-                    <p class="text-2xl font-mono text-blue-400">0.05000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">≈ $1,500</p>
+                    <p id="swap-balance" class="text-2xl font-mono text-blue-400">0.00000000 BTC</p>
+                    <p class="text-xs text-gray-500 mt-1">Received in swaps</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Contract</p>
-                    <p class="text-2xl font-mono text-yellow-400">0.00000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">≈ $0</p>
+                    <p id="contract-balance" class="text-2xl font-mono text-yellow-400">0.00000000 BTC</p>
+                    <p class="text-xs text-gray-500 mt-1">In active contracts</p>
                 </div>
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Spendable</p>
-                    <p class="text-2xl font-mono text-[#FF6B35]">0.20000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">≈ $6,000</p>
+                    <p id="spendable-balance" class="text-2xl font-mono text-[#FF6B35]">0.00000000 BTC</p>
+                    <p class="text-xs text-gray-500 mt-1">Total available</p>
                 </div>
             </div>
         </div>
 
        <!-- UTXOs Section -->
-<div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-    <h3 class="text-xl font-semibold mb-4 text-gray-300">UTXOs</h3>
-    <div class="overflow-x-auto">
-        <table class="w-full">
-            <thead>
-                <tr class="border-b border-gray-700">
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid:Vout</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold">Type</th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                    <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('a1b2c3d4e5f6789012345678901234567890abcdef123456789012345678901234')">a1b2c3d4...e5f6:0</td>
-                    <td class="py-3 px-4 text-green-400 font-mono">0.05000000</td>
-                    <td class="py-3 px-4 text-gray-300">142</td>
-                    <td class="py-3 px-4 text-green-400">Regular</td>
-                </tr>
-                <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-                    <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('7g8h9i0j1k2l3m4n5o6p7q8r9s0t1u2v3w4x5y6z7a8b9c0d1e2f3g4h5i6j7k8l')">7g8h9i0j...k1l2:1</td>
-                    <td class="py-3 px-4 text-green-400 font-mono">0.10000000</td>
-                    <td class="py-3 px-4 text-gray-300">89</td>
-                    <td class="py-3 px-4 text-green-400">Regular</td>
-                </tr>
-                <tr class="hover:bg-[#242d3d]">
-                    <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" onclick="openTxOnMempool('m3n4o5p6q7r8s9t0u1v2w3x4y5z6a7b8c9d0e1f2g3h4i5j6k7l8m9n0o1p2q3r4')">m3n4o5p6...q7r8:0</td>
-                    <td class="py-3 px-4 text-blue-400 font-mono">0.05000000</td>
-                    <td class="py-3 px-4 text-gray-300">23</td>
-                    <td class="py-3 px-4 text-blue-400">Swap</td>
-                </tr>
-            </tbody>
-        </table>
-<button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
-    View All UTXOs →
-</button>
-    </div>
-</div>
+        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+            <h3 class="text-xl font-semibold mb-4 text-gray-300">UTXOs</h3>
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-gray-700">
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid:Vout</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="utxo-table-body">
+                        <!-- UTXOs will be populated here -->
+                    </tbody>
+                </table>
+                <button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
+                    View All UTXOs →
+                </button>
+            </div>
+        </div>
+
         <!-- Recent Transactions -->
         <div class="bg-[#1a2332] rounded-lg p-6">
             <h3 class="text-xl font-semibold mb-4 text-gray-300">Recent Transactions</h3>
-            <div class="space-y-3">
-                <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-green-500/20 rounded-full flex items-center justify-center">
-                            <span class="text-green-400">↓</span>
-                        </div>
-                        <div>
-                            <p class="text-white font-mono text-sm">Received</p>
-                            <p class="text-gray-400 text-xs">2 hours ago</p>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-green-400 font-mono">+0.05000000 BTC</p>
-                        <p class="text-gray-400 text-xs">6 confirmations</p>
-                    </div>
-                </div>
-                <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
-                    <div class="flex items-center space-x-3">
-                        <div class="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
-                            <span class="text-red-400">↑</span>
-                        </div>
-                        <div>
-                            <p class="text-white font-mono text-sm">Sent</p>
-                            <p class="text-gray-400 text-xs">1 day ago</p>
-                        </div>
-                    </div>
-                    <div class="text-right">
-                        <p class="text-red-400 font-mono">-0.02000000 BTC</p>
-                        <p class="text-gray-400 text-xs">142 confirmations</p>
-                    </div>
-                </div>
+            <div id="transactions-container" class="space-y-3">
+                <!-- Transactions will be populated here -->
             </div>
             <button id="view-all-transactions" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
                 View All Transactions →
@@ -117,7 +294,7 @@ export function WalletComponent(container) {
 
   // Global function for opening transactions on mempool.space
   window.openTxOnMempool = (txid) => {
-    const url = `https://mempool.space/tx/${txid}`;
+    const url = `https://mempool.space/signet/tx/${txid}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');
@@ -130,7 +307,9 @@ export function WalletComponent(container) {
     }
   };
 
-  // Add view all UTXOs handler
+  // Event handlers
+  content.querySelector('#refresh-all-btn').addEventListener('click', refreshAllData);
+
   const viewAllButton = content.querySelector('#view-all-utxos');
   if (viewAllButton) {
     viewAllButton.addEventListener('click', () => {
@@ -141,7 +320,6 @@ export function WalletComponent(container) {
     });
   }
 
-  // Add view all transactions handler
   const viewAllTransactionsButton = content.querySelector('#view-all-transactions');
   if (viewAllTransactionsButton) {
     viewAllTransactionsButton.addEventListener('click', () => {
@@ -151,4 +329,9 @@ export function WalletComponent(container) {
       });
     });
   }
+
+  // Initialize data
+  updateBalance();
+  updateTransactions();
+  updateUtxos();
 }
