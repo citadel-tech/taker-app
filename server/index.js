@@ -27,6 +27,17 @@ async function initNAPI() {
     }
 }
 
+// Middleware to ensure services are initialized
+function ensureInitialized(req, res, next) {
+    if (!takerInstance || !walletInstance) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'Service not initialized. Please initialize taker first.' 
+        });
+    }
+    next();
+}
+
 // Health check
 app.get('/api/health', (req, res) => {
     res.json({
@@ -37,245 +48,115 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// Test correct NAPI usage
-app.get('/api/test/correct', async (req, res) => {
-    try {
-        console.log('🧪 Testing correct NAPI usage with proper parameters...');
-
-        const rpcConfig = {
-            url: "127.0.0.1:38332",
-            username: "user",
-            password: "password",
-            walletName: "taker-wallet"
-        };
-
-        console.log('📋 RPC Config:', rpcConfig);
-
-        // Test 1: Try Wallet constructor (simpler, no initialization)
-        try {
-            console.log('💰 Testing Wallet constructor...');
-            const wallet = new coinswapNapi.Wallet("/tmp/coinswap-test-wallet", rpcConfig);
-            console.log('✅ Wallet instance created');
-
-            const balance = wallet.getBalances();
-            console.log('✅ Balance retrieved:', balance);
-
-            res.json({
-                success: true,
-                method: 'wallet',
-                balance,
-                config: rpcConfig
-            });
-            return;
-
-        } catch (walletError) {
-            console.log('❌ Wallet failed:', walletError.message);
-        }
-
-        // Test 2: Try Taker constructor with proper parameters
-        try {
-            console.log('🎯 Testing Taker constructor...');
-            const taker = new coinswapNapi.Taker(
-                null,                    // dataDir (use default ~/.coinswap/taker)
-                "taker-test",           // walletFileName
-                rpcConfig,              // rpcConfig object
-                null,                   // behavior (use default)
-                9053,                   // controlPort
-                null                    // torAuthPassword
-            );
-            console.log('✅ Taker instance created');
-
-            const balance = taker.getWalletBalances();
-            console.log('✅ Taker balance retrieved:', balance);
-
-            res.json({
-                success: true,
-                method: 'taker',
-                balance,
-                config: rpcConfig
-            });
-            return;
-
-        } catch (takerError) {
-            console.log('❌ Taker failed:', takerError.message);
-        }
-
-        res.json({
-            success: false,
-            error: 'Both Wallet and Taker constructors failed',
-            details: 'Check server logs for specific errors'
-        });
-
-    } catch (error) {
-        console.error('❌ Test failed:', error.message);
-        res.json({
-            success: false,
-            error: error.message,
-            stack: error.stack
-        });
-    }
-});
-
 // Initialize taker
 app.post('/api/taker/initialize', async (req, res) => {
     try {
-        if (!coinswapNapi) {
-            throw new Error('coinswap-napi not loaded');
-        }
-
-        const config = req.body;
-        console.log('🔧 Initializing taker with config:', JSON.stringify(config, null, 2));
+        const config = req.body || {};
 
         const rpcConfig = {
-            url: `${config.rpc.host}:${config.rpc.port}`,
-            username: config.rpc.username,
-            password: config.rpc.password,
+            url: `${config.rpc?.host || "127.0.0.1"}:${config.rpc?.port || 38332}`,
+            username: config.rpc?.username || "user",
+            password: config.rpc?.password || "password",
             walletName: "taker-wallet"
         };
 
-        console.log('🎯 Creating Taker instance...');
+        const dataDir = `${process.env.HOME}/.coinswap/taker`;
+        const walletPath = `${dataDir}/wallets/taker-wallet`;
+
+        console.log('🔧 Initializing Taker with config:', { dataDir, walletPath, rpcConfig });
+
         takerInstance = new coinswapNapi.Taker(
-            null,                              // dataDir (use default ~/.coinswap/taker)
-            "taker-wallet",                    // walletFileName  
-            rpcConfig,                         // rpcConfig object
-            null,                              // behavior
-            config.tor?.control_port || 9053,  // controlPort
-            config.tor?.tor_auth_password || null  // torAuthPassword
+            dataDir,
+            "taker-wallet",
+            rpcConfig,
+            null,
+            config.tor?.control_port || null,  // null = no Tor for now
+            config.tor?.tor_auth_password || null
         );
 
-        console.log('✅ Taker initialized successfully');
+        // Load the wallet for direct access
+        // TODO: Replace with takerInstance.getWallet() when available
+        walletInstance = coinswapNapi.Wallet.loadWallet(walletPath, rpcConfig);
 
-        res.json({
-            success: true,
-            message: 'Taker initialized successfully',
-            method: 'taker'
-        });
+        console.log('✅ Taker initialized successfully');
+        res.json({ success: true, message: "Taker initialized and ready" });
 
     } catch (error) {
-        console.error('❌ Taker initialization failed:', error);
-        res.json({
-            success: false,
-            error: error.message,
-            details: error.stack
-        });
+        console.error('❌ Initialization failed:', error);
+        res.json({ success: false, error: error.message });
     }
 });
 
-// Track sync operations to prevent race conditions
-let isSyncing = false;
-let lastSyncTime = 0;
-const SYNC_COOLDOWN = 2000; // 2 second cooldown between syncs
-
-async function safeSync(walletOrTaker, type = 'wallet') {
-    const now = Date.now();
-
-    // Skip if already syncing or too soon since last sync
-    if (isSyncing || (now - lastSyncTime) < SYNC_COOLDOWN) {
-        console.log(`⏱️ Skipping sync - too frequent (last sync: ${now - lastSyncTime}ms ago)`);
-        return;
-    }
-
-    try {
-        isSyncing = true;
-        lastSyncTime = now;
-
-        if (type === 'wallet') {
-            console.log('🔄 Safe syncing wallet...');
-            walletOrTaker.syncAndSave();
-        } else {
-            console.log('🔄 Safe syncing taker...');
-            walletOrTaker.syncWallet();
-        }
-        console.log('✅ Safe sync completed');
-    } catch (error) {
-        console.error('❌ Sync failed:', error);
-    } finally {
-        isSyncing = false;
-    }
-}
-
 // Get balance
-app.get('/api/taker/balance', async (req, res) => {
+app.get('/api/taker/balance', ensureInitialized, async (req, res) => {
     try {
-        if (!takerInstance) {
-            throw new Error('Taker not initialized');
-        }
+        // Sync both to ensure latest state
+        takerInstance.syncWallet();
+        walletInstance.syncAndSave();
 
-        console.log('🎯 Getting balance from Taker...');
-        await safeSync(takerInstance, 'taker');
-        const balance = takerInstance.getWalletBalances();
+        const balance = walletInstance.getBalances();
 
-        console.log('✅ Balance retrieved:', balance);
-        res.json({ success: true, balance });
-
+        res.json({
+            success: true,
+            balance: {
+                spendable: balance.spendable,
+                regular: balance.regular,
+                swap: balance.swap,
+                contract: balance.contract,
+                fidelity: balance.fidelity
+            }
+        });
     } catch (error) {
         console.error('❌ Failed to get balance:', error);
         res.json({ success: false, error: error.message });
     }
 });
 
-// Generate new address
-app.post('/api/taker/address', async (req, res) => {
+// Get new address - NOTE: Currently returns same address due to NAPI limitation
+app.post('/api/taker/address', ensureInitialized, async (req, res) => {
     try {
-        if (!takerInstance) {
-            throw new Error('Taker not initialized');
-        }
+        const address = walletInstance.getNextExternalAddress();
+        
+        // TODO: This currently returns the same address each time
+        // Need taker.getWallet() API to properly increment address index
+        console.log('⚠️  Address generation limitation - returns same address');
+        
+        // Sync after generating new address
+        walletInstance.syncAndSave();
+        takerInstance.syncWallet();
 
-        console.log('💰 Generating address from coinswap wallet...');
-
-        // Use the same path and config as Taker initialization
-        const walletPath = `${process.env.HOME}/.coinswap/taker/taker/wallets/taker-wallet`;
-
-        // Get the same RPC config (we need to store this globally or reconstruct it)
-        const rpcConfig = {
-            url: '127.0.0.1:38332',  // This should match what was used in initialize
-            username: 'user',
-            password: 'password',
-            walletName: 'taker-wallet'
-        };
-
-        const tempWallet = new coinswapNapi.Wallet(walletPath, rpcConfig);
-        const address = tempWallet.getNextExternalAddress();
-        tempWallet.syncAndSave();
-
-        console.log('✅ Address generated from coinswap wallet:', address);
-        res.json({ success: true, address: address.address });
-
+        // Return just the address string, not nested object
+        res.json({ 
+            success: true, 
+            address: address.address || address
+        });
     } catch (error) {
-        console.error('❌ Failed to generate address from coinswap wallet:', error);
+        console.error('❌ Failed to generate address:', error);
         res.json({ success: false, error: error.message });
     }
 });
 
 // Sync wallet
-app.post('/api/taker/sync', async (req, res) => {
+app.post('/api/taker/sync', ensureInitialized, async (req, res) => {
     try {
-        if (walletInstance) {
-            console.log('💰 Syncing Wallet...');
-            walletInstance.syncAndSave();
-        } else if (takerInstance) {
-            console.log('🎯 Syncing Taker wallet...');
-            takerInstance.syncWallet();
-        } else {
-            throw new Error('Neither Wallet nor Taker initialized');
-        }
+        console.log('🔄 Syncing wallet...');
+        
+        // Sync both instances
+        takerInstance.syncWallet();
+        walletInstance.syncAndSave();
 
-        console.log('✅ Wallet synced');
+        console.log('✅ Wallet synced successfully');
         res.json({ success: true, message: 'Wallet synced successfully' });
 
     } catch (error) {
-        console.error('❌ Failed to sync wallet:', error);
+        console.error('❌ Sync failed:', error);
         res.json({ success: false, error: error.message });
     }
 });
 
 // Fetch offers (Taker only)
-app.get('/api/taker/offers', async (req, res) => {
+app.get('/api/taker/offers', ensureInitialized, async (req, res) => {
     try {
-        if (!takerInstance) {
-            throw new Error('Taker not initialized - offers require full Taker instance');
-        }
-
         console.log('📊 Syncing offerbook...');
         takerInstance.syncOfferbook();
 
@@ -283,7 +164,7 @@ app.get('/api/taker/offers', async (req, res) => {
         const makers = takerInstance.fetchAllMakers();
 
         console.log('✅ Offers retrieved:', makers?.length || 0);
-        res.json({ success: true, offers: makers });
+        res.json({ success: true, offers: makers || [] });
 
     } catch (error) {
         console.error('❌ Failed to fetch offers:', error);
@@ -292,31 +173,32 @@ app.get('/api/taker/offers', async (req, res) => {
 });
 
 // Do coinswap (Taker only)
-app.post('/api/taker/coinswap', async (req, res) => {
+app.post('/api/taker/coinswap', ensureInitialized, async (req, res) => {
     try {
-        if (!takerInstance) {
-            throw new Error('Taker not initialized - coinswap requires full Taker instance');
+        const { amount, makerCount = 2 } = req.body;
+        
+        if (!amount || amount <= 0) {
+            throw new Error('Invalid amount specified');
         }
 
-        const { amount, makerCount } = req.body;
-        console.log(`🔄 Starting coinswap: ${amount} sats with ${makerCount || 2} makers...`);
+        console.log(`🔄 Starting coinswap: ${amount} sats with ${makerCount} makers...`);
 
         const swapParams = coinswapNapi.createSwapParams(
             amount,
-            makerCount || 2,
+            makerCount,
             []  // No manually selected outpoints
         );
 
         console.log('📋 Swap params:', swapParams);
 
-        // Note: This will likely require maker connections and may take time
-        takerInstance.sendCoinswap(swapParams);
-        console.log('✅ Coinswap initiated');
+        // This is synchronous in the current API
+        const result = takerInstance.doCoinswap(swapParams);
+        console.log('✅ Coinswap completed');
 
         res.json({
             success: true,
-            message: 'Coinswap initiated successfully',
-            swapParams
+            message: 'Coinswap completed successfully',
+            result
         });
 
     } catch (error) {
@@ -325,78 +207,108 @@ app.post('/api/taker/coinswap', async (req, res) => {
     }
 });
 
-// Get transactions - FIXED WITH GRACEFUL HANDLING
-app.get('/api/taker/transactions', async (req, res) => {
+// Get transactions
+app.get('/api/taker/transactions', ensureInitialized, async (req, res) => {
     try {
         const { count = 10, skip = 0 } = req.query;
         console.log(`📊 Getting ${count} transactions (skip ${skip})...`);
 
-        // If wallet exists, try to get transactions
-        if (walletInstance) {
-            try {
-                const transactions = walletInstance.getTransactions(parseInt(count), parseInt(skip));
-                console.log('✅ Transactions retrieved:', transactions?.length || 0);
-                res.json({ success: true, transactions });
-                return;
-            } catch (error) {
-                console.log(`⚠️  Transaction retrieval failed (${error.message}), falling back to empty list`);
-            }
-        }
-
-        // Graceful fallback - don't fail the entire API
-        console.log('📊 No transaction history available - using internal wallet only');
-        res.json({
-            success: true,
-            transactions: [],
-            message: 'Limited mode: Transaction history not available. Balance and address generation still work.'
-        });
+        const transactions = walletInstance.getTransactions(parseInt(count), parseInt(skip));
+        console.log('✅ Transactions retrieved:', transactions?.length || 0);
+        
+        res.json({ success: true, transactions: transactions || [] });
 
     } catch (error) {
-        console.log(`⚠️  Transaction endpoint error: ${error.message}`);
-        // Still return success with empty list to prevent UI breakage
+        console.log(`⚠️  Transaction retrieval failed: ${error.message}`);
+        // Graceful fallback to prevent UI breakage
         res.json({
             success: true,
             transactions: [],
-            message: 'Limited mode: Transaction history temporarily unavailable'
+            message: 'Transaction history temporarily unavailable'
         });
     }
 });
 
-// Get UTXOs - FIXED WITH GRACEFUL HANDLING
-app.get('/api/taker/utxos', async (req, res) => {
+// Get UTXOs
+app.get('/api/taker/utxos', ensureInitialized, async (req, res) => {
     try {
         console.log('📊 Getting UTXOs...');
-
-        if (walletInstance) {
-            try {
-                const utxos = walletInstance.listAllUtxos();
-                console.log('✅ UTXOs retrieved:', utxos?.length || 0);
-                res.json({ success: true, utxos });
-                return;
-            } catch (error) {
-                console.log(`⚠️  UTXO retrieval failed (${error.message}), falling back to empty list`);
+        
+        const rawUtxos = walletInstance.listAllUtxos();
+        console.log('✅ UTXOs retrieved:', rawUtxos?.length || 0);
+        
+        // Transform NAPI format [ListUnspentResultEntry, UtxoSpendInfo] to frontend format
+        const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => ({
+            utxo: {
+                txid: utxoEntry.txid.hex,
+                vout: utxoEntry.vout,
+                amount: utxoEntry.amount.sats,
+                confirmations: utxoEntry.confirmations,
+                address: utxoEntry.address,
+                scriptPubKey: utxoEntry.scriptPubKey,
+                spendable: utxoEntry.spendable,
+                solvable: utxoEntry.solvable,
+                safe: utxoEntry.safe
+            },
+            spendInfo: {
+                spendType: spendInfo.spendType,
+                path: spendInfo.path,
+                multisigRedeemscript: spendInfo.multisigRedeemscript,
+                inputValue: spendInfo.inputValue,
+                index: spendInfo.index
             }
-        }
-
-        // Graceful fallback
-        console.log('📊 No UTXOs available - using internal wallet only');
-        res.json({
-            success: true,
-            utxos: [],
-            message: 'Limited mode: UTXO list not available. Balance still works.'
-        });
+        }));
+        
+        res.json({ success: true, utxos: transformedUtxos || [] });
 
     } catch (error) {
-        console.log(`⚠️  UTXO endpoint error: ${error.message}`);
-        // Still return success with empty list
+        console.log(`⚠️  UTXO retrieval failed: ${error.message}`);
+        // Graceful fallback
         res.json({
             success: true,
             utxos: [],
-            message: 'Limited mode: UTXO list temporarily unavailable'
+            message: 'UTXO list temporarily unavailable'
         });
     }
 });
 
+// Send to address
+app.post('/api/taker/send', ensureInitialized, async (req, res) => {
+    try {
+        const { address, amount } = req.body;
+        
+        if (!address || !amount || amount <= 0) {
+            throw new Error('Invalid address or amount');
+        }
+
+        console.log(`📤 Sending ${amount} sats to ${address}...`);
+        
+        const txid = walletInstance.sendToAddress(address, amount);
+        
+        // Sync after sending
+        walletInstance.syncAndSave();
+        takerInstance.syncWallet();
+
+        console.log(`✅ Transaction sent: ${txid}`);
+        res.json({ success: true, txid });
+
+    } catch (error) {
+        console.error('❌ Send failed:', error);
+        res.json({ success: false, error: error.message });
+    }
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+    console.error('🔥 Unhandled error:', err);
+    res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        message: err.message
+    });
+});
+
+// Start server
 const PORT = 3001;
 app.listen(PORT, async () => {
     console.log(`🚀 Bridge server running on http://localhost:${PORT}`);

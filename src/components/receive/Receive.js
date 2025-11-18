@@ -1,7 +1,7 @@
 export function ReceiveComponent(container) {
   const content = document.createElement('div');
   content.id = 'receive-content';
-  
+
   let currentAddress = null;
   let isGenerating = false;
 
@@ -153,7 +153,7 @@ export function ReceiveComponent(container) {
       copyButton.textContent = 'Copied!';
       copyButton.classList.add('bg-green-500');
       copyButton.classList.remove('bg-[#FF6B35]');
-      
+
       setTimeout(() => {
         copyButton.textContent = 'Copy';
         copyButton.classList.remove('bg-green-500');
@@ -168,7 +168,7 @@ export function ReceiveComponent(container) {
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-      
+
       copyButton.textContent = 'Copied!';
       setTimeout(() => {
         copyButton.textContent = 'Copy';
@@ -179,30 +179,35 @@ export function ReceiveComponent(container) {
   // Generate new address
   async function generateNewAddress() {
     if (isGenerating) return;
-    
+
     isGenerating = true;
     generateButton.disabled = true;
     generateText.classList.add('hidden');
     generateLoading.classList.remove('hidden');
-    
+
     try {
       console.log('🎯 Requesting new address...');
       const result = await callAPI('/taker/address', 'POST');
-      
+
       if (result.success && result.address) {
-        currentAddress = result.address;
-        currentAddressEl.textContent = result.address;
+        // Handle both string and object address formats
+        const addressString = typeof result.address === 'string'
+          ? result.address
+          : result.address.address;
+
+        currentAddress = addressString;
+        currentAddressEl.textContent = addressString;
         copyButton.disabled = false;
-        
+
         // Update QR code
-        generateQR(result.address);
-        
+        generateQR(addressString);
+
         // Update status
         generationTime.textContent = new Date().toLocaleTimeString();
         usageCount.textContent = '0';
         totalReceived.textContent = '0 BTC';
-        
-        console.log('✅ New address generated:', result.address);
+
+        console.log('✅ New address generated:', addressString);
       } else {
         throw new Error(result.error || 'Failed to generate address');
       }
@@ -236,7 +241,7 @@ export function ReceiveComponent(container) {
         <div class="text-center text-red-400">
           <p>❌</p>
           <p class="text-sm mt-2">Initialization failed</p>
-          <button onclick="initialize()" class="mt-2 text-xs underline">Retry</button>
+          <button onclick="location.reload()" class="mt-2 text-xs underline">Retry</button>
         </div>
       `;
     }

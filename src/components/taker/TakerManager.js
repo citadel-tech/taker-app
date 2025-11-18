@@ -122,62 +122,50 @@ export class TakerManager {
         }
     }
 
-    async initialize() {
-        try {
-            console.log('🚀 Initializing Taker automatically...');
-            
-            // Step 1: Set up Bitcoin Core wallet FIRST (this is what enables full functionality)
-            console.log('📋 Step 1: Setting up Bitcoin Core wallet...');
-            try {
-                const walletSetup = await this.createBitcoinCoreWallet();
-                console.log('✅ Bitcoin Core wallet setup:', walletSetup.message);
-            } catch (walletError) {
-                console.warn('⚠️ Bitcoin Core wallet setup failed:', walletError.message);
-                console.log('📝 Continuing anyway - will have limited functionality...');
-                // Don't fail completely, just continue with limited mode
-            }
-            
-            // Step 2: Create taker configuration
-            console.log('📋 Step 2: Configuring taker...');
-            const takerConfig = {
-                rpc: {
-                    host: this.config.rpc?.host || '127.0.0.1',
-                    port: this.config.rpc?.port || 38332,
-                    username: this.config.rpc?.username || 'user',
-                    password: this.config.rpc?.password || 'password',
-                },
-                tor: {
-                    control_port: this.config.taker?.control_port || 9053,
-                    socks_port: this.config.taker?.socks_port || 9052,
-                    auth_password: this.config.taker?.tor_auth_password || '',
-                },
-                tracker_address: this.config.taker?.tracker_address || '',
-            };
+async initialize() {
+    try {
+        console.log('🚀 Initializing Taker automatically...');
 
-            console.log('📋 Taker config being sent:', takerConfig);
+        
+        // Step 1: Create taker configuration
+        console.log('📋 Configuring taker...');
+        const takerConfig = {
+            rpc: {
+                host: this.config.rpc?.host || '127.0.0.1',
+                port: this.config.rpc?.port || 38332,
+                username: this.config.rpc?.username || 'user',
+                password: this.config.rpc?.password || 'password',
+            },
+            tor: {
+                control_port: this.config.taker?.control_port || 9053,
+                socks_port: this.config.taker?.socks_port || 9052,
+                auth_password: this.config.taker?.tor_auth_password || '',
+            },
+            tracker_address: this.config.taker?.tracker_address || '',
+        };
 
-            // Step 3: Initialize via bridge (server will now have the wallet ready)
-            console.log('📋 Step 3: Initializing taker via bridge...');
-            const result = await this.callBridge('/taker/initialize', takerConfig);
-            
-            if (!result.success) {
-                throw new Error(result.error);
-            }
-            
-            this.isInitialized = true;
-            console.log('✅ Taker initialized successfully with full functionality');
-            
-            return { success: true };
-            
-        } catch (error) {
-            console.error('❌ Failed to initialize Taker:', error);
-            return { 
-                success: false, 
-                error: error.message,
-                details: error
-            };
+        // Step 2: Initialize via bridge (let it handle everything)
+        console.log('📋 Initializing taker via bridge...');
+        const result = await this.callBridge('/taker/initialize', takerConfig);
+        
+        if (!result.success) {
+            throw new Error(result.error);
         }
+        
+        this.isInitialized = true;
+        console.log('✅ Taker initialized successfully');
+        
+        return { success: true };
+        
+    } catch (error) {
+        console.error('❌ Failed to initialize Taker:', error);
+        return { 
+            success: false, 
+            error: error.message,
+            details: error
+        };
     }
+}
 
     async fetchOffers() {
         if (!this.isInitialized) {
