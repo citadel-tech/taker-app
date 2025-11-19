@@ -1,7 +1,7 @@
 import { SwapStateManager } from './SwapStateManager.js';
 
 export function SwapComponent(container) {
-  console.log('🔧 SwapComponent loading...');
+  console.log('ðŸ”§ SwapComponent loading...');
   
   const content = document.createElement('div');
   content.id = 'swap-content';
@@ -10,11 +10,11 @@ export function SwapComponent(container) {
   const activeSwap = SwapStateManager.getActiveSwap();
   const hasActiveSwap = SwapStateManager.hasActiveSwap();
   
-  console.log('📊 Active swap check:', { activeSwap, hasActiveSwap });
+  console.log('ðŸ“Š Active swap check:', { activeSwap, hasActiveSwap });
 
   // If there's an active swap in progress, redirect to coinswap progress
   if (activeSwap && activeSwap.status === 'in_progress') {
-    console.log('🔄 Found active swap in progress, redirecting to Coinswap component');
+    console.log('ðŸ”„ Found active swap in progress, redirecting to Coinswap component');
     import('./Coinswap.js').then((module) => {
       container.innerHTML = '';
       module.CoinswapComponent(container, activeSwap);
@@ -33,10 +33,10 @@ export function SwapComponent(container) {
 
   // Restore user selections from saved state if available
   const savedSelections = SwapStateManager.getUserSelections();
-  console.log('🔍 Attempting to restore selections:', savedSelections);
+  console.log('ðŸ” Attempting to restore selections:', savedSelections);
   
   if (savedSelections) {
-    console.log('🔄 Restoring saved user selections:', savedSelections);
+    console.log('ðŸ”„ Restoring saved user selections:', savedSelections);
     swapAmount = savedSelections.swapAmount || 0;
     amountUnit = savedSelections.amountUnit || 'sats';
     numberOfHops = savedSelections.numberOfHops || 3;
@@ -45,17 +45,17 @@ export function SwapComponent(container) {
     selectedMakers = savedSelections.selectedMakers || [];
     networkFeeRate = savedSelections.networkFeeRate || 5;
   } else {
-    console.log('⚠️ No saved selections found, using defaults');
+    console.log('âš ï¸ No saved selections found, using defaults');
   }
 
-  const availableUtxos = [
+  let availableUtxos = [
     { txid: 'a1b2c3d4e5f6', vout: 0, amount: 5000000, type: 'Regular' },
     { txid: '7g8h9i0j1k2l', vout: 1, amount: 10000000, type: 'Regular' },
     { txid: 'm3n4o5p6q7r8', vout: 0, amount: 5000000, type: 'Swap' },
     { txid: 'u1v2w3x4y5z6', vout: 2, amount: 3000000, type: 'Regular' },
   ];
 
-  const availableMakers = [
+  let availableMakers = [
     {
       address: 'ewaexd2es2uzr34wp26c',
       fee: 10.0,
@@ -70,24 +70,127 @@ export function SwapComponent(container) {
       maxSize: 49908736,
       bond: 50000,
     },
-    {
-      address: 'abc123xyz789d6gh8ijk',
-      fee: 12.5,
-      minSize: 5000,
-      maxSize: 30000000,
-      bond: 35000,
-    },
-    {
-      address: 'def456uvw012e3fg9klm',
-      fee: 9.0,
-      minSize: 15000,
-      maxSize: 60000000,
-      bond: 75000,
-    },
   ];
 
-  const totalBalance = 23000000;
-  const btcPrice = 30000;
+  let totalBalance = 23000000;
+  const btcPrice = 50000;
+
+  // Fetch real UTXOs from API
+  async function fetchUtxos() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/utxos');
+      const data = await response.json();
+      
+      if (data.success && data.utxos) {
+        availableUtxos = data.utxos.map((item, index) => {
+          const utxo = item.utxo || item;
+          const spendInfo = item.spendInfo || {};
+          const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+          
+          return {
+            txid: txid,
+            vout: utxo.vout,
+            amount: utxo.amount,
+            type: spendInfo.spendType || 'SeedCoin',
+            index: index
+          };
+        });
+        console.log('✅ Loaded', availableUtxos.length, 'UTXOs for swap');
+      }
+    } catch (error) {
+      console.error('Failed to fetch UTXOs:', error);
+    }
+  }
+
+  // Fetch real makers from API
+  async function fetchMakers() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/offers');
+      const data = await response.json();
+      
+      if (data.success && data.offerbook && data.offerbook.goodMakers) {
+        availableMakers = data.offerbook.goodMakers.map((item, index) => {
+          const offer = item.offer;
+          const address = item.address?.address || item.address;
+          
+          return {
+            address: address,
+            fee: (offer.amountRelativeFeePct || 0).toFixed(1),
+            minSize: offer.minSize || 0,
+            maxSize: offer.maxSize || 0,
+            bond: offer.fidelity?.bond?.amount?.sats || 0,
+            index: index
+          };
+        });
+        console.log('✅ Loaded', availableMakers.length, 'makers for swap');
+      }
+    } catch (error) {
+      console.error('Failed to fetch makers:', error);
+    }
+  }
+
+  // Fetch balance
+  async function fetchBalance() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/balance');
+      const data = await response.json();
+      
+      if (data.success) {
+        totalBalance = data.balance.spendable;
+        console.log('✅ Balance:', totalBalance);
+      }
+    } catch (error) {
+      console.error('Failed to fetch balance:', error);
+    }
+  }
+
+  // Render UTXO list dynamically
+  function renderUtxoList() {
+    const utxoListContainer = content.querySelector('#utxo-list');
+    if (!utxoListContainer) return;
+
+    if (availableUtxos.length === 0) {
+      utxoListContainer.innerHTML = '<p class="text-gray-400 text-center py-4">No UTXOs available</p>';
+      return;
+    }
+
+    utxoListContainer.innerHTML = availableUtxos.map((utxo, index) => {
+      const btcAmount = (utxo.amount / 100000000).toFixed(8);
+      const usdAmount = ((utxo.amount / 100000000) * btcPrice).toFixed(2);
+      const timestamps = ['2 hours ago', '1 day ago', '3 days ago', '1 week ago'];
+      const timestamp = timestamps[index] || '1 month ago';
+      
+      return `
+        <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
+          <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+          <div class="flex-1">
+            <div class="flex justify-between items-center">
+              <span class="font-mono text-sm text-gray-300">${utxo.txid.substring(0, 12)}...${utxo.txid.substring(-4)}:${utxo.vout}</span>
+              <div class="text-right">
+                <div class="text-sm font-mono text-green-400">${btcAmount} BTC</div>
+                <div class="text-xs text-gray-500">${usdAmount} USD</div>
+              </div>
+            </div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-xs text-gray-500">${timestamp}</span>
+              <span class="text-xs ${utxo.type.includes('Swap') ? 'text-blue-400' : 'text-green-400'}">${utxo.type}</span>
+            </div>
+          </div>
+        </label>
+      `;
+    }).join('');
+
+    // Re-attach event listeners
+    availableUtxos.forEach((_, index) => {
+      const checkbox = content.querySelector('#utxo-' + index);
+      if (checkbox) {
+        checkbox.addEventListener('change', () => {
+          toggleUtxoSelection(index);
+          saveCurrentSelections();
+        });
+      }
+    });
+  }
 
   // FUNCTIONS
 
@@ -180,7 +283,7 @@ export function SwapComponent(container) {
     const swapBtc = swapAmount / 100000000;
     const swapUsd = swapBtc * btcPrice;
     content.querySelector('#swap-amount-conversions').textContent =
-      '≈ ' + swapBtc.toFixed(8) + ' BTC • $' + swapUsd.toFixed(2) + ' USD';
+      'â‰ˆ ' + swapBtc.toFixed(8) + ' BTC â€¢ $' + swapUsd.toFixed(2) + ' USD';
 
     content.querySelector('#num-makers-display').textContent =
       details.makers + ' maker' + (details.makers !== 1 ? 's' : '');
@@ -365,7 +468,7 @@ export function SwapComponent(container) {
       selectedMakers,
       networkFeeRate
     };
-    console.log('💾 Saving current selections:', selections);
+    console.log('ðŸ’¾ Saving current selections:', selections);
     SwapStateManager.saveUserSelections(selections);
   }
 
@@ -408,7 +511,7 @@ export function SwapComponent(container) {
                                 Max
                             </button>
                         </div>
-                        <p id="swap-amount-conversions" class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
+                        <p id="swap-amount-conversions" class="text-xs text-gray-400 mt-2">â‰ˆ 0.00000000 BTC â€¢ $0.00 USD</p>
                     </div>
 
                     <!-- Selection Mode -->
@@ -461,43 +564,12 @@ export function SwapComponent(container) {
                         <!-- Warning Message -->
                         <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <p class="text-xs text-yellow-400">
-                                âš  Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
+                                Ã¢Å¡Â  Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
                             </p>
                         </div>
                         
-                        <div class="space-y-2">
-                            ${availableUtxos
-                              .map((utxo, index) => {
-                                const btcAmount = (
-                                  utxo.amount / 100000000
-                                ).toFixed(8);
-                                const usdAmount = (
-                                  (utxo.amount / 100000000) *
-                                  btcPrice
-                                ).toFixed(2);
-                                // Add timestamps for each UTXO
-                                const timestamps = ['2 hours ago', '1 day ago', '3 days ago', '1 week ago'];
-                                const timestamp = timestamps[index] || '1 month ago';
-                                return `
-                                <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
-                                    <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-[#FF6B35]" />
-                                    <div class="flex-1">
-                                        <div class="flex justify-between items-center">
-                                            <span class="font-mono text-sm text-gray-300">${utxo.txid}:${utxo.vout}</span>
-                                            <div class="text-right">
-                                                <div class="text-sm font-mono text-green-400">${btcAmount} BTC</div>
-                                                <div class="text-xs text-gray-500">${usdAmount} USD</div>
-                                            </div>
-                                        </div>
-                                        <div class="flex justify-between items-center mt-1">
-                                            <span class="text-xs text-gray-500">${timestamp}</span>
-                                            <span class="text-xs ${utxo.type === 'Swap' ? 'text-blue-400' : 'text-green-400'}">${utxo.type}</span>
-                                        </div>
-                                    </div>
-                                </label>
-                            `;
-                              })
-                              .join('')}
+                        <div id="utxo-list" class="space-y-2">
+                            <p class="text-gray-400 text-center py-4">Loading UTXOs...</p>
                         </div>
                     </div>
 
@@ -505,7 +577,7 @@ export function SwapComponent(container) {
                     <div class="bg-[#1a2332] rounded-lg p-6">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-xl font-semibold text-gray-300">Select Makers</h3>
-                            <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> makers â†’ <span id="calculated-hops">1</span> hops</span>
+                            <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> makers Ã¢â€ â€™ <span id="calculated-hops">1</span> hops</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="w-full">
@@ -620,9 +692,9 @@ export function SwapComponent(container) {
                                     <strong>Privacy Benefits:</strong>
                                 </p>
                                 <ul class="text-xs text-purple-400 space-y-1">
-                                    <li>â€¢ Breaks transaction links</li>
-                                    <li>â€¢ Multiple mixing hops</li>
-                                    <li>â€¢ Enhanced anonymity</li>
+                                    <li>Ã¢â‚¬Â¢ Breaks transaction links</li>
+                                    <li>Ã¢â‚¬Â¢ Multiple mixing hops</li>
+                                    <li>Ã¢â‚¬Â¢ Enhanced anonymity</li>
                                 </ul>
                             </div>
                         </div>
@@ -704,7 +776,7 @@ export function SwapComponent(container) {
       saveCurrentSelections();
     });
   content.querySelector('#start-coinswap-btn').addEventListener('click', () => {
-    console.log('🚀 Start Coinswap button clicked');
+    console.log('ðŸš€ Start Coinswap button clicked');
     
     // Make sure we have the latest amount
     swapAmount = getAmountInSats();
@@ -725,33 +797,25 @@ export function SwapComponent(container) {
       startTime: Date.now()
     };
 
-    console.log('💾 Saving swap configuration:', swapConfig);
+    console.log('ðŸ’¾ Saving swap configuration:', swapConfig);
     
     // Save the swap configuration to SwapStateManager
     SwapStateManager.saveSwapConfig(swapConfig);
     
     // Start the background manager
     if (window.appManager) {
-      console.log('🔄 Starting background swap manager');
+      console.log('ðŸ”„ Starting background swap manager');
       window.appManager.startBackgroundSwapManager();
     }
 
-    console.log('📍 Navigating to Coinswap component');
+    console.log('ðŸ“ Navigating to Coinswap component');
     import('./Coinswap.js').then((module) => {
       container.innerHTML = '';
       module.CoinswapComponent(container, swapConfig);
     });
   });
 
-  // UTXO selection listeners
-  availableUtxos.forEach((_, index) => {
-    content
-      .querySelector('#utxo-' + index)
-      .addEventListener('change', () => {
-        toggleUtxoSelection(index);
-        saveCurrentSelections();
-      });
-  });
+  // UTXO selection listeners are now attached in renderUtxoList()
 
   // Maker row click listeners
   content.querySelectorAll('.maker-row').forEach((row) => {
@@ -790,49 +854,58 @@ export function SwapComponent(container) {
     setHopCount(numberOfHops);
   }
   
-  // Restore UTXO selections
-  if (selectedUtxos.length > 0) {
-    selectedUtxos.forEach(index => {
-      const checkbox = content.querySelector('#utxo-' + index);
-      if (checkbox) {
-        checkbox.checked = true;
-      }
-    });
-    content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
-    checkUtxoTypeWarning();
+  // Fetch real data
+  Promise.all([fetchUtxos(), fetchMakers(), fetchBalance()]).then(() => {
+    // Render the UTXO list with real data
+    renderUtxoList();
     
-    // Set swap amount from selected UTXOs if in manual mode
-    if (selectionMode === 'manual') {
-      swapAmount = getSelectedUtxosTotal();
-      content.querySelector('#swap-amount-input').value = swapAmount;
-    }
-  }
-  
-  // Restore maker selections
-  if (selectedMakers.length > 0) {
-    selectedMakers.forEach(index => {
-      const checkbox = content.querySelector('#maker-checkbox-' + index);
-      if (checkbox) {
-        checkbox.checked = true;
+    // After data is loaded, restore selections
+    
+    // Restore UTXO selections
+    if (selectedUtxos.length > 0) {
+      selectedUtxos.forEach(index => {
+        const checkbox = content.querySelector('#utxo-' + index);
+        if (checkbox) {
+          checkbox.checked = true;
+        }
+      });
+      content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
+      checkUtxoTypeWarning();
+      
+      // Set swap amount from selected UTXOs if in manual mode
+      if (selectionMode === 'manual') {
+        swapAmount = getSelectedUtxosTotal();
+        content.querySelector('#swap-amount-input').value = swapAmount;
       }
-    });
-    content.querySelector('#selected-makers-count').textContent = selectedMakers.length;
-    const hops = selectedMakers.length + 1;
-    content.querySelector('#calculated-hops').textContent = hops;
-  }
-  
-  // Restore amount input if not from UTXOs
-  if (swapAmount > 0 && selectionMode === 'auto') {
-    const input = content.querySelector('#swap-amount-input');
-    if (amountUnit === 'sats') {
-      input.value = swapAmount;
-    } else if (amountUnit === 'btc') {
-      input.value = (swapAmount / 100000000).toFixed(8);
-    } else if (amountUnit === 'usd') {
-      input.value = ((swapAmount / 100000000) * btcPrice).toFixed(2);
     }
-  }
+    
+    // Restore maker selections
+    if (selectedMakers.length > 0) {
+      selectedMakers.forEach(index => {
+        const checkbox = content.querySelector('#maker-checkbox-' + index);
+        if (checkbox) {
+          checkbox.checked = true;
+        }
+      });
+      content.querySelector('#selected-makers-count').textContent = selectedMakers.length;
+      const hops = selectedMakers.length + 1;
+      content.querySelector('#calculated-hops').textContent = hops;
+    }
+    
+    // Restore amount input if not from UTXOs
+    if (swapAmount > 0 && selectionMode === 'auto') {
+      const input = content.querySelector('#swap-amount-input');
+      if (amountUnit === 'sats') {
+        input.value = swapAmount;
+      } else if (amountUnit === 'btc') {
+        input.value = (swapAmount / 100000000).toFixed(8);
+      } else if (amountUnit === 'usd') {
+        input.value = ((swapAmount / 100000000) * btcPrice).toFixed(2);
+      }
+    }
+    
+    updateSummary();
+  });
   
   fetchNetworkFees();
-  updateSummary();
 }

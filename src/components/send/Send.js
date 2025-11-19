@@ -12,7 +12,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
   const txSize = 140; // vBytes
 
   // Available UTXOs for manual selection
-  const availableUtxos = [
+  let availableUtxos = [
     { txid: 'a1b2c3d4e5f6', vout: 0, amount: 5000000, type: 'Regular' },
     { txid: '7g8h9i0j1k2l', vout: 1, amount: 10000000, type: 'Regular' },
     { txid: 'm3n4o5p6q7r8', vout: 0, amount: 5000000, type: 'Swap' },
@@ -20,7 +20,36 @@ export function SendComponent(container, preSelectedUtxos = null) {
   ];
 
   // Calculate total available balance from UTXOs
-  const availableBalance = availableUtxos.reduce((sum, utxo) => sum + utxo.amount, 0); // 23,000,000 sats
+  let availableBalance = availableUtxos.reduce((sum, utxo) => sum + utxo.amount, 0); // 23,000,000 sats
+
+  // Fetch real UTXOs from API
+  async function fetchUtxosFromAPI() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/utxos');
+      const data = await response.json();
+      
+      if (data.success && data.utxos) {
+        availableUtxos = data.utxos.map((item, index) => {
+          const utxo = item.utxo || item;
+          const spendInfo = item.spendInfo || {};
+          const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+          
+          return {
+            txid: txid,
+            vout: utxo.vout,
+            amount: utxo.amount,
+            type: spendInfo.spendType || 'Regular',
+            index: index
+          };
+        });
+        
+        availableBalance = availableUtxos.reduce((sum, utxo) => sum + utxo.amount, 0);
+        console.log('✅ Loaded', availableUtxos.length, 'UTXOs');
+      }
+    } catch (error) {
+      console.error('Failed to fetch UTXOs:', error);
+    }
+  }
 
   // FUNCTIONS
 
@@ -223,8 +252,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
       const amountBtcEl = content.querySelector('#amount-btc');
       const amountUsdEl = content.querySelector('#amount-usd');
       if (amountBtcEl && amountUsdEl) {
-        amountBtcEl.textContent = '≈ ' + amountBtc.toFixed(8) + ' BTC';
-        amountUsdEl.textContent = '≈ $' + amountUsd.toFixed(2) + ' USD';
+        amountBtcEl.textContent = 'â‰ˆ ' + amountBtc.toFixed(8) + ' BTC';
+        amountUsdEl.textContent = 'â‰ˆ $' + amountUsd.toFixed(2) + ' USD';
       }
     }
 
@@ -233,7 +262,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     content.querySelector('#summary-fee-rate').textContent = selectedFeeRate;
     content.querySelector('#summary-fee').textContent = '~' + fee.toLocaleString() + ' sats';
     content.querySelector('#summary-total').textContent = Math.floor(total).toLocaleString() + ' sats';
-    content.querySelector('#summary-total-usd').textContent = '≈ $' + ((total * btcPrice) / 100000000).toFixed(2);
+    content.querySelector('#summary-total-usd').textContent = 'â‰ˆ $' + ((total * btcPrice) / 100000000).toFixed(2);
 
     // Update technical details
     content.querySelector('#tx-size').textContent = actualTxSize + ' vB';
@@ -245,7 +274,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     content.querySelector('#summary-remaining').textContent = Math.floor(remaining).toLocaleString() + ' sats';
     const remainingBtc = remaining / 100000000;
     const remainingUsd = remainingBtc * btcPrice;
-    content.querySelector('#summary-remaining-detail').textContent = remainingBtc.toFixed(8) + ' BTC ≈ $' + remainingUsd.toFixed(2);
+    content.querySelector('#summary-remaining-detail').textContent = remainingBtc.toFixed(8) + ' BTC â‰ˆ $' + remainingUsd.toFixed(2);
 
     // Update available balance display based on selection mode
     const availableBalanceEl = content.querySelector('#available-balance-sats');
@@ -339,8 +368,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
                             </button>
                         </div>
                         <div class="flex justify-between mt-2">
-                            <p id="amount-btc" class="text-xs text-gray-400">≈ 0.00000000 BTC</p>
-                            <p id="amount-usd" class="text-xs text-gray-400">≈ $0.00 USD</p>
+                            <p id="amount-btc" class="text-xs text-gray-400">â‰ˆ 0.00000000 BTC</p>
+                            <p id="amount-usd" class="text-xs text-gray-400">â‰ˆ $0.00 USD</p>
                         </div>
                     </div>
 
@@ -405,7 +434,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                         <!-- Warning Message -->
                         <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                             <p class="text-xs text-yellow-400">
-                                ⚠ Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per send.
+                                âš  Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per send.
                             </p>
                         </div>
                         
@@ -446,7 +475,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                 
                 <!-- Send Button (moved to bottom) -->
                 <div class="mt-6">
-                    <button class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-colors text-lg">
+                    <button id="send-bitcoin-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-colors text-lg">
                         Send Bitcoin
                     </button>
                 </div>
@@ -462,7 +491,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                             <p class="text-sm text-gray-400 mb-1">Available Balance</p>
                             <p id="available-balance-sats" class="text-xl font-mono text-green-400">23,000,000 sats</p>
                             <p class="text-xs text-gray-500">
-                                <span id="available-balance-btc">0.23000000</span> BTC ≈ $6,900
+                                <span id="available-balance-btc">0.23000000</span> BTC â‰ˆ $6,900
                             </p>
                         </div>
 
@@ -479,7 +508,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                                 <span class="text-sm font-semibold text-gray-300">Total Sent</span>
                                 <span id="summary-total" class="text-sm font-mono font-semibold text-[#FF6B35]">980 sats</span>
                             </div>
-                            <p id="summary-total-usd" class="text-xs text-gray-500 text-right mt-1">≈ $0.29</p>
+                            <p id="summary-total-usd" class="text-xs text-gray-500 text-right mt-1">â‰ˆ $0.29</p>
                         </div>
 
                         <!-- Essential Technical Details -->
@@ -507,7 +536,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                                 </div>
                                 <div class="flex justify-between">
                                     <span class="text-gray-400">RBF:</span>
-                                    <span class="text-blue-400">✓ Enabled</span>
+                                    <span class="text-blue-400">âœ“ Enabled</span>
                                 </div>
                             </div>
                         </div>
@@ -515,13 +544,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
                         <div class="border-t border-gray-700 pt-4">
                             <p class="text-sm text-gray-400 mb-1">Remaining Balance</p>
                             <p id="summary-remaining" class="text-lg font-mono text-blue-400">22,999,020 sats</p>
-                            <p id="summary-remaining-detail" class="text-xs text-gray-500">0.22999020 BTC ≈ $6,899.71</p>
+                            <p id="summary-remaining-detail" class="text-xs text-gray-500">0.22999020 BTC â‰ˆ $6,899.71</p>
                         </div>
                     </div>
 
                     <div class="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                         <p class="text-xs text-blue-400">
-                            ⓘ Transactions are irreversible. Double-check the address before sending.
+                            â“˜ Transactions are irreversible. Double-check the address before sending.
                         </p>
                     </div>
                 </div>
@@ -586,15 +615,95 @@ export function SendComponent(container, preSelectedUtxos = null) {
     }
   });
 
-  // UTXO selection listeners
-  availableUtxos.forEach((_, index) => {
-    const checkbox = content.querySelector('#utxo-' + index);
-    if (checkbox) {
-      checkbox.addEventListener('change', () => {
-        toggleUtxoSelection(index);
-      });
+  // SEND TRANSACTION FUNCTION
+  async function handleSendBitcoin() {
+    const recipientAddress = content.querySelector('#recipient-address').value.trim();
+    const amountSats = getAmountInSats();
+    
+    if (!recipientAddress) {
+      alert('Please enter a recipient address');
+      return;
     }
-  });
+    
+    if (amountSats <= 0) {
+      alert('Please enter a valid amount');
+      return;
+    }
+    
+    const fee = selectedFeeRate * txSize;
+    const total = amountSats + fee;
+    
+    if (total > availableBalance) {
+      alert(`Insufficient balance. Total required: ${(total / 100000000).toFixed(8)} BTC`);
+      return;
+    }
+    
+    const confirmed = confirm(
+      `Send ${(amountSats / 100000000).toFixed(8)} BTC to:\n${recipientAddress}\n\n` +
+      `Network Fee: ${fee} sats\n` +
+      `Total: ${(total / 100000000).toFixed(8)} BTC\n\n` +
+      `⚠️ This transaction is irreversible. Continue?`
+    );
+    
+    if (!confirmed) return;
+    
+    const sendBtn = content.querySelector('#send-bitcoin-btn');
+    const originalText = sendBtn.textContent;
+    sendBtn.disabled = true;
+    sendBtn.textContent = 'Sending...';
+    
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          address: recipientAddress,
+          amount: amountSats
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const txid = typeof data.txid === 'object' ? data.txid.hex : data.txid;
+        alert(`✅ Transaction sent successfully!\n\nTXID: ${txid}`);
+        
+        // Reset form
+        content.querySelector('#recipient-address').value = '';
+        content.querySelector('#amount-input').value = '';
+        
+        // Refresh UTXOs
+        await fetchUtxosFromAPI();
+        updateSummary();
+      } else {
+        throw new Error(data.error || 'Failed to send transaction');
+      }
+    } catch (error) {
+      console.error('Send failed:', error);
+      alert(`❌ Failed to send: ${error.message}`);
+    } finally {
+      sendBtn.disabled = false;
+      sendBtn.textContent = originalText;
+    }
+  }
+
+  // UTXO selection listeners
+  setTimeout(() => {
+    availableUtxos.forEach((_, index) => {
+      const checkbox = content.querySelector('#utxo-' + index);
+      if (checkbox) {
+        checkbox.addEventListener('change', () => {
+          toggleUtxoSelection(index);
+        });
+      }
+    });
+  }, 100);
+
+  // Send button listener
+  const sendBtn = content.querySelector('#send-bitcoin-btn');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', handleSendBitcoin);
+  }
 
   // INITIALIZE PRE-SELECTED UTXOs
   if (preSelectedUtxos && preSelectedUtxos.length > 0) {
@@ -614,5 +723,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     checkUtxoTypeWarning();
   }
   
+  // Fetch real data
+  fetchUtxosFromAPI();
   fetchFeeRates();
 }

@@ -108,6 +108,13 @@ export const SwapStateManager = {
       progress: this.getSwapProgress(),
       selections: this.getUserSelections()
     };
+  },
+
+  // Get elapsed time for active swap
+  getElapsedTime() {
+    const progress = this.getSwapProgress();
+    if (!progress || !progress.startTime) return 0;
+    return Date.now() - progress.startTime;
   }
 };
 

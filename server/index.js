@@ -155,57 +155,172 @@ app.post('/api/taker/sync', ensureInitialized, async (req, res) => {
 });
 
 // Fetch offers (Taker only)
-app.get('/api/taker/offers', ensureInitialized, async (req, res) => {
-    try {
-        console.log('📊 Syncing offerbook...');
-        takerInstance.syncOfferbook();
+// ADD THESE ENDPOINTS TO YOUR index.js (bridge server)
 
-        console.log('📊 Fetching makers...');
-        const makers = takerInstance.fetchAllMakers();
+// Get offerbook (all makers and offers)
+// app.get('/api/taker/offers', async (req, res) => {
+//   try {
+//     console.log('📊 Fetching offers...');
 
-        console.log('✅ Offers retrieved:', makers?.length || 0);
-        res.json({ success: true, offers: makers || [] });
+//     if (!takerInstance) {
+//       return res.json({
+//         success: false,
+//         error: 'Taker not initialized'
+//       });
+//     }
 
-    } catch (error) {
-        console.error('❌ Failed to fetch offers:', error);
-        res.json({ success: false, error: error.message });
+//     // Fetch offers from the taker
+//     const offerbook = takerInstance.fetchOffers();
+
+//     console.log('✅ Offers fetched:', {
+//       goodMakers: offerbook.goodMakers?.length || 0,
+//       allMakers: offerbook.allMakers?.length || 0
+//     });
+
+//     res.json({
+//       success: true,
+//       offerbook: {
+//         goodMakers: offerbook.goodMakers || [],
+//         allMakers: offerbook.allMakers || []
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('❌ Fetch offers error:', error);
+//     res.json({
+//       success: false,
+//       error: error.message || 'Failed to fetch offers'
+//     });
+//   }
+// });
+
+// Sync offerbook (refresh makers list)
+app.post('/api/taker/sync-offerbook', async (req, res) => {
+  try {
+    console.log('🔄 Syncing offerbook...');
+
+    if (!takerInstance) {
+      return res.json({
+        success: false,
+        error: 'Taker not initialized'
+      });
     }
+
+    // Sync the offerbook
+    takerInstance.syncOfferbook();
+
+    console.log('✅ Offerbook synced');
+
+    res.json({
+      success: true,
+      message: 'Offerbook synced successfully'
+    });
+
+  } catch (error) {
+    console.error('❌ Sync offerbook error:', error);
+    res.json({
+      success: false,
+      error: error.message || 'Failed to sync offerbook'
+    });
+  }
 });
 
-// Do coinswap (Taker only)
-app.post('/api/taker/coinswap', ensureInitialized, async (req, res) => {
-    try {
-        const { amount, makerCount = 2 } = req.body;
-        
-        if (!amount || amount <= 0) {
-            throw new Error('Invalid amount specified');
-        }
+// Get good makers (addresses only)
+app.get('/api/taker/good-makers', async (req, res) => {
+  try {
+    console.log('📋 Fetching good makers...');
 
-        console.log(`🔄 Starting coinswap: ${amount} sats with ${makerCount} makers...`);
-
-        const swapParams = coinswapNapi.createSwapParams(
-            amount,
-            makerCount,
-            []  // No manually selected outpoints
-        );
-
-        console.log('📋 Swap params:', swapParams);
-
-        // This is synchronous in the current API
-        const result = takerInstance.doCoinswap(swapParams);
-        console.log('✅ Coinswap completed');
-
-        res.json({
-            success: true,
-            message: 'Coinswap completed successfully',
-            result
-        });
-
-    } catch (error) {
-        console.error('❌ Coinswap failed:', error);
-        res.json({ success: false, error: error.message });
+    if (!takerInstance) {
+      return res.json({
+        success: false,
+        error: 'Taker not initialized'
+      });
     }
+
+    const goodMakers = takerInstance.fetchGoodMakers();
+
+    console.log('✅ Good makers fetched:', goodMakers.length);
+
+    res.json({
+      success: true,
+      makers: goodMakers
+    });
+
+  } catch (error) {
+    console.error('❌ Fetch good makers error:', error);
+    res.json({
+      success: false,
+      error: error.message || 'Failed to fetch good makers'
+    });
+  }
 });
+
+// ADD THIS TO YOUR index.js (bridge server)
+
+// Start coinswap
+app.post('/api/taker/start-coinswap', async (req, res) => {
+  try {
+    console.log('🔄 Starting coinswap...', req.body);
+
+    const { amount, makerCount, outpoints } = req.body;
+
+    if (!takerInstance) {
+      return res.json({
+        success: false,
+        error: 'Taker not initialized'
+      });
+    }
+
+    if (!amount || amount <= 0) {
+      return res.json({
+        success: false,
+        error: 'Invalid amount'
+      });
+    }
+
+    if (!makerCount || makerCount < 1) {
+      return res.json({
+        success: false,
+        error: 'Invalid maker count'
+      });
+    }
+
+    // Create swap params
+    const swapParams = {
+      sendAmount: amount,
+      makerCount: makerCount,
+      manuallySelectedOutpoints: outpoints || null
+    };
+
+    console.log('📤 Calling do_coinswap with params:', swapParams);
+
+    // Start the coinswap (this will take time)
+    const swapReport = takerInstance.doCoinswap(swapParams);
+
+    if (swapReport) {
+      console.log('✅ Coinswap completed successfully:', swapReport);
+      
+      res.json({
+        success: true,
+        report: swapReport
+      });
+    } else {
+      console.log('⚠️ Coinswap returned null');
+      res.json({
+        success: false,
+        error: 'Coinswap returned no report'
+      });
+    }
+
+  } catch (error) {
+    console.error('❌ Coinswap error:', error);
+    res.json({
+      success: false,
+      error: error.message || 'Coinswap failed'
+    });
+  }
+});
+
 
 // Get transactions
 app.get('/api/taker/transactions', ensureInitialized, async (req, res) => {
