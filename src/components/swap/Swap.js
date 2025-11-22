@@ -66,8 +66,8 @@ export function SwapComponent(container) {
   // Fetch real UTXOs from API
   async function fetchUtxos() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/utxos');
-      const data = await response.json();
+      // IPC call to get UTXOs
+      const data = await window.api.taker.getUtxos();
 
       if (data.success && data.utxos) {
         availableUtxos = data.utxos.map((item, index) => {
@@ -93,8 +93,8 @@ export function SwapComponent(container) {
   // Fetch real makers from API (to check availability)
   async function fetchMakers() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/offers');
-      const data = await response.json();
+      // IPC call to get offers
+      const data = await window.api.taker.getOffers();
 
       if (data.success && data.offerbook && data.offerbook.goodMakers) {
         availableMakers = data.offerbook.goodMakers.map((item, index) => {
@@ -122,8 +122,8 @@ export function SwapComponent(container) {
   // Fetch balance
   async function fetchBalance() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/balance');
-      const data = await response.json();
+      // IPC call to get balance
+      const data = await window.api.taker.getBalance();
 
       if (data.success) {
         totalBalance = data.balance.spendable;
@@ -964,22 +964,17 @@ export function SwapComponent(container) {
     startBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
     try {
-      const response = await fetch('http://localhost:3001/api/taker/start-coinswap', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: swapAmount,
-          makerCount: swapConfig.makers,
-          outpoints: selectionMode === 'manual' && selectedUtxos.length > 0
-            ? selectedUtxos.map(i => ({
-              txid: availableUtxos[i].txid,
-              vout: availableUtxos[i].vout
-            }))
-            : undefined
-        })
+      // IPC call to start coinswap
+      const result = await window.api.coinswap.start({
+        amount: swapAmount,
+        makerCount: swapConfig.makers,
+        outpoints: selectionMode === 'manual' && selectedUtxos.length > 0
+          ? selectedUtxos.map(i => ({
+            txid: availableUtxos[i].txid,
+            vout: availableUtxos[i].vout
+          }))
+          : undefined
       });
-
-      const result = await response.json();
 
       if (!result.success) {
         alert('Failed to start swap: ' + result.error);

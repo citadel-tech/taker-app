@@ -414,8 +414,8 @@ zmqpubrawtx=${rawtx}`;
   // Fetch and display seed phrase
   async function fetchSeedPhrase() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/seed');
-      const data = await response.json();
+      // IPC call to get seed phrase
+      const data = await window.api.taker.getSeed();
 
       if (data.success && data.seed) {
         const seedWords = data.seed.split(' ');

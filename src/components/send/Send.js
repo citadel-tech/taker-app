@@ -22,18 +22,17 @@ export function SendComponent(container, preSelectedUtxos = null) {
   // Calculate total available balance from UTXOs
   let availableBalance = availableUtxos.reduce((sum, utxo) => sum + utxo.amount, 0); // 23,000,000 sats
 
-  // Fetch real UTXOs from API
+  // Fetch real UTXOs from API (using IPC)
   async function fetchUtxosFromAPI() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/utxos');
-      const data = await response.json();
-      
+      const data = await window.api.taker.getUtxos();
+
       if (data.success && data.utxos) {
         availableUtxos = data.utxos.map((item, index) => {
           const utxo = item.utxo || item;
           const spendInfo = item.spendInfo || {};
           const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
-          
+
           return {
             txid: txid,
             vout: utxo.vout,
@@ -42,7 +41,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             index: index
           };
         });
-        
+
         availableBalance = availableUtxos.reduce((sum, utxo) => sum + utxo.amount, 0);
         console.log('✅ Loaded', availableUtxos.length, 'UTXOs');
       }
@@ -653,25 +652,16 @@ export function SendComponent(container, preSelectedUtxos = null) {
     sendBtn.textContent = 'Sending...';
     
     try {
-      const response = await fetch('http://localhost:3001/api/taker/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address: recipientAddress,
-          amount: amountSats
-        })
-      });
-      
-      const data = await response.json();
-      
+      const data = await window.api.taker.sendToAddress(recipientAddress, amountSats);
+
       if (data.success) {
         const txid = typeof data.txid === 'object' ? data.txid.hex : data.txid;
         alert(`✅ Transaction sent successfully!\n\nTXID: ${txid}`);
-        
+
         // Reset form
         content.querySelector('#recipient-address').value = '';
         content.querySelector('#amount-input').value = '';
-        
+
         // Refresh UTXOs
         await fetchUtxosFromAPI();
         updateSummary();

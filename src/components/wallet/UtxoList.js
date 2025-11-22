@@ -8,9 +8,9 @@ export function UtxoListComponent(container) {
   // API Functions
   async function fetchUtxos() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/utxos');
-      const data = await response.json();
-      
+      // IPC call to get UTXOs
+      const data = await window.api.taker.getUtxos();
+
       if (data.success) {
         return data.utxos || [];
       } else {

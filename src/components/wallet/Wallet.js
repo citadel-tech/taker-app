@@ -1,9 +1,8 @@
 export function WalletComponent(container) {
-  // API Functions
+  // API Functions (using IPC)
   async function fetchBalance() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/balance');
-      const data = await response.json();
+      const data = await window.api.taker.getBalance();
 
       if (data.success) {
         return data.balance;
@@ -18,8 +17,7 @@ export function WalletComponent(container) {
 
   async function fetchTransactions() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/transactions?count=5');
-      const data = await response.json();
+      const data = await window.api.taker.getTransactions(5, 0);
 
       if (data.success) {
         return data.transactions || [];
@@ -34,8 +32,7 @@ export function WalletComponent(container) {
 
   async function fetchUtxos() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/utxos');
-      const data = await response.json();
+      const data = await window.api.taker.getUtxos();
 
       if (data.success) {
         return data.utxos || [];

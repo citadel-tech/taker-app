@@ -5,12 +5,11 @@ export function TransactionsListComponent(container) {
   let currentPage = 0;
   const transactionsPerPage = 20;
 
-  // API Functions
+  // API Functions (using IPC)
   async function fetchTransactions(count = 50, skip = 0) {
     try {
-      const response = await fetch(`http://localhost:3001/api/taker/transactions?count=${count}&skip=${skip}`);
-      const data = await response.json();
-      
+      const data = await window.api.taker.getTransactions(count, skip);
+
       if (data.success) {
         return data.transactions || [];
       } else {

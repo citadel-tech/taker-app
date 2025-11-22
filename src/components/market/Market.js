@@ -13,9 +13,9 @@ export function Market(container) {
             console.log('📡 Fetching makers from API...');
             isLoading = true;
             updateUI();
-            
-            const response = await fetch('http://localhost:3001/api/taker/offers');
-            const data = await response.json();
+
+            // IPC call to get offers
+            const data = await window.api.taker.getOffers();
 
             if (data.success && data.offerbook) {
                 const goodMakers = data.offerbook.goodMakers || [];
@@ -58,19 +58,60 @@ export function Market(container) {
 
     async function syncOfferbook() {
         try {
-            console.log('🔄 Syncing offerbook...');
-            
-            const response = await fetch('http://localhost:3001/api/taker/sync-offerbook', {
-                method: 'POST'
-            });
-            const data = await response.json();
+            console.log('🔄 Starting offerbook sync...');
 
-            if (data.success) {
-                console.log('✅ Offerbook synced');
-                await fetchMakers();
-            } else {
-                throw new Error(data.error || 'Failed to sync offerbook');
+            // IPC call to start sync in worker thread
+            const result = await window.api.taker.syncOfferbook();
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to start sync');
             }
+
+            const syncId = result.syncId;
+            console.log('📡 Sync started:', syncId);
+
+            // Poll for completion (timeout after 2 minutes)
+            const timeout = 120000; // 2 minutes
+            const startTime = Date.now();
+
+            return new Promise((resolve, reject) => {
+                const pollInterval = setInterval(async () => {
+                    try {
+                        // Check timeout
+                        if (Date.now() - startTime > timeout) {
+                            clearInterval(pollInterval);
+                            reject(new Error('Sync timeout - operation took too long'));
+                            return;
+                        }
+
+                        const status = await window.api.taker.getSyncStatus(syncId);
+
+                        if (!status.success) {
+                            clearInterval(pollInterval);
+                            reject(new Error('Failed to get sync status'));
+                            return;
+                        }
+
+                        const sync = status.sync;
+                        console.log('📊 Sync status:', sync.status);
+
+                        if (sync.status === 'completed') {
+                            clearInterval(pollInterval);
+                            console.log('✅ Offerbook synced');
+                            // Wait a moment for file to be written
+                            await new Promise(r => setTimeout(r, 1000));
+                            await fetchMakers();
+                            resolve();
+                        } else if (sync.status === 'failed') {
+                            clearInterval(pollInterval);
+                            reject(new Error(sync.error || 'Sync failed'));
+                        }
+                    } catch (error) {
+                        clearInterval(pollInterval);
+                        reject(error);
+                    }
+                }, 1000); // Poll every second
+            });
         } catch (error) {
             console.error('❌ Sync failed:', error);
             throw error;

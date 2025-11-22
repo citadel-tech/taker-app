@@ -4,10 +4,8 @@ export function RecoveryComponent(container) {
 
     async function triggerRecovery() {
         try {
-            const response = await fetch('http://localhost:3001/api/taker/recover', {
-                method: 'POST'
-            });
-            const result = await response.json();
+            // IPC call to trigger recovery
+            const result = await window.api.taker.recover();
             return result;
         } catch (error) {
             console.error('Recovery failed:', error);

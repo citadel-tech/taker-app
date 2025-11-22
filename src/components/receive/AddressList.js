@@ -49,8 +49,8 @@ export function AddressListComponent(container) {
 
   async function syncAddressUsage() {
     try {
-      const response = await fetch('http://localhost:3001/api/taker/utxos');
-      const data = await response.json();
+      // IPC call to get UTXOs
+      const data = await window.api.taker.getUtxos();
 
       if (!data.success) return;
 
