@@ -1,7 +1,7 @@
 /**
  * Taker Manager using bridge server
  * Handles taker operations via HTTP bridge to coinswap-napi
- * Automatically sets up Bitcoin Core wallet during initialization
+ * Taker creates and manages wallet internally
  */
 
 const BRIDGE_URL = 'http://localhost:3001/api';
@@ -21,169 +21,81 @@ export class TakerManager {
         return response.json();
     }
 
-    // Create Bitcoin Core wallet via RPC during initialization
-    async createBitcoinCoreWallet() {
-        console.log('🔧 Setting up Bitcoin Core wallet...');
-        
-        const rpcConfig = {
-            host: this.config.rpc?.host || '127.0.0.1',
-            port: this.config.rpc?.port || 38332,
-            username: this.config.rpc?.username || 'user',
-            password: this.config.rpc?.password || 'password',
-        };
-        
-        const auth = btoa(`${rpcConfig.username}:${rpcConfig.password}`);
-        const rpcUrl = `http://${rpcConfig.host}:${rpcConfig.port}/`;
-        
+    async initialize() {
         try {
-            // First check if wallet already exists
-            console.log('🔍 Checking existing Bitcoin Core wallets...');
-            const listResponse = await fetch(rpcUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ${auth}`
+            console.log('🚀 Initializing Taker...');
+
+            const takerConfig = {
+                rpc: {
+                    host: this.config.rpc?.host || '127.0.0.1',
+                    port: this.config.rpc?.port || 38332,
+                    username: this.config.rpc?.username || 'user',
+                    password: this.config.rpc?.password || 'password',
                 },
-                body: JSON.stringify({
-                    jsonrpc: '1.0',
-                    id: 'setup-check',
-                    method: 'listwallets',
-                    params: []
-                })
-            });
-            
-            const listResult = await listResponse.json();
-            const existingWallets = listResult.result || [];
-            
-            console.log('📋 Existing wallets:', existingWallets);
-            
-            if (existingWallets.includes('taker-wallet')) {
-                console.log('✅ taker-wallet already exists');
-                return { created: false, message: 'Wallet already exists' };
-            }
-            
-            // Create the wallet
-            console.log('🔧 Creating taker-wallet in Bitcoin Core...');
-            const createResponse = await fetch(rpcUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Basic ${auth}`
-                },
-                body: JSON.stringify({
-                    jsonrpc: '1.0',
-                    id: 'setup-create',
-                    method: 'createwallet',
-                    params: ['taker-wallet', false, false, '', false, true, false]
-                })
-            });
-            
-            const createResult = await createResponse.json();
-            
-            if (createResult.error) {
-                // If error is "already exists" or "Database already exists", try loading instead
-                if (createResult.error.message?.includes('already exists') || 
-                    createResult.error.message?.includes('Database already exists')) {
-                    console.log('⚠️ Wallet database exists, trying to load instead...');
-                    
-                    // Try to load the existing wallet
-                    const loadResponse = await fetch(rpcUrl, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Basic ${auth}`
-                        },
-                        body: JSON.stringify({
-                            jsonrpc: '1.0',
-                            id: 'setup-load',
-                            method: 'loadwallet',
-                            params: ['taker-wallet']
-                        })
-                    });
-                    
-                    const loadResult = await loadResponse.json();
-                    if (loadResult.error) {
-                        throw new Error(`Failed to load existing wallet: ${loadResult.error.message}`);
-                    } else {
-                        console.log('✅ taker-wallet loaded successfully');
-                        return { created: false, message: 'Wallet loaded successfully' };
-                    }
-                } else {
-                    throw new Error(`Failed to create wallet: ${createResult.error.message}`);
+                tor: {
+                    control_port: this.config.tor?.control_port || null,
+                    tor_auth_password: this.config.tor?.tor_auth_password || null,
                 }
-            } else {
-                console.log('✅ taker-wallet created successfully');
-                return { created: true, message: 'Wallet created successfully' };
+            };
+
+            console.log('📋 Initializing taker via bridge...');
+            const result = await this.callBridge('/taker/initialize', takerConfig);
+            
+            if (!result.success) {
+                throw new Error(result.error);
             }
+            
+            this.isInitialized = true;
+            console.log('✅ Taker initialized (wallet created internally)');
+            
+            return { success: true };
             
         } catch (error) {
-            console.error('❌ Bitcoin Core wallet setup failed:', error.message);
-            throw new Error(`Bitcoin Core wallet setup failed: ${error.message}`);
+            console.error('❌ Failed to initialize Taker:', error);
+            return { 
+                success: false, 
+                error: error.message
+            };
         }
     }
 
-async initialize() {
-    try {
-        console.log('🚀 Initializing Taker automatically...');
-
-        
-        // Step 1: Create taker configuration
-        console.log('📋 Configuring taker...');
-        const takerConfig = {
-            rpc: {
-                host: this.config.rpc?.host || '127.0.0.1',
-                port: this.config.rpc?.port || 38332,
-                username: this.config.rpc?.username || 'user',
-                password: this.config.rpc?.password || 'password',
-            },
-            tor: {
-                control_port: this.config.taker?.control_port || 9053,
-                socks_port: this.config.taker?.socks_port || 9052,
-                auth_password: this.config.taker?.tor_auth_password || '',
-            },
-            tracker_address: this.config.taker?.tracker_address || '',
-        };
-
-        // Step 2: Initialize via bridge (let it handle everything)
-        console.log('📋 Initializing taker via bridge...');
-        const result = await this.callBridge('/taker/initialize', takerConfig);
-        
+    async syncOfferbook() {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/sync-offerbook', {});
         if (!result.success) {
             throw new Error(result.error);
         }
-        
-        this.isInitialized = true;
-        console.log('✅ Taker initialized successfully');
-        
-        return { success: true };
-        
-    } catch (error) {
-        console.error('❌ Failed to initialize Taker:', error);
-        return { 
-            success: false, 
-            error: error.message,
-            details: error
-        };
+        return result;
     }
-}
 
     async fetchOffers() {
         if (!this.isInitialized) {
             throw new Error('Taker not initialized');
         }
-
         const result = await this.callBridge('/taker/offers');
         if (!result.success) {
             throw new Error(result.error);
         }
-        return result.offers;
+        return result.offerbook;
+    }
+
+    async getGoodMakers() {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/good-makers');
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result.makers;
     }
 
     async getBalance() {
         if (!this.isInitialized) {
             throw new Error('Taker not initialized');
         }
-
         const result = await this.callBridge('/taker/balance');
         if (!result.success) {
             throw new Error(result.error);
@@ -191,20 +103,90 @@ async initialize() {
         return result.balance;
     }
 
-    async doCoinswap(amount, targetAddress = null) {
+    async getAddress() {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/address', {});
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result.address;
+    }
+
+    async syncWallet() {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/sync', {});
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result;
+    }
+
+    async getTransactions(count = 10, skip = 0) {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge(`/taker/transactions?count=${count}&skip=${skip}`);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result.transactions;
+    }
+
+    async getUtxos() {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/utxos');
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result.utxos;
+    }
+
+    async sendToAddress(address, amount) {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/send', { address, amount });
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result.txid;
+    }
+
+    async startCoinswap(amount, makerCount, outpoints = []) {
         if (!this.isInitialized) {
             throw new Error('Taker not initialized');
         }
 
-        console.log(`🔄 Starting coinswap for ${amount} satoshis...`);
-        const result = await this.callBridge('/taker/coinswap', { amount, targetAddress });
+        console.log(`🔄 Starting coinswap: ${amount} sats, ${makerCount} makers`);
+        const result = await this.callBridge('/taker/start-coinswap', { 
+            amount, 
+            makerCount, 
+            outpoints 
+        });
         
         if (!result.success) {
             throw new Error(result.error);
         }
         
-        console.log('✅ Coinswap completed:', result.result);
-        return result.result;
+        console.log('✅ Coinswap completed:', result.report);
+        return result.report;
+    }
+
+    async recoverFromSwap() {
+        if (!this.isInitialized) {
+            throw new Error('Taker not initialized');
+        }
+        const result = await this.callBridge('/taker/recover', {});
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        return result;
     }
 
     isReady() {
@@ -216,7 +198,6 @@ async initialize() {
     }
 }
 
-// Singleton instance for global access
 let globalTakerManager = null;
 
 export function getTakerManager() {

@@ -1,23 +1,84 @@
 export function SwapReportComponent(container, swapReport) {
   console.log('📊 SwapReportComponent loading with report:', swapReport);
+  console.log('📊 Report keys:', Object.keys(swapReport || {}));
   
   const content = document.createElement('div');
   content.id = 'swap-report-content';
 
+  // Validate report data
+  if (!swapReport || typeof swapReport !== 'object') {
+    console.error('❌ Invalid swap report:', swapReport);
+    content.innerHTML = `
+      <div class="text-center py-20">
+        <p class="text-red-400 text-xl">Error: No swap report data available</p>
+        <button id="back-btn" class="mt-4 bg-[#FF6B35] text-white px-6 py-3 rounded-lg">Back to Wallet</button>
+      </div>
+    `;
+    container.appendChild(content);
+    content.querySelector('#back-btn')?.addEventListener('click', () => {
+      if (window.appManager) window.appManager.renderComponent('wallet');
+    });
+    return;
+  }
+
+  // Extract values with safe defaults
+  const report = {
+    swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
+    swapDurationSeconds: swapReport.swapDurationSeconds || swapReport.swap_duration_seconds || 0,
+    targetAmount: swapReport.targetAmount || swapReport.target_amount || 0,
+    totalInputAmount: swapReport.totalInputAmount || swapReport.total_input_amount || 0,
+    totalOutputAmount: swapReport.totalOutputAmount || swapReport.total_output_amount || 0,
+    makersCount: swapReport.makersCount || swapReport.makers_count || 0,
+    makerAddresses: swapReport.makerAddresses || swapReport.maker_addresses || [],
+    totalFundingTxs: swapReport.totalFundingTxs || swapReport.total_funding_txs || 0,
+    fundingTxidsByHop: swapReport.fundingTxidsByHop || swapReport.funding_txids_by_hop || [],
+    totalFee: swapReport.totalFee || swapReport.total_fee || 0,
+    totalMakerFees: swapReport.totalMakerFees || swapReport.total_maker_fees || 0,
+    miningFee: swapReport.miningFee || swapReport.mining_fee || 0,
+    feePercentage: swapReport.feePercentage || swapReport.fee_percentage || 0,
+    makerFeeInfo: swapReport.makerFeeInfo || swapReport.maker_fee_info || [],
+    inputUtxos: swapReport.inputUtxos || swapReport.input_utxos || [],
+    outputRegularUtxos: swapReport.outputRegularUtxos || swapReport.output_regular_utxos || [],
+    outputSwapUtxos: swapReport.outputSwapUtxos || swapReport.output_swap_utxos || []
+  };
+
+  console.log('📊 Normalized report:', report);
+
   // Helper functions
   function satsToBtc(sats) {
+    if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
     return (sats / 100000000).toFixed(8);
   }
 
   function formatDuration(seconds) {
+    if (typeof seconds !== 'number' || isNaN(seconds)) return '0m 0s';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}m ${secs}s`;
   }
 
+  function formatNumber(num) {
+    if (typeof num !== 'number' || isNaN(num)) return '0';
+    return num.toLocaleString();
+  }
+
+  function truncateAddress(addr, start = 16, end = 8) {
+    if (!addr || typeof addr !== 'string') return 'unknown';
+    if (addr.length <= start + end) return addr;
+    return `${addr.substring(0, start)}...${addr.substring(addr.length - end)}`;
+  }
+
+  function truncateTxid(txid, start = 20, end = 12) {
+    if (!txid || typeof txid !== 'string') return 'unknown';
+    if (txid.length <= start + end) return txid;
+    return `${txid.substring(0, start)}...${txid.substring(txid.length - end)}`;
+  }
+
   function copyToClipboard(text) {
     navigator.clipboard.writeText(text).then(() => {
       showNotification('Copied to clipboard!');
+    }).catch(err => {
+      console.error('Copy failed:', err);
     });
   }
 
@@ -31,80 +92,124 @@ export function SwapReportComponent(container, swapReport) {
 
   const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
 
+  // Build funding transactions HTML
+  function buildFundingTxsHtml() {
+    if (!report.fundingTxidsByHop || report.fundingTxidsByHop.length === 0) {
+      return '<p class="text-gray-500 text-sm">No transaction data available</p>';
+    }
+
+    return report.fundingTxidsByHop.map((txids, hopIdx) => {
+      const txidArray = Array.isArray(txids) ? txids : [txids];
+      const color = makerColors[hopIdx % makerColors.length];
+      
+      return `
+        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800 hover:border-[#FF6B35]/50 transition-colors">
+          <p class="text-sm font-semibold mb-2" style="color: ${color}">
+            <span class="inline-block w-6 h-6 rounded-full text-center leading-6 text-xs" 
+                  style="background: ${color}20; border: 2px solid ${color}">
+              ${hopIdx + 1}
+            </span>
+            Hop ${hopIdx + 1}
+          </p>
+          ${txidArray.map(txid => `
+            <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
+              <p class="font-mono text-xs text-gray-300 flex-1">${truncateTxid(txid)}</p>
+              <div class="flex gap-2">
+                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors" 
+                        data-txid="${txid}" title="Copy">📋</button>
+                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors" 
+                        data-txid="${txid}" title="View on Explorer">🔍</button>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Build maker addresses HTML - Now clickable to copy
+  function buildMakersHtml() {
+    if (!report.makerAddresses || report.makerAddresses.length === 0) {
+      return '<p class="text-gray-500 text-sm">No maker data available</p>';
+    }
+
+    return report.makerAddresses.map((addr, idx) => {
+      const color = makerColors[idx % makerColors.length];
+      return `
+        <div class="bg-[#0f1419] rounded-lg p-4 border hover:border-[${color}] transition-all cursor-pointer copy-maker-card"
+             style="border-color: ${color}40;" data-address="${addr}">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
+                 style="background: ${color}20; color: ${color};">
+              M${idx + 1}
+            </div>
+            <div class="flex-1 min-w-0">
+              <p class="text-xs text-gray-400">Maker ${idx + 1}</p>
+              <p class="font-mono text-xs text-white truncate">${truncateAddress(addr)}</p>
+            </div>
+            <span class="text-gray-500 text-sm">📋</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Build visual flow for makers - FIXED: Simplified arrows without SVG markers
+  function buildMakerFlowHtml() {
+    if (report.makersCount === 0) {
+      return '';
+    }
+
+    return Array.from({ length: report.makersCount }, (_, i) => {
+      const color = makerColors[i % makerColors.length];
+      const makerAddr = report.makerAddresses[i] || `maker${i + 1}`;
+      
+      return `
+        <!-- Arrow ${i + 1} - Simplified CSS arrows -->
+        <div class="flex-1 flex flex-col items-center justify-center relative px-2">
+          <div class="flex items-center w-full">
+            <div class="flex-1 h-1 rounded" style="background: ${color};"></div>
+            <span class="text-xl font-bold" style="color: ${color};">➔</span>
+          </div>
+          <span class="px-2 py-1 rounded text-xs font-bold mt-1" style="background: ${color}20; color: ${color};">
+            🔓 BROKEN
+          </span>
+          <p class="text-xs text-gray-500 mt-1">Hop ${i + 1}</p>
+        </div>
+
+        <!-- Maker ${i + 1} - Clickable to copy -->
+        <div class="flex flex-col items-center z-10 copy-maker-flow cursor-pointer" style="flex: 0 0 100px;" data-address="${makerAddr}" title="Click to copy address">
+          <div class="w-20 h-20 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform border-2"
+               style="background: linear-gradient(135deg, ${color}20, ${color}40); border-color: ${color};">
+            <span class="text-xl font-bold" style="color: ${color};">M${i + 1}</span>
+          </div>
+          <p class="text-xs text-white mt-2 font-semibold">Maker ${i + 1}</p>
+          <p class="text-xs text-gray-500 font-mono">${truncateAddress(makerAddr, 6, 0)}</p>
+        </div>
+      `;
+    }).join('');
+  }
+
   // UI
   content.innerHTML = `
     <style>
       @keyframes fadeInUp {
-        from {
-          opacity: 0;
-          transform: translateY(30px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
       }
       
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          transform: translateX(-20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateX(0);
-        }
-      }
-
-      @keyframes pulse {
-        0%, 100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-
-      @keyframes flowAnimation {
-        0% {
-          stroke-dashoffset: 1000;
-        }
-        100% {
-          stroke-dashoffset: 0;
-        }
-      }
-
-      .animate-fade-in-up {
-        animation: fadeInUp 0.6s ease-out forwards;
-      }
-
-      .animate-slide-in {
-        animation: slideIn 0.5s ease-out forwards;
-      }
-
+      .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
       .stagger-1 { animation-delay: 0.1s; }
       .stagger-2 { animation-delay: 0.2s; }
       .stagger-3 { animation-delay: 0.3s; }
       .stagger-4 { animation-delay: 0.4s; }
-
-      .flow-path {
-        stroke-dasharray: 1000;
-        stroke-dashoffset: 1000;
-        animation: flowAnimation 2s ease-out forwards;
+      
+      .copy-maker-card:hover {
+        transform: scale(1.02);
       }
-
-      .broken-link {
-        position: relative;
-      }
-
-      .broken-link::before {
-        content: "🔓";
-        position: absolute;
-        top: -20px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 24px;
-        animation: pulse 2s infinite;
+      
+      .copy-maker-flow:hover {
+        opacity: 0.8;
       }
     </style>
 
@@ -113,11 +218,11 @@ export function SwapReportComponent(container, swapReport) {
       <div class="mb-8 animate-fade-in-up">
         <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-gradient-to-br from-[#FF6B35] to-[#ff8c5a] rounded-xl flex items-center justify-center shadow-lg">
+            <div class="w-16 h-16 bg-[#FF6B35] rounded-xl flex items-center justify-center shadow-lg">
               <span class="text-3xl">🪙</span>
             </div>
             <div>
-              <h2 class="text-4xl font-bold bg-gradient-to-r from-[#FF6B35] to-[#ff8c5a] bg-clip-text text-transparent">
+              <h2 class="text-4xl font-bold text-[#FF6B35]">
                 Coinswap Report
               </h2>
               <p class="text-gray-400 text-sm mt-1">Privacy-Enhanced Bitcoin Transaction</p>
@@ -134,12 +239,12 @@ export function SwapReportComponent(container, swapReport) {
           </div>
           <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
             <span class="text-gray-400 text-sm">ID: </span>
-            <span class="font-mono text-white text-sm">${swapReport.swapId}</span>
+            <span class="font-mono text-white text-sm">${report.swapId}</span>
           </div>
         </div>
       </div>
 
-      <!-- Visual Flow Diagram - THE MAIN ATTRACTION -->
+      <!-- Visual Flow Diagram -->
       <div class="mb-8 animate-fade-in-up stagger-1">
         <div class="bg-gradient-to-br from-[#1a2332] to-[#0f1419] rounded-xl p-8 border border-[#FF6B35]/20 shadow-2xl">
           <h3 class="text-2xl font-bold text-white mb-6 flex items-center gap-3">
@@ -171,13 +276,12 @@ export function SwapReportComponent(container, swapReport) {
                 <p class="text-xs text-gray-400 mt-2">Your Wallet</p>
               </div>
               
-              <div class="flex-1 flex items-center justify-center relative">
-                <svg width="200" height="40" class="mx-4">
-                  <line x1="0" y1="20" x2="200" y2="20" stroke="#ef4444" stroke-width="3" stroke-dasharray="5,5"/>
-                  <text x="100" y="15" fill="#ef4444" font-size="10" text-anchor="middle" font-weight="bold">
-                    TRACEABLE
-                  </text>
-                </svg>
+              <div class="flex-1 flex flex-col items-center justify-center">
+                <div class="flex items-center w-full max-w-xs">
+                  <div class="flex-1 h-1 bg-red-500 rounded" style="background: repeating-linear-gradient(90deg, #ef4444 0px, #ef4444 5px, transparent 5px, transparent 10px);"></div>
+                  <span class="text-red-500 text-xl font-bold">➔</span>
+                </div>
+                <span class="text-red-400 text-xs font-bold mt-1">TRACEABLE</span>
               </div>
               
               <div class="flex flex-col items-center">
@@ -192,128 +296,39 @@ export function SwapReportComponent(container, swapReport) {
           <!-- After Coinswap -->
           <div>
             <p class="text-green-400 font-semibold mb-3">✅ After Coinswap (Links Broken):</p>
-            <div class="p-6 bg-green-500/5 border border-green-500/20 rounded-lg">
-              <div class="flex items-center justify-between relative">
+            <div class="p-6 bg-green-500/5 border border-green-500/20 rounded-lg overflow-x-auto">
+              <div class="flex items-center justify-between relative min-w-max">
                 
-                <!-- Start -->
+                <!-- Start - You -->
                 <div class="flex flex-col items-center z-10" style="flex: 0 0 100px;">
-                  <div class="w-24 h-24 bg-gradient-to-br from-[#FF6B35] to-[#ff8c5a] rounded-xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
-                    <span class="text-3xl">👤</span>
+                  <div class="w-20 h-20 bg-[#FF6B35] rounded-xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
+                    <span class="text-2xl">👤</span>
                   </div>
                   <p class="text-xs text-white mt-2 font-semibold">You</p>
-                  <p class="text-xs text-gray-500">${satsToBtc(swapReport.targetAmount)} BTC</p>
+                  <p class="text-xs text-gray-500">${satsToBtc(report.targetAmount)} BTC</p>
                 </div>
 
-                ${Array.from({ length: swapReport.makersCount }, (_, i) => {
-                  const color = makerColors[i % makerColors.length];
-                  return `
-                    <!-- Arrow ${i + 1} with Enhanced Broken Indicator -->
-                    <div class="flex-1 flex flex-col items-center justify-center relative px-4 group">
-                      <svg width="100%" height="60" style="overflow: visible;">
-                        <defs>
-                          <marker id="arrowhead${i}" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                            <polygon points="0 0, 10 3, 0 6" fill="${color}" />
-                          </marker>
-                        </defs>
-                        <path d="M 0 30 Q 50 10, 100% 30" stroke="${color}" stroke-width="3" fill="none" 
-                              marker-end="url(#arrowhead${i})" class="flow-path" style="animation-delay: ${i * 0.3}s"/>
-                        <text x="50%" y="20" fill="${color}" font-size="10" text-anchor="middle" font-weight="bold" class="cursor-help">
-                          🔓 BROKEN
-                        </text>
-                      </svg>
-                      <!-- Detailed Tooltip on Hover -->
-                      <div class="hidden group-hover:block absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 bg-[#0f1419] border-2 border-${color} rounded-lg p-4 shadow-2xl z-50" style="border-color: ${color};">
-                        <p class="text-sm font-bold mb-3" style="color: ${color};">🔓 Link Broken - Hop ${i + 1}</p>
-                        <div class="text-xs text-gray-300 space-y-2">
-                          <div class="flex items-start gap-2">
-                            <span class="text-green-400 mt-0.5">✓</span>
-                            <div>
-                              <strong class="text-white">No Common Ownership:</strong> Transaction ${i + 1} uses Maker ${i + 1}'s UTXO (not yours)
-                            </div>
-                          </div>
-                          <div class="flex items-start gap-2">
-                            <span class="text-green-400 mt-0.5">✓</span>
-                            <div>
-                              <strong class="text-white">HTLC Swap:</strong> Atomic swap ensures coins actually change hands
-                            </div>
-                          </div>
-                          <div class="flex items-start gap-2">
-                            <span class="text-green-400 mt-0.5">✓</span>
-                            <div>
-                              <strong class="text-white">Fresh Address:</strong> New keys generated, no address reuse
-                            </div>
-                          </div>
-                          <div class="flex items-start gap-2">
-                            <span class="text-green-400 mt-0.5">✓</span>
-                            <div>
-                              <strong class="text-white">Result:</strong> Blockchain observers cannot prove this tx is related to previous one
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      <p class="text-xs text-gray-500 mt-1">Hop ${i + 1}</p>
-                    </div>
+                ${buildMakerFlowHtml()}
 
-                    <!-- Maker ${i + 1} -->
-                    <div class="flex flex-col items-center z-10" style="flex: 0 0 100px;">
-                      <div class="w-24 h-24 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform border-2"
-                           style="background: linear-gradient(135deg, ${color}20, ${color}40); border-color: ${color};">
-                        <span class="text-2xl font-bold" style="color: ${color};">M${i + 1}</span>
-                      </div>
-                      <p class="text-xs text-white mt-2 font-semibold">Maker ${i + 1}</p>
-                      <p class="text-xs text-gray-500 font-mono">${swapReport.makerAddresses[i]?.substring(0, 6)}...</p>
-                    </div>
-                  `;
-                }).join('')}
-
-                <!-- Final Arrow with Enhanced Broken Indicator -->
-                <div class="flex-1 flex flex-col items-center justify-center relative px-4 group">
-                  <svg width="100%" height="60" style="overflow: visible;">
-                    <defs>
-                      <marker id="arrowheadFinal" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-                        <polygon points="0 0, 10 3, 0 6" fill="#10B981" />
-                      </marker>
-                    </defs>
-                    <path d="M 0 30 Q 50 10, 100% 30" stroke="#10B981" stroke-width="3" fill="none" 
-                          marker-end="url(#arrowheadFinal)" class="flow-path" style="animation-delay: ${swapReport.makersCount * 0.3}s"/>
-                    <text x="50%" y="20" fill="#10B981" font-size="10" text-anchor="middle" font-weight="bold" class="cursor-help">
-                      🔓 BROKEN
-                    </text>
-                  </svg>
-                  <!-- Detailed Tooltip on Hover -->
-                  <div class="hidden group-hover:block absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-72 bg-[#0f1419] border-2 border-green-500 rounded-lg p-4 shadow-2xl z-50">
-                    <p class="text-sm font-bold text-green-400 mb-3">🔓 Final Link Broken - Your Coins Return</p>
-                    <div class="text-xs text-gray-300 space-y-2">
-                      <div class="flex items-start gap-2">
-                        <span class="text-green-400 mt-0.5">✓</span>
-                        <div>
-                          <strong class="text-white">Back to You:</strong> Final HTLC returns coins to your fresh address
-                        </div>
-                      </div>
-                      <div class="flex items-start gap-2">
-                        <span class="text-green-400 mt-0.5">✓</span>
-                        <div>
-                          <strong class="text-white">Complete Break:</strong> No on-chain evidence linking your original UTXO to this final one
-                        </div>
-                      </div>
-                      <div class="flex items-start gap-2">
-                        <span class="text-green-400 mt-0.5">✓</span>
-                        <div>
-                          <strong class="text-white">Result:</strong> You have clean Bitcoin with no traceable history from the swap
-                        </div>
-                      </div>
-                    </div>
+                <!-- Final Arrow -->
+                <div class="flex-1 flex flex-col items-center justify-center relative px-2">
+                  <div class="flex items-center w-full">
+                    <div class="flex-1 h-1 rounded bg-green-500"></div>
+                    <span class="text-xl font-bold text-green-500">➔</span>
                   </div>
+                  <span class="px-2 py-1 rounded text-xs font-bold mt-1 bg-green-500/20 text-green-400">
+                    🔓 BROKEN
+                  </span>
                   <p class="text-xs text-gray-500 mt-1">Final Hop</p>
                 </div>
 
-                <!-- End -->
+                <!-- End - You -->
                 <div class="flex flex-col items-center z-10" style="flex: 0 0 100px;">
-                  <div class="w-24 h-24 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
-                    <span class="text-3xl">👤</span>
+                  <div class="w-20 h-20 bg-green-500 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform">
+                    <span class="text-2xl">👤</span>
                   </div>
                   <p class="text-xs text-white mt-2 font-semibold">You</p>
-                  <p class="text-xs text-gray-500">${satsToBtc(swapReport.totalOutputAmount)} BTC</p>
+                  <p class="text-xs text-gray-500">${satsToBtc(report.totalOutputAmount)} BTC</p>
                 </div>
 
               </div>
@@ -321,88 +336,22 @@ export function SwapReportComponent(container, swapReport) {
           </div>
 
           <!-- Technical Privacy Explanation -->
-          <div class="mt-6 space-y-4">
-            <!-- Main Explanation -->
-            <div class="p-5 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/40 rounded-lg">
-              <h4 class="text-lg font-bold text-purple-300 mb-3 flex items-center gap-2">
-                <span>🔒</span> How Coinswap Breaks Transaction Links
-              </h4>
-              <p class="text-sm text-gray-200 mb-3">
-                Unlike traditional Bitcoin transactions where you can trace coins from sender to receiver, coinswap creates <strong>cryptographically unlinkable hops</strong> 
-                that make it impossible for blockchain observers to follow the money trail.
+          <div class="mt-6 grid grid-cols-2 gap-4">
+            <div class="bg-[#1a2332] border border-blue-500/30 rounded-lg p-4">
+              <h5 class="text-sm font-bold text-blue-400 mb-2 flex items-center gap-2">
+                <span>👥</span> Different UTXO Ownership
+              </h5>
+              <p class="text-xs text-gray-300 leading-relaxed">
+                Each transaction uses UTXOs from <strong>different owners</strong>. No common input ownership means no on-chain link.
               </p>
             </div>
-
-            <!-- Technical Details Grid -->
-            <div class="grid grid-cols-2 gap-4">
-              <!-- Box 1: UTXO Ownership -->
-              <div class="bg-[#1a2332] border border-blue-500/30 rounded-lg p-4">
-                <h5 class="text-sm font-bold text-blue-400 mb-2 flex items-center gap-2">
-                  <span>👥</span> Different UTXO Ownership
-                </h5>
-                <p class="text-xs text-gray-300 leading-relaxed">
-                  Each transaction in the chain uses UTXOs from <strong>different owners</strong>. Your original UTXO → Maker1's UTXO → Maker2's UTXO → Your new UTXO. 
-                  No common input ownership means no on-chain link.
-                </p>
-              </div>
-
-              <!-- Box 2: HTLCs -->
-              <div class="bg-[#1a2332] border border-green-500/30 rounded-lg p-4">
-                <h5 class="text-sm font-bold text-green-400 mb-2 flex items-center gap-2">
-                  <span>⚛️</span> HTLC Atomic Swaps
-                </h5>
-                <p class="text-xs text-gray-300 leading-relaxed">
-                  Hash Time-Locked Contracts ensure coins <strong>actually swap ownership</strong> atomically. Not just passing through - genuine ownership change at each hop. 
-                  If any hop fails, the entire swap reverts.
-                </p>
-              </div>
-
-              <!-- Box 3: Fresh Keys -->
-              <div class="bg-[#1a2332] border border-yellow-500/30 rounded-lg p-4">
-                <h5 class="text-sm font-bold text-yellow-400 mb-2 flex items-center gap-2">
-                  <span>🔑</span> Fresh Addresses
-                </h5>
-                <p class="text-xs text-gray-300 leading-relaxed">
-                  Every hop generates <strong>brand new addresses</strong> with new private keys. No address reuse, no key reuse. 
-                  Combined with ownership changes, this eliminates heuristic-based tracking.
-                </p>
-              </div>
-
-              <!-- Box 4: Blockchain View -->
-              <div class="bg-[#1a2332] border border-red-500/30 rounded-lg p-4">
-                <h5 class="text-sm font-bold text-red-400 mb-2 flex items-center gap-2">
-                  <span>👁️</span> Observer's Perspective
-                </h5>
-                <p class="text-xs text-gray-300 leading-relaxed">
-                  To an outside observer: ${swapReport.makersCount + 1} <strong>unrelated transactions</strong> with no provable connection. 
-                  They can't prove Tx1 output became Tx2 input, or that you're involved in both.
-                </p>
-              </div>
-            </div>
-
-            <!-- vs Traditional Transaction -->
-            <div class="bg-[#0f1419] border border-gray-700 rounded-lg p-4">
-              <h5 class="text-sm font-bold text-gray-300 mb-3">🔍 Comparison: Regular vs Coinswap</h5>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <p class="text-xs text-red-400 font-semibold mb-2">❌ Regular Transaction:</p>
-                  <ul class="text-xs text-gray-400 space-y-1 list-disc list-inside">
-                    <li>Single transaction visible</li>
-                    <li>Clear input → output path</li>
-                    <li>Easily traceable</li>
-                    <li>Common ownership analysis</li>
-                  </ul>
-                </div>
-                <div>
-                  <p class="text-xs text-green-400 font-semibold mb-2">✅ Coinswap Transaction:</p>
-                  <ul class="text-xs text-gray-400 space-y-1 list-disc list-inside">
-                    <li>${swapReport.makersCount + 1} separate transactions</li>
-                    <li>No provable connections</li>
-                    <li>Untraceable across hops</li>
-                    <li>Ownership breaks at each hop</li>
-                  </ul>
-                </div>
-              </div>
+            <div class="bg-[#1a2332] border border-green-500/30 rounded-lg p-4">
+              <h5 class="text-sm font-bold text-green-400 mb-2 flex items-center gap-2">
+                <span>⚛️</span> HTLC Atomic Swaps
+              </h5>
+              <p class="text-xs text-gray-300 leading-relaxed">
+                Hash Time-Locked Contracts ensure coins <strong>actually swap ownership</strong> atomically at each hop.
+              </p>
             </div>
           </div>
         </div>
@@ -410,84 +359,67 @@ export function SwapReportComponent(container, swapReport) {
 
       <!-- Stats Grid -->
       <div class="grid grid-cols-4 gap-4 mb-6">
-        ${[
-          { label: 'Swap Amount', value: satsToBtc(swapReport.targetAmount) + ' BTC', subtext: swapReport.targetAmount.toLocaleString() + ' sats', color: 'from-[#FF6B35] to-[#ff8c5a]', icon: '💰' },
-          { label: 'Duration', value: formatDuration(swapReport.swapDurationSeconds), subtext: swapReport.swapDurationSeconds.toFixed(1) + 's total', color: 'from-cyan-500 to-blue-500', icon: '⏱️' },
-          { label: 'Privacy Hops', value: swapReport.makersCount + 1, subtext: swapReport.makersCount + ' makers used', color: 'from-purple-500 to-pink-500', icon: '🔗' },
-          { label: 'Total Fee', value: swapReport.feePercentage.toFixed(2) + '%', subtext: swapReport.totalFee.toLocaleString() + ' sats', color: 'from-yellow-500 to-orange-500', icon: '💸' }
-        ].map((stat, idx) => `
-          <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-${idx + 1}">
-            <div class="flex items-center justify-between mb-2">
-              <p class="text-sm text-white">${stat.label}</p>
-              <span class="text-2xl">${stat.icon}</span>
-            </div>
-            <p class="text-2xl font-bold bg-gradient-to-r ${stat.color} bg-clip-text text-transparent">${stat.value}</p>
-            <p class="text-xs text-gray-500 mt-1">${stat.subtext}</p>
+        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-1">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm text-white">Swap Amount</p>
+            <span class="text-2xl">💰</span>
           </div>
-        `).join('')}
+          <p class="text-2xl font-bold text-[#FF6B35]">${satsToBtc(report.targetAmount)} BTC</p>
+          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.targetAmount)} sats</p>
+        </div>
+
+        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-2">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm text-white">Duration</p>
+            <span class="text-2xl">⏱️</span>
+          </div>
+          <p class="text-2xl font-bold text-cyan-400">${formatDuration(report.swapDurationSeconds)}</p>
+          <p class="text-xs text-gray-400 mt-1">${report.swapDurationSeconds.toFixed(1)}s total</p>
+        </div>
+
+        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-3">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm text-white">Privacy Hops</p>
+            <span class="text-2xl">🔗</span>
+          </div>
+          <p class="text-2xl font-bold text-purple-400">${report.makersCount + 1}</p>
+          <p class="text-xs text-gray-400 mt-1">${report.makersCount} makers used</p>
+        </div>
+
+        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm text-white">Total Fee</p>
+            <span class="text-2xl">💸</span>
+          </div>
+          <p class="text-2xl font-bold text-yellow-400">${report.feePercentage.toFixed(2)}%</p>
+          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.totalFee)} sats</p>
+        </div>
       </div>
 
       <!-- Details Grid -->
       <div class="grid grid-cols-3 gap-6">
         
-        <!-- Transactions & Fees -->
+        <!-- Transactions & Makers -->
         <div class="col-span-2 space-y-6">
           
-          <!-- Transactions -->
+          <!-- Funding Transactions -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
             <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
               <span>📝</span> Funding Transactions
             </h3>
             <div class="space-y-3">
-              ${swapReport.fundingTxidsByHop.map((txids, hopIdx) => `
-                <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800 hover:border-[#FF6B35]/50 transition-colors">
-                  <p class="text-sm font-semibold mb-2" style="color: ${makerColors[hopIdx % makerColors.length]}">
-                    <span class="inline-block w-6 h-6 rounded-full text-center leading-6 text-xs" 
-                          style="background: ${makerColors[hopIdx % makerColors.length]}20; border: 2px solid ${makerColors[hopIdx % makerColors.length]}">
-                      ${hopIdx + 1}
-                    </span>
-                    Hop ${hopIdx + 1}
-                  </p>
-                  ${txids.map((txid, txIdx) => `
-                    <div class="flex items-center justify-between group hover:bg-[#1a2332] p-2 rounded transition-colors">
-                      <p class="font-mono text-xs text-gray-300 flex-1">${txid.substring(0, 20)}...${txid.substring(-12)}</p>
-                      <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors" 
-                                data-txid="${txid}" title="Copy">📋</button>
-                        <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors" 
-                                data-txid="${txid}" title="View">🔍</button>
-                      </div>
-                    </div>
-                  `).join('')}
-                </div>
-              `).join('')}
+              ${buildFundingTxsHtml()}
             </div>
           </div>
 
-          <!-- Makers -->
+          <!-- Swap Partners / Makers -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-3">
             <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
               <span>🤝</span> Swap Partners
+              <span class="text-xs text-gray-500 font-normal ml-2">(Click to copy address)</span>
             </h3>
             <div class="grid grid-cols-2 gap-3">
-              ${swapReport.makerAddresses.map((addr, idx) => `
-                <div class="bg-[#0f1419] rounded-lg p-4 border hover:scale-105 transition-transform cursor-pointer"
-                     style="border-color: ${makerColors[idx % makerColors.length]}40;">
-                  <div class="flex items-center gap-3 mb-2">
-                    <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
-                         style="background: ${makerColors[idx % makerColors.length]}20; color: ${makerColors[idx % makerColors.length]};">
-                      M${idx + 1}
-                    </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-xs text-gray-400">Maker ${idx + 1}</p>
-                      <p class="font-mono text-xs text-white truncate">${addr.substring(0, 16)}...</p>
-                    </div>
-                    <button class="copy-maker-btn text-gray-400 hover:text-white transition-colors" data-address="${addr}">
-                      📋
-                    </button>
-                  </div>
-                </div>
-              `).join('')}
+              ${buildMakersHtml()}
             </div>
           </div>
 
@@ -504,31 +436,31 @@ export function SwapReportComponent(container, swapReport) {
             <div class="space-y-3">
               <div class="flex justify-between items-center pb-3 border-b border-gray-700">
                 <span class="text-sm text-gray-400">Maker Fees</span>
-                <span class="font-mono text-sm text-yellow-400">${swapReport.totalMakerFees.toLocaleString()}</span>
+                <span class="font-mono text-sm text-yellow-400">${formatNumber(report.totalMakerFees)}</span>
               </div>
               <div class="flex justify-between items-center pb-3 border-b border-gray-700">
                 <span class="text-sm text-gray-400">Mining Fees</span>
-                <span class="font-mono text-sm text-cyan-400">${swapReport.miningFee.toLocaleString()}</span>
+                <span class="font-mono text-sm text-cyan-400">${formatNumber(report.miningFee)}</span>
               </div>
               <div class="flex justify-between items-center pt-2">
                 <span class="text-sm font-semibold text-white">Total</span>
                 <div class="text-right">
-                  <p class="font-mono text-lg text-[#FF6B35] font-bold">${swapReport.totalFee.toLocaleString()}</p>
-                  <p class="text-xs text-gray-500">${satsToBtc(swapReport.totalFee)} BTC</p>
+                  <p class="font-mono text-lg text-[#FF6B35] font-bold">${formatNumber(report.totalFee)}</p>
+                  <p class="text-xs text-gray-500">${satsToBtc(report.totalFee)} BTC</p>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Privacy Impact -->
-          <div class="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-lg p-6 animate-fade-in-up stagger-3">
+          <div class="bg-purple-500/20 border border-purple-500/30 rounded-lg p-6 animate-fade-in-up stagger-3">
             <h3 class="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
               <span>🔒</span> Privacy Achieved
             </h3>
             <ul class="space-y-2 text-sm">
               <li class="flex items-start gap-2 text-purple-200">
                 <span class="text-green-400 mt-0.5">✓</span>
-                <span><span class="font-bold">${swapReport.makersCount + 1}</span> transaction hops completed</span>
+                <span><span class="font-bold">${report.makersCount + 1}</span> transaction hops completed</span>
               </li>
               <li class="flex items-start gap-2 text-purple-200">
                 <span class="text-green-400 mt-0.5">✓</span>
@@ -553,15 +485,15 @@ export function SwapReportComponent(container, swapReport) {
             <div class="space-y-3 text-sm">
               <div class="flex justify-between items-center">
                 <span class="text-gray-400">Inputs</span>
-                <span class="font-mono text-white">${swapReport.inputUtxos.length}</span>
+                <span class="font-mono text-white">${report.inputUtxos.length}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-gray-400">Regular Outputs</span>
-                <span class="font-mono text-green-400">${swapReport.outputRegularUtxos.length}</span>
+                <span class="font-mono text-green-400">${report.outputRegularUtxos.length}</span>
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-gray-400">Swap Coins</span>
-                <span class="font-mono text-blue-400">${swapReport.outputSwapUtxos.length}</span>
+                <span class="font-mono text-blue-400">${report.outputSwapUtxos.length}</span>
               </div>
             </div>
           </div>
@@ -574,7 +506,7 @@ export function SwapReportComponent(container, swapReport) {
         <button id="export-report" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-4 rounded-lg transition-all hover:scale-105">
           📥 Export Report
         </button>
-        <button id="done-btn" class="flex-1 bg-gradient-to-r from-[#FF6B35] to-[#ff8c5a] hover:from-[#ff7d4d] hover:to-[#ffa070] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
+        <button id="done-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
           ✅ Done - Return to Wallet
         </button>
       </div>
@@ -585,10 +517,17 @@ export function SwapReportComponent(container, swapReport) {
 
   // EVENT LISTENERS
 
-  // Copy maker addresses
-  content.querySelectorAll('.copy-maker-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      copyToClipboard(btn.dataset.address);
+  // Copy maker addresses from cards
+  content.querySelectorAll('.copy-maker-card').forEach(card => {
+    card.addEventListener('click', () => {
+      copyToClipboard(card.dataset.address);
+    });
+  });
+
+  // Copy maker addresses from flow diagram
+  content.querySelectorAll('.copy-maker-flow').forEach(el => {
+    el.addEventListener('click', () => {
+      copyToClipboard(el.dataset.address);
     });
   });
 
@@ -603,18 +542,19 @@ export function SwapReportComponent(container, swapReport) {
   content.querySelectorAll('.view-txid-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const txid = btn.dataset.txid;
-      window.open(`https://mempool.space/tx/${txid}`, '_blank');
+      // Use mempool.space signet explorer (change to mainnet when ready)
+      window.open(`https://mempool.space/signet/tx/${txid}`, '_blank');
     });
   });
 
   // Export report as JSON
   content.querySelector('#export-report').addEventListener('click', () => {
-    const reportJson = JSON.stringify(swapReport, null, 2);
+    const reportJson = JSON.stringify(report, null, 2);
     const blob = new Blob([reportJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `coinswap-report-${swapReport.swapId}.json`;
+    a.download = `coinswap-report-${report.swapId}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showNotification('Report exported!');

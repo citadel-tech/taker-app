@@ -41,27 +41,67 @@ export function TransactionsListComponent(container) {
     return date.toLocaleDateString();
   }
 
+  function formatFullDate(timestamp) {
+    const date = new Date(timestamp * 1000);
+    return date.toLocaleString();
+  }
+
+  // Improved swap detection
   function getTransactionType(transaction) {
-    const category = transaction.detail.category.toLowerCase();
+    const category = (transaction.detail.category || '').toLowerCase();
     const amount = transaction.detail.amount.sats;
+    const label = (transaction.detail.label || '').toLowerCase();
     
-    if (category === 'receive') return 'received';
-    if (category === 'send') return 'sent';
-    if (transaction.detail.label === 'watchonly_swapcoin_label') return 'swap';
+    // Check various indicators for swap transactions
+    // 1. Label contains swap-related keywords
+    if (label.includes('swap') || 
+        label.includes('swapcoin') || 
+        label.includes('coinswap') ||
+        label.includes('watchonly_swapcoin')) {
+      return 'swap';
+    }
+    
+    // 2. Check if it's a contract transaction (often part of swaps)
+    if (label.includes('contract') || label.includes('htlc')) {
+      return 'swap';
+    }
+
+    // 3. Check category for swap indicators
+    if (category.includes('swap')) {
+      return 'swap';
+    }
+
+    // 4. Standard receive/send detection
+    if (category === 'receive' || category === '"receive"') return 'received';
+    if (category === 'send' || category === '"send"') return 'sent';
+    
+    // 5. Fallback to amount-based detection
     return amount > 0 ? 'received' : 'sent';
   }
 
+  // Sort transactions by time (newest first)
+  function sortTransactionsByTime(transactions) {
+    return [...transactions].sort((a, b) => {
+      const timeA = a.info.time || a.info.timereceived || 0;
+      const timeB = b.info.time || b.info.timereceived || 0;
+      return timeB - timeA; // Descending order (newest first)
+    });
+  }
+
   function getFilteredTransactions() {
+    // First sort all transactions
+    const sorted = sortTransactionsByTime(allTransactions);
+    
     if (currentFilter === 'all') {
-      return allTransactions;
+      return sorted;
     } else if (currentFilter === 'received') {
-      return allTransactions.filter(tx => getTransactionType(tx) === 'received');
+      return sorted.filter(tx => getTransactionType(tx) === 'received');
     } else if (currentFilter === 'sent') {
-      return allTransactions.filter(tx => getTransactionType(tx) === 'sent');
+      return sorted.filter(tx => getTransactionType(tx) === 'sent');
     } else if (currentFilter === 'swaps') {
-      return allTransactions.filter(tx => getTransactionType(tx) === 'swap');
+      return sorted.filter(tx => getTransactionType(tx) === 'swap');
     }
-    return allTransactions;
+    return sorted;
   }
 
   function updateFilterButtons() {
@@ -69,9 +109,9 @@ export function TransactionsListComponent(container) {
     buttons.forEach(btn => {
       const filter = btn.dataset.filter;
       if (filter === currentFilter) {
-        btn.className = 'filter-btn bg-[#FF6B35] text-white px-3 py-1 rounded text-sm font-semibold';
+        btn.className = 'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
       } else {
-        btn.className = 'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-sm font-semibold transition-colors';
+        btn.className = 'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
       }
     });
   }
@@ -85,15 +125,15 @@ export function TransactionsListComponent(container) {
   function getTransactionIcon(type) {
     switch (type) {
       case 'received':
-        return { icon: '↓', color: 'green' };
+        return { icon: '↓', color: 'green', bg: 'green' };
       case 'sent':
-        return { icon: '↑', color: 'red' };
+        return { icon: '↑', color: 'red', bg: 'red' };
       case 'swap':
-        return { icon: '⇄', color: 'blue' };
+        return { icon: '⇄', color: 'blue', bg: 'blue' };
       case 'pending':
-        return { icon: '⏳', color: 'yellow' };
+        return { icon: '⏳', color: 'yellow', bg: 'yellow' };
       default:
-        return { icon: '?', color: 'gray' };
+        return { icon: '?', color: 'gray', bg: 'gray' };
     }
   }
 
@@ -106,11 +146,11 @@ export function TransactionsListComponent(container) {
 
   function getStatusBadge(confirmations) {
     if (confirmations === 0) {
-      return { text: 'Unconfirmed', class: 'bg-yellow-500/20 text-yellow-400' };
+      return { text: 'Unconfirmed', class: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' };
     } else if (confirmations >= 6) {
-      return { text: 'Confirmed', class: 'bg-green-500/20 text-green-400' };
+      return { text: 'Confirmed', class: 'bg-green-500/20 text-green-400 border border-green-500/30' };
     } else {
-      return { text: `${confirmations}/6`, class: 'bg-blue-500/20 text-blue-400' };
+      return { text: `${confirmations}/6 conf`, class: 'bg-blue-500/20 text-blue-400 border border-blue-500/30' };
     }
   }
 
@@ -120,43 +160,51 @@ export function TransactionsListComponent(container) {
     
     if (filteredTransactions.length === 0) {
       transactionContainer.innerHTML = `
-        <div class="text-center py-8">
+        <div class="text-center py-12">
+          <div class="text-4xl mb-4">📭</div>
           <p class="text-gray-400">No transactions found for the selected filter.</p>
+          <p class="text-gray-500 text-sm mt-2">Try selecting a different filter or refresh.</p>
         </div>
       `;
       return;
     }
 
-    transactionContainer.innerHTML = filteredTransactions.map(tx => {
+    transactionContainer.innerHTML = filteredTransactions.map((tx, index) => {
       const type = getTransactionType(tx);
       const iconData = getTransactionIcon(type);
       const amountData = formatAmount(tx.detail.amount.sats);
       const statusBadge = getStatusBadge(tx.info.confirmations);
       const txid = typeof tx.info.txid === 'object' ? tx.info.txid.hex : tx.info.txid;
+      const timestamp = tx.info.time || tx.info.timereceived;
+      const label = tx.detail.label || '';
       
       return `
-        <div class="flex items-center justify-between p-4 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg transition-colors">
+        <div class="flex items-center justify-between p-4 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg transition-colors group">
             <div class="flex items-center space-x-4">
-                <div class="w-12 h-12 bg-${iconData.color}-500/20 rounded-full flex items-center justify-center">
-                    <span class="text-${iconData.color}-400 text-lg">${iconData.icon}</span>
+                <div class="w-12 h-12 bg-${iconData.bg}-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <span class="text-${iconData.color}-400 text-xl">${iconData.icon}</span>
                 </div>
-                <div>
-                    <div class="flex items-center gap-2 mb-1">
-                        <p class="text-white font-semibold text-sm capitalize">${type === 'swap' ? 'Coinswap' : type}</p>
-                        <span class="text-xs px-2 py-1 rounded ${statusBadge.class}">${statusBadge.text}</span>
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
+                        <p class="text-white font-semibold capitalize">
+                          ${type === 'swap' ? '🔄 Coinswap' : type === 'received' ? '📥 Received' : '📤 Sent'}
+                        </p>
+                        <span class="text-xs px-2 py-0.5 rounded ${statusBadge.class}">${statusBadge.text}</span>
+                        ${label ? `<span class="text-xs text-gray-500 truncate max-w-[150px]" title="${label}">${label}</span>` : ''}
                     </div>
-                    <div class="flex items-center gap-3 text-xs text-gray-400">
-                        <span class="cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors font-mono" onclick="openTxOnMempool('${txid}')">
-                            ${txid.substring(0, 16)}...
+                    <div class="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
+                        <span class="cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors font-mono" 
+                              onclick="openTxOnMempool('${txid}')" 
+                              title="${txid}">
+                            ${txid.substring(0, 16)}...${txid.substring(txid.length - 8)}
                         </span>
-                        <span>${formatDate(tx.info.time)}</span>
-                        <span>${tx.info.confirmations} confirmations</span>
+                        <span title="${formatFullDate(timestamp)}">${formatDate(timestamp)}</span>
                     </div>
                 </div>
             </div>
-            <div class="text-right">
+            <div class="text-right flex-shrink-0">
                 <p class="${amountData.colorClass} font-mono text-lg font-semibold">${amountData.text}</p>
-                <p class="text-gray-400 text-xs">Fee: ${tx.detail.fee ? satsToBtc(Math.abs(tx.detail.fee.sats)) + ' BTC' : 'N/A'}</p>
+                ${tx.detail.fee ? `<p class="text-gray-500 text-xs">Fee: ${satsToBtc(Math.abs(tx.detail.fee.sats))} BTC</p>` : ''}
             </div>
         </div>
       `;
@@ -196,7 +244,15 @@ export function TransactionsListComponent(container) {
 
   async function loadTransactions() {
     const refreshBtn = content.querySelector('#refresh-transactions-btn');
-    const loadMoreBtn = content.querySelector('#load-more-btn');
+    const transactionContainer = content.querySelector('#transaction-container');
+    
+    // Show loading state
+    transactionContainer.innerHTML = `
+      <div class="text-center py-12">
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+        <p class="text-gray-400">Loading transactions...</p>
+      </div>
+    `;
     
     if (refreshBtn) {
       refreshBtn.textContent = 'Loading...';
@@ -205,6 +261,18 @@ export function TransactionsListComponent(container) {
     
     try {
       allTransactions = await fetchTransactions(100); // Load more transactions
+      
+      // Debug: log transaction types to help identify swap detection
+      console.log('📊 Transaction breakdown:');
+      allTransactions.forEach((tx, i) => {
+        const type = getTransactionType(tx);
+        const label = tx.detail.label || 'no label';
+        const category = tx.detail.category;
+        if (i < 10) { // Log first 10 for debugging
+          console.log(`  ${i}: type=${type}, category=${category}, label=${label}`);
+        }
+      });
+      
       updateStats();
       renderTransactions();
       console.log('✅ Transactions loaded:', allTransactions.length);
@@ -218,12 +286,17 @@ export function TransactionsListComponent(container) {
       }
     } catch (error) {
       console.error('❌ Failed to load transactions:', error);
+      transactionContainer.innerHTML = `
+        <div class="text-center py-12">
+          <div class="text-4xl mb-4">❌</div>
+          <p class="text-red-400">Failed to load transactions</p>
+          <p class="text-gray-500 text-sm mt-2">${error.message}</p>
+          <button onclick="location.reload()" class="mt-4 bg-[#FF6B35] text-white px-4 py-2 rounded-lg">Retry</button>
+        </div>
+      `;
       if (refreshBtn) {
-        refreshBtn.textContent = 'Load Failed';
-        setTimeout(() => {
-          refreshBtn.textContent = 'Refresh';
-          refreshBtn.disabled = false;
-        }, 3000);
+        refreshBtn.textContent = 'Retry';
+        refreshBtn.disabled = false;
       }
     }
   }
@@ -233,20 +306,20 @@ export function TransactionsListComponent(container) {
     const totals = calculateTotals();
     
     // Update filter button counts
-    const filterButtons = content.querySelectorAll('.filter-btn');
-    filterButtons.forEach(btn => {
-      const filter = btn.dataset.filter;
-      const count = stats[filter] || 0;
-      const text = btn.textContent.split('(')[0].trim();
-      btn.textContent = `${text} (${count})`;
-    });
+    content.querySelector('#filter-all-count').textContent = stats.all;
+    content.querySelector('#filter-received-count').textContent = stats.received;
+    content.querySelector('#filter-sent-count').textContent = stats.sent;
+    content.querySelector('#filter-swaps-count').textContent = stats.swaps;
     
     // Update stats cards
     content.querySelector('#total-transactions').textContent = stats.all;
     content.querySelector('#total-received').textContent = totals.totalReceived + ' BTC';
     content.querySelector('#total-sent').textContent = totals.totalSent + ' BTC';
-    content.querySelector('#net-balance').textContent = 
-      (totals.netBalance.startsWith('-') ? '' : '+') + totals.netBalance + ' BTC';
+    
+    const netEl = content.querySelector('#net-balance');
+    const netValue = parseFloat(totals.netBalance);
+    netEl.textContent = (netValue >= 0 ? '+' : '') + totals.netBalance + ' BTC';
+    netEl.className = `text-2xl font-mono ${netValue >= 0 ? 'text-green-400' : 'text-red-400'}`;
   }
 
   // Create content
@@ -256,13 +329,13 @@ export function TransactionsListComponent(container) {
   content.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <div>
-                <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4">
-                    ← Back to Wallet
+                <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4 flex items-center gap-2">
+                    <span>←</span> Back to Wallet
                 </button>
                 <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Transactions</h2>
-                <p class="text-gray-400">Complete transaction history</p>
+                <p class="text-gray-400">Complete transaction history (newest first)</p>
             </div>
-            <button id="refresh-transactions-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+            <button id="refresh-transactions-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-6 rounded-lg transition-colors">
                 Refresh
             </button>
         </div>
@@ -283,7 +356,7 @@ export function TransactionsListComponent(container) {
             </div>
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Net Balance</p>
-                <p id="net-balance" class="text-2xl font-mono text-blue-400">-- BTC</p>
+                <p id="net-balance" class="text-2xl font-mono text-green-400">-- BTC</p>
             </div>
         </div>
 
@@ -293,17 +366,17 @@ export function TransactionsListComponent(container) {
                 <h3 class="text-xl font-semibold text-gray-300">Transaction History</h3>
                 <!-- Filter buttons -->
                 <div class="flex gap-2">
-                    <button data-filter="all" class="filter-btn bg-[#FF6B35] text-white px-3 py-1 rounded text-sm font-semibold">
-                        All (--)
+                    <button data-filter="all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        All (<span id="filter-all-count">--</span>)
                     </button>
-                    <button data-filter="received" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-sm font-semibold transition-colors">
-                        Received (--)
+                    <button data-filter="received" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        📥 Received (<span id="filter-received-count">--</span>)
                     </button>
-                    <button data-filter="sent" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-sm font-semibold transition-colors">
-                        Sent (--)
+                    <button data-filter="sent" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        📤 Sent (<span id="filter-sent-count">--</span>)
                     </button>
-                    <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-sm font-semibold transition-colors">
-                        Swaps (--)
+                    <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                        🔄 Swaps (<span id="filter-swaps-count">--</span>)
                     </button>
                 </div>
             </div>
@@ -319,6 +392,11 @@ export function TransactionsListComponent(container) {
                     Load More Transactions
                 </button>
             </div>
+        </div>
+        
+        <!-- Debug Info (can be removed in production) -->
+        <div class="mt-4 p-4 bg-[#0f1419] rounded-lg text-xs text-gray-500">
+            <p>💡 Tip: Check browser console for transaction type breakdown to debug swap detection</p>
         </div>
     `;
 
@@ -341,6 +419,28 @@ export function TransactionsListComponent(container) {
 
   // Event handlers
   content.querySelector('#refresh-transactions-btn').addEventListener('click', loadTransactions);
+
+  // Load more handler
+  content.querySelector('#load-more-btn').addEventListener('click', async () => {
+    const btn = content.querySelector('#load-more-btn');
+    btn.textContent = 'Loading...';
+    btn.disabled = true;
+    
+    try {
+      const moreTransactions = await fetchTransactions(50, allTransactions.length);
+      if (moreTransactions.length > 0) {
+        allTransactions = [...allTransactions, ...moreTransactions];
+        updateStats();
+        renderTransactions();
+        btn.textContent = 'Load More Transactions';
+      } else {
+        btn.textContent = 'No More Transactions';
+      }
+    } catch (error) {
+      btn.textContent = 'Load Failed - Retry';
+    }
+    btn.disabled = false;
+  });
 
   // Add filter button event listeners
   const filterButtons = content.querySelectorAll('.filter-btn');

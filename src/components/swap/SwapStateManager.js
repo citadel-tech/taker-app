@@ -3,8 +3,11 @@
 const STORAGE_KEYS = {
   ACTIVE_SWAP: 'coinswap_active_swap',
   SWAP_PROGRESS: 'coinswap_swap_progress', 
-  USER_SELECTIONS: 'coinswap_user_selections'
+  USER_SELECTIONS: 'coinswap_user_selections',
+  SWAP_HISTORY: 'coinswap_swap_history'
 };
+
+const MAX_HISTORY_ITEMS = 50; // Keep last 50 swaps
 
 export const SwapStateManager = {
   // Swap Configuration Management
@@ -79,13 +82,82 @@ export const SwapStateManager = {
     console.log('User selections cleared');
   },
 
+  // Swap History Management
+  getSwapHistory() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.SWAP_HISTORY);
+      return data ? JSON.parse(data) : [];
+    } catch (error) {
+      console.error('Error getting swap history:', error);
+      return [];
+    }
+  },
+
+  addToSwapHistory(swapReport) {
+    try {
+      const history = this.getSwapHistory();
+      
+      // Create history entry from report
+      const historyEntry = {
+        id: swapReport.swapId || `swap_${Date.now()}`,
+        completedAt: Date.now(),
+        amount: swapReport.targetAmount || 0,
+        totalOutputAmount: swapReport.totalOutputAmount || 0,
+        makersCount: swapReport.makersCount || 0,
+        hops: (swapReport.makersCount || 0) + 1,
+        totalFee: swapReport.totalFee || 0,
+        feePercentage: swapReport.feePercentage || 0,
+        durationSeconds: swapReport.swapDurationSeconds || 0,
+        status: 'completed',
+        // Store full report for detailed view
+        report: swapReport
+      };
+      
+      // Add to beginning of array (most recent first)
+      history.unshift(historyEntry);
+      
+      // Keep only last MAX_HISTORY_ITEMS
+      if (history.length > MAX_HISTORY_ITEMS) {
+        history.splice(MAX_HISTORY_ITEMS);
+      }
+      
+      localStorage.setItem(STORAGE_KEYS.SWAP_HISTORY, JSON.stringify(history));
+      console.log('Swap added to history:', historyEntry);
+      
+      return historyEntry;
+    } catch (error) {
+      console.error('Error adding to swap history:', error);
+      return null;
+    }
+  },
+
+  getSwapFromHistory(swapId) {
+    const history = this.getSwapHistory();
+    return history.find(swap => swap.id === swapId) || null;
+  },
+
+  getRecentSwaps(count = 5) {
+    const history = this.getSwapHistory();
+    return history.slice(0, count);
+  },
+
+  clearSwapHistory() {
+    localStorage.removeItem(STORAGE_KEYS.SWAP_HISTORY);
+    console.log('Swap history cleared');
+  },
+
   // Swap Completion
-  completeSwap() {
+  completeSwap(report = null) {
     const activeSwap = this.getActiveSwap();
     if (activeSwap) {
       activeSwap.status = 'completed';
       activeSwap.completedAt = Date.now();
       localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(activeSwap));
+    }
+    
+    // Add to history if report provided
+    if (report) {
+      this.addToSwapHistory(report);
     }
     
     // Clear progress data but keep active swap for history
@@ -106,7 +178,8 @@ export const SwapStateManager = {
     return {
       activeSwap: this.getActiveSwap(),
       progress: this.getSwapProgress(),
-      selections: this.getUserSelections()
+      selections: this.getUserSelections(),
+      history: this.getSwapHistory()
     };
   },
 
@@ -130,6 +203,27 @@ export function formatElapsedTime(milliseconds) {
     return `${minutes}m ${seconds % 60}s`;
   } else {
     return `${seconds}s`;
+  }
+}
+
+// Utility function to format relative time (e.g., "2 hours ago")
+export function formatRelativeTime(timestamp) {
+  const now = Date.now();
+  const diff = now - timestamp;
+  
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  
+  if (days > 0) {
+    return days === 1 ? '1 day ago' : `${days} days ago`;
+  } else if (hours > 0) {
+    return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
+  } else if (minutes > 0) {
+    return minutes === 1 ? '1 minute ago' : `${minutes} minutes ago`;
+  } else {
+    return 'Just now';
   }
 }
 

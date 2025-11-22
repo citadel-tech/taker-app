@@ -348,7 +348,7 @@ export function SettingsComponent(container) {
   container.appendChild(content);
 
   // FUNCTIONS
-  
+
   // Load existing configuration and populate form fields
   function loadExistingConfig() {
     try {
@@ -356,7 +356,7 @@ export function SettingsComponent(container) {
       if (savedConfig) {
         const config = JSON.parse(savedConfig);
         console.log('ðŸ“‹ Loading existing config:', config);
-        
+
         // Populate RPC fields
         if (config.rpc) {
           if (config.rpc.host) content.querySelector('#rpc-host-input').value = config.rpc.host;
@@ -364,7 +364,7 @@ export function SettingsComponent(container) {
           if (config.rpc.username) content.querySelector('#rpc-username-input').value = config.rpc.username;
           if (config.rpc.password) content.querySelector('#rpc-password-input').value = config.rpc.password;
         }
-        
+
         // Populate Taker config fields
         if (config.taker) {
           if (config.taker.control_port) content.querySelector('#tor-control-port-input').value = config.taker.control_port;
@@ -399,7 +399,7 @@ export function SettingsComponent(container) {
       'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident'
     ];
     const seedPhrase = seedWords.join(' ');
-    
+
     try {
       await navigator.clipboard.writeText(seedPhrase);
       const btn = content.querySelector('#copy-seed-btn');
@@ -422,7 +422,7 @@ export function SettingsComponent(container) {
       alert('Please enter a seed phrase');
       return;
     }
-    
+
     if (confirm('Are you sure you want to restore from this seed phrase? This will replace your current wallet.')) {
       // Here you would implement the actual restore logic
       alert('Wallet restore functionality would be implemented here');
@@ -438,7 +438,7 @@ export function SettingsComponent(container) {
     const status = content.querySelector('#rpc-status');
     const connectBtn = content.querySelector('#connect-btn');
     const disconnectBtn = content.querySelector('#disconnect-btn');
-    
+
     if (connected) {
       indicator.className = 'w-3 h-3 bg-green-500 rounded-full mr-2';
       status.textContent = 'Connected';
@@ -446,7 +446,7 @@ export function SettingsComponent(container) {
       connectBtn.disabled = true;
       disconnectBtn.disabled = false;
       isConnected = true;
-      
+
       // Update info if provided
       if (info.version) content.querySelector('#bitcoin-version').textContent = info.version;
       if (info.network) content.querySelector('#bitcoin-network').textContent = info.network;
@@ -455,7 +455,7 @@ export function SettingsComponent(container) {
         const progress = (info.verificationprogress * 100).toFixed(1);
         content.querySelector('#sync-progress').textContent = `${progress}%`;
       }
-      
+
     } else {
       indicator.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
       status.textContent = 'Not Connected';
@@ -463,7 +463,7 @@ export function SettingsComponent(container) {
       connectBtn.disabled = false;
       disconnectBtn.disabled = true;
       isConnected = false;
-      
+
       // Clear info
       content.querySelector('#bitcoin-version').textContent = '--';
       content.querySelector('#bitcoin-network').textContent = '--';
@@ -484,7 +484,7 @@ export function SettingsComponent(container) {
 
     const url = `http://${host}:${port}`;
     const auth = btoa(`${username}:${password}`);
-    
+
     const body = {
       jsonrpc: "1.0",
       id: Date.now(),
@@ -512,11 +512,11 @@ export function SettingsComponent(container) {
     }
 
     const data = await response.json();
-    
+
     if (data.error) {
       throw new Error(`RPC Error: ${data.error.message}`);
     }
-    
+
     return data.result;
   }
 
@@ -530,16 +530,16 @@ export function SettingsComponent(container) {
     try {
       const info = await makeRPCCall('getblockchaininfo');
       const networkInfo = await makeRPCCall('getnetworkinfo');
-      
+
       updateConnectionStatus(true, {
         version: networkInfo.subversion || 'Unknown',
         network: info.chain,
         blocks: info.blocks,
         verificationprogress: info.verificationprogress
       });
-      
+
       console.log('✅ RPC connection successful:', info);
-      
+
     } catch (error) {
       console.error('❌ RPC connection failed:', error);
       updateConnectionStatus(false);
@@ -583,18 +583,18 @@ export function SettingsComponent(container) {
       const { bitcoindConnection } = await import('./BitcoindConnection.js');
       if (bitcoindConnection) {
         bitcoindConnection.updateConfig(updatedConfig);
-        
+
         // Test the connection
         const info = await makeRPCCall('getblockchaininfo');
         const networkInfo = await makeRPCCall('getnetworkinfo');
-        
+
         updateConnectionStatus(true, {
           version: networkInfo.subversion || 'Unknown',
           network: info.chain,
           blocks: info.blocks,
           verificationprogress: info.verificationprogress
         });
-        
+
         // Start status refresh timer
         if (connectionTimer) clearInterval(connectionTimer);
         connectionTimer = setInterval(async () => {
@@ -614,10 +614,10 @@ export function SettingsComponent(container) {
             }
           }
         }, 5000); // Refresh every 5 seconds
-        
+
         console.log('✅ Connected and monitoring status');
       }
-      
+
     } catch (error) {
       console.error('❌ Connection failed:', error);
       updateConnectionStatus(false);
@@ -647,7 +647,7 @@ export function SettingsComponent(container) {
     try {
       const info = await makeRPCCall('getblockchaininfo');
       const networkInfo = await makeRPCCall('getnetworkinfo');
-      
+
       updateConnectionStatus(true, {
         version: networkInfo.subversion || 'Unknown',
         network: info.chain,
@@ -670,18 +670,18 @@ export function SettingsComponent(container) {
     const statusText = content.querySelector('#tracker-status-text');
     const makersCount = content.querySelector('#available-makers-count');
     const responseTime = content.querySelector('#tracker-response-time');
-    
+
     const originalText = btn.textContent;
     btn.textContent = 'Testing...';
     btn.disabled = true;
-    
+
     // Show status div
     statusDiv.classList.remove('hidden');
     statusText.textContent = 'Testing...';
     statusText.className = 'text-sm font-semibold text-yellow-400';
 
     const trackerAddress = content.querySelector('#tracker-address-input').value;
-    
+
     // Simulate tracker test (in real implementation, this would test the actual tracker connection)
     setTimeout(() => {
       // Mock successful connection
@@ -726,7 +726,7 @@ export function SettingsComponent(container) {
     btn.textContent = 'Saved!';
     btn.classList.remove('bg-[#FF6B35]', 'hover:bg-[#ff7d4d]');
     btn.classList.add('bg-green-600', 'hover:bg-green-700');
-    
+
     setTimeout(() => {
       btn.textContent = originalText;
       btn.classList.remove('bg-green-600', 'hover:bg-green-700');
@@ -742,20 +742,39 @@ export function SettingsComponent(container) {
       content.querySelector('#tor-socks-port-input').value = '9050';
       content.querySelector('#tor-auth-password-input').value = '';
       content.querySelector('#tracker-address-input').value = 'lp75qh3del4qot6fmkqq4taqm33pidvk63lncvhlwsllbwrl2f4g4qqd.onion:8080';
-      
+
       // Reset RPC fields
       content.querySelector('#rpc-host-input').value = '127.0.0.1';
       content.querySelector('#rpc-port-input').value = '18443';
       content.querySelector('#rpc-username-input').value = 'user';
       content.querySelector('#rpc-password-input').value = '';
-      
+
       // Hide status displays
       content.querySelector('#tracker-status').classList.add('hidden');
-      
+
       alert('Settings reset to defaults');
     }
   });
 
   // INITIALIZE - Load existing configuration
   loadExistingConfig();
+
+  // Auto-check connection status on page load
+  (async function checkInitialStatus() {
+    try {
+      const info = await makeRPCCall('getblockchaininfo');
+      const networkInfo = await makeRPCCall('getnetworkinfo');
+
+      updateConnectionStatus(true, {
+        version: networkInfo.subversion || 'Unknown',
+        network: info.chain,
+        blocks: info.blocks,
+        verificationprogress: info.verificationprogress
+      });
+    } catch (error) {
+      // Silently fail - just leave as "Not Connected"
+      console.log('Initial connection check failed:', error.message);
+    }
+  })();
+
 }

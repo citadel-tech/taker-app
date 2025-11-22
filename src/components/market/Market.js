@@ -11,27 +11,31 @@ export function Market(container) {
     async function fetchMakers() {
         try {
             console.log('📡 Fetching makers from API...');
+            isLoading = true;
+            updateUI();
             
             const response = await fetch('http://localhost:3001/api/taker/offers');
             const data = await response.json();
 
             if (data.success && data.offerbook) {
-                // Use good makers (verified and online)
                 const goodMakers = data.offerbook.goodMakers || [];
                 
                 makers = goodMakers.map((item, index) => {
                     const offer = item.offer;
-                    const address = item.address?.address || item.address;
+                    const addressObj = item.address || {};
+                    const onionAddr = addressObj.onion_addr || '';
+                    const port = addressObj.port || '6102';
+                    const fullAddress = `${onionAddr}:${port}`;
                     
                     return {
-                        address: address,
+                        address: fullAddress,
                         baseFee: offer.baseFee || 0,
                         volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
                         timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
                         minSize: offer.minSize || 0,
                         maxSize: offer.maxSize || 0,
-                        bond: offer.fidelity?.bond?.amount?.sats || 0,
-                        bondTxid: offer.fidelity?.bond?.outpoint?.txid || '',
+                        bond: offer.fidelity?.bond?.amount || 0,
+                        bondTxid: offer.fidelity?.bond?.outpoint?.split(':')[0] || '',
                         requiredConfirms: offer.requiredConfirms || 0,
                         minimumLocktime: offer.minimumLocktime || 0,
                         index: index
@@ -63,18 +67,16 @@ export function Market(container) {
 
             if (data.success) {
                 console.log('✅ Offerbook synced');
-                // Refresh makers after sync
                 await fetchMakers();
             } else {
                 throw new Error(data.error || 'Failed to sync offerbook');
             }
         } catch (error) {
             console.error('❌ Sync failed:', error);
-            showError('Failed to sync: ' + error.message);
+            throw error;
         }
     }
 
-    // UI FUNCTIONS
     function showError(message) {
         const errorDiv = document.createElement('div');
         errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
@@ -101,20 +103,18 @@ export function Market(container) {
             totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
             avgFee: avgFee.toFixed(1),
             onlineMakers: makers.length,
-            avgResponse: '2.3' // This would need to be tracked separately
+            avgResponse: '2.3'
         };
     }
 
-    // Global function for viewing fidelity bonds
     window.viewFidelityBond = (makerAddress) => {
         const maker = makers.find(m => m.address === makerAddress);
         if (maker && maker.bondTxid) {
-            const url = `https://mempool.space/tx/${maker.bondTxid}`;
+            const url = `https://mempool.space/signet/tx/${maker.bondTxid}`;
             window.open(url, '_blank');
         }
     };
 
-    // SELECTION FUNCTIONS
     function toggleMakerSelection(index) {
         const makerIndex = selectedMakers.indexOf(index);
         if (makerIndex > -1) {
@@ -126,7 +126,6 @@ export function Market(container) {
     }
 
     function updateSelectionUI() {
-        // Update individual checkboxes
         makers.forEach((_, index) => {
             const checkbox = content.querySelector(`#maker-${index}`);
             if (checkbox) {
@@ -134,7 +133,6 @@ export function Market(container) {
             }
         });
 
-        // Update select all checkbox
         const selectAllCheckbox = content.querySelector('#select-all-makers');
         if (selectAllCheckbox) {
             if (selectedMakers.length === 0) {
@@ -149,7 +147,6 @@ export function Market(container) {
             }
         }
 
-        // Update action buttons
         const actionButtons = content.querySelector('#maker-actions');
         const selectedCount = content.querySelector('#selected-makers-count');
         
@@ -178,10 +175,9 @@ export function Market(container) {
         }
 
         const selectedMakerData = selectedMakers.map(index => makers[index]);
-        
         console.log('🔄 Starting swap with', selectedMakerData.length, 'makers:', selectedMakerData);
         
-        import('../swap/Swap.js').then((module) => {
+        import('./Swap.js').then((module) => {
             container.innerHTML = '';
             module.SwapComponent(container, null, selectedMakerData);
         });
@@ -192,7 +188,6 @@ export function Market(container) {
         const tableBody = content.querySelector('#maker-table-body');
         const statsContainer = content.querySelector('#market-stats');
 
-        // Update stats
         if (statsContainer) {
             statsContainer.innerHTML = `
                 <div class="bg-[#1a2332] rounded-lg p-6">
@@ -214,7 +209,6 @@ export function Market(container) {
             `;
         }
 
-        // Update table
         if (tableBody) {
             if (isLoading) {
                 tableBody.innerHTML = `
@@ -236,11 +230,7 @@ export function Market(container) {
                 setTimeout(() => {
                     const retryBtn = content.querySelector('#retry-fetch');
                     if (retryBtn) {
-                        retryBtn.addEventListener('click', () => {
-                            isLoading = true;
-                            updateUI();
-                            fetchMakers();
-                        });
+                        retryBtn.addEventListener('click', () => fetchMakers());
                     }
                 }, 100);
             } else {
@@ -261,7 +251,6 @@ export function Market(container) {
                     </div>
                 `).join('');
 
-                // Re-attach event listeners for checkboxes
                 makers.forEach((_, index) => {
                     const checkbox = content.querySelector(`#maker-${index}`);
                     if (checkbox) {
@@ -271,7 +260,6 @@ export function Market(container) {
             }
         }
 
-        // Update footer
         const footer = content.querySelector('#market-footer');
         if (footer) {
             const now = new Date();
@@ -303,7 +291,6 @@ export function Market(container) {
         }
     }
     
-    // RENDER
     content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
             <div>
@@ -315,7 +302,6 @@ export function Market(container) {
             </button>
         </div>
 
-        <!-- Stats Cards -->
         <div id="market-stats" class="grid grid-cols-4 gap-4 mb-6">
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
@@ -335,9 +321,7 @@ export function Market(container) {
             </div>
         </div>
 
-        <!-- Market Table -->
         <div class="bg-[#1a2332] rounded-lg overflow-hidden">
-            <!-- Action Buttons -->
             <div id="maker-actions" class="hidden bg-[#FF6B35] p-4 flex justify-between items-center">
                 <span class="text-white font-semibold">
                     <span id="selected-makers-count">0</span> makers selected
@@ -347,7 +331,6 @@ export function Market(container) {
                 </button>
             </div>
 
-            <!-- Table Header -->
             <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4">
                 <div class="flex items-center">
                     <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
@@ -383,7 +366,6 @@ export function Market(container) {
                 </div>
             </div>
 
-            <!-- Table Body -->
             <div id="maker-table-body" class="divide-y divide-gray-700">
                 <div class="col-span-8 text-center py-12">
                     <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
@@ -391,7 +373,6 @@ export function Market(container) {
                 </div>
             </div>
 
-            <!-- Footer -->
             <div id="market-footer" class="p-4 text-center text-gray-400 text-sm border-t border-gray-700">
                 Loading...
             </div>
@@ -400,22 +381,10 @@ export function Market(container) {
     
     container.appendChild(content);
 
-    // EVENT LISTENERS
     content.querySelector('#refresh-market-btn').addEventListener('click', handleRefresh);
     content.querySelector('#select-all-makers').addEventListener('change', selectAllMakers);
     content.querySelector('#swap-with-makers').addEventListener('click', swapWithSelectedMakers);
 
-    // INITIAL LOAD
-    // fetchMakers(); // Disabled for now - fetchOffers() is blocking the server
-    
-    // Show a message instead
-    const tableBody = content.querySelector('#maker-table-body');
-    if (tableBody) {
-        tableBody.innerHTML = `
-            <div class="col-span-8 text-center py-12">
-                <p class="text-gray-400 mb-4">Market discovery temporarily disabled</p>
-                <p class="text-sm text-gray-500">Use manual maker selection in the Swap page</p>
-            </div>
-        `;
-    }
+    // Initial load
+    fetchMakers();
 }
