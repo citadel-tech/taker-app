@@ -14,20 +14,29 @@ export function SwapComponent(container) {
 
   // If there's an active swap in progress, redirect to coinswap progress
   if (activeSwap && activeSwap.status === 'configured') {
-    const age = Date.now() - activeSwap.createdAt;
-    if (age > 5 * 60 * 1000) {
-      console.log('🧹 Clearing stale configured swap');
-      SwapStateManager.clearSwapData();
-    }
+  const age = Date.now() - activeSwap.createdAt;
+  if (age > 5 * 60 * 1000) {
+    console.log('🧹 Clearing stale configured swap');
+    SwapStateManager.clearSwapData();
+  } else {
+    console.log('🔄 Active swap detected, redirecting to progress view');
+    import('./Coinswap.js').then((module) => {
+      container.innerHTML = '';
+      module.CoinswapComponent(container, activeSwap);
+    });
+    return; // Exit early, don't render the config page
   }
+}
+
 
   // STATE
   let swapAmount = 0;
   let amountUnit = 'sats';
   let numberOfHops = 3;
-  let selectionMode = 'auto';
+  let selectionMode = 'auto'; // 'auto' or 'manual'
   let selectedUtxos = [];
-  let selectedMakers = [];
+  let useCustomHops = false;
+  let customHopCount = 6;
   let networkFeeRate = 5; // sats/vB
 
   // Restore user selections from saved state if available
@@ -41,7 +50,8 @@ export function SwapComponent(container) {
     numberOfHops = savedSelections.numberOfHops || 3;
     selectionMode = savedSelections.selectionMode || 'auto';
     selectedUtxos = savedSelections.selectedUtxos || [];
-    selectedMakers = savedSelections.selectedMakers || [];
+    useCustomHops = savedSelections.useCustomHops || false;
+    customHopCount = savedSelections.customHopCount || 6;
     networkFeeRate = savedSelections.networkFeeRate || 5;
   } else {
     console.log('⚠️ No saved selections found, using defaults');
@@ -80,7 +90,7 @@ export function SwapComponent(container) {
     }
   }
 
-  // Fetch real makers from API
+  // Fetch real makers from API (to check availability)
   async function fetchMakers() {
     try {
       const response = await fetch('http://localhost:3001/api/taker/offers');
@@ -89,24 +99,20 @@ export function SwapComponent(container) {
       if (data.success && data.offerbook && data.offerbook.goodMakers) {
         availableMakers = data.offerbook.goodMakers.map((item, index) => {
           const offer = item.offer;
-          const addressObj = item.address || {};
-          const onionAddr = addressObj.onion_addr || '';
-          const port = addressObj.port || '6102';
-          const fullAddress = `${onionAddr}:${port}`;
-
           return {
-            address: fullAddress,
-            fee: (offer.amountRelativeFeePct || 0).toFixed(1),
             minSize: offer.minSize || 0,
             maxSize: offer.maxSize || 0,
-            bond: offer.fidelity?.bond?.amount || 0,
+            fee: (offer.amountRelativeFeePct || 0).toFixed(1),
             index: index
           };
         });
         console.log('✅ Loaded', availableMakers.length, 'makers for swap');
 
-        // Re-render maker table after fetching
-        renderMakerTable();
+        // Update available makers count
+        const makersCountEl = content.querySelector('#available-makers-count');
+        if (makersCountEl) {
+          makersCountEl.textContent = availableMakers.length;
+        }
       }
     } catch (error) {
       console.error('Failed to fetch makers:', error);
@@ -136,63 +142,6 @@ export function SwapComponent(container) {
     } catch (error) {
       console.error('Failed to fetch balance:', error);
     }
-  }
-
-  // Render maker table dynamically
-  function renderMakerTable() {
-    const tbody = content.querySelector('#maker-table-body');
-    if (!tbody) return;
-
-    if (availableMakers.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-400">No makers available</td></tr>';
-      return;
-    }
-
-    tbody.innerHTML = availableMakers.map((maker, index) => `
-      <tr class="maker-row border-b border-gray-800 hover:bg-[#242d3d] cursor-pointer transition-colors" data-maker-index="${index}">
-        <td class="py-3 px-2">
-          <input type="checkbox" id="maker-checkbox-${index}" class="w-4 h-4 accent-[#FF6B35]" />
-        </td>
-        <td class="py-3 px-2">
-          <span class="font-mono text-xs text-gray-300">
-            ${maker.address.substring(0, 20)}...
-          </span>
-        </td>
-        <td class="py-3 px-2 text-xs text-blue-400">${maker.fee}%</td>
-        <td class="py-3 px-2">
-          <span class="text-xs text-yellow-400">
-            ${maker.minSize.toLocaleString()} / ${(maker.maxSize / 1000000).toFixed(1)}M
-          </span>
-        </td>
-        <td class="py-3 px-2">
-          <span class="text-xs text-purple-400">
-            ${maker.bond.toLocaleString()}
-          </span>
-        </td>
-      </tr>
-    `).join('');
-
-    // Re-attach event listeners for maker rows
-    content.querySelectorAll('.maker-row').forEach((row) => {
-      row.addEventListener('click', (e) => {
-        if (e.target.type !== 'checkbox') {
-          const index = parseInt(row.dataset.makerIndex);
-          toggleMakerSelection(index);
-          saveCurrentSelections();
-        }
-      });
-    });
-
-    // Re-attach event listeners for maker checkboxes
-    availableMakers.forEach((_, index) => {
-      const checkbox = content.querySelector(`#maker-checkbox-${index}`);
-      if (checkbox) {
-        checkbox.addEventListener('change', () => {
-          toggleMakerSelection(index);
-          saveCurrentSelections();
-        });
-      }
-    });
   }
 
   // Render UTXO list dynamically
@@ -321,20 +270,15 @@ export function SwapComponent(container) {
     }
   }
 
-  function getNumberOfMakers() {
-    if (selectionMode === 'auto') {
-      return numberOfHops - 1;
-    } else {
-      return selectedMakers.length;
+  function getNumberOfHops() {
+    if (useCustomHops) {
+      return customHopCount;
     }
+    return numberOfHops;
   }
 
-  function getNumberOfHops() {
-    if (selectionMode === 'auto') {
-      return numberOfHops;
-    } else {
-      return selectedMakers.length + 1;
-    }
+  function getNumberOfMakers() {
+    return getNumberOfHops() - 1;
   }
 
   function getSelectedUtxosTotal() {
@@ -345,27 +289,7 @@ export function SwapComponent(container) {
     }, 0);
   }
 
-  function getAmountInSats() {
-    // In manual mode, swap amount is calculated from UTXOs minus fees
-    if (selectionMode === 'manual') {
-      return swapAmount; // Already calculated in updateSummary
-    }
-
-    // In auto mode, read from input
-    const input = content.querySelector('#swap-amount-input');
-    const value = parseFloat(input?.value) || 0;
-
-    if (amountUnit === 'sats') {
-      return value;
-    } else if (amountUnit === 'btc') {
-      return Math.floor(value * 100000000);
-    } else if (amountUnit === 'usd') {
-      return Math.floor((value / btcPrice) * 100000000);
-    }
-    return 0;
-  }
-
-  // Calculate fees based on hops/makers (used for manual mode calculation)
+  // Calculate fees based on hops/makers
   function calculateFees(amount) {
     const hops = getNumberOfHops();
     const makers = getNumberOfMakers();
@@ -412,26 +336,18 @@ export function SwapComponent(container) {
       makerFeeSats: Math.floor(makerFee),
       networkFeeSats: Math.floor(networkFee),
       totalFeeSats: Math.floor(totalFee),
-      totalCost: swapAmount + Math.floor(totalFee),
     };
   }
 
   function updateSummary() {
     const selectedTotal = getSelectedUtxosTotal();
 
-    // KEY CHANGE: In manual mode, auto-calculate swap amount from UTXOs minus fees
+    // In manual mode, calculate swap amount from UTXOs
     if (selectionMode === 'manual' && selectedUtxos.length > 0) {
-      // First, estimate fees based on a rough amount (use selectedTotal as initial estimate)
-      const estimatedFees = calculateFees(selectedTotal);
-      // Swap amount = Total UTXOs - Total Fees - small buffer for dust
-      const buffer = 330; // Minimum dust threshold buffer
-      swapAmount = Math.max(0, selectedTotal - estimatedFees.totalFeeSats - buffer);
-
-      // Recalculate fees with actual swap amount for accuracy
-      const actualFees = calculateFees(swapAmount);
-      swapAmount = Math.max(0, selectedTotal - actualFees.totalFeeSats - buffer);
+      // Swap amount = Total UTXOs (fees will be deducted)
+      swapAmount = selectedTotal;
     } else if (selectionMode === 'auto') {
-      // In auto mode, read from input as before
+      // In auto mode, read from input
       const input = content.querySelector('#swap-amount-input');
       const value = parseFloat(input?.value) || 0;
 
@@ -446,7 +362,10 @@ export function SwapComponent(container) {
 
     const details = calculateSwapDetails();
 
-    // Update swap amount display
+    // Calculate what user actually receives (amount - fees)
+    const receiveAmount = Math.max(0, swapAmount - details.totalFeeSats);
+
+    // Update swap amount display (what user is sending)
     content.querySelector('#swap-amount-display').textContent =
       swapAmount.toLocaleString() + ' sats';
 
@@ -483,20 +402,12 @@ export function SwapComponent(container) {
     content.querySelector('#total-fee-sats').textContent =
       '~' + details.totalFeeSats.toLocaleString() + ' sats';
 
-    // In manual mode, total cost = selected UTXOs (since fees are deducted from swap amount)
-    if (selectionMode === 'manual' && selectedUtxos.length > 0) {
-      content.querySelector('#total-amount').textContent =
-        selectedTotal.toLocaleString() + ' sats';
-      const totalBtc = selectedTotal / 100000000;
-      content.querySelector('#total-btc').textContent =
-        totalBtc.toFixed(8) + ' BTC';
-    } else {
-      content.querySelector('#total-amount').textContent =
-        details.totalCost.toLocaleString() + ' sats';
-      const totalBtc = details.totalCost / 100000000;
-      content.querySelector('#total-btc').textContent =
-        totalBtc.toFixed(8) + ' BTC';
-    }
+    // Total = Amount - Fees (what user receives)
+    content.querySelector('#total-amount').textContent =
+      receiveAmount.toLocaleString() + ' sats';
+    const totalBtc = receiveAmount / 100000000;
+    content.querySelector('#total-btc').textContent =
+      totalBtc.toFixed(8) + ' BTC';
 
     // Validate and show warning if needed
     validateSwapConfig();
@@ -507,22 +418,20 @@ export function SwapComponent(container) {
     const startBtn = content.querySelector('#start-coinswap-btn');
     if (!warningEl || !startBtn) return;
 
-    const selectedTotal = getSelectedUtxosTotal();
     let warnings = [];
+    const makersNeeded = getNumberOfMakers();
 
-    // Check if in manual mode
+    // Check swap amount
     if (selectionMode === 'manual') {
       if (selectedUtxos.length === 0) {
         warnings.push('Select at least one UTXO');
       }
-
-      if (selectedMakers.length === 0) {
-        warnings.push('Select at least one maker');
-      }
-
-      // Check if swap amount is too small after fee deduction
-      if (selectedUtxos.length > 0 && swapAmount < 10000) {
-        warnings.push('Swap amount too small after fees. Select more UTXOs or fewer makers.');
+      
+      // Check if receive amount is too small after fees
+      const details = calculateSwapDetails();
+      const receiveAmount = swapAmount - details.totalFeeSats;
+      if (selectedUtxos.length > 0 && receiveAmount < 10000) {
+        warnings.push('Receive amount too small after fees. Select more UTXOs or fewer hops.');
       }
     } else {
       // Auto mode validations
@@ -531,13 +440,22 @@ export function SwapComponent(container) {
       }
 
       // Check if amount exceeds balance
-      const details = calculateSwapDetails();
-      if (details.totalCost > totalBalance) {
-        warnings.push(`Total cost (${details.totalCost.toLocaleString()} sats) exceeds available balance`);
+      if (swapAmount > totalBalance && totalBalance > 0) {
+        warnings.push(`Swap amount (${swapAmount.toLocaleString()} sats) exceeds available balance`);
       }
     }
 
-    // Check maker liquidity limits (both modes)
+    // Check if enough makers available
+    if (availableMakers.length > 0 && makersNeeded > availableMakers.length) {
+      warnings.push(`Need ${makersNeeded} makers for ${getNumberOfHops()} hops, but only ${availableMakers.length} available`);
+    }
+
+    // Check custom hops validity
+    if (useCustomHops && customHopCount < 2) {
+      warnings.push('Minimum 2 hops required (1 maker)');
+    }
+
+    // Check maker liquidity limits
     if (availableMakers.length > 0 && swapAmount > 0) {
       const maxMakerSize = Math.max(...availableMakers.map(m => m.maxSize));
       if (swapAmount > maxMakerSize) {
@@ -581,14 +499,28 @@ export function SwapComponent(container) {
   }
 
   function setHopCount(count) {
-    numberOfHops = count;
+    if (count === 'custom') {
+      useCustomHops = true;
+    } else {
+      useCustomHops = false;
+      numberOfHops = count;
+    }
 
+    // Update button styles
     content.querySelectorAll('.hop-count-btn').forEach((btn) => {
       btn.className =
         'hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors';
     });
-    content.querySelector('#hop-' + count).className =
-      'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
+
+    if (useCustomHops) {
+      content.querySelector('#hop-custom').className =
+        'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
+      content.querySelector('#custom-hop-input-container').classList.remove('hidden');
+    } else {
+      content.querySelector('#hop-' + count).className =
+        'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
+      content.querySelector('#custom-hop-input-container').classList.add('hidden');
+    }
 
     updateSummary();
   }
@@ -603,32 +535,26 @@ export function SwapComponent(container) {
     content.querySelector('#mode-' + mode).className =
       'mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
 
-    const autoSection = content.querySelector('#auto-selection-section');
-    const manualSection = content.querySelector('#manual-selection-section');
     const amountInputSection = content.querySelector('#amount-input-section');
+    const utxoSection = content.querySelector('#utxo-selection-section');
 
     if (mode === 'manual') {
-      autoSection.classList.add('hidden');
-      manualSection.classList.remove('hidden');
-      // Hide amount input in manual mode - it's auto-calculated
-      if (amountInputSection) {
-        amountInputSection.classList.add('hidden');
-      }
+      amountInputSection.classList.add('hidden');
+      utxoSection.classList.remove('hidden');
     } else {
-      autoSection.classList.remove('hidden');
-      manualSection.classList.add('hidden');
-      // Show amount input in auto mode
-      if (amountInputSection) {
-        amountInputSection.classList.remove('hidden');
-      }
+      amountInputSection.classList.remove('hidden');
+      utxoSection.classList.add('hidden');
     }
 
     updateSummary();
   }
 
   function checkUtxoTypeWarning() {
+    const warningEl = content.querySelector('#utxo-warning');
+    if (!warningEl) return;
+
     if (selectedUtxos.length < 2) {
-      content.querySelector('#utxo-warning').classList.add('hidden');
+      warningEl.classList.add('hidden');
       return;
     }
 
@@ -637,9 +563,9 @@ export function SwapComponent(container) {
     const hasSwap = types.some(t => t.includes('Swap'));
 
     if (hasRegular && hasSwap) {
-      content.querySelector('#utxo-warning').classList.remove('hidden');
+      warningEl.classList.remove('hidden');
     } else {
-      content.querySelector('#utxo-warning').classList.add('hidden');
+      warningEl.classList.add('hidden');
     }
   }
 
@@ -660,38 +586,12 @@ export function SwapComponent(container) {
       selectedUtxos.length;
 
     checkUtxoTypeWarning();
-
-    // Update summary - swap amount will be auto-calculated
-    updateSummary();
-  }
-
-  function toggleMakerSelection(index) {
-    const makerIndex = selectedMakers.indexOf(index);
-    if (makerIndex > -1) {
-      selectedMakers.splice(makerIndex, 1);
-    } else {
-      selectedMakers.push(index);
-    }
-
-    const checkbox = content.querySelector('#maker-checkbox-' + index);
-    if (checkbox) {
-      checkbox.checked = selectedMakers.includes(index);
-    }
-
-    content.querySelector('#selected-makers-count').textContent =
-      selectedMakers.length;
-
-    const hops = selectedMakers.length + 1;
-    content.querySelector('#calculated-hops').textContent = hops;
-
-    // Update summary - in manual mode this recalculates swap amount based on new fees
     updateSummary();
   }
 
   function setMaxAmount() {
-    // Only applies in auto mode
     if (selectionMode === 'manual') {
-      return; // In manual mode, amount is auto-calculated
+      return; // In manual mode, amount is from UTXOs
     }
 
     const details = calculateSwapDetails();
@@ -725,7 +625,8 @@ export function SwapComponent(container) {
       numberOfHops,
       selectionMode,
       selectedUtxos,
-      selectedMakers,
+      useCustomHops,
+      customHopCount,
       networkFeeRate
     };
     console.log('💾 Saving current selections:', selections);
@@ -743,7 +644,20 @@ export function SwapComponent(container) {
         <div class="bg-[#1a2332] rounded-lg p-6">
           <h3 class="text-xl font-semibold text-gray-300 mb-6">Initiate Swap</h3>
 
-          <!-- Amount to Swap (Only shown in Auto mode) -->
+          <!-- Selection Mode -->
+          <div class="mb-6">
+            <label class="block text-sm text-gray-400 mb-2">Selection Mode</label>
+            <div class="flex gap-2">
+              <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold">
+                Auto Select UTXOs
+              </button>
+              <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
+                Manual Select UTXOs
+              </button>
+            </div>
+          </div>
+
+          <!-- Amount to Swap (Only in Auto mode) -->
           <div id="amount-input-section" class="mb-6">
             <div class="flex justify-between items-center mb-2">
               <label class="block text-sm text-gray-400">Amount to Swap</label>
@@ -770,30 +684,41 @@ export function SwapComponent(container) {
                 Max
               </button>
             </div>
-            <p id="swap-amount-conversions" class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
+            <p class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
           </div>
 
-          <!-- Selection Mode -->
-          <div class="mb-6">
-            <label class="block text-sm text-gray-400 mb-2">UTXO And Maker Selection</label>
-            <div class="flex gap-2">
-              <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold">
-                Auto Select
-              </button>
-              <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
-                Manual Select
-              </button>
+          <!-- UTXO Selection (Only in Manual mode) -->
+          <div id="utxo-selection-section" class="mb-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+              <label class="block text-sm text-gray-400">Select UTXOs</label>
+              <span class="text-sm text-gray-400">Selected: <span id="selected-utxos-count">0</span></span>
+            </div>
+            
+            <!-- Warning Message -->
+            <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p class="text-xs text-yellow-400">
+                ⚠ Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
+              </p>
+            </div>
+            
+            <div id="utxo-list" class="space-y-2 max-h-60 overflow-y-auto">
+              <p class="text-gray-400 text-center py-4">Loading UTXOs...</p>
+            </div>
+
+            <div class="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <p class="text-xs text-blue-400">
+                💡 Swap amount will be calculated from selected UTXOs minus fees.
+              </p>
             </div>
           </div>
 
-          <!-- Auto Selection: Number of Hops -->
-          <div id="auto-selection-section" class="mb-6">
-            <label class="block text-sm text-gray-400 mb-2">Number of Hops</label>
+          <!-- Number of Hops -->
+          <div class="mb-6">
+            <div class="flex justify-between items-center mb-2">
+              <label class="block text-sm text-gray-400">Number of Hops</label>
+              <span class="text-xs text-gray-500">Available makers: <span id="available-makers-count">0</span></span>
+            </div>
             <div class="grid grid-cols-4 gap-2">
-              <button id="hop-2" class="hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
-                <div>2 hops</div>
-                <div class="text-xs text-gray-400 mt-1">1 maker</div>
-              </button>
               <button id="hop-3" class="hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold">
                 <div>3 hops</div>
                 <div class="text-xs text-white/80 mt-1">2 makers</div>
@@ -806,65 +731,30 @@ export function SwapComponent(container) {
                 <div>5 hops</div>
                 <div class="text-xs text-gray-400 mt-1">4 makers</div>
               </button>
+              <button id="hop-custom" class="hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
+                <div>Custom</div>
+                <div class="text-xs text-gray-400 mt-1">6+ hops</div>
+              </button>
             </div>
+            
+            <!-- Custom hop input -->
+            <div id="custom-hop-input-container" class="hidden mt-3">
+              <div class="flex items-center gap-4">
+                <input 
+                  id="custom-hop-input"
+                  type="number" 
+                  min="2" 
+                  max="20"
+                  value="6"
+                  class="w-24 bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                />
+                <span class="text-gray-400">hops = <span id="custom-makers-display" class="text-cyan-400 font-semibold">5</span> makers</span>
+              </div>
+            </div>
+
             <p class="text-xs text-gray-500 mt-2">More hops = better privacy, higher fees</p>
           </div>
         </div>
-
-        <!-- Manual Selection Section -->
-        <div id="manual-selection-section" class="space-y-6 hidden">
-          <!-- Info Banner for Manual Mode -->
-          <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-            <p class="text-sm text-blue-400">
-              <strong>💡 Manual Mode:</strong> Select UTXOs and makers below. The swap amount will be automatically calculated as: <span class="font-mono">Selected UTXOs - Fees</span>
-            </p>
-          </div>
-
-          <!-- UTXO Selection -->
-          <div class="bg-[#1a2332] rounded-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-xl font-semibold text-gray-300">Select UTXOs</h3>
-              <span class="text-sm text-gray-400">Selected: <span id="selected-utxos-count">0</span></span>
-            </div>
-            
-            <!-- Warning Message -->
-            <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <p class="text-xs text-yellow-400">
-                ⚠ Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
-              </p>
-            </div>
-            
-            <div id="utxo-list" class="space-y-2 max-h-80 overflow-y-auto">
-              <p class="text-gray-400 text-center py-4">Loading UTXOs...</p>
-            </div>
-          </div>
-
-          <!-- Maker Selection -->
-          <div class="bg-[#1a2332] rounded-lg p-6">
-            <div class="flex justify-between items-center mb-4">
-              <h3 class="text-xl font-semibold text-gray-300">Select Makers</h3>
-              <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> makers → <span id="calculated-hops">1</span> hops</span>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="w-full">
-                <thead>
-                  <tr class="border-b border-gray-700">
-                    <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Select</th>
-                    <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Address</th>
-                    <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Fee</th>
-                    <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Min/Max Size</th>
-                    <th class="text-left py-2 px-2 text-gray-400 font-semibold text-xs">Bond</th>
-                  </tr>
-                </thead>
-                <tbody id="maker-table-body">
-                  <tr><td colspan="5" class="text-center py-4 text-gray-400">Loading makers...</td></tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-       
 
         <!-- Validation Warning -->
         <div id="validation-warning" class="hidden p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg space-y-1">
@@ -878,10 +768,6 @@ export function SwapComponent(container) {
 
       <!-- Right: Summary -->
       <div class="col-span-1">
-
-      
-
-        
         <div class="bg-[#1a2332] rounded-lg p-6 top-8">
           <h3 class="text-lg font-semibold text-gray-300 mb-4">Swap Summary</h3>
           
@@ -935,7 +821,7 @@ export function SwapComponent(container) {
                 <span id="total-fee-sats" class="text-sm font-mono text-yellow-400">~0 sats</span>
               </div>
               <div class="flex justify-between pt-2 border-t border-gray-700">
-                <span class="text-sm font-semibold text-gray-300">Total Cost</span>
+                <span class="text-sm font-semibold text-gray-300">You Receive</span>
                 <div class="text-right">
                   <div id="total-amount" class="text-sm font-mono font-semibold text-[#FF6B35]">0 sats</div>
                   <div id="total-btc" class="text-xs text-gray-500">0.00000000 BTC</div>
@@ -958,7 +844,7 @@ export function SwapComponent(container) {
           </div>
         </div>
 
-         <!-- Recent Swaps Section -->
+        <!-- Recent Swaps Section -->
         <div class="bg-[#1a2332] rounded-lg p-6 mt-6">
           <div class="flex justify-between items-center mb-4">
             <h3 class="text-xl font-semibold text-gray-300">Recent Swaps</h3>
@@ -998,10 +884,6 @@ export function SwapComponent(container) {
     saveCurrentSelections();
   });
 
-  content.querySelector('#hop-2').addEventListener('click', () => {
-    setHopCount(2);
-    saveCurrentSelections();
-  });
   content.querySelector('#hop-3').addEventListener('click', () => {
     setHopCount(3);
     saveCurrentSelections();
@@ -1012,6 +894,20 @@ export function SwapComponent(container) {
   });
   content.querySelector('#hop-5').addEventListener('click', () => {
     setHopCount(5);
+    saveCurrentSelections();
+  });
+  content.querySelector('#hop-custom').addEventListener('click', () => {
+    setHopCount('custom');
+    saveCurrentSelections();
+  });
+
+  // Custom hop input
+  content.querySelector('#custom-hop-input').addEventListener('input', (e) => {
+    let value = parseInt(e.target.value) || 2;
+    value = Math.max(2, Math.min(20, value));
+    customHopCount = value;
+    content.querySelector('#custom-makers-display').textContent = value - 1;
+    updateSummary();
     saveCurrentSelections();
   });
 
@@ -1041,26 +937,21 @@ export function SwapComponent(container) {
       return;
     }
 
-    if (selectionMode === 'manual') {
-      if (selectedUtxos.length === 0) {
-        alert('Please select at least one UTXO');
-        return;
-      }
-      if (selectedMakers.length === 0) {
-        alert('Please select at least one maker');
-        return;
-      }
+    if (selectionMode === 'manual' && selectedUtxos.length === 0) {
+      alert('Please select at least one UTXO');
+      return;
     }
 
     const swapConfig = {
       amount: swapAmount,
       makers: getNumberOfMakers(),
       hops: getNumberOfHops(),
-      selectedMakers: selectionMode === 'manual' ? selectedMakers.map((i) => availableMakers[i]) : null,
-      selectedUtxos: selectedUtxos,
       selectionMode: selectionMode,
+      selectedUtxos: selectedUtxos,
       amountUnit: amountUnit,
       numberOfHops: numberOfHops,
+      useCustomHops: useCustomHops,
+      customHopCount: customHopCount,
       networkFeeRate: networkFeeRate,
       startTime: Date.now()
     };
@@ -1124,6 +1015,8 @@ export function SwapComponent(container) {
   });
 
   // INITIALIZE
+  
+  // Restore selection mode
   if (selectionMode === 'manual') {
     toggleSelectionMode('manual');
   }
@@ -1132,14 +1025,21 @@ export function SwapComponent(container) {
     switchUnit(amountUnit);
   }
 
-  if (numberOfHops !== 3) {
+  // Restore hop selection
+  if (useCustomHops) {
+    setHopCount('custom');
+    const customInput = content.querySelector('#custom-hop-input');
+    if (customInput) {
+      customInput.value = customHopCount;
+      content.querySelector('#custom-makers-display').textContent = customHopCount - 1;
+    }
+  } else if (numberOfHops !== 3) {
     setHopCount(numberOfHops);
   }
 
   // Fetch real data
   Promise.all([fetchUtxos(), fetchMakers(), fetchBalance()]).then(() => {
     renderUtxoList();
-    renderMakerTable();
     renderRecentSwaps();
 
     // Restore UTXO selections
@@ -1152,19 +1052,6 @@ export function SwapComponent(container) {
       });
       content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
       checkUtxoTypeWarning();
-    }
-
-    // Restore maker selections
-    if (selectedMakers.length > 0) {
-      selectedMakers.forEach(index => {
-        const checkbox = content.querySelector('#maker-checkbox-' + index);
-        if (checkbox) {
-          checkbox.checked = true;
-        }
-      });
-      content.querySelector('#selected-makers-count').textContent = selectedMakers.length;
-      const hops = selectedMakers.length + 1;
-      content.querySelector('#calculated-hops').textContent = hops;
     }
 
     // Restore amount input (only in auto mode)

@@ -1,2 +1,84 @@
-# taker-app
-Staging area for the demo taker-app
+# Coinswap Taker App
+
+A desktop application for performing private Bitcoin coinswaps.
+
+## Prerequisites
+
+- Node.js (v18+)
+- Rust toolchain
+- Bitcoin Core (with RPC and ZMQ enabled)
+
+## Setup
+
+
+### Step 1: Coinswap Core
+ Core
+```bash
+cd coinswap
+git checkout ffi (gh pr checkout 630 - neo's pr)
+cargo build
+```
+
+### Step 2: coinswap FFI
+```bash
+git clone https://github.com/citadel-tech/coinswap-ffi.git
+cd coinswap-ffi/coinswap-napi
+npm install
+npm run build
+```
+
+### Step 3: Taker Backend Server
+```bash
+git clone https://github.com/citadel-tech/taker-app.git
+cd taker-app/server
+npm install
+node index.js
+```
+
+### Step 4: Taker Frontend (UI)
+```bash
+cd taker-app
+npm install
+npm run dev
+```
+
+
+## Bitcoin Core Configuration
+
+here is my `bitcoin.conf`:
+```
+[signet]
+signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44
+rpcuser=user
+rpcpassword=password
+fallbackfee=0.00001000
+server=1
+txindex=1
+blockfilterindex=1
+addnode=172.81.178.3:38333
+rpcport=38332
+rpcbind=127.0.0.1
+rpcallowip=127.0.0.1
+zmqpubrawblock=tcp://127.0.0.1:28332
+zmqpubrawtx=tcp://127.0.0.1:28333
+zmqpubhashblock=tcp://127.0.0.1:28334
+
+# Regtest
+[regtest]
+rpcuser=user
+rpcpassword=password
+fallbackfee=0.00001000
+server=1
+txindex=1
+blockfilterindex=1
+rpcport=18443
+rpcbind=127.0.0.1
+rpcallowip=127.0.0.1
+zmqpubrawblock=tcp://127.0.0.1:29332
+zmqpubrawtx=tcp://127.0.0.1:29333
+zmqpubhashblock=tcp://127.0.0.1:29334
+
+```
+
+
+Note: on initial start, there will be a popup that ask for all the ports and settings. configure them based on your own configuration. 

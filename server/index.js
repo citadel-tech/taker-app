@@ -56,7 +56,7 @@ app.post('/api/taker/initialize', async (req, res) => {
         };
 
         const dataDir = `${process.env.HOME}/.coinswap/taker`;
-        const zmqAddr = config.zmq?.address || "tcp://127.0.0.1:29332";
+        const zmqAddr = config.zmq?.address || "tcp://127.0.0.1:28332";
 
         console.log('🔧 Initializing Taker with config:', { dataDir, rpcConfig, zmqAddr });
         console.log('⚠️  Make sure Bitcoin Core has ZMQ enabled in bitcoin.conf:');
@@ -67,7 +67,7 @@ app.post('/api/taker/initialize', async (req, res) => {
             dataDir,
             "taker-wallet",
             rpcConfig,
-            9053,  // Tor control port for coinswap instance
+            9051,  // Tor control port for coinswap instance
             undefined,  // tor_auth_password (CookieAuthentication is 0)
             zmqAddr
         );

@@ -22,57 +22,10 @@ export function SettingsComponent(container) {
                         
                         <div id="seed-display" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
                             <div class="flex items-center mb-3">
-                                <span class="text-yellow-400 text-sm">âš ï¸ Keep this safe and private!</span>
+                                <span class="text-yellow-400 text-sm">⚠️ Keep this safe and private!</span>
                             </div>
-                            <div class="grid grid-cols-3 gap-2 mb-4">
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">1.</span>
-                                    <div class="font-mono text-sm text-white">abandon</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">2.</span>
-                                    <div class="font-mono text-sm text-white">ability</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">3.</span>
-                                    <div class="font-mono text-sm text-white">able</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">4.</span>
-                                    <div class="font-mono text-sm text-white">about</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">5.</span>
-                                    <div class="font-mono text-sm text-white">above</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">6.</span>
-                                    <div class="font-mono text-sm text-white">absent</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">7.</span>
-                                    <div class="font-mono text-sm text-white">absorb</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">8.</span>
-                                    <div class="font-mono text-sm text-white">abstract</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">9.</span>
-                                    <div class="font-mono text-sm text-white">absurd</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">10.</span>
-                                    <div class="font-mono text-sm text-white">abuse</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">11.</span>
-                                    <div class="font-mono text-sm text-white">access</div>
-                                </div>
-                                <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-                                    <span class="text-xs text-gray-500">12.</span>
-                                    <div class="font-mono text-sm text-white">accident</div>
-                                </div>
+                            <div id="seed-words-grid" class="grid grid-cols-3 gap-2 mb-4">
+                                <!-- Seed words will be populated dynamically -->
                             </div>
                             <button id="copy-seed-btn" class="w-full bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded text-sm transition-colors">
                                 Copy to Clipboard
@@ -116,11 +69,10 @@ export function SettingsComponent(container) {
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-gray-300 mb-6">Taker Configuration</h3>
                 
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- Tor Configuration -->
-                    <div class="space-y-4">
-                        <h4 class="text-lg font-medium text-white mb-4">Tor Configuration</h4>
-                        
+                <div class="space-y-4">
+                    <h4 class="text-lg font-medium text-white mb-4">Tor Configuration</h4>
+                    
+                    <div class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="block text-sm text-gray-400 mb-2">Control Port</label>
                             <input 
@@ -159,52 +111,10 @@ export function SettingsComponent(container) {
                         </div>
                     </div>
                     
-                    <!-- Tracker Configuration -->
-                    <div class="space-y-4">
-                        <h4 class="text-lg font-medium text-white mb-4">Tracker Configuration</h4>
-                        
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-2">Tracker Address</label>
-                            <input 
-                                type="text" 
-                                id="tracker-address-input"
-                                value="lp75qh3del4qot6fmkqq4taqm33pidvk63lncvhlwsllbwrl2f4g4qqd.onion:8080"
-                                class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                            />
-                            <p class="text-xs text-gray-500 mt-1">Onion address for maker discovery</p>
-                        </div>
-                        
-                        <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-                            <p class="text-xs text-purple-400 mb-2">
-                                <strong>Tor Network Required:</strong>
-                            </p>
-                            <ul class="text-xs text-purple-400 space-y-1">
-                                <li>• Tracker runs on Tor hidden service</li>
-                                <li>• Ensures maker discovery privacy</li>
-                                <li>• Configure Tor settings above</li>
-                            </ul>
-                        </div>
-                        
-                        <button id="test-tracker-btn" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                            Test Tracker Connection
-                        </button>
-                        
-                        <div id="tracker-status" class="hidden bg-[#0f1419] rounded-lg p-3">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-sm text-gray-400">Tracker Status</span>
-                                <span id="tracker-status-text" class="text-sm font-semibold text-yellow-400">Testing...</span>
-                            </div>
-                            <div class="text-xs text-gray-500">
-                                <div class="flex justify-between">
-                                    <span>Available Makers</span>
-                                    <span id="available-makers-count">--</span>
-                                </div>
-                                <div class="flex justify-between">
-                                    <span>Response Time</span>
-                                    <span id="tracker-response-time">--</span>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mt-4">
+                        <p class="text-xs text-purple-400">
+                            <strong>🧅 Tor Network:</strong> Coinswap uses Tor for private maker discovery and communication. Make sure Tor is running on your system.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -315,22 +225,100 @@ export function SettingsComponent(container) {
                                 Refresh Status
                             </button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ZMQ Configuration -->
+            <div class="bg-[#1a2332] rounded-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-300 mb-6">ZMQ Configuration</h3>
+                
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-medium text-white mb-4">ZMQ Endpoints</h4>
+                        
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">ZMQ Raw Block</label>
+                            <input 
+                                type="text" 
+                                id="zmq-rawblock-input"
+                                value="tcp://127.0.0.1:28332"
+                                class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">ZMQ endpoint for raw block notifications</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">ZMQ Raw Transaction</label>
+                            <input 
+                                type="text" 
+                                id="zmq-rawtx-input"
+                                value="tcp://127.0.0.1:28333"
+                                class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                            />
+                            <p class="text-xs text-gray-500 mt-1">ZMQ endpoint for raw transaction notifications</p>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <h4 class="text-lg font-medium text-white mb-4">Bitcoin.conf Setup</h4>
+                        
+                        <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                            <p class="text-xs text-yellow-400 mb-2">
+                                ⚠️ <strong>ZMQ Required:</strong> Bitcoin Core must have ZMQ enabled for real-time notifications.
+                            </p>
+                            <p class="text-xs text-gray-400">Add these lines to your bitcoin.conf:</p>
+                        </div>
+                        
+                        <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300">
+                            <div id="zmq-config-preview">
+                                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+                                zmqpubrawtx=tcp://127.0.0.1:28333
+                            </div>
+                        </div>
+                        
+                        <button id="copy-zmq-config-btn" class="w-full bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
+                            📋 Copy ZMQ Config
+                        </button>
                         
                         <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                             <p class="text-xs text-blue-400">
-                                ðŸ’¡ Make sure Bitcoin Core is running with RPC enabled. Add these lines to your bitcoin.conf:
+                                💡 After adding ZMQ config, restart Bitcoin Core for changes to take effect.
                             </p>
-                            <div class="bg-[#0f1419] rounded mt-2 p-2 font-mono text-xs text-gray-300">
-                                regtest=1<br/>
-                                server=1<br/>
-                                rpcuser=user<br/>
-                                rpcpassword=password<br/>
-                                rpcport=18443<br/>
-                                rpcallowip=127.0.0.1
-                            </div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Full Bitcoin.conf Reference -->
+            <div class="bg-[#1a2332] rounded-lg p-6">
+                <h3 class="text-xl font-semibold text-gray-300 mb-4">Complete bitcoin.conf Reference</h3>
+                
+                <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300">
+                    <div id="full-config-preview">
+                        # Network (choose one)<br/>
+                        regtest=1<br/>
+                        # testnet=1<br/>
+                        # mainnet (no flag needed)<br/>
+                        <br/>
+                        # Server settings<br/>
+                        server=1<br/>
+                        <br/>
+                        # RPC settings<br/>
+                        rpcuser=user<br/>
+                        rpcpassword=password<br/>
+                        rpcport=18443<br/>
+                        rpcallowip=127.0.0.1<br/>
+                        <br/>
+                        # ZMQ settings (required for Coinswap)<br/>
+                        zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+                        zmqpubrawtx=tcp://127.0.0.1:28333
+                    </div>
+                </div>
+                
+                <button id="copy-full-config-btn" class="mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
+                    📋 Copy Full Config
+                </button>
             </div>
 
             <!-- Save Settings Button -->
@@ -355,7 +343,7 @@ export function SettingsComponent(container) {
       const savedConfig = localStorage.getItem('coinswap_config');
       if (savedConfig) {
         const config = JSON.parse(savedConfig);
-        console.log('ðŸ“‹ Loading existing config:', config);
+        console.log('📋 Loading existing config:', config);
 
         // Populate RPC fields
         if (config.rpc) {
@@ -365,39 +353,176 @@ export function SettingsComponent(container) {
           if (config.rpc.password) content.querySelector('#rpc-password-input').value = config.rpc.password;
         }
 
-        // Populate Taker config fields
+        // Populate Taker/Tor config fields
         if (config.taker) {
           if (config.taker.control_port) content.querySelector('#tor-control-port-input').value = config.taker.control_port;
           if (config.taker.socks_port) content.querySelector('#tor-socks-port-input').value = config.taker.socks_port;
           if (config.taker.tor_auth_password) content.querySelector('#tor-auth-password-input').value = config.taker.tor_auth_password;
-          if (config.taker.tracker_address) content.querySelector('#tracker-address-input').value = config.taker.tracker_address;
         }
+
+        // Populate ZMQ fields
+        if (config.zmq) {
+          if (config.zmq.rawblock) content.querySelector('#zmq-rawblock-input').value = config.zmq.rawblock;
+          if (config.zmq.rawtx) content.querySelector('#zmq-rawtx-input').value = config.zmq.rawtx;
+        }
+
+        // Update config previews
+        updateConfigPreviews();
       }
     } catch (error) {
       console.error('Error loading existing config:', error);
     }
   }
 
+  // Update the config preview sections
+  function updateConfigPreviews() {
+    const rawblock = content.querySelector('#zmq-rawblock-input').value;
+    const rawtx = content.querySelector('#zmq-rawtx-input').value;
+    const rpcUser = content.querySelector('#rpc-username-input').value || 'user';
+    const rpcPass = content.querySelector('#rpc-password-input').value || 'password';
+    const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
+
+    // Update ZMQ config preview
+    const zmqPreview = content.querySelector('#zmq-config-preview');
+    if (zmqPreview) {
+      zmqPreview.innerHTML = `zmqpubrawblock=${rawblock}<br/>zmqpubrawtx=${rawtx}`;
+    }
+
+    // Update full config preview
+    const fullPreview = content.querySelector('#full-config-preview');
+    if (fullPreview) {
+      fullPreview.innerHTML = `# Network (choose one)<br/>
+regtest=1<br/>
+# testnet=1<br/>
+# mainnet (no flag needed)<br/>
+<br/>
+# Server settings<br/>
+server=1<br/>
+<br/>
+# RPC settings<br/>
+rpcuser=${rpcUser}<br/>
+rpcpassword=${rpcPass}<br/>
+rpcport=${rpcPort}<br/>
+rpcallowip=127.0.0.1<br/>
+<br/>
+# ZMQ settings (required for Coinswap)<br/>
+zmqpubrawblock=${rawblock}<br/>
+zmqpubrawtx=${rawtx}`;
+    }
+  }
+
+  // Fetch and display seed phrase
+  async function fetchSeedPhrase() {
+    try {
+      const response = await fetch('http://localhost:3001/api/taker/seed');
+      const data = await response.json();
+
+      if (data.success && data.seed) {
+        const seedWords = data.seed.split(' ');
+        const grid = content.querySelector('#seed-words-grid');
+
+        grid.innerHTML = seedWords.map((word, index) => `
+          <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
+            <span class="text-xs text-gray-500">${index + 1}.</span>
+            <div class="font-mono text-sm text-white">${word}</div>
+          </div>
+        `).join('');
+
+        return seedWords.join(' ');
+      }
+    } catch (error) {
+      console.error('Failed to fetch seed phrase:', error);
+    }
+    return null;
+  }
+
   // EVENT LISTENERS
 
+  // ZMQ input changes - update previews
+  content.querySelector('#zmq-rawblock-input').addEventListener('input', updateConfigPreviews);
+  content.querySelector('#zmq-rawtx-input').addEventListener('input', updateConfigPreviews);
+  content.querySelector('#rpc-username-input').addEventListener('input', updateConfigPreviews);
+  content.querySelector('#rpc-password-input').addEventListener('input', updateConfigPreviews);
+  content.querySelector('#rpc-port-input').addEventListener('input', updateConfigPreviews);
+
+  // Copy ZMQ config
+  content.querySelector('#copy-zmq-config-btn').addEventListener('click', async () => {
+    const rawblock = content.querySelector('#zmq-rawblock-input').value;
+    const rawtx = content.querySelector('#zmq-rawtx-input').value;
+    const configText = `zmqpubrawblock=${rawblock}\nzmqpubrawtx=${rawtx}`;
+
+    try {
+      await navigator.clipboard.writeText(configText);
+      const btn = content.querySelector('#copy-zmq-config-btn');
+      const originalText = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = originalText; }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  });
+
+  // Copy full config
+  content.querySelector('#copy-full-config-btn').addEventListener('click', async () => {
+    const rawblock = content.querySelector('#zmq-rawblock-input').value;
+    const rawtx = content.querySelector('#zmq-rawtx-input').value;
+    const rpcUser = content.querySelector('#rpc-username-input').value || 'user';
+    const rpcPass = content.querySelector('#rpc-password-input').value || 'password';
+    const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
+
+    const configText = `# Network (choose one)
+regtest=1
+# testnet=1
+# mainnet (no flag needed)
+
+# Server settings
+server=1
+
+# RPC settings
+rpcuser=${rpcUser}
+rpcpassword=${rpcPass}
+rpcport=${rpcPort}
+rpcallowip=127.0.0.1
+
+# ZMQ settings (required for Coinswap)
+zmqpubrawblock=${rawblock}
+zmqpubrawtx=${rawtx}`;
+
+    try {
+      await navigator.clipboard.writeText(configText);
+      const btn = content.querySelector('#copy-full-config-btn');
+      const originalText = btn.textContent;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = originalText; }, 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  });
+
   // Seed phrase display
-  content.querySelector('#show-seed-btn').addEventListener('click', () => {
+  content.querySelector('#show-seed-btn').addEventListener('click', async () => {
     const seedDisplay = content.querySelector('#seed-display');
+    const btn = content.querySelector('#show-seed-btn');
+
     if (seedDisplay.classList.contains('hidden')) {
+      btn.textContent = 'Loading...';
+      btn.disabled = true;
+
+      await fetchSeedPhrase();
+
       seedDisplay.classList.remove('hidden');
-      content.querySelector('#show-seed-btn').textContent = 'Hide Seed Phrase';
+      btn.textContent = 'Hide Seed Phrase';
+      btn.disabled = false;
     } else {
       seedDisplay.classList.add('hidden');
-      content.querySelector('#show-seed-btn').textContent = 'Show Seed Phrase';
+      btn.textContent = 'Show Seed Phrase';
     }
   });
 
   // Copy seed phrase
   content.querySelector('#copy-seed-btn').addEventListener('click', async () => {
-    const seedWords = [
-      'abandon', 'ability', 'able', 'about', 'above', 'absent',
-      'absorb', 'abstract', 'absurd', 'abuse', 'access', 'accident'
-    ];
+    const seedWords = Array.from(content.querySelectorAll('#seed-words-grid .font-mono'))
+      .map(el => el.textContent);
     const seedPhrase = seedWords.join(' ');
 
     try {
@@ -423,8 +548,14 @@ export function SettingsComponent(container) {
       return;
     }
 
+    const words = seedInput.split(/\s+/);
+    if (words.length !== 12 && words.length !== 24) {
+      alert('Seed phrase must be 12 or 24 words');
+      return;
+    }
+
     if (confirm('Are you sure you want to restore from this seed phrase? This will replace your current wallet.')) {
-      // Here you would implement the actual restore logic
+      // TODO: Implement actual restore logic via API
       alert('Wallet restore functionality would be implemented here');
     }
   });
@@ -447,7 +578,6 @@ export function SettingsComponent(container) {
       disconnectBtn.disabled = false;
       isConnected = true;
 
-      // Update info if provided
       if (info.version) content.querySelector('#bitcoin-version').textContent = info.version;
       if (info.network) content.querySelector('#bitcoin-network').textContent = info.network;
       if (info.blocks) content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
@@ -455,7 +585,6 @@ export function SettingsComponent(container) {
         const progress = (info.verificationprogress * 100).toFixed(1);
         content.querySelector('#sync-progress').textContent = `${progress}%`;
       }
-
     } else {
       indicator.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
       status.textContent = 'Not Connected';
@@ -464,7 +593,6 @@ export function SettingsComponent(container) {
       disconnectBtn.disabled = true;
       isConnected = false;
 
-      // Clear info
       content.querySelector('#bitcoin-version').textContent = '--';
       content.querySelector('#bitcoin-network').textContent = '--';
       content.querySelector('#block-height').textContent = '--';
@@ -539,7 +667,6 @@ export function SettingsComponent(container) {
       });
 
       console.log('✅ RPC connection successful:', info);
-
     } catch (error) {
       console.error('❌ RPC connection failed:', error);
       updateConnectionStatus(false);
@@ -557,67 +684,43 @@ export function SettingsComponent(container) {
     btn.disabled = true;
 
     try {
-      // First update and save the configuration
-      const updatedConfig = {
-        rpc: {
-          host: content.querySelector('#rpc-host-input').value,
-          port: parseInt(content.querySelector('#rpc-port-input').value),
-          username: content.querySelector('#rpc-username-input').value,
-          password: content.querySelector('#rpc-password-input').value,
-        },
-        taker: {
-          control_port: parseInt(content.querySelector('#tor-control-port-input').value),
-          socks_port: parseInt(content.querySelector('#tor-socks-port-input').value),
-          tor_auth_password: content.querySelector('#tor-auth-password-input').value,
-          tracker_address: content.querySelector('#tracker-address-input').value,
-        },
-        setupComplete: true,
-        setupDate: new Date().toISOString(),
-        lastModified: new Date().toISOString(),
-      };
-
+      // First save the configuration
+      const updatedConfig = buildConfig();
       localStorage.setItem('coinswap_config', JSON.stringify(updatedConfig));
-      console.log('💾 Config updated and saved:', updatedConfig);
+      console.log('💾 Config saved:', updatedConfig);
 
-      // Import and update the BitcoindConnection
-      const { bitcoindConnection } = await import('./BitcoindConnection.js');
-      if (bitcoindConnection) {
-        bitcoindConnection.updateConfig(updatedConfig);
+      // Test the connection
+      const info = await makeRPCCall('getblockchaininfo');
+      const networkInfo = await makeRPCCall('getnetworkinfo');
 
-        // Test the connection
-        const info = await makeRPCCall('getblockchaininfo');
-        const networkInfo = await makeRPCCall('getnetworkinfo');
+      updateConnectionStatus(true, {
+        version: networkInfo.subversion || 'Unknown',
+        network: info.chain,
+        blocks: info.blocks,
+        verificationprogress: info.verificationprogress
+      });
 
-        updateConnectionStatus(true, {
-          version: networkInfo.subversion || 'Unknown',
-          network: info.chain,
-          blocks: info.blocks,
-          verificationprogress: info.verificationprogress
-        });
-
-        // Start status refresh timer
-        if (connectionTimer) clearInterval(connectionTimer);
-        connectionTimer = setInterval(async () => {
-          if (isConnected) {
-            try {
-              const info = await makeRPCCall('getblockchaininfo');
-              content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
-              const progress = (info.verificationprogress * 100).toFixed(1);
-              content.querySelector('#sync-progress').textContent = `${progress}%`;
-            } catch (error) {
-              console.log('Status refresh failed, connection may be lost');
-              updateConnectionStatus(false);
-              if (connectionTimer) {
-                clearInterval(connectionTimer);
-                connectionTimer = null;
-              }
+      // Start status refresh timer
+      if (connectionTimer) clearInterval(connectionTimer);
+      connectionTimer = setInterval(async () => {
+        if (isConnected) {
+          try {
+            const info = await makeRPCCall('getblockchaininfo');
+            content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
+            const progress = (info.verificationprogress * 100).toFixed(1);
+            content.querySelector('#sync-progress').textContent = `${progress}%`;
+          } catch (error) {
+            console.log('Status refresh failed');
+            updateConnectionStatus(false);
+            if (connectionTimer) {
+              clearInterval(connectionTimer);
+              connectionTimer = null;
             }
           }
-        }, 5000); // Refresh every 5 seconds
+        }
+      }, 5000);
 
-        console.log('✅ Connected and monitoring status');
-      }
-
+      console.log('✅ Connected and monitoring status');
     } catch (error) {
       console.error('❌ Connection failed:', error);
       updateConnectionStatus(false);
@@ -663,42 +766,9 @@ export function SettingsComponent(container) {
     btn.disabled = false;
   });
 
-  // Test tracker connection
-  content.querySelector('#test-tracker-btn').addEventListener('click', async () => {
-    const btn = content.querySelector('#test-tracker-btn');
-    const statusDiv = content.querySelector('#tracker-status');
-    const statusText = content.querySelector('#tracker-status-text');
-    const makersCount = content.querySelector('#available-makers-count');
-    const responseTime = content.querySelector('#tracker-response-time');
-
-    const originalText = btn.textContent;
-    btn.textContent = 'Testing...';
-    btn.disabled = true;
-
-    // Show status div
-    statusDiv.classList.remove('hidden');
-    statusText.textContent = 'Testing...';
-    statusText.className = 'text-sm font-semibold text-yellow-400';
-
-    const trackerAddress = content.querySelector('#tracker-address-input').value;
-
-    // Simulate tracker test (in real implementation, this would test the actual tracker connection)
-    setTimeout(() => {
-      // Mock successful connection
-      statusText.textContent = 'Connected';
-      statusText.className = 'text-sm font-semibold text-green-400';
-      makersCount.textContent = '4 makers';
-      responseTime.textContent = '1.2s';
-
-      btn.textContent = originalText;
-      btn.disabled = false;
-    }, 3000);
-  });
-
-  // Save settings
-  content.querySelector('#save-settings-btn').addEventListener('click', () => {
-    // Collect all current form values
-    const updatedConfig = {
+  // Build config object from form values
+  function buildConfig() {
+    return {
       rpc: {
         host: content.querySelector('#rpc-host-input').value,
         port: parseInt(content.querySelector('#rpc-port-input').value),
@@ -708,17 +778,27 @@ export function SettingsComponent(container) {
       taker: {
         control_port: parseInt(content.querySelector('#tor-control-port-input').value),
         socks_port: parseInt(content.querySelector('#tor-socks-port-input').value),
-        tor_auth_password: content.querySelector('#tor-auth-password-input').value,
-        tracker_address: content.querySelector('#tracker-address-input').value,
+        tor_auth_password: content.querySelector('#tor-auth-password-input').value || undefined,
+      },
+      zmq: {
+        rawblock: content.querySelector('#zmq-rawblock-input').value,
+        rawtx: content.querySelector('#zmq-rawtx-input').value,
+        // Combined address for backward compatibility (uses rawblock endpoint)
+        address: content.querySelector('#zmq-rawblock-input').value,
       },
       setupComplete: true,
       setupDate: new Date().toISOString(),
       lastModified: new Date().toISOString(),
     };
+  }
+
+  // Save settings
+  content.querySelector('#save-settings-btn').addEventListener('click', () => {
+    const updatedConfig = buildConfig();
 
     // Save to localStorage
     localStorage.setItem('coinswap_config', JSON.stringify(updatedConfig));
-    console.log('ðŸ’¾ Settings saved:', updatedConfig);
+    console.log('💾 Settings saved:', updatedConfig);
 
     // Show success feedback
     const btn = content.querySelector('#save-settings-btn');
@@ -737,11 +817,10 @@ export function SettingsComponent(container) {
   // Reset settings
   content.querySelector('#reset-settings-btn').addEventListener('click', () => {
     if (confirm('Are you sure you want to reset all settings to defaults?')) {
-      // Reset Taker Config fields to match Rust defaults
+      // Reset Tor config fields
       content.querySelector('#tor-control-port-input').value = '9051';
       content.querySelector('#tor-socks-port-input').value = '9050';
       content.querySelector('#tor-auth-password-input').value = '';
-      content.querySelector('#tracker-address-input').value = 'lp75qh3del4qot6fmkqq4taqm33pidvk63lncvhlwsllbwrl2f4g4qqd.onion:8080';
 
       // Reset RPC fields
       content.querySelector('#rpc-host-input').value = '127.0.0.1';
@@ -749,15 +828,20 @@ export function SettingsComponent(container) {
       content.querySelector('#rpc-username-input').value = 'user';
       content.querySelector('#rpc-password-input').value = '';
 
-      // Hide status displays
-      content.querySelector('#tracker-status').classList.add('hidden');
+      // Reset ZMQ fields
+      content.querySelector('#zmq-rawblock-input').value = 'tcp://127.0.0.1:28332';
+      content.querySelector('#zmq-rawtx-input').value = 'tcp://127.0.0.1:28333';
+
+      // Update previews
+      updateConfigPreviews();
 
       alert('Settings reset to defaults');
     }
   });
 
-  // INITIALIZE - Load existing configuration
+  // INITIALIZE
   loadExistingConfig();
+  updateConfigPreviews();
 
   // Auto-check connection status on page load
   (async function checkInitialStatus() {
@@ -772,9 +856,7 @@ export function SettingsComponent(container) {
         verificationprogress: info.verificationprogress
       });
     } catch (error) {
-      // Silently fail - just leave as "Not Connected"
       console.log('Initial connection check failed:', error.message);
     }
   })();
-
 }

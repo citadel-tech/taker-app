@@ -135,14 +135,14 @@ function checkFirstTimeSetup() {
         const appContainer = document.querySelector('body');
 
         FirstTimeSetupModal(appContainer, (config) => {
-            console.log('âœ… Setup completed:', config);
+            console.log('Setup completed:', config);
 
             // Show success message
             const successDiv = document.createElement('div');
             successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300';
             successDiv.innerHTML = `
                 <div class="flex items-center">
-                    <span class="mr-2">âœ“</span>
+                    <span class="mr-2">✔</span>
                     <span>Setup completed successfully!</span>
                 </div>
             `;
