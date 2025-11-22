@@ -138,14 +138,9 @@ export function ReceiveComponent(container) {
   const recentAddressesEl = content.querySelector('#recent-addresses');
   const totalAddressesEl = content.querySelector('#total-addresses');
 
-  // API helpers
-  async function callAPI(endpoint, method = 'GET', data = null) {
-    const response = await fetch(`http://localhost:3001/api${endpoint}`, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: data ? JSON.stringify(data) : null
-    });
-    return response.json();
+  // API helpers (using IPC)
+  async function getNextAddress() {
+    return await window.api.taker.getNextAddress();
   }
 
   // Generate QR code using QR Code API or canvas
@@ -325,7 +320,7 @@ export function ReceiveComponent(container) {
 
     try {
       console.log('🎯 Requesting new address...');
-      const result = await callAPI('/taker/address', 'POST');
+      const result = await getNextAddress();
 
       if (result.success && result.address) {
         // Handle both string and object address formats

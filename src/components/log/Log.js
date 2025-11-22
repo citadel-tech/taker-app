@@ -22,19 +22,19 @@ export function LogComponent(container) {
   }
 
   async function fetchLogs() {
-  try {
-    const res = await fetch('http://localhost:3001/api/taker/logs?lines=200');
-    const data = await res.json();
-    console.log('📋 Fetched logs:', data);  // Add this
-    if (data.success) {
-      logs = data.logs.map(parseLogLine);
-      console.log('📋 Parsed logs:', logs);  // Add this
-      renderLogs();
+    try {
+      // IPC call to get logs
+      const data = await window.api.logs.get(200);
+      console.log('📋 Fetched logs:', data);
+      if (data.success) {
+        logs = data.logs.map(parseLogLine);
+        console.log('📋 Parsed logs:', logs);
+        renderLogs();
+      }
+    } catch (err) {
+      console.error('Failed to fetch logs:', err);
     }
-  } catch (err) {
-    console.error('Failed to fetch logs:', err);
   }
-}
 
   function formatTime(timestamp) {
     return new Date(timestamp).toLocaleTimeString('en-US', { hour12: false });

@@ -15,11 +15,11 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
             <div class="mb-6">
                 <div class="space-y-3">
-                    <div id="step-bridge" class="flex items-center space-x-3">
-                        <div id="step-bridge-icon" class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
+                    <div id="step-napi" class="flex items-center space-x-3">
+                        <div id="step-napi-icon" class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
                             <span class="text-xs text-white">1</span>
                         </div>
-                        <span id="step-bridge-text" class="text-gray-400 text-sm">Connecting to bridge server</span>
+                        <span id="step-napi-text" class="text-gray-400 text-sm">Loading coinswap module</span>
                     </div>
                     <div id="step-taker" class="flex items-center space-x-3">
                         <div id="step-taker-icon" class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
@@ -57,12 +57,13 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
             <div id="manual-setup" class="hidden mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                 <p class="text-xs text-blue-400 mb-3">
-                    💡 <strong>Bridge Server Not Running:</strong>
+                    💡 <strong>Make sure:</strong>
                 </p>
-                <div class="bg-[#0f1419] rounded p-3 font-mono text-xs text-gray-300">
-                    cd server<br/>
-                    node index.js
-                </div>
+                <ul class="text-xs text-blue-400 space-y-1 list-disc list-inside">
+                    <li>coinswap-napi is installed in node_modules</li>
+                    <li>Bitcoin Core is running</li>
+                    <li>RPC credentials are correct</li>
+                </ul>
             </div>
         </div>
     `;
@@ -98,7 +99,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                 break;
             default:
                 icon.className += ' bg-gray-600';
-                const num = stepId.includes('bridge') ? '1' : '2';
+                const num = stepId.includes('napi') ? '1' : '2';
                 icon.innerHTML = `<span class="text-xs text-white">${num}</span>`;
                 textEl.className = 'text-gray-400 text-sm';
         }
@@ -140,33 +141,18 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
     async function startTakerInitialization() {
         try {
-            updateStep('step-bridge', 'active', 'Connecting to bridge...');
-            updateProgress(25, 'Checking bridge server...');
+            updateStep('step-napi', 'active', 'Loading coinswap module...');
+            updateProgress(25, 'Initializing native module...');
 
-            const healthResponse = await fetch('http://localhost:3001/api/health');
-            if (!healthResponse.ok) {
-                throw new Error('Bridge server not running');
-            }
-
-            const health = await healthResponse.json();
-            if (!health.napiLoaded) {
-                throw new Error('coinswap-napi not loaded');
-            }
-
-            updateStep('step-bridge', 'complete', 'Bridge connected');
-            updateStep('step-taker', 'active', 'Initializing taker...');
-            updateProgress(60, 'Creating taker instance...');
-
-            const { initializeTakerManager } = await import('./TakerManager.js');
-            const takerManager = initializeTakerManager(config);
-
-            const result = await takerManager.initialize();
+            // IPC call to initialize taker
+            const result = await window.api.taker.initialize(config);
 
             if (!result.success) {
-                throw new Error(result.error);
+                throw new Error(result.error || 'Failed to initialize taker');
             }
 
-            updateStep('step-taker', 'complete', 'Taker ready (wallet created)');
+            updateStep('step-napi', 'complete', 'Coinswap module loaded');
+            updateStep('step-taker', 'complete', 'Taker initialized (wallet ready)');
             updateProgress(100, 'Initialization complete');
 
             showSuccess();
@@ -177,12 +163,11 @@ export function TakerInitializationComponent(container, config, onInitialized) {
             let errorMessage = error.message;
             let showManual = false;
 
-            if (error.message.includes('Bridge server not running') || error.message.includes('fetch')) {
-                errorMessage = 'Bridge server not running. Start with: node server/index.js';
+            if (error.message.includes('coinswap-napi') || error.message.includes('not loaded')) {
                 showManual = true;
             }
 
-            updateStep('step-bridge', 'error');
+            updateStep('step-napi', 'error');
             updateStep('step-taker', 'error');
             showError(errorMessage, showManual);
         }
