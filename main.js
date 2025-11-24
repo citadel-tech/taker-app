@@ -3,6 +3,10 @@ const path = require('path');
 const { Worker } = require('worker_threads');
 const fs = require('fs');
 
+console.log('MAIN.JS __dirname:', __dirname);
+console.log('PRELOAD PATH:', path.join(__dirname, 'preload.js'));
+console.log('Does preload exist?', require('fs').existsSync(path.join(__dirname, 'preload.js')));
+
 // Add hot reload in development
 try {
     require('electron-reloader')(module, {
@@ -13,7 +17,7 @@ try {
 // Native module and taker instance
 let coinswapNapi = null;
 let takerInstance = null;
-let storedTakerConfig = null; // Store config for workers
+let storedTakerConfig = null;
 const activeSwaps = new Map();
 const activeSyncs = new Map();
 
@@ -36,13 +40,15 @@ async function initNAPI() {
  */
 function createWindow() {
     const win = new BrowserWindow({
-        width: 1200,
-        height: 800,
+        width: 1400,
+        height: 900,
         webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js')
-        }
+            nodeIntegration: false,        // ❌ DISABLED - security
+            contextIsolation: true,        // ✅ ENABLED - security
+            enableRemoteModule: false,     // ❌ DISABLED - deprecated
+            preload: path.join(__dirname, 'preload.js')  // ✅ Use IPC bridge
+        },
+        icon: path.join(__dirname, 'assets/icon.png')
     });
 
     // Log any errors
@@ -54,6 +60,11 @@ function createWindow() {
     console.log('Loading file from:', htmlPath);
 
     win.loadFile(htmlPath);
+
+    // Open DevTools in development
+    if (process.env.NODE_ENV === 'development') {
+        win.webContents.openDevTools();
+    }
 }
 
 /**
@@ -179,6 +190,109 @@ ipcMain.handle('taker:sync', async () => {
         return { success: true, message: 'Wallet synced' };
     } catch (error) {
         console.error('❌ Sync failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Get transactions
+ipcMain.handle('taker:getTransactions', async (event, { count = 10, skip = 0 }) => {
+    try {
+        if (!takerInstance) {
+            return { success: false, error: 'Taker not initialized' };
+        }
+
+        console.log(`📊 Getting ${count} transactions (skip ${skip})...`);
+        const transactions = takerInstance.getTransactions(parseInt(count), parseInt(skip));
+
+        console.log('✅ Transactions retrieved:', transactions?.length || 0);
+        return { success: true, transactions: transactions || [] };
+
+    } catch (error) {
+        console.log(`⚠️ Transaction retrieval failed: ${error.message}`);
+        return { success: true, transactions: [], message: 'Transaction history unavailable' };
+    }
+});
+
+// Get UTXOs
+ipcMain.handle('taker:getUtxos', async () => {
+    try {
+        if (!takerInstance) {
+            return { success: false, error: 'Taker not initialized' };
+        }
+
+        console.log('📊 Getting UTXOs...');
+        const rawUtxos = takerInstance.listAllUtxoSpendInfo();
+
+        console.log('✅ UTXOs retrieved:', rawUtxos?.length || 0);
+
+        const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => ({
+            utxo: {
+                txid: utxoEntry.txid.hex,
+                vout: utxoEntry.vout,
+                amount: utxoEntry.amount.sats,
+                confirmations: utxoEntry.confirmations,
+                address: utxoEntry.address,
+                scriptPubKey: utxoEntry.scriptPubKey,
+                spendable: utxoEntry.spendable,
+                solvable: utxoEntry.solvable,
+                safe: utxoEntry.safe
+            },
+            spendInfo: {
+                spendType: spendInfo.spendType,
+                path: spendInfo.path,
+                multisigRedeemscript: spendInfo.multisigRedeemscript,
+                inputValue: spendInfo.inputValue,
+                index: spendInfo.index
+            }
+        }));
+
+        return { success: true, utxos: transformedUtxos || [] };
+
+    } catch (error) {
+        console.log(`⚠️ UTXO retrieval failed: ${error.message}`);
+        return { success: true, utxos: [], message: 'UTXO list unavailable' };
+    }
+});
+
+// Send to address
+ipcMain.handle('taker:sendToAddress', async (event, { address, amount }) => {
+    try {
+        if (!takerInstance) {
+            return { success: false, error: 'Taker not initialized' };
+        }
+
+        if (!address || !amount || amount <= 0) {
+            return { success: false, error: 'Invalid address or amount' };
+        }
+
+        console.log(`📤 Sending ${amount} sats to ${address}...`);
+
+        const txidObj = takerInstance.sendToAddress(address, amount);
+        takerInstance.syncAndSave();
+
+        const txid = txidObj.hex || txidObj;
+        console.log(`✅ Transaction sent: ${txid}`);
+        return { success: true, txid };
+
+    } catch (error) {
+        console.error('❌ Send failed:', error);
+        return { success: false, error: error.message };
+    }
+});
+
+// Recover from failed swap
+ipcMain.handle('taker:recover', async () => {
+    try {
+        if (!takerInstance) {
+            return { success: false, error: 'Taker not initialized' };
+        }
+
+        console.log('🔄 Recovering from failed swap...');
+        takerInstance.recoverFromSwap();
+        console.log('✅ Recovery completed');
+        return { success: true, message: 'Recovery completed' };
+    } catch (error) {
+        console.error('❌ Recovery failed:', error);
         return { success: false, error: error.message };
     }
 });
@@ -348,109 +462,6 @@ ipcMain.handle('taker:getGoodMakers', async () => {
     }
 });
 
-// Get transactions
-ipcMain.handle('taker:getTransactions', async (event, { count = 10, skip = 0 }) => {
-    try {
-        if (!takerInstance) {
-            return { success: false, error: 'Taker not initialized' };
-        }
-
-        console.log(`📊 Getting ${count} transactions (skip ${skip})...`);
-        const transactions = takerInstance.getTransactions(parseInt(count), parseInt(skip));
-
-        console.log('✅ Transactions retrieved:', transactions?.length || 0);
-        return { success: true, transactions: transactions || [] };
-
-    } catch (error) {
-        console.log(`⚠️ Transaction retrieval failed: ${error.message}`);
-        return { success: true, transactions: [], message: 'Transaction history unavailable' };
-    }
-});
-
-// Get UTXOs
-ipcMain.handle('taker:getUtxos', async () => {
-    try {
-        if (!takerInstance) {
-            return { success: false, error: 'Taker not initialized' };
-        }
-
-        console.log('📊 Getting UTXOs...');
-        const rawUtxos = takerInstance.listAllUtxoSpendInfo();
-
-        console.log('✅ UTXOs retrieved:', rawUtxos?.length || 0);
-
-        const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => ({
-            utxo: {
-                txid: utxoEntry.txid.hex,
-                vout: utxoEntry.vout,
-                amount: utxoEntry.amount.sats,
-                confirmations: utxoEntry.confirmations,
-                address: utxoEntry.address,
-                scriptPubKey: utxoEntry.scriptPubKey,
-                spendable: utxoEntry.spendable,
-                solvable: utxoEntry.solvable,
-                safe: utxoEntry.safe
-            },
-            spendInfo: {
-                spendType: spendInfo.spendType,
-                path: spendInfo.path,
-                multisigRedeemscript: spendInfo.multisigRedeemscript,
-                inputValue: spendInfo.inputValue,
-                index: spendInfo.index
-            }
-        }));
-
-        return { success: true, utxos: transformedUtxos || [] };
-
-    } catch (error) {
-        console.log(`⚠️ UTXO retrieval failed: ${error.message}`);
-        return { success: true, utxos: [], message: 'UTXO list unavailable' };
-    }
-});
-
-// Send to address
-ipcMain.handle('taker:sendToAddress', async (event, { address, amount }) => {
-    try {
-        if (!takerInstance) {
-            return { success: false, error: 'Taker not initialized' };
-        }
-
-        if (!address || !amount || amount <= 0) {
-            return { success: false, error: 'Invalid address or amount' };
-        }
-
-        console.log(`📤 Sending ${amount} sats to ${address}...`);
-
-        const txidObj = takerInstance.sendToAddress(address, amount);
-        takerInstance.syncAndSave();
-
-        const txid = txidObj.hex || txidObj;
-        console.log(`✅ Transaction sent: ${txid}`);
-        return { success: true, txid };
-
-    } catch (error) {
-        console.error('❌ Send failed:', error);
-        return { success: false, error: error.message };
-    }
-});
-
-// Recover from failed swap
-ipcMain.handle('taker:recover', async () => {
-    try {
-        if (!takerInstance) {
-            return { success: false, error: 'Taker not initialized' };
-        }
-
-        console.log('🔄 Recovering from failed swap...');
-        takerInstance.recoverFromSwap();
-        console.log('✅ Recovery completed');
-        return { success: true, message: 'Recovery completed' };
-    } catch (error) {
-        console.error('❌ Recovery failed:', error);
-        return { success: false, error: error.message };
-    }
-});
-
 /**
  * IPC Handlers for Coinswap operations (using worker threads)
  */
@@ -569,3 +580,10 @@ app.on('activate', () => {
         createWindow();
     }
 });
+
+// Handle any uncaught exceptions
+process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+});
+
+console.log('🚀 Modern IPC-enabled Electron app starting...');

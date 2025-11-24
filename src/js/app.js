@@ -131,7 +131,7 @@ function checkFirstTimeSetup() {
         config.rpc.password.trim() === '';
 
     if (needsSetup) {
-        console.log('ðŸ”§ Setup required (missing RPC credentials), showing setup modal...');
+        console.log('🔧 Setup required (missing RPC credentials), showing setup modal...');
         const appContainer = document.querySelector('body');
 
         FirstTimeSetupModal(appContainer, (config) => {
@@ -158,7 +158,7 @@ function checkFirstTimeSetup() {
         });
         return true; // Setup modal shown
     } else {
-        console.log('âœ… Setup already complete with valid credentials:', config);
+        console.log('✅ Setup already complete with valid credentials:', config);
         return false; // Setup not needed
     }
 }
@@ -186,9 +186,9 @@ async function checkTakerInitialization() {
 
     const config = getSavedConfig();
 
-    // Check if taker configuration is available
-    if (!config.taker || !config.taker.tracker_address) {
-        console.log('⚠️ Taker configuration missing, skipping taker initialization');
+    // Check if RPC configuration is available (minimum requirement for taker)
+    if (!config || !config.rpc) {
+        console.log('⚠️ RPC configuration missing, skipping taker initialization');
         startMainApp();
         return;
     }

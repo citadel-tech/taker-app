@@ -2,7 +2,7 @@
   "name": "taker-app",
   "version": "1.0.0",
   "description": "Staging area for the demo taker-app",
-  "main": "index.js",
+  "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "concurrently \"npm run tailwind:watch\" \"npm run start\"",
