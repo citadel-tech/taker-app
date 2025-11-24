@@ -8,7 +8,9 @@
     "dev": "concurrently \"npm run tailwind:watch\" \"npm run start\"",
     "tailwind:watch": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css --watch",
     "build:css": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "setup:coinswap": "node setup-coinswap.js",
+    "prepare": "npm run setup:coinswap && npm run build:css"
   },
   "repository": {
     "type": "git",

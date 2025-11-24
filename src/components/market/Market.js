@@ -262,9 +262,6 @@ export function Market(container) {
                 tableBody.innerHTML = `
                     <div class="col-span-8 text-center py-12">
                         <p class="text-gray-400 mb-4">No makers found</p>
-                        <button id="retry-fetch" class="bg-[#FF6B35] text-white px-6 py-2 rounded-lg hover:bg-[#ff7d4d]">
-                            Refresh
-                        </button>
                     </div>
                 `;
                 

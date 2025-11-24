@@ -370,8 +370,6 @@ ipcMain.handle('taker:getOffers', async () => {
         }
 
         console.log('📊 Reading cached offerbook...');
-
-        // Only read from cached offerbook file - never fetch live (that's blocking!)
         const offerbookPath = path.join(process.env.HOME, '.coinswap/taker/offerbook.json');
 
         try {
@@ -380,14 +378,28 @@ ipcMain.handle('taker:getOffers', async () => {
                 const offerbook = JSON.parse(offerbookData);
 
                 if (offerbook.all_makers) {
+                    // Create a Set of bad maker addresses for fast lookup
+                    const badMakerAddresses = new Set(
+                        (offerbook.bad_makers || []).map(maker => 
+                            `${maker.address.onion_addr}:${maker.address.port}`
+                        )
+                    );
+
+                    // Filter out bad makers from all_makers
+                    const goodMakers = offerbook.all_makers.filter(maker => {
+                        const makerAddr = `${maker.address.onion_addr}:${maker.address.port}`;
+                        return !badMakerAddresses.has(makerAddr);
+                    });
+
                     console.log('✅ Loaded cached offerbook:', {
                         allMakers: offerbook.all_makers.length,
-                        badMakers: offerbook.bad_makers?.length || 0
+                        badMakers: offerbook.bad_makers?.length || 0,
+                        goodMakers: goodMakers.length
                     });
 
                     // Transform to expected format
                     const transformedOfferbook = {
-                        goodMakers: (offerbook.all_makers || []).map(maker => ({
+                        goodMakers: goodMakers.map(maker => ({
                             address: maker.address,
                             offer: {
                                 baseFee: maker.offer.base_fee,
@@ -401,7 +413,7 @@ ipcMain.handle('taker:getOffers', async () => {
                                 fidelity: maker.offer.fidelity
                             }
                         })),
-                        allMakers: (offerbook.all_makers || []).map(maker => ({
+                        allMakers: offerbook.all_makers.map(maker => ({
                             address: maker.address,
                             offer: {
                                 baseFee: maker.offer.base_fee,
@@ -428,14 +440,9 @@ ipcMain.handle('taker:getOffers', async () => {
             console.log('⚠️ Could not read cached offerbook:', fileError.message);
         }
 
-        // Return empty offerbook if no cache exists
-        console.log('⚠️ No cached offerbook found - use syncOfferbook to fetch');
         return {
             success: true,
-            offerbook: {
-                goodMakers: [],
-                allMakers: []
-            },
+            offerbook: { goodMakers: [], allMakers: [] },
             cached: false,
             message: 'No cached data - click sync to fetch offers'
         };
@@ -444,7 +451,6 @@ ipcMain.handle('taker:getOffers', async () => {
         return { success: false, error: error.message };
     }
 });
-
 // Get good makers
 ipcMain.handle('taker:getGoodMakers', async () => {
     try {

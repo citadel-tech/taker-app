@@ -25,10 +25,8 @@ export function LogComponent(container) {
     try {
       // IPC call to get logs
       const data = await window.api.logs.get(200);
-      console.log('📋 Fetched logs:', data);
       if (data.success) {
         logs = data.logs.map(parseLogLine);
-        console.log('📋 Parsed logs:', logs);
         renderLogs();
       }
     } catch (err) {
@@ -153,7 +151,7 @@ export function LogComponent(container) {
   content.querySelector('#show-timestamps').addEventListener('change', (e) => { showTimestamps = e.target.checked; renderLogs(); });
   content.querySelector('#auto-refresh').addEventListener('change', (e) => {
     if (e.target.checked) {
-      pollInterval = setInterval(fetchLogs, 2000);
+      pollInterval = setInterval(fetchLogs, 500);
     } else {
       clearInterval(pollInterval);
     }
@@ -168,5 +166,5 @@ export function LogComponent(container) {
 
   // Initial fetch and start polling
   fetchLogs();
-  pollInterval = setInterval(fetchLogs, 2000);
+  pollInterval = setInterval(fetchLogs, 500);
 }

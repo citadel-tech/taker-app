@@ -19,24 +19,9 @@ git checkout ffi (gh pr checkout 630 - neo's pr)
 cargo build
 ```
 
-### Step 2: coinswap FFI
-```bash
-git clone https://github.com/citadel-tech/coinswap-ffi.git
-cd coinswap-ffi/coinswap-napi
-npm install
-npm run build
-```
-
-### Step 3: Taker Backend Server
+### Step 2: taker app
 ```bash
 git clone https://github.com/citadel-tech/taker-app.git
-cd taker-app/server
-npm install
-node index.js
-```
-
-### Step 4: Taker Frontend (UI)
-```bash
 cd taker-app
 npm install
 npm run dev

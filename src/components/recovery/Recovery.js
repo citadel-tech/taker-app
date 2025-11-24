@@ -12,37 +12,22 @@ export function RecoveryComponent(container) {
             return { success: false, error: error.message };
         }
     }
-    
+
     content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Recovery</h2>
         <p class="text-gray-400 mb-8">Recover funds from failed or stuck coinswaps</p>
 
-        <div class="grid grid-cols-3 gap-6">
+        <div class="grid grid-cols-2 gap-6">
             <!-- Left: Recovery Status -->
-            <div class="col-span-2 space-y-6">
-                <!-- No Pending Recovery -->
-                <div class="bg-[#1a2332] rounded-lg p-8 text-center">
-                    <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <span class="text-4xl text-green-400">✓</span>
-                    </div>
-                    <h3 class="text-xl font-semibold text-gray-300 mb-2">No Recovery Needed</h3>
-                    <p class="text-gray-400 text-sm">All your swaps completed successfully. No stuck funds detected.</p>
+              <div class="bg-[#1a2332] rounded-lg p-6">
+                    <h3 class="text-lg font-semibold text-gray-300 mb-4">Manual Recovery</h3>
+                    <p class="text-sm text-gray-400 mb-4">If automatic recovery fails, you can manually recover funds</p>
+                   <button id="manual-recovery-btn" 
+    class="w-full bg-[#ff6b35] hover:bg-[#ff7f50] text-white font-bold py-4 text-lg rounded-xl transition-all border border-[#ff6b35] shadow-lg shadow-black/30 hover:shadow-xl hover:scale-[1.02]">
+    🔧 Manually Trigger Recovery
+</button>
+                    <div id="recovery-status" class="hidden mt-3 p-3 rounded-lg text-sm"></div>
                 </div>
-
-                <!-- Stuck Swaps (Hidden by default, shown when there are stuck swaps) -->
-                <div class="bg-[#1a2332] rounded-lg p-6 hidden" id="stuck-swaps">
-                    <h3 class="text-xl font-semibold text-gray-300 mb-6">Stuck Swaps Detected</h3>
-                    <div id="stuck-swaps-list" class="space-y-4"></div>
-                </div>
-
-                <!-- Recovery History -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-xl font-semibold text-gray-300 mb-6">Recovery History</h3>
-                    <div id="recovery-history" class="space-y-3">
-                        <p class="text-gray-500 text-sm text-center py-4">No recovery history</p>
-                    </div>
-                </div>
-            </div>
 
             <!-- Right: Recovery Info -->
             <div class="col-span-1 space-y-6">
@@ -95,35 +80,28 @@ export function RecoveryComponent(container) {
                 </div>
 
                 <!-- Manual Recovery -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">Manual Recovery</h3>
-                    <p class="text-sm text-gray-400 mb-4">If automatic recovery fails, you can manually recover funds</p>
-                    <button id="manual-recovery-btn" class="w-full bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-3 rounded-lg transition-colors border border-gray-700">
-                        Manually Trigger Recovery
-                    </button>
-                    <div id="recovery-status" class="hidden mt-3 p-3 rounded-lg text-sm"></div>
-                </div>
+              
             </div>
         </div>
     `;
-    
+
     container.appendChild(content);
 
     // Event listener for manual recovery button
     content.querySelector('#manual-recovery-btn').addEventListener('click', async () => {
         const btn = content.querySelector('#manual-recovery-btn');
         const statusDiv = content.querySelector('#recovery-status');
-        
+
         btn.textContent = 'Recovering...';
         btn.disabled = true;
         btn.classList.add('opacity-50', 'cursor-not-allowed');
-        
+
         statusDiv.classList.remove('hidden', 'bg-green-500/20', 'bg-red-500/20');
         statusDiv.classList.add('bg-blue-500/20');
         statusDiv.innerHTML = '<span class="text-blue-400">⏳ Running recovery process...</span>';
-        
+
         const result = await triggerRecovery();
-        
+
         if (result.success) {
             statusDiv.classList.remove('bg-blue-500/20');
             statusDiv.classList.add('bg-green-500/20');
@@ -135,9 +113,9 @@ export function RecoveryComponent(container) {
             statusDiv.innerHTML = `<span class="text-red-400">✗ ${result.error || 'Recovery failed'}</span>`;
             btn.textContent = 'Recovery Failed';
         }
-        
+
         setTimeout(() => {
-            btn.textContent = 'Manually Trigger Recovery';
+            btn.textContent = '🔧 Manually Trigger Recovery';
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
         }, 3000);
