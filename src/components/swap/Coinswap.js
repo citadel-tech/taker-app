@@ -147,8 +147,8 @@ export function CoinswapComponent(container, swapConfig) {
 
   async function fetchSwapLogs() {
     try {
-      const res = await fetch('http://localhost:3001/api/taker/logs?lines=150');
-      const data = await res.json();
+      // IPC call to get logs
+      const data = await window.api.logs.get(150);
       if (!data.success || !data.logs) return;
 
       data.logs.forEach(line => {
@@ -268,7 +268,8 @@ export function CoinswapComponent(container, swapConfig) {
 
   async function triggerRecovery() {
     try {
-      await fetch('http://localhost:3001/api/taker/recover', { method: 'POST' });
+      // IPC call to trigger recovery
+      await window.api.taker.recover();
       console.log('🔄 Recovery triggered');
     } catch (err) {
       console.error('Recovery call failed:', err);
@@ -285,8 +286,8 @@ export function CoinswapComponent(container, swapConfig) {
 
     pollInterval = setInterval(async () => {
       try {
-        const response = await fetch(`http://localhost:3001/api/taker/coinswap-status/${swapId}`);
-        const result = await response.json();
+        // IPC call to get coinswap status
+        const result = await window.api.coinswap.getStatus(swapId);
 
         if (!result.success) {
           console.error('Polling error:', result.error);
