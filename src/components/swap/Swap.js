@@ -37,7 +37,7 @@ export function SwapComponent(container) {
   let selectedUtxos = [];
   let useCustomHops = false;
   let customHopCount = 6;
-  let networkFeeRate = 5; // sats/vB
+  let networkFeeRate = 2; // sats/vB
 
   // Restore user selections from saved state if available
   const savedSelections = SwapStateManager.getUserSelections();
@@ -316,7 +316,7 @@ export function SwapComponent(container) {
     const hops = getNumberOfHops();
     const makers = getNumberOfMakers();
 
-    const baseTime = 5;
+    const baseTime = 10;
     const baseFeePercent = 0.1;
 
     // Network fees: estimate ~250 vBytes per hop
@@ -813,7 +813,7 @@ export function SwapComponent(container) {
                 <span class="text-sm text-gray-400">Network Fee</span>
                 <div class="text-right">
                   <div id="network-fee-sats" class="text-sm text-yellow-400">~0 sats</div>
-                  <div id="network-fee-rate" class="text-xs text-gray-500">5 sat/vB</div>
+                  <div id="network-fee-rate" class="text-xs text-gray-500">2 sat/vB</div>
                 </div>
               </div>
               <div class="flex justify-between mb-2">

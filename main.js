@@ -255,7 +255,7 @@ ipcMain.handle('taker:getUtxos', async () => {
 });
 
 // Send to address
-ipcMain.handle('taker:sendToAddress', async (event, { address, amount }) => {
+ipcMain.handle('taker:sendToAddress', async (event, { address, amount, feeRate, manuallySelectedOutpoints }) => {
     try {
         if (!takerInstance) {
             return { success: false, error: 'Taker not initialized' };
@@ -266,8 +266,17 @@ ipcMain.handle('taker:sendToAddress', async (event, { address, amount }) => {
         }
 
         console.log(`📤 Sending ${amount} sats to ${address}...`);
+        console.log(`   Fee rate: ${feeRate || 'default'}`);
+        console.log(`   Manual UTXOs: ${manuallySelectedOutpoints ? manuallySelectedOutpoints.length : 'none'}`);
 
-        const txidObj = takerInstance.sendToAddress(address, amount);
+        // Call with all 4 parameters (fee_rate and manually_selected_outpoints can be null/undefined)
+        const txidObj = takerInstance.sendToAddress(
+            address,
+            amount,
+            feeRate || null,  // Pass null if not provided
+            manuallySelectedOutpoints || null  // Pass null if not provided
+        );
+
         takerInstance.syncAndSave();
 
         const txid = txidObj.hex || txidObj;
@@ -380,7 +389,7 @@ ipcMain.handle('taker:getOffers', async () => {
                 if (offerbook.all_makers) {
                     // Create a Set of bad maker addresses for fast lookup
                     const badMakerAddresses = new Set(
-                        (offerbook.bad_makers || []).map(maker => 
+                        (offerbook.bad_makers || []).map(maker =>
                             `${maker.address.onion_addr}:${maker.address.port}`
                         )
                     );

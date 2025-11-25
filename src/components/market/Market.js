@@ -336,7 +336,7 @@ export function Market(container) {
                 <p class="text-gray-400">Live market offers with competitive rates</p>
             </div>
             <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold transition-colors">
-                🔄 Refresh Market
+                🔄 Sync Market Data
             </button>
         </div>
 

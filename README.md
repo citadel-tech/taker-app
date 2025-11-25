@@ -10,16 +10,6 @@ A desktop application for performing private Bitcoin coinswaps.
 
 ## Setup
 
-
-### Step 1: Coinswap Core
- Core
-```bash
-cd coinswap
-git checkout ffi (gh pr checkout 630 - neo's pr)
-cargo build
-```
-
-### Step 2: taker app
 ```bash
 git clone https://github.com/citadel-tech/taker-app.git
 cd taker-app
