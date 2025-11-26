@@ -56,7 +56,7 @@ export function ReceiveComponent(container) {
                 <!-- Info Card -->
                 <div class="mt-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <p class="text-xs text-red-400">
-                      ⚠️ <strong>PRIVACY WARNING:</strong> Reusing addresses can cause significant privacy reduction. Always generate a fresh address for each transaction to maintain anonymity.
+                      ⚠️ Reusing addresses can cause significant privacy reduction. Always generate a fresh address for each transaction to maintain anonymity.
                   </p>
                 </div>
 
@@ -131,7 +131,7 @@ export function ReceiveComponent(container) {
     // In production, you might want to use a local library like qrcode.js
     const size = 256;
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000&margin=10`;
-    
+
     qrContainer.innerHTML = `
       <img 
         src="${qrApiUrl}" 

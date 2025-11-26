@@ -54,30 +54,64 @@ export function WalletComponent(container) {
     const date = new Date(timestamp * 1000);
     const now = new Date();
     const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60)
+      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
+    if (diffHours < 24)
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffDays < 7)
+      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
     return date.toLocaleDateString();
   }
-
   function truncateTxid(txid) {
     if (typeof txid === 'object' && txid.hex) {
       txid = txid.hex;
     }
-    return `${txid.substring(0, 8)}...${txid.substring(-4)}`;
+    return `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
   }
 
   function getUtxoTypeColor(spendType) {
     switch (spendType.toLowerCase()) {
-      case 'regular': return 'green';
-      case 'swap': return 'blue';
-      case 'contract': return 'yellow';
-      case 'fidelity': return 'purple';
-      default: return 'gray';
+      case 'regular':
+        return 'green';
+      case 'swap':
+        return 'blue';
+      case 'contract':
+        return 'yellow';
+      case 'fidelity':
+        return 'purple';
+      default:
+        return 'gray';
     }
+  }
+
+  // Add this function after the other helper functions
+  function getTransactionType(transaction) {
+    const category = (transaction.detail.category || '').toLowerCase();
+    const label = (transaction.detail.label || '').toLowerCase();
+
+    // Check for swap indicators
+    if (
+      label.includes('swap') ||
+      label.includes('swapcoin') ||
+      label.includes('coinswap') ||
+      label.includes('watchonly_swapcoin') ||
+      label.includes('contract') ||
+      label.includes('htlc')
+    ) {
+      return 'swap';
+    }
+
+    if (category.includes('swap')) {
+      return 'swap';
+    }
+
+    // Standard transactions
+    return 'regular';
   }
 
   // UI Update Functions
@@ -85,10 +119,14 @@ export function WalletComponent(container) {
     try {
       const balance = await fetchBalance();
 
-      content.querySelector('#regular-balance').textContent = satsToBtc(balance.regular) + ' BTC';
-      content.querySelector('#swap-balance').textContent = satsToBtc(balance.swap) + ' BTC';
-      content.querySelector('#contract-balance').textContent = satsToBtc(balance.contract) + ' BTC';
-      content.querySelector('#spendable-balance').textContent = satsToBtc(balance.spendable) + ' BTC';
+      content.querySelector('#regular-balance').textContent =
+        satsToBtc(balance.regular) + ' BTC';
+      content.querySelector('#swap-balance').textContent =
+        satsToBtc(balance.swap) + ' BTC';
+      content.querySelector('#contract-balance').textContent =
+        satsToBtc(balance.contract) + ' BTC';
+      content.querySelector('#spendable-balance').textContent =
+        satsToBtc(balance.spendable) + ' BTC';
 
       console.log('✅ Balance updated:', balance);
     } catch (error) {
@@ -97,43 +135,67 @@ export function WalletComponent(container) {
   }
 
   async function updateTransactions() {
-    const transactionsContainer = content.querySelector('#transactions-container');
+    const transactionsContainer = content.querySelector(
+      '#transactions-container'
+    );
 
     try {
       const transactions = await fetchTransactions();
 
       if (transactions.length === 0) {
-        transactionsContainer.innerHTML = '<div class="text-center py-4 text-gray-400">No transactions yet</div>';
+        transactionsContainer.innerHTML =
+          '<div class="text-center py-4 text-gray-400">No transactions yet</div>';
       } else {
         // Sort transactions newest first (by time)
-        const sortedTransactions = transactions.sort((a, b) => b.info.time - a.info.time);
+        const sortedTransactions = transactions.sort(
+          (a, b) => b.info.time - a.info.time
+        );
 
-        transactionsContainer.innerHTML = sortedTransactions.map(tx => {
-          const isReceive = tx.detail.amount.sats > 0;
-          return `
-            <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
-              <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 bg-${isReceive ? 'green' : 'red'}-500/20 rounded-full flex items-center justify-center">
-                  <span class="text-${isReceive ? 'green' : 'red'}-400">${isReceive ? '↓' : '↑'}</span>
-                </div>
-                <div>
-                  <p class="text-white font-mono text-sm">${isReceive ? 'Received' : 'Sent'}</p>
-                  <p class="text-gray-400 text-xs">${formatDate(tx.info.time)}</p>
-                </div>
-              </div>
-              <div class="text-right">
-                <p class="text-${isReceive ? 'green' : 'red'}-400 font-mono">${isReceive ? '+' : ''}${satsToBtc(Math.abs(tx.detail.amount.sats))} BTC</p>
-                <p class="text-gray-400 text-xs">${tx.info.confirmations} confirmations</p>
-              </div>
-            </div>
+        transactionsContainer.innerHTML = sortedTransactions
+          .map((tx) => {
+            const isReceive = tx.detail.amount.sats > 0;
+            const txType = getTransactionType(tx);
+            const txid =
+              typeof tx.info.txid === 'object'
+                ? tx.info.txid.hex
+                : tx.info.txid;
+            const txidShort = `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
+
+            return `
+    <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 bg-${isReceive ? 'green' : 'red'}-500/20 rounded-full flex items-center justify-center">
+          <span class="text-${isReceive ? 'green' : 'red'}-400">${isReceive ? '↓' : '↑'}</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <p class="text-white font-mono text-sm">${isReceive ? 'Received' : 'Sent'}</p>
+            <span class="text-xs px-2 py-0.5 rounded ${txType === 'swap' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}">
+              ${txType === 'swap' ? 'Swap' : 'Regular'}
+            </span>
+          </div>
+          <p class="text-gray-400 text-xs cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+             onclick="openTxOnMempool('${txid}')"
+             title="${txid}">
+            ${txidShort} • ${formatDate(tx.info.time)}
+          </p>
+        </div>
+      </div>
+      <div class="text-right">
+        <p class="text-${isReceive ? 'green' : 'red'}-400 font-mono">${isReceive ? '+' : ''}${satsToBtc(Math.abs(tx.detail.amount.sats))} BTC</p>
+        <p class="text-gray-400 text-xs">${tx.info.confirmations} confirmations</p>
+      </div>
+    </div>
           `;
-        }).join('');
+          })
+          .join('');
       }
 
       console.log('✅ Transactions updated:', transactions.length);
     } catch (error) {
       console.error('❌ Transactions update failed:', error);
-      transactionsContainer.innerHTML = '<div class="text-center py-4 text-gray-400">Error loading transactions</div>';
+      transactionsContainer.innerHTML =
+        '<div class="text-center py-4 text-gray-400">Error loading transactions</div>';
     }
   }
 
@@ -144,15 +206,17 @@ export function WalletComponent(container) {
       const utxos = await fetchUtxos();
 
       if (utxos.length === 0) {
-        utxoTableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-400">No UTXOs found</td></tr>';
+        utxoTableBody.innerHTML =
+          '<tr><td colspan="4" class="text-center py-4 text-gray-400">No UTXOs found</td></tr>';
       } else {
-        utxoTableBody.innerHTML = utxos.map(utxoData => {
-          const utxo = utxoData.utxo;
-          const spendInfo = utxoData.spendInfo;
-          const txidShort = truncateTxid(utxo.txid);
-          const color = getUtxoTypeColor(spendInfo.spendType);
+        utxoTableBody.innerHTML = utxos
+          .map((utxoData) => {
+            const utxo = utxoData.utxo;
+            const spendInfo = utxoData.spendInfo;
+            const txidShort = truncateTxid(utxo.txid);
+            const color = getUtxoTypeColor(spendInfo.spendType);
 
-          return `
+            return `
             <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
               <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
                   onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid}')">${txidShort}:${utxo.vout}</td>
@@ -161,7 +225,8 @@ export function WalletComponent(container) {
               <td class="py-3 px-4 text-${color}-400">${spendInfo.spendType}</td>
             </tr>
           `;
-        }).join('');
+          })
+          .join('');
       }
 
       console.log('✅ UTXOs updated:', utxos.length);
@@ -187,11 +252,7 @@ export function WalletComponent(container) {
     refreshBtn.disabled = true;
 
     try {
-      await Promise.all([
-        updateBalance(),
-        updateTransactions(),
-        updateUtxos()
-      ]);
+      await Promise.all([updateBalance(), updateTransactions(), updateUtxos()]);
 
       refreshBtn.textContent = 'Refreshed!';
       setTimeout(() => {
@@ -305,7 +366,9 @@ export function WalletComponent(container) {
   };
 
   // Event handlers
-  content.querySelector('#refresh-all-btn').addEventListener('click', refreshAllData);
+  content
+    .querySelector('#refresh-all-btn')
+    .addEventListener('click', refreshAllData);
 
   const viewAllButton = content.querySelector('#view-all-utxos');
   if (viewAllButton) {
@@ -317,7 +380,9 @@ export function WalletComponent(container) {
     });
   }
 
-  const viewAllTransactionsButton = content.querySelector('#view-all-transactions');
+  const viewAllTransactionsButton = content.querySelector(
+    '#view-all-transactions'
+  );
   if (viewAllTransactionsButton) {
     viewAllTransactionsButton.addEventListener('click', () => {
       import('./TransactionsList.js').then((module) => {

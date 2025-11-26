@@ -36,7 +36,6 @@ rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 zmqpubrawblock=tcp://127.0.0.1:28332
 zmqpubrawtx=tcp://127.0.0.1:28333
-zmqpubhashblock=tcp://127.0.0.1:28334
 
 # Regtest
 [regtest]
@@ -49,9 +48,8 @@ blockfilterindex=1
 rpcport=18443
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
-zmqpubrawblock=tcp://127.0.0.1:29332
-zmqpubrawtx=tcp://127.0.0.1:29333
-zmqpubhashblock=tcp://127.0.0.1:29334
+zmqpubrawblock=tcp://127.0.0.1:28332
+zmqpubrawtx=tcp://127.0.0.1:283323
 
 ```
 

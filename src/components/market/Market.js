@@ -1,127 +1,139 @@
 export function Market(container) {
-    const content = document.createElement('div');
-    content.id = 'market-content';
+  const content = document.createElement('div');
+  content.id = 'market-content';
 
-    // STATE
-    let makers = [];
-    let selectedMakers = [];
-    let isLoading = true;
+  // STATE
+  let makers = [];
+  let selectedMakers = [];
+  let isLoading = true;
 
-    // API FUNCTIONS
-    async function fetchMakers() {
-        try {
-            console.log('📡 Fetching makers from API...');
-            isLoading = true;
-            updateUI();
+  // API FUNCTIONS
+  async function fetchMakers() {
+    try {
+      console.log('📡 Fetching makers from API...');
+      isLoading = true;
+      updateUI();
 
-            // IPC call to get offers
-            const data = await window.api.taker.getOffers();
+      const data = await window.api.taker.getOffers();
 
-            if (data.success && data.offerbook) {
-                const goodMakers = data.offerbook.goodMakers || [];
-                
-                makers = goodMakers.map((item, index) => {
-                    const offer = item.offer;
-                    const addressObj = item.address || {};
-                    const onionAddr = addressObj.onion_addr || '';
-                    const port = addressObj.port || '6102';
-                    const fullAddress = `${onionAddr}:${port}`;
-                    
-                    return {
-                        address: fullAddress,
-                        baseFee: offer.baseFee || 0,
-                        volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
-                        timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
-                        minSize: offer.minSize || 0,
-                        maxSize: offer.maxSize || 0,
-                        bond: offer.fidelity?.bond?.amount || 0,
-                        bondTxid: offer.fidelity?.bond?.outpoint?.split(':')[0] || '',
-                        requiredConfirms: offer.requiredConfirms || 0,
-                        minimumLocktime: offer.minimumLocktime || 0,
-                        index: index
-                    };
-                });
+      if (data.success && data.offerbook) {
+        const goodMakers = data.offerbook.goodMakers || [];
 
-                console.log('✅ Loaded', makers.length, 'makers');
-                isLoading = false;
-                updateUI();
-            } else {
-                throw new Error(data.error || 'Failed to fetch offers');
-            }
-        } catch (error) {
-            console.error('❌ Failed to fetch makers:', error);
-            isLoading = false;
-            showError('Failed to load makers: ' + error.message);
-            updateUI();
-        }
+        makers = goodMakers.map((item, index) => {
+          const offer = item.offer;
+          const addressObj = item.address || {};
+          const onionAddr = addressObj.onion_addr || '';
+          const port = addressObj.port || '6102';
+          const fullAddress = `${onionAddr}:${port}`;
+
+          // Extract full fidelity bond data
+          const fidelity = offer.fidelity || {};
+          const bond = fidelity.bond || {};
+          const outpoint = bond.outpoint || '';
+
+          return {
+            address: fullAddress,
+            baseFee: offer.baseFee || 0,
+            volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
+            timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
+            minSize: offer.minSize || 0,
+            maxSize: offer.maxSize || 0,
+            bond: bond.amount || 0,
+            bondTxid: outpoint.split(':')[0] || '',
+            bondVout: outpoint.split(':')[1] || '0',
+            bondOutpoint: outpoint,
+            bondLocktime: bond.lock_time || 0,
+            bondPubkey: bond.pubkey || '',
+            bondConfHeight: bond.conf_height || null,
+            bondCertExpiry: bond.cert_expiry || null,
+            bondIsSpent: bond.is_spent || false,
+            requiredConfirms: offer.requiredConfirms || 0,
+            minimumLocktime: offer.minimumLocktime || 0,
+            index: index,
+          };
+        });
+
+        console.log('✅ Loaded', makers.length, 'makers');
+        isLoading = false;
+        updateUI();
+      } else {
+        throw new Error(data.error || 'Failed to fetch offers');
+      }
+    } catch (error) {
+      console.error('❌ Failed to fetch makers:', error);
+      isLoading = false;
+      showError('Failed to load makers: ' + error.message);
+      updateUI();
     }
+  }
 
-    async function syncOfferbook() {
-        try {
-            console.log('🔄 Starting offerbook sync...');
+  async function syncOfferbook() {
+    try {
+      console.log('🔄 Starting offerbook sync...');
 
-            // IPC call to start sync in worker thread
-            const result = await window.api.taker.syncOfferbook();
+      // IPC call to start sync in worker thread
+      const result = await window.api.taker.syncOfferbook();
 
-            if (!result.success) {
-                throw new Error(result.error || 'Failed to start sync');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start sync');
+      }
+
+      const syncId = result.syncId;
+      console.log('📡 Sync started:', syncId);
+
+      // Poll for completion (timeout after 2 minutes)
+      const timeout = 120000; // 2 minutes
+      const startTime = Date.now();
+
+      return new Promise((resolve, reject) => {
+        const pollInterval = setInterval(async () => {
+          try {
+            // Check timeout
+            if (Date.now() - startTime > timeout) {
+              clearInterval(pollInterval);
+              reject(new Error('Sync timeout - operation took too long'));
+              return;
             }
 
-            const syncId = result.syncId;
-            console.log('📡 Sync started:', syncId);
+            const status = await window.api.taker.getSyncStatus(syncId);
 
-            // Poll for completion (timeout after 2 minutes)
-            const timeout = 120000; // 2 minutes
-            const startTime = Date.now();
+            if (!status.success) {
+              clearInterval(pollInterval);
+              reject(new Error('Failed to get sync status'));
+              return;
+            }
 
-            return new Promise((resolve, reject) => {
-                const pollInterval = setInterval(async () => {
-                    try {
-                        // Check timeout
-                        if (Date.now() - startTime > timeout) {
-                            clearInterval(pollInterval);
-                            reject(new Error('Sync timeout - operation took too long'));
-                            return;
-                        }
+            const sync = status.sync;
+            console.log('📊 Sync status:', sync.status);
 
-                        const status = await window.api.taker.getSyncStatus(syncId);
-
-                        if (!status.success) {
-                            clearInterval(pollInterval);
-                            reject(new Error('Failed to get sync status'));
-                            return;
-                        }
-
-                        const sync = status.sync;
-                        console.log('📊 Sync status:', sync.status);
-
-                        if (sync.status === 'completed') {
-                            clearInterval(pollInterval);
-                            console.log('✅ Offerbook synced');
-                            // Wait a moment for file to be written
-                            await new Promise(r => setTimeout(r, 1000));
-                            await fetchMakers();
-                            resolve();
-                        } else if (sync.status === 'failed') {
-                            clearInterval(pollInterval);
-                            reject(new Error(sync.error || 'Sync failed'));
-                        }
-                    } catch (error) {
-                        clearInterval(pollInterval);
-                        reject(error);
-                    }
-                }, 1000); // Poll every second
-            });
-        } catch (error) {
-            console.error('❌ Sync failed:', error);
-            throw error;
-        }
+            if (sync.status === 'completed') {
+              clearInterval(pollInterval);
+              console.log('✅ Offerbook synced');
+              // Wait a moment for file to be written
+              await new Promise((r) => setTimeout(r, 1000));
+              await fetchMakers();
+              resolve();
+            } else if (sync.status === 'failed') {
+              clearInterval(pollInterval);
+              reject(new Error(sync.error || 'Sync failed'));
+            }
+          } catch (error) {
+            clearInterval(pollInterval);
+            reject(error);
+          }
+        }, 1000); // Poll every second
+      });
+    } catch (error) {
+      console.error('❌ Sync failed:', error);
+      throw error;
     }
+  }
 
-    function showError(message) {
-        const errorDiv = document.createElement('div');
-        errorDiv.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
-        errorDiv.innerHTML = `
+  function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className =
+      'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
+    errorDiv.innerHTML = `
             <div class="flex items-start gap-3">
                 <span class="text-xl">❌</span>
                 <div class="flex-1">
@@ -130,107 +142,236 @@ export function Market(container) {
                 </div>
             </div>
         `;
-        document.body.appendChild(errorDiv);
-        setTimeout(() => errorDiv.remove(), 5000);
+    document.body.appendChild(errorDiv);
+    setTimeout(() => errorDiv.remove(), 5000);
+  }
+
+  function calculateStats() {
+    const totalLiquidity = makers.reduce((sum, m) => sum + m.maxSize, 0);
+    const avgFee =
+      makers.length > 0
+        ? makers.reduce((sum, m) => sum + parseFloat(m.volumeFee), 0) /
+          makers.length
+        : 0;
+
+    return {
+      totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
+      avgFee: avgFee.toFixed(1),
+      onlineMakers: makers.length,
+      avgResponse: '2.3',
+    };
+  }
+
+  window.viewFidelityBond = (makerAddress) => {
+    const maker = makers.find(m => m.address === makerAddress);
+    if (!maker || !maker.bondTxid) {
+        alert('No fidelity bond data available');
+        return;
     }
 
-    function calculateStats() {
-        const totalLiquidity = makers.reduce((sum, m) => sum + m.maxSize, 0);
-        const avgFee = makers.length > 0 
-            ? makers.reduce((sum, m) => sum + parseFloat(m.volumeFee), 0) / makers.length 
-            : 0;
-        
-        return {
-            totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
-            avgFee: avgFee.toFixed(1),
-            onlineMakers: makers.length,
-            avgResponse: '2.3'
-        };
-    }
-
-    window.viewFidelityBond = (makerAddress) => {
-        const maker = makers.find(m => m.address === makerAddress);
-        if (maker && maker.bondTxid) {
-            const url = `https://mempool.space/signet/tx/${maker.bondTxid}`;
-            window.open(url, '_blank');
-        }
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
     };
 
-    function toggleMakerSelection(index) {
-        const makerIndex = selectedMakers.indexOf(index);
-        if (makerIndex > -1) {
-            selectedMakers.splice(makerIndex, 1);
-        } else {
-            selectedMakers.push(index);
-        }
-        updateSelectionUI();
+    // Calculate locktime in days (assuming 10 min blocks)
+    const locktimeDays = maker.bondLocktime ? Math.floor(maker.bondLocktime / 144) : 0;
+    
+    // Calculate cert expiry in days (multiples of 2016 blocks)
+    const certExpiryDays = maker.bondCertExpiry ? Math.floor((maker.bondCertExpiry * 2016) / 144) : null;
+
+    modal.innerHTML = `
+        <div class="bg-[#1a2332] rounded-lg p-6 max-w-3xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-start mb-6">
+                <h3 class="text-2xl font-bold text-[#FF6B35]">Fidelity Bond Details</h3>
+                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            
+            <div class="space-y-4">
+                <!-- Maker Address -->
+                <div class="bg-[#0f1419] p-4 rounded-lg">
+                    <p class="text-sm text-gray-400 mb-1">Maker Address</p>
+                    <p class="text-white font-mono text-sm break-all">${maker.address}</p>
+                </div>
+
+                <!-- Bond Amount & Status -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-[#0f1419] p-4 rounded-lg">
+                        <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
+                        <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
+                        <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
+                    </div>
+
+                    <div class="bg-[#0f1419] p-4 rounded-lg">
+                        <p class="text-sm text-gray-400 mb-1">Bond Status</p>
+                        <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
+                            ${maker.bondIsSpent ? '❌ Spent' : '✅ Active'}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Outpoint -->
+                <div class="bg-[#0f1419] p-4 rounded-lg">
+                    <p class="text-sm text-gray-400 mb-1">Bond Outpoint (UTXO)</p>
+                    <p class="text-white font-mono text-sm break-all">${maker.bondOutpoint}</p>
+                    <div class="flex gap-2 mt-2 text-xs">
+                        <span class="text-gray-400">Txid: <span class="text-cyan-400">${maker.bondTxid}</span></span>
+                        <span class="text-gray-400">Vout: <span class="text-cyan-400">${maker.bondVout}</span></span>
+                    </div>
+                </div>
+
+                <!-- Locktime & Confirmations -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-[#0f1419] p-4 rounded-lg">
+                        <p class="text-sm text-gray-400 mb-1">Bond Locktime</p>
+                        <p class="text-lg font-mono text-yellow-400">${maker.bondLocktime.toLocaleString()} blocks</p>
+                        <p class="text-xs text-gray-500 mt-1">~${locktimeDays} days</p>
+                    </div>
+
+                    <div class="bg-[#0f1419] p-4 rounded-lg">
+                        <p class="text-sm text-gray-400 mb-1">Confirmation Height</p>
+                        <p class="text-lg font-mono text-blue-400">
+                            ${maker.bondConfHeight !== null ? maker.bondConfHeight.toLocaleString() : 'N/A'}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Certificate Expiry -->
+                ${maker.bondCertExpiry !== null ? `
+                <div class="bg-[#0f1419] p-4 rounded-lg">
+                    <p class="text-sm text-gray-400 mb-1">Certificate Expiry</p>
+                    <p class="text-lg font-mono text-orange-400">${maker.bondCertExpiry} difficulty periods</p>
+                    <p class="text-xs text-gray-500 mt-1">${maker.bondCertExpiry * 2016} blocks (~${certExpiryDays} days)</p>
+                </div>
+                ` : ''}
+
+                <!-- Public Key -->
+                ${maker.bondPubkey ? `
+                <div class="bg-[#0f1419] p-4 rounded-lg">
+                    <p class="text-sm text-gray-400 mb-1">Bond Public Key</p>
+                    <p class="text-white font-mono text-xs break-all">${maker.bondPubkey}</p>
+                </div>
+                ` : ''}
+
+                <!-- Required Confirms & Minimum Locktime -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-[#0f1419] p-4 rounded-lg">
+                        <p class="text-sm text-gray-400 mb-1">Required Confirmations</p>
+                        <p class="text-lg font-mono text-blue-400">${maker.requiredConfirms}</p>
+                    </div>
+
+                    <div class="bg-[#0f1419] p-4 rounded-lg">
+                        <p class="text-sm text-gray-400 mb-1">Minimum Locktime</p>
+                        <p class="text-lg font-mono text-yellow-400">${maker.minimumLocktime} blocks</p>
+                        <p class="text-xs text-gray-500 mt-1">~${Math.floor(maker.minimumLocktime / 144)} days</p>
+                    </div>
+                </div>
+
+                <!-- Block Explorer Link -->
+                <div class="bg-[#0f1419] p-4 rounded-lg">
+                    <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
+                    <button 
+                        onclick="window.open('https://mempool.space/signet/tx/${maker.bondTxid}', '_blank')"
+                        class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+                        View on Block Explorer →
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-6 flex justify-end">
+                <button onclick="this.closest('.fixed').remove()" 
+                    class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+                    Close
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+};
+
+  function toggleMakerSelection(index) {
+    const makerIndex = selectedMakers.indexOf(index);
+    if (makerIndex > -1) {
+      selectedMakers.splice(makerIndex, 1);
+    } else {
+      selectedMakers.push(index);
+    }
+    updateSelectionUI();
+  }
+
+  function updateSelectionUI() {
+    makers.forEach((_, index) => {
+      const checkbox = content.querySelector(`#maker-${index}`);
+      if (checkbox) {
+        checkbox.checked = selectedMakers.includes(index);
+      }
+    });
+
+    const selectAllCheckbox = content.querySelector('#select-all-makers');
+    if (selectAllCheckbox) {
+      if (selectedMakers.length === 0) {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = false;
+      } else if (selectedMakers.length === makers.length) {
+        selectAllCheckbox.checked = true;
+        selectAllCheckbox.indeterminate = false;
+      } else {
+        selectAllCheckbox.checked = false;
+        selectAllCheckbox.indeterminate = true;
+      }
     }
 
-    function updateSelectionUI() {
-        makers.forEach((_, index) => {
-            const checkbox = content.querySelector(`#maker-${index}`);
-            if (checkbox) {
-                checkbox.checked = selectedMakers.includes(index);
-            }
-        });
+    const actionButtons = content.querySelector('#maker-actions');
+    const selectedCount = content.querySelector('#selected-makers-count');
 
-        const selectAllCheckbox = content.querySelector('#select-all-makers');
-        if (selectAllCheckbox) {
-            if (selectedMakers.length === 0) {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = false;
-            } else if (selectedMakers.length === makers.length) {
-                selectAllCheckbox.checked = true;
-                selectAllCheckbox.indeterminate = false;
-            } else {
-                selectAllCheckbox.checked = false;
-                selectAllCheckbox.indeterminate = true;
-            }
-        }
+    if (selectedMakers.length > 0) {
+      actionButtons.classList.remove('hidden');
+      selectedCount.textContent = selectedMakers.length;
+    } else {
+      actionButtons.classList.add('hidden');
+    }
+  }
 
-        const actionButtons = content.querySelector('#maker-actions');
-        const selectedCount = content.querySelector('#selected-makers-count');
-        
-        if (selectedMakers.length > 0) {
-            actionButtons.classList.remove('hidden');
-            selectedCount.textContent = selectedMakers.length;
-        } else {
-            actionButtons.classList.add('hidden');
-        }
+  function selectAllMakers() {
+    const selectAllCheckbox = content.querySelector('#select-all-makers');
+    if (selectAllCheckbox.checked) {
+      selectedMakers = makers.map((_, index) => index);
+    } else {
+      selectedMakers = [];
+    }
+    updateSelectionUI();
+  }
+
+  function swapWithSelectedMakers() {
+    if (selectedMakers.length === 0) {
+      alert('Please select at least one maker');
+      return;
     }
 
-    function selectAllMakers() {
-        const selectAllCheckbox = content.querySelector('#select-all-makers');
-        if (selectAllCheckbox.checked) {
-            selectedMakers = makers.map((_, index) => index);
-        } else {
-            selectedMakers = [];
-        }
-        updateSelectionUI();
-    }
+    const selectedMakerData = selectedMakers.map((index) => makers[index]);
+    console.log(
+      '🔄 Starting swap with',
+      selectedMakerData.length,
+      'makers:',
+      selectedMakerData
+    );
 
-    function swapWithSelectedMakers() {
-        if (selectedMakers.length === 0) {
-            alert('Please select at least one maker');
-            return;
-        }
+    import('./Swap.js').then((module) => {
+      container.innerHTML = '';
+      module.SwapComponent(container, null, selectedMakerData);
+    });
+  }
 
-        const selectedMakerData = selectedMakers.map(index => makers[index]);
-        console.log('🔄 Starting swap with', selectedMakerData.length, 'makers:', selectedMakerData);
-        
-        import('./Swap.js').then((module) => {
-            container.innerHTML = '';
-            module.SwapComponent(container, null, selectedMakerData);
-        });
-    }
+  function updateUI() {
+    const stats = calculateStats();
+    const tableBody = content.querySelector('#maker-table-body');
+    const statsContainer = content.querySelector('#market-stats');
 
-    function updateUI() {
-        const stats = calculateStats();
-        const tableBody = content.querySelector('#maker-table-body');
-        const statsContainer = content.querySelector('#market-stats');
-
-        if (statsContainer) {
-            statsContainer.innerHTML = `
+    if (statsContainer) {
+      statsContainer.innerHTML = `
                 <div class="bg-[#1a2332] rounded-lg p-6">
                     <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
                     <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
@@ -248,31 +389,33 @@ export function Market(container) {
                     <p class="text-2xl font-mono text-cyan-400">${stats.avgResponse}s</p>
                 </div>
             `;
-        }
+    }
 
-        if (tableBody) {
-            if (isLoading) {
-                tableBody.innerHTML = `
+    if (tableBody) {
+      if (isLoading) {
+        tableBody.innerHTML = `
                     <div class="col-span-8 text-center py-12">
                         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
                         <p class="text-gray-400">Loading makers...</p>
                     </div>
                 `;
-            } else if (makers.length === 0) {
-                tableBody.innerHTML = `
+      } else if (makers.length === 0) {
+        tableBody.innerHTML = `
                     <div class="col-span-8 text-center py-12">
                         <p class="text-gray-400 mb-4">No makers found</p>
                     </div>
                 `;
-                
-                setTimeout(() => {
-                    const retryBtn = content.querySelector('#retry-fetch');
-                    if (retryBtn) {
-                        retryBtn.addEventListener('click', () => fetchMakers());
-                    }
-                }, 100);
-            } else {
-                tableBody.innerHTML = makers.map((maker, index) => `
+
+        setTimeout(() => {
+          const retryBtn = content.querySelector('#retry-fetch');
+          if (retryBtn) {
+            retryBtn.addEventListener('click', () => fetchMakers());
+          }
+        }, 100);
+      } else {
+        tableBody.innerHTML = makers
+          .map(
+            (maker, index) => `
                     <div class="grid grid-cols-8 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
                         <div class="flex items-center">
                             <input type="checkbox" id="maker-${index}" class="w-4 h-4 accent-[#FF6B35]" />
@@ -287,58 +430,82 @@ export function Market(container) {
                             ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
                         </div>
                     </div>
-                `).join('');
+                `
+          )
+          .join('');
 
-                makers.forEach((_, index) => {
-                    const checkbox = content.querySelector(`#maker-${index}`);
-                    if (checkbox) {
-                        checkbox.addEventListener('change', () => toggleMakerSelection(index));
-                    }
-                });
-            }
-        }
-
-        const footer = content.querySelector('#market-footer');
-        if (footer) {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            footer.innerHTML = `Showing ${makers.length} active offers • ${timeStr}`;
-        }
+        makers.forEach((_, index) => {
+          const checkbox = content.querySelector(`#maker-${index}`);
+          if (checkbox) {
+            checkbox.addEventListener('change', () =>
+              toggleMakerSelection(index)
+            );
+          }
+        });
+      }
     }
 
-    async function handleRefresh() {
-        const refreshBtn = content.querySelector('#refresh-market-btn');
-        const originalText = refreshBtn.innerHTML;
-        
-        refreshBtn.disabled = true;
-        refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
-        
-        try {
-            await syncOfferbook();
-            refreshBtn.innerHTML = '✅ Synced!';
-            setTimeout(() => {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalText;
-            }, 2000);
-        } catch (error) {
-            refreshBtn.innerHTML = '❌ Failed';
-            setTimeout(() => {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalText;
-            }, 3000);
-        }
+    const footer = content.querySelector('#market-footer');
+    if (footer) {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      });
+      footer.innerHTML = `Showing ${makers.length} active offers • ${timeStr}`;
     }
-    
-    content.innerHTML = `
+  }
+
+  async function handleRefresh() {
+    const refreshBtn = content.querySelector('#refresh-market-btn');
+    const originalText = refreshBtn.innerHTML;
+
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
+
+    try {
+      await syncOfferbook();
+      refreshBtn.innerHTML = '✅ Synced!';
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalText;
+      }, 2000);
+    } catch (error) {
+      refreshBtn.innerHTML = '❌ Failed';
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalText;
+      }, 3000);
+    }
+  }
+
+  content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
             <div>
                 <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
-                <p class="text-gray-400">Live market offers with competitive rates</p>
+                <p class="text-gray-400">Live view of the current coinswap market</p>
             </div>
             <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold transition-colors">
                 🔄 Sync Market Data
             </button>
         </div>
+<div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+    <div class="flex items-start gap-3">
+        <span class="text-2xl">ℹ️</span>
+        <div>
+            <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
+            <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
+            <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
+                Total Fee = Base Fee + (Amount × Volume Fee %) + (Locktime × Time Fee %)
+            </code>
+            <p class="text-gray-400 text-sm mt-2">
+                Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
+            </p>
+        </div>
+    </div>
+</div>
+
 
         <div id="market-stats" class="grid grid-cols-4 gap-4 mb-6">
             <div class="bg-[#1a2332] rounded-lg p-6">
@@ -370,39 +537,18 @@ export function Market(container) {
             </div>
 
             <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4">
-                <div class="flex items-center">
-                    <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
-                    <span class="font-semibold text-sm">Select</span>
-                </div>
-                <div>
-                    <div class="font-semibold">Address</div>
-                    <div class="text-sm opacity-80">Maker Address</div>
-                </div>
-                <div>
-                    <div class="font-semibold">Base Fee</div>
-                    <div class="text-sm opacity-80">Fixed Fee</div>
-                </div>
-                <div>
-                    <div class="font-semibold">Amount</div>
-                    <div class="text-sm opacity-80">Volume Fee</div>
-                </div>
-                <div>
-                    <div class="font-semibold">Time</div>
-                    <div class="text-sm opacity-80">Fee Lock</div>
-                </div>
-                <div>
-                    <div class="font-semibold">Min Size</div>
-                    <div class="text-sm opacity-80">Minimum Order</div>
-                </div>
-                <div>
-                    <div class="font-semibold">Max Size</div>
-                    <div class="text-sm opacity-80">Maximum Order</div>
-                </div>
-                <div>
-                    <div class="font-semibold">Bond</div>
-                    <div class="text-sm opacity-80">Click to View</div>
-                </div>
-            </div>
+    <div class="flex items-center">
+        <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
+        <span class="font-semibold text-sm">Select</span>
+    </div>
+    <div class="font-semibold">Maker Address</div>
+    <div class="font-semibold">Fixed Fee</div>
+    <div class="font-semibold">% Fee</div>
+    <div class="font-semibold">Timelock Fee</div>
+    <div class="font-semibold">Min Swap Size</div>
+    <div class="font-semibold">Max Swap Size</div>
+    <div class="font-semibold">Fidelity Bond</div>
+</div>
 
             <div id="maker-table-body" class="divide-y divide-gray-700">
                 <div class="col-span-8 text-center py-12">
@@ -416,13 +562,19 @@ export function Market(container) {
             </div>
         </div>
     `;
-    
-    container.appendChild(content);
 
-    content.querySelector('#refresh-market-btn').addEventListener('click', handleRefresh);
-    content.querySelector('#select-all-makers').addEventListener('change', selectAllMakers);
-    content.querySelector('#swap-with-makers').addEventListener('click', swapWithSelectedMakers);
+  container.appendChild(content);
 
-    // Initial load
-    fetchMakers();
+  content
+    .querySelector('#refresh-market-btn')
+    .addEventListener('click', handleRefresh);
+  content
+    .querySelector('#select-all-makers')
+    .addEventListener('change', selectAllMakers);
+  content
+    .querySelector('#swap-with-makers')
+    .addEventListener('click', swapWithSelectedMakers);
+
+  // Initial load
+  fetchMakers();
 }

@@ -135,7 +135,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="text" 
                     id="setup-zmq-rawblock"
-                    value="tcp://127.0.0.1:29332"
+                    value="tcp://127.0.0.1:28332"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
                   />
                 </div>
@@ -167,7 +167,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 rpcpassword=password<br/>
                 rpcport=18443<br/>
                 rpcallowip=127.0.0.1<br/>
-                zmqpubrawblock=tcp://127.0.0.1:29332<br/>
+                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
                 zmqpubrawtx=tcp://127.0.0.1:28333
               </div>
             </div>
@@ -401,7 +401,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="number" 
                     id="setup-tor-control-port"
-                    value="9053"
+                    value="9051"
                     min="1024"
                     max="65535"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -413,7 +413,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="number" 
                     id="setup-tor-socks-port"
-                    value="9052"
+                    value="9050"
                     min="1024"
                     max="65535"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"

@@ -50,7 +50,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="number" 
                                 id="tor-control-port-input"
-                                value="9053"
+                                value="9051"
                                 min="1024"
                                 max="65535"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -63,7 +63,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="number" 
                                 id="tor-socks-port-input"
-                                value="9052"
+                                value="9050"
                                 min="1024"
                                 max="65535"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -214,7 +214,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="text" 
                                 id="zmq-rawblock-input"
-                                value="tcp://127.0.0.1:29332"
+                                value="tcp://127.0.0.1:28332"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <p class="text-xs text-gray-500 mt-1">ZMQ endpoint for raw block notifications</p>
@@ -225,7 +225,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="text" 
                                 id="zmq-rawtx-input"
-                                value="tcp://127.0.0.1:29332"
+                                value="tcp://127.0.0.1:28332"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <p class="text-xs text-gray-500 mt-1">ZMQ endpoint for raw transaction notifications</p>
@@ -250,8 +250,8 @@ export function SettingsComponent(container) {
                         
                         <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300">
                             <div id="zmq-config-preview">
-                                zmqpubrawblock=tcp://127.0.0.1:29332<br/>
-                                zmqpubrawtx=tcp://127.0.0.1:29332
+                                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+                                zmqpubrawtx=tcp://127.0.0.1:28332
                             </div>
                         </div>
                         
@@ -274,27 +274,39 @@ export function SettingsComponent(container) {
                 
                 <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
                     <div id="full-config-preview">
-                        # Network (choose one)<br/>
-                        regtest=1<br/>
-                        # testnet=1<br/>
-                        # mainnet (no flag needed)<br/>
-                        <br/>
-                        # Server settings<br/>
-                        server=1<br/>
-                        txindex=1<br/>
-                        blockfilterindex=1<br/>
-                        <br/>
-                        # RPC settings<br/>
-                        rpcuser=user<br/>
-                        rpcpassword=password<br/>
-                        rpcport=18443<br/>
-                        rpcbind=127.0.0.1<br/>
-                        rpcallowip=127.0.0.1<br/>
-                        <br/>
-                        # ZMQ settings (required for Coinswap)<br/>
-                        zmqpubrawblock=tcp://127.0.0.1:29332<br/>
-                        zmqpubrawtx=tcp://127.0.0.1:29332
-                    </div>
+    # ========================================<br/>
+    # SIGNET CONFIGURATION<br/>
+    # ========================================<br/>
+    [signet]<br/>
+    signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44<br/>
+    rpcuser=user<br/>
+    rpcpassword=password<br/>
+    server=1<br/>
+    txindex=1<br/>
+    blockfilterindex=1<br/>
+    addnode=172.81.178.3:38333<br/>
+    rpcport=38332<br/>
+    rpcbind=127.0.0.1<br/>
+    rpcallowip=127.0.0.1<br/>
+    zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+    zmqpubrawtx=tcp://127.0.0.1:28332<br/>
+    <br/>
+    # ========================================<br/>
+    # REGTEST CONFIGURATION<br/>
+    # ========================================<br/>
+    [regtest]<br/>
+    rpcuser=user<br/>
+    rpcpassword=password<br/>
+    fallbackfee=0.00001000<br/>
+    server=1<br/>
+    txindex=1<br/>
+    blockfilterindex=1<br/>
+    rpcport=18443<br/>
+    rpcbind=127.0.0.1<br/>
+    rpcallowip=127.0.0.1<br/>
+    zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+    zmqpubrawtx=tcp://127.0.0.1:28332
+</div>
                 </div>
                 
                 <button id="copy-full-config-btn" class="mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
@@ -445,26 +457,38 @@ export function SettingsComponent(container) {
     // Update full config preview
     const fullPreview = content.querySelector('#full-config-preview');
     if (fullPreview) {
-      fullPreview.innerHTML = `# Network (choose one)<br/>
-regtest=1<br/>
-# testnet=1<br/>
-# mainnet (no flag needed)<br/>
-<br/>
-# Server settings<br/>
-server=1<br/>
-txindex=1<br/>
-blockfilterindex=1<br/>
-<br/>
-# RPC settings<br/>
-rpcuser=${rpcUser}<br/>
-rpcpassword=${rpcPass}<br/>
-rpcport=${rpcPort}<br/>
-rpcbind=127.0.0.1<br/>
-rpcallowip=127.0.0.1<br/>
-<br/>
-# ZMQ settings (required for Coinswap)<br/>
-zmqpubrawblock=${rawblock}<br/>
-zmqpubrawtx=${rawtx}`;
+      fullPreview.innerHTML = `# ========================================<br/>
+        # SIGNET CONFIGURATION<br/>
+        # ========================================<br/>
+        [signet]<br/>
+        signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44<br/>
+        rpcuser=${rpcUser}<br/>
+        rpcpassword=${rpcPass}<br/>
+        server=1<br/>
+        txindex=1<br/>
+        blockfilterindex=1<br/>
+        addnode=172.81.178.3:38333<br/>
+        rpcport=38332<br/>
+        rpcbind=127.0.0.1<br/>
+        rpcallowip=127.0.0.1<br/>
+        zmqpubrawblock=${rawblock}<br/>
+        zmqpubrawtx=${rawtx}<br/>
+        <br/>
+        # ========================================<br/>
+        # REGTEST CONFIGURATION<br/>
+        # ========================================<br/>
+        [regtest]<br/>
+        rpcuser=${rpcUser}<br/>
+        rpcpassword=${rpcPass}<br/>
+        fallbackfee=0.00001000<br/>
+        server=1<br/>
+        txindex=1<br/>
+        blockfilterindex=1<br/>
+        rpcport=${rpcPort}<br/>
+        rpcbind=127.0.0.1<br/>
+        rpcallowip=127.0.0.1<br/>
+        zmqpubrawblock=${rawblock}<br/>
+        zmqpubrawtx=${rawtx}`;
     }
   }
 
@@ -637,27 +661,38 @@ zmqpubrawtx=${rawtx}`;
         content.querySelector('#rpc-password-input').value || 'password';
       const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
 
-      const configText = `# Network (choose one)
-regtest=1
-# testnet=1
-# mainnet (no flag needed)
-
-# Server settings
+      const configText = `# ========================================
+# SIGNET CONFIGURATION
+# ========================================
+[signet]
+signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44
+rpcuser=${rpcUser}
+rpcpassword=${rpcPass}
 server=1
 txindex=1
 blockfilterindex=1
+addnode=172.81.178.3:38333
+rpcport=38332
+rpcbind=127.0.0.1
+rpcallowip=127.0.0.1
+zmqpubrawblock=${rawblock}
+zmqpubrawtx=${rawtx}
 
-# RPC settings
+# ========================================
+# REGTEST CONFIGURATION
+# ========================================
+[regtest]
 rpcuser=${rpcUser}
 rpcpassword=${rpcPass}
+fallbackfee=0.00001000
+server=1
+txindex=1
+blockfilterindex=1
 rpcport=${rpcPort}
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
-
-# ZMQ settings (required for Coinswap)
 zmqpubrawblock=${rawblock}
 zmqpubrawtx=${rawtx}`;
-
       try {
         await navigator.clipboard.writeText(configText);
         const btn = content.querySelector('#copy-full-config-btn');
@@ -763,6 +798,24 @@ zmqpubrawtx=${rawtx}`;
     return data.result;
   }
 
+  async function testZMQConnection() {
+    const rawblock = content.querySelector('#zmq-rawblock-input').value;
+    const rawtx = content.querySelector('#zmq-rawtx-input').value;
+
+    // Extract port from ZMQ address
+    const portMatch = rawblock.match(/:(\d+)$/);
+    if (!portMatch) {
+      throw new Error('Invalid ZMQ address format');
+    }
+
+    // Just validate format for now - actual ZMQ test would need socket connection
+    if (rawblock !== rawtx) {
+      throw new Error('ZMQ ports must match (both should be 28332)');
+    }
+
+    return { rawblock, rawtx };
+  }
+
   // Test RPC connection
   content
     .querySelector('#test-connection-btn')
@@ -787,7 +840,9 @@ zmqpubrawtx=${rawtx}`;
       } catch (error) {
         console.error('❌ RPC connection failed:', error);
         updateConnectionStatus(false);
-        alert(`Connection failed: ${error.message}`);
+        alert(
+          `RPC Connection failed: ${error.message}\n\nPlease check:\n- Bitcoin Core is running\n- RPC credentials are correct\n- RPC port matches your bitcoin.conf`
+        );
       }
 
       btn.textContent = originalText;
@@ -955,8 +1010,8 @@ zmqpubrawtx=${rawtx}`;
   content.querySelector('#reset-settings-btn').addEventListener('click', () => {
     if (confirm('Are you sure you want to reset all settings to defaults?')) {
       // Reset Tor config fields
-      content.querySelector('#tor-control-port-input').value = '9053';
-      content.querySelector('#tor-socks-port-input').value = '9052';
+      content.querySelector('#tor-control-port-input').value = '9051';
+      content.querySelector('#tor-socks-port-input').value = '9050';
       content.querySelector('#tor-auth-password-input').value = '';
 
       // Reset RPC fields
@@ -967,8 +1022,8 @@ zmqpubrawtx=${rawtx}`;
 
       // Reset ZMQ fields (both to 28332)
       content.querySelector('#zmq-rawblock-input').value =
-        'tcp://127.0.0.1:29332';
-      content.querySelector('#zmq-rawtx-input').value = 'tcp://127.0.0.1:29332';
+        'tcp://127.0.0.1:28332';
+      content.querySelector('#zmq-rawtx-input').value = 'tcp://127.0.0.1:28332';
 
       // Update previews
       updateConfigPreviews();

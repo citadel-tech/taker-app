@@ -92,7 +92,7 @@ ipcMain.handle('taker:initialize', async (event, config) => {
     };
 
     const dataDir = `${process.env.HOME}/.coinswap/taker`;
-    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:29332';
+    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
 
     console.log('🔧 Initializing Taker with config:', {
       dataDir,
@@ -121,7 +121,7 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       dataDir,
       'taker-wallet',
       rpcConfig,
-      9053,
+      9051,
       undefined,
       zmqAddr,
       walletPassword
@@ -665,7 +665,7 @@ ipcMain.handle(
           password: 'password',
           walletName: 'taker-wallet',
         },
-        zmqAddr: 'tcp://127.0.0.1:29332',
+        zmqAddr: 'tcp://127.0.0.1:28332',
         password: password || '',
       };
 

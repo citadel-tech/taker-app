@@ -30,16 +30,19 @@ export function TransactionsListComponent(container) {
     const date = new Date(timestamp * 1000);
     const now = new Date();
     const diffMs = now - date;
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours} hours ago`;
-    if (diffDays < 7) return `${diffDays} days ago`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+
+    if (diffMinutes < 1) return 'Just now';
+    if (diffMinutes < 60)
+      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
+    if (diffHours < 24)
+      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
+    if (diffDays < 7)
+      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
     return date.toLocaleDateString();
   }
-
   function formatFullDate(timestamp) {
     const date = new Date(timestamp * 1000);
     return date.toLocaleString();
@@ -50,16 +53,18 @@ export function TransactionsListComponent(container) {
     const category = (transaction.detail.category || '').toLowerCase();
     const amount = transaction.detail.amount.sats;
     const label = (transaction.detail.label || '').toLowerCase();
-    
+
     // Check various indicators for swap transactions
     // 1. Label contains swap-related keywords
-    if (label.includes('swap') || 
-        label.includes('swapcoin') || 
-        label.includes('coinswap') ||
-        label.includes('watchonly_swapcoin')) {
+    if (
+      label.includes('swap') ||
+      label.includes('swapcoin') ||
+      label.includes('coinswap') ||
+      label.includes('watchonly_swapcoin')
+    ) {
       return 'swap';
     }
-    
+
     // 2. Check if it's a contract transaction (often part of swaps)
     if (label.includes('contract') || label.includes('htlc')) {
       return 'swap';
@@ -73,7 +78,7 @@ export function TransactionsListComponent(container) {
     // 4. Standard receive/send detection
     if (category === 'receive' || category === '"receive"') return 'received';
     if (category === 'send' || category === '"send"') return 'sent';
-    
+
     // 5. Fallback to amount-based detection
     return amount > 0 ? 'received' : 'sent';
   }
@@ -90,27 +95,29 @@ export function TransactionsListComponent(container) {
   function getFilteredTransactions() {
     // First sort all transactions
     const sorted = sortTransactionsByTime(allTransactions);
-    
+
     if (currentFilter === 'all') {
       return sorted;
     } else if (currentFilter === 'received') {
-      return sorted.filter(tx => getTransactionType(tx) === 'received');
+      return sorted.filter((tx) => getTransactionType(tx) === 'received');
     } else if (currentFilter === 'sent') {
-      return sorted.filter(tx => getTransactionType(tx) === 'sent');
+      return sorted.filter((tx) => getTransactionType(tx) === 'sent');
     } else if (currentFilter === 'swaps') {
-      return sorted.filter(tx => getTransactionType(tx) === 'swap');
+      return sorted.filter((tx) => getTransactionType(tx) === 'swap');
     }
     return sorted;
   }
 
   function updateFilterButtons() {
     const buttons = content.querySelectorAll('.filter-btn');
-    buttons.forEach(btn => {
+    buttons.forEach((btn) => {
       const filter = btn.dataset.filter;
       if (filter === currentFilter) {
-        btn.className = 'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
+        btn.className =
+          'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
       } else {
-        btn.className = 'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
+        btn.className =
+          'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
       }
     });
   }
@@ -145,18 +152,29 @@ export function TransactionsListComponent(container) {
 
   function getStatusBadge(confirmations) {
     if (confirmations === 0) {
-      return { text: 'Unconfirmed', class: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' };
+      return {
+        text: 'Unconfirmed',
+        class: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+      };
     } else if (confirmations >= 6) {
-      return { text: 'Confirmed', class: 'bg-green-500/20 text-green-400 border border-green-500/30' };
+      return {
+        text: 'Confirmed',
+        class: 'bg-green-500/20 text-green-400 border border-green-500/30',
+      };
     } else {
-      return { text: `${confirmations}/6 conf`, class: 'bg-blue-500/20 text-blue-400 border border-blue-500/30' };
+      return {
+        text: `${confirmations}/6 conf`,
+        class: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+      };
     }
   }
 
   function renderTransactions() {
     const filteredTransactions = getFilteredTransactions();
-    const transactionContainer = content.querySelector('#transaction-container');
-    
+    const transactionContainer = content.querySelector(
+      '#transaction-container'
+    );
+
     if (filteredTransactions.length === 0) {
       transactionContainer.innerHTML = `
         <div class="text-center py-12">
@@ -168,16 +186,18 @@ export function TransactionsListComponent(container) {
       return;
     }
 
-    transactionContainer.innerHTML = filteredTransactions.map((tx, index) => {
-      const type = getTransactionType(tx);
-      const iconData = getTransactionIcon(type);
-      const amountData = formatAmount(tx.detail.amount.sats);
-      const statusBadge = getStatusBadge(tx.info.confirmations);
-      const txid = typeof tx.info.txid === 'object' ? tx.info.txid.hex : tx.info.txid;
-      const timestamp = tx.info.time || tx.info.timereceived;
-      const label = tx.detail.label || '';
-      
-      return `
+    transactionContainer.innerHTML = filteredTransactions
+      .map((tx, index) => {
+        const type = getTransactionType(tx);
+        const iconData = getTransactionIcon(type);
+        const amountData = formatAmount(tx.detail.amount.sats);
+        const statusBadge = getStatusBadge(tx.info.confirmations);
+        const txid =
+          typeof tx.info.txid === 'object' ? tx.info.txid.hex : tx.info.txid;
+        const timestamp = tx.info.time || tx.info.timereceived;
+        const label = tx.detail.label || '';
+
+        return `
         <div class="flex items-center justify-between p-4 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg transition-colors group">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-${iconData.bg}-500/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -207,44 +227,55 @@ export function TransactionsListComponent(container) {
             </div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   function getFilterStats() {
-    const received = allTransactions.filter(tx => getTransactionType(tx) === 'received');
-    const sent = allTransactions.filter(tx => getTransactionType(tx) === 'sent');
-    const swaps = allTransactions.filter(tx => getTransactionType(tx) === 'swap');
-    
+    const received = allTransactions.filter(
+      (tx) => getTransactionType(tx) === 'received'
+    );
+    const sent = allTransactions.filter(
+      (tx) => getTransactionType(tx) === 'sent'
+    );
+    const swaps = allTransactions.filter(
+      (tx) => getTransactionType(tx) === 'swap'
+    );
+
     return {
       all: allTransactions.length,
       received: received.length,
       sent: sent.length,
-      swaps: swaps.length
+      swaps: swaps.length,
     };
   }
 
   function calculateTotals() {
     const totalReceived = allTransactions
-      .filter(tx => tx.detail.amount.sats > 0)
+      .filter((tx) => tx.detail.amount.sats > 0)
       .reduce((sum, tx) => sum + tx.detail.amount.sats, 0);
-    
-    const totalSent = Math.abs(allTransactions
-      .filter(tx => tx.detail.amount.sats < 0)
-      .reduce((sum, tx) => sum + tx.detail.amount.sats, 0));
-    
+
+    const totalSent = Math.abs(
+      allTransactions
+        .filter((tx) => tx.detail.amount.sats < 0)
+        .reduce((sum, tx) => sum + tx.detail.amount.sats, 0)
+    );
+
     const netBalance = totalReceived - totalSent;
-    
+
     return {
       totalReceived: satsToBtc(totalReceived),
       totalSent: satsToBtc(totalSent),
-      netBalance: satsToBtc(netBalance)
+      netBalance: satsToBtc(netBalance),
     };
   }
 
   async function loadTransactions() {
     const refreshBtn = content.querySelector('#refresh-transactions-btn');
-    const transactionContainer = content.querySelector('#transaction-container');
-    
+    const transactionContainer = content.querySelector(
+      '#transaction-container'
+    );
+
     // Show loading state
     transactionContainer.innerHTML = `
       <div class="text-center py-12">
@@ -252,30 +283,33 @@ export function TransactionsListComponent(container) {
         <p class="text-gray-400">Loading transactions...</p>
       </div>
     `;
-    
+
     if (refreshBtn) {
       refreshBtn.textContent = 'Loading...';
       refreshBtn.disabled = true;
     }
-    
+
     try {
       allTransactions = await fetchTransactions(100); // Load more transactions
-      
+
       // Debug: log transaction types to help identify swap detection
       console.log('📊 Transaction breakdown:');
       allTransactions.forEach((tx, i) => {
         const type = getTransactionType(tx);
         const label = tx.detail.label || 'no label';
         const category = tx.detail.category;
-        if (i < 10) { // Log first 10 for debugging
-          console.log(`  ${i}: type=${type}, category=${category}, label=${label}`);
+        if (i < 10) {
+          // Log first 10 for debugging
+          console.log(
+            `  ${i}: type=${type}, category=${category}, label=${label}`
+          );
         }
       });
-      
+
       updateStats();
       renderTransactions();
       console.log('✅ Transactions loaded:', allTransactions.length);
-      
+
       if (refreshBtn) {
         refreshBtn.textContent = 'Refreshed!';
         setTimeout(() => {
@@ -303,18 +337,21 @@ export function TransactionsListComponent(container) {
   function updateStats() {
     const stats = getFilterStats();
     const totals = calculateTotals();
-    
+
     // Update filter button counts
     content.querySelector('#filter-all-count').textContent = stats.all;
-    content.querySelector('#filter-received-count').textContent = stats.received;
+    content.querySelector('#filter-received-count').textContent =
+      stats.received;
     content.querySelector('#filter-sent-count').textContent = stats.sent;
     content.querySelector('#filter-swaps-count').textContent = stats.swaps;
-    
+
     // Update stats cards
     content.querySelector('#total-transactions').textContent = stats.all;
-    content.querySelector('#total-received').textContent = totals.totalReceived + ' BTC';
-    content.querySelector('#total-sent').textContent = totals.totalSent + ' BTC';
-    
+    content.querySelector('#total-received').textContent =
+      totals.totalReceived + ' BTC';
+    content.querySelector('#total-sent').textContent =
+      totals.totalSent + ' BTC';
+
     const netEl = content.querySelector('#net-balance');
     const netValue = parseFloat(totals.netBalance);
     netEl.textContent = (netValue >= 0 ? '+' : '') + totals.netBalance + ' BTC';
@@ -417,33 +454,40 @@ export function TransactionsListComponent(container) {
   };
 
   // Event handlers
-  content.querySelector('#refresh-transactions-btn').addEventListener('click', loadTransactions);
+  content
+    .querySelector('#refresh-transactions-btn')
+    .addEventListener('click', loadTransactions);
 
   // Load more handler
-  content.querySelector('#load-more-btn').addEventListener('click', async () => {
-    const btn = content.querySelector('#load-more-btn');
-    btn.textContent = 'Loading...';
-    btn.disabled = true;
-    
-    try {
-      const moreTransactions = await fetchTransactions(50, allTransactions.length);
-      if (moreTransactions.length > 0) {
-        allTransactions = [...allTransactions, ...moreTransactions];
-        updateStats();
-        renderTransactions();
-        btn.textContent = 'Load More Transactions';
-      } else {
-        btn.textContent = 'No More Transactions';
+  content
+    .querySelector('#load-more-btn')
+    .addEventListener('click', async () => {
+      const btn = content.querySelector('#load-more-btn');
+      btn.textContent = 'Loading...';
+      btn.disabled = true;
+
+      try {
+        const moreTransactions = await fetchTransactions(
+          50,
+          allTransactions.length
+        );
+        if (moreTransactions.length > 0) {
+          allTransactions = [...allTransactions, ...moreTransactions];
+          updateStats();
+          renderTransactions();
+          btn.textContent = 'Load More Transactions';
+        } else {
+          btn.textContent = 'No More Transactions';
+        }
+      } catch (error) {
+        btn.textContent = 'Load Failed - Retry';
       }
-    } catch (error) {
-      btn.textContent = 'Load Failed - Retry';
-    }
-    btn.disabled = false;
-  });
+      btn.disabled = false;
+    });
 
   // Add filter button event listeners
   const filterButtons = content.querySelectorAll('.filter-btn');
-  filterButtons.forEach(button => {
+  filterButtons.forEach((button) => {
     button.addEventListener('click', () => {
       const filter = button.dataset.filter;
       setFilter(filter);
