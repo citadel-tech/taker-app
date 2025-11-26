@@ -13,13 +13,18 @@ contextBridge.exposeInMainWorld('api', {
     getNextAddress: () => ipcRenderer.invoke('taker:getNextAddress'),
     sync: () => ipcRenderer.invoke('taker:sync'),
     syncOfferbook: () => ipcRenderer.invoke('taker:syncOfferbook'),
-    getSyncStatus: (syncId) => ipcRenderer.invoke('taker:getSyncStatus', syncId),
+    getSyncStatus: (syncId) =>
+      ipcRenderer.invoke('taker:getSyncStatus', syncId),
     getOffers: () => ipcRenderer.invoke('taker:getOffers'),
     getGoodMakers: () => ipcRenderer.invoke('taker:getGoodMakers'),
-    getTransactions: (count, skip) => ipcRenderer.invoke('taker:getTransactions', { count, skip }),
+    getTransactions: (count, skip) =>
+      ipcRenderer.invoke('taker:getTransactions', { count, skip }),
     getUtxos: () => ipcRenderer.invoke('taker:getUtxos'),
-    sendToAddress: (address, amount) => ipcRenderer.invoke('taker:sendToAddress', { address, amount }),
+    sendToAddress: (address, amount) =>
+      ipcRenderer.invoke('taker:sendToAddress', { address, amount }),
     recover: () => ipcRenderer.invoke('taker:recover'),
+    isWalletEncrypted: (walletPath) =>
+      ipcRenderer.invoke('taker:isWalletEncrypted', walletPath),
   },
 
   // Coinswap operations
@@ -32,4 +37,10 @@ contextBridge.exposeInMainWorld('api', {
   logs: {
     get: (lines) => ipcRenderer.invoke('logs:get', lines),
   },
+
+  // File dialogs - TOP LEVEL, NOT INSIDE TAKER!
+  openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
+  saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),
+  restoreWallet: (data) => ipcRenderer.invoke('taker:restore', data),
+  backupWallet: (data) => ipcRenderer.invoke('taker:backup', data),
 });

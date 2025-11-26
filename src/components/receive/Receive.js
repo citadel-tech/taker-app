@@ -54,28 +54,10 @@ export function ReceiveComponent(container) {
             <!-- Right: Info & Recent Addresses -->
             <div class="space-y-6">
                 <!-- Info Card -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">How to Receive</h3>
-                    <div class="space-y-3 text-sm text-gray-400">
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">1.</span>
-                            <p>Share your Bitcoin address or QR code with the sender</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">2.</span>
-                            <p>Wait for the transaction to be broadcast to the network</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">3.</span>
-                            <p>Funds will appear after network confirmation (~10 minutes)</p>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <p class="text-xs text-blue-400">
-                            💡 Each address can be reused, but generating new addresses improves privacy
-                        </p>
-                    </div>
+                <div class="mt-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+                  <p class="text-xs text-red-400">
+                      ⚠️ <strong>PRIVACY WARNING:</strong> Reusing addresses can cause significant privacy reduction. Always generate a fresh address for each transaction to maintain anonymity.
+                  </p>
                 </div>
 
                 <!-- Address Status Card -->
@@ -205,8 +187,9 @@ export function ReceiveComponent(container) {
     const createdDate = new Date(addressData.createdAt);
     generationTime.textContent = createdDate.toLocaleTimeString();
     usageCount.textContent = addressData.used.toString();
-    totalReceived.textContent = (addressData.received / 100000000).toFixed(8) + ' BTC';
-    
+    totalReceived.textContent =
+      (addressData.received / 100000000).toFixed(8) + ' BTC';
+
     // Status
     if (addressData.used === 0) {
       addressStatusText.textContent = 'Unused';
@@ -221,13 +204,15 @@ export function ReceiveComponent(container) {
 
     // Address type badge
     const typeColors = {
-      'P2WPKH': 'bg-green-500/20 text-green-400 border-green-500/30',
-      'P2WSH': 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      'P2TR': 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-      'P2PKH': 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      'P2SH': 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+      P2WPKH: 'bg-green-500/20 text-green-400 border-green-500/30',
+      P2WSH: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+      P2TR: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
+      P2PKH: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+      P2SH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
     };
-    const colorClass = typeColors[addressData.type] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+    const colorClass =
+      typeColors[addressData.type] ||
+      'bg-gray-500/20 text-gray-400 border-gray-500/30';
     addressTypeBadge.className = `text-xs px-2 py-1 rounded border ${colorClass}`;
     addressTypeBadge.textContent = addressData.type;
   }
@@ -248,17 +233,18 @@ export function ReceiveComponent(container) {
 
     // Show last 5 addresses
     const recentAddresses = addresses.slice(0, 5);
-    
-    recentAddressesEl.innerHTML = recentAddresses.map((addr, index) => {
-      const isCurrent = addr.address === currentAddress;
-      const typeColors = {
-        'P2WPKH': 'text-green-400',
-        'P2WSH': 'text-blue-400',
-        'P2TR': 'text-purple-400'
-      };
-      const typeColor = typeColors[addr.type] || 'text-gray-400';
-      
-      return `
+
+    recentAddressesEl.innerHTML = recentAddresses
+      .map((addr, index) => {
+        const isCurrent = addr.address === currentAddress;
+        const typeColors = {
+          P2WPKH: 'text-green-400',
+          P2WSH: 'text-blue-400',
+          P2TR: 'text-purple-400',
+        };
+        const typeColor = typeColors[addr.type] || 'text-gray-400';
+
+        return `
         <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-[#FF6B35]/10 border border-[#FF6B35]/30' : 'bg-[#0f1419] hover:bg-[#242d3d]'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
@@ -278,15 +264,18 @@ export function ReceiveComponent(container) {
           </div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
 
     // Add click handlers to switch to that address
-    recentAddressesEl.querySelectorAll('.recent-address-item').forEach(item => {
-      item.addEventListener('click', () => {
-        const address = item.dataset.address;
-        selectAddress(address);
+    recentAddressesEl
+      .querySelectorAll('.recent-address-item')
+      .forEach((item) => {
+        item.addEventListener('click', () => {
+          const address = item.dataset.address;
+          selectAddress(address);
+        });
       });
-    });
   }
 
   // Select an existing address
@@ -295,7 +284,7 @@ export function ReceiveComponent(container) {
     currentAddressEl.textContent = addressString;
     copyButton.disabled = false;
     generateQR(addressString);
-    
+
     const addressData = AddressStorage.getAddress(addressString);
     updateAddressStatus(addressData);
     updateRecentAddresses();
@@ -324,9 +313,10 @@ export function ReceiveComponent(container) {
 
       if (result.success && result.address) {
         // Handle both string and object address formats
-        const addressString = typeof result.address === 'string'
-          ? result.address
-          : result.address.address;
+        const addressString =
+          typeof result.address === 'string'
+            ? result.address
+            : result.address.address;
 
         currentAddress = addressString;
         currentAddressEl.textContent = addressString;
@@ -367,28 +357,28 @@ export function ReceiveComponent(container) {
   }
 
   // Initialize - always generate a new address on page load
-async function initialize() {
-  try {
-    // Always generate a new address
-    await generateNewAddress();
+  async function initialize() {
+    try {
+      // Always generate a new address
+      await generateNewAddress();
 
-    // Update recent addresses list
-    updateRecentAddresses();
+      // Update recent addresses list
+      updateRecentAddresses();
 
-    // Enable generate button
-    generateButton.disabled = false;
-  } catch (error) {
-    console.error('❌ Initialization failed:', error);
-    currentAddressEl.textContent = 'Failed to initialize';
-    qrContainer.innerHTML = `
+      // Enable generate button
+      generateButton.disabled = false;
+    } catch (error) {
+      console.error('❌ Initialization failed:', error);
+      currentAddressEl.textContent = 'Failed to initialize';
+      qrContainer.innerHTML = `
       <div class="text-center text-red-400 p-4">
         <p class="text-2xl mb-2">❌</p>
         <p class="text-sm">Initialization failed</p>
         <button onclick="location.reload()" class="mt-2 text-xs underline">Retry</button>
       </div>
     `;
+    }
   }
-}
 
   // Event listeners
   copyButton.addEventListener('click', () => {
@@ -403,13 +393,15 @@ async function initialize() {
   const viewAllButton = content.querySelector('#view-all-addresses');
   if (viewAllButton) {
     viewAllButton.addEventListener('click', () => {
-      import('./AddressList.js').then((module) => {
-        container.innerHTML = '';
-        module.AddressListComponent(container);
-      }).catch((err) => {
-        console.error('Failed to load AddressList:', err);
-        alert('Address list feature loading...');
-      });
+      import('./AddressList.js')
+        .then((module) => {
+          container.innerHTML = '';
+          module.AddressListComponent(container);
+        })
+        .catch((err) => {
+          console.error('Failed to load AddressList:', err);
+          alert('Address list feature loading...');
+        });
     });
   }
 

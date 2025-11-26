@@ -14,20 +14,19 @@ export function SwapComponent(container) {
 
   // If there's an active swap in progress, redirect to coinswap progress
   if (activeSwap && activeSwap.status === 'configured') {
-  const age = Date.now() - activeSwap.createdAt;
-  if (age > 5 * 60 * 1000) {
-    console.log('🧹 Clearing stale configured swap');
-    SwapStateManager.clearSwapData();
-  } else {
-    console.log('🔄 Active swap detected, redirecting to progress view');
-    import('./Coinswap.js').then((module) => {
-      container.innerHTML = '';
-      module.CoinswapComponent(container, activeSwap);
-    });
-    return; // Exit early, don't render the config page
+    const age = Date.now() - activeSwap.createdAt;
+    if (age > 5 * 60 * 1000) {
+      console.log('🧹 Clearing stale configured swap');
+      SwapStateManager.clearSwapData();
+    } else {
+      console.log('🔄 Active swap detected, redirecting to progress view');
+      import('./Coinswap.js').then((module) => {
+        container.innerHTML = '';
+        module.CoinswapComponent(container, activeSwap);
+      });
+      return; // Exit early, don't render the config page
+    }
   }
-}
-
 
   // STATE
   let swapAmount = 0;
@@ -73,14 +72,15 @@ export function SwapComponent(container) {
         availableUtxos = data.utxos.map((item, index) => {
           const utxo = item.utxo || item;
           const spendInfo = item.spendInfo || {};
-          const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+          const txid =
+            typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
 
           return {
             txid: txid,
             vout: utxo.vout,
             amount: utxo.amount,
             type: spendInfo.spendType || 'SeedCoin',
-            index: index
+            index: index,
           };
         });
         console.log('✅ Loaded', availableUtxos.length, 'UTXOs for swap');
@@ -103,7 +103,7 @@ export function SwapComponent(container) {
             minSize: offer.minSize || 0,
             maxSize: offer.maxSize || 0,
             fee: (offer.amountRelativeFeePct || 0).toFixed(1),
-            index: index
+            index: index,
           };
         });
         console.log('✅ Loaded', availableMakers.length, 'makers for swap');
@@ -136,7 +136,8 @@ export function SwapComponent(container) {
           balanceEl.textContent = totalBalance.toLocaleString() + ' sats';
         }
         if (balanceBtcEl) {
-          balanceBtcEl.textContent = (totalBalance / 100000000).toFixed(8) + ' BTC';
+          balanceBtcEl.textContent =
+            (totalBalance / 100000000).toFixed(8) + ' BTC';
         }
       }
     } catch (error) {
@@ -150,17 +151,24 @@ export function SwapComponent(container) {
     if (!utxoListContainer) return;
 
     if (availableUtxos.length === 0) {
-      utxoListContainer.innerHTML = '<p class="text-gray-400 text-center py-4">No UTXOs available</p>';
+      utxoListContainer.innerHTML =
+        '<p class="text-gray-400 text-center py-4">No UTXOs available</p>';
       return;
     }
 
-    utxoListContainer.innerHTML = availableUtxos.map((utxo, index) => {
-      const btcAmount = (utxo.amount / 100000000).toFixed(8);
-      const usdAmount = ((utxo.amount / 100000000) * btcPrice).toFixed(2);
-      const timestamps = ['2 hours ago', '1 day ago', '3 days ago', '1 week ago'];
-      const timestamp = timestamps[index] || '1 month ago';
+    utxoListContainer.innerHTML = availableUtxos
+      .map((utxo, index) => {
+        const btcAmount = (utxo.amount / 100000000).toFixed(8);
+        const usdAmount = ((utxo.amount / 100000000) * btcPrice).toFixed(2);
+        const timestamps = [
+          '2 hours ago',
+          '1 day ago',
+          '3 days ago',
+          '1 week ago',
+        ];
+        const timestamp = timestamps[index] || '1 month ago';
 
-      return `
+        return `
         <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
           <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-[#FF6B35]" />
           <div class="flex-1">
@@ -178,7 +186,8 @@ export function SwapComponent(container) {
           </div>
         </label>
       `;
-    }).join('');
+      })
+      .join('');
 
     // Re-attach event listeners
     availableUtxos.forEach((_, index) => {
@@ -194,7 +203,9 @@ export function SwapComponent(container) {
 
   // Render Recent Swaps section
   function renderRecentSwaps() {
-    const recentSwapsContainer = content.querySelector('#recent-swaps-container');
+    const recentSwapsContainer = content.querySelector(
+      '#recent-swaps-container'
+    );
     if (!recentSwapsContainer) return;
 
     const recentSwaps = SwapStateManager.getRecentSwaps(5);
@@ -210,11 +221,12 @@ export function SwapComponent(container) {
       return;
     }
 
-    recentSwapsContainer.innerHTML = recentSwaps.map((swap) => {
-      const btcAmount = (swap.amount / 100000000).toFixed(8);
-      const timeAgo = formatRelativeTime(swap.completedAt);
+    recentSwapsContainer.innerHTML = recentSwaps
+      .map((swap) => {
+        const btcAmount = (swap.amount / 100000000).toFixed(8);
+        const timeAgo = formatRelativeTime(swap.completedAt);
 
-      return `
+        return `
         <div class="swap-history-item flex items-center gap-4 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-4 cursor-pointer transition-colors" data-swap-id="${swap.id}">
           <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
             <span class="text-green-400">✓</span>
@@ -231,7 +243,8 @@ export function SwapComponent(container) {
           </div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
 
     // Add click handlers for swap history items
     content.querySelectorAll('.swap-history-item').forEach((item) => {
@@ -308,7 +321,7 @@ export function SwapComponent(container) {
       makerFeeSats: Math.floor(makerFee),
       networkFeeSats: Math.floor(networkFee),
       totalFeeSats: Math.floor(totalFee),
-      makerFeePercent: makerFeePercent.toFixed(2)
+      makerFeePercent: makerFeePercent.toFixed(2),
     };
   }
 
@@ -378,7 +391,8 @@ export function SwapComponent(container) {
     const selectedUtxosDisplay = content.querySelector('#selected-utxos-total');
     if (selectedUtxosDisplay) {
       if (selectionMode === 'manual' && selectedUtxos.length > 0) {
-        selectedUtxosDisplay.textContent = selectedTotal.toLocaleString() + ' sats';
+        selectedUtxosDisplay.textContent =
+          selectedTotal.toLocaleString() + ' sats';
         selectedUtxosDisplay.parentElement.classList.remove('hidden');
       } else {
         selectedUtxosDisplay.parentElement.classList.add('hidden');
@@ -426,12 +440,14 @@ export function SwapComponent(container) {
       if (selectedUtxos.length === 0) {
         warnings.push('Select at least one UTXO');
       }
-      
+
       // Check if receive amount is too small after fees
       const details = calculateSwapDetails();
       const receiveAmount = swapAmount - details.totalFeeSats;
       if (selectedUtxos.length > 0 && receiveAmount < 10000) {
-        warnings.push('Receive amount too small after fees. Select more UTXOs or fewer hops.');
+        warnings.push(
+          'Receive amount too small after fees. Select more UTXOs or fewer hops.'
+        );
       }
     } else {
       // Auto mode validations
@@ -441,13 +457,17 @@ export function SwapComponent(container) {
 
       // Check if amount exceeds balance
       if (swapAmount > totalBalance && totalBalance > 0) {
-        warnings.push(`Swap amount (${swapAmount.toLocaleString()} sats) exceeds available balance`);
+        warnings.push(
+          `Swap amount (${swapAmount.toLocaleString()} sats) exceeds available balance`
+        );
       }
     }
 
     // Check if enough makers available
     if (availableMakers.length > 0 && makersNeeded > availableMakers.length) {
-      warnings.push(`Need ${makersNeeded} makers for ${getNumberOfHops()} hops, but only ${availableMakers.length} available`);
+      warnings.push(
+        `Need ${makersNeeded} makers for ${getNumberOfHops()} hops, but only ${availableMakers.length} available`
+      );
     }
 
     // Check custom hops validity
@@ -457,19 +477,25 @@ export function SwapComponent(container) {
 
     // Check maker liquidity limits
     if (availableMakers.length > 0 && swapAmount > 0) {
-      const maxMakerSize = Math.max(...availableMakers.map(m => m.maxSize));
+      const maxMakerSize = Math.max(...availableMakers.map((m) => m.maxSize));
       if (swapAmount > maxMakerSize) {
-        warnings.push(`Swap amount exceeds maker max size (${maxMakerSize.toLocaleString()} sats)`);
+        warnings.push(
+          `Swap amount exceeds maker max size (${maxMakerSize.toLocaleString()} sats)`
+        );
       }
 
-      const minMakerSize = Math.min(...availableMakers.map(m => m.minSize));
+      const minMakerSize = Math.min(...availableMakers.map((m) => m.minSize));
       if (swapAmount < minMakerSize) {
-        warnings.push(`Swap amount below maker minimum (${minMakerSize.toLocaleString()} sats)`);
+        warnings.push(
+          `Swap amount below maker minimum (${minMakerSize.toLocaleString()} sats)`
+        );
       }
     }
 
     if (warnings.length > 0) {
-      warningEl.innerHTML = warnings.map(w => `<p class="text-xs text-yellow-400">⚠️ ${w}</p>`).join('');
+      warningEl.innerHTML = warnings
+        .map((w) => `<p class="text-xs text-yellow-400">⚠️ ${w}</p>`)
+        .join('');
       warningEl.classList.remove('hidden');
       startBtn.disabled = true;
       startBtn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -515,11 +541,15 @@ export function SwapComponent(container) {
     if (useCustomHops) {
       content.querySelector('#hop-custom').className =
         'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
-      content.querySelector('#custom-hop-input-container').classList.remove('hidden');
+      content
+        .querySelector('#custom-hop-input-container')
+        .classList.remove('hidden');
     } else {
       content.querySelector('#hop-' + count).className =
         'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
-      content.querySelector('#custom-hop-input-container').classList.add('hidden');
+      content
+        .querySelector('#custom-hop-input-container')
+        .classList.add('hidden');
     }
 
     updateSummary();
@@ -558,9 +588,11 @@ export function SwapComponent(container) {
       return;
     }
 
-    const types = selectedUtxos.map((index) => availableUtxos[index]?.type || '');
-    const hasRegular = types.some(t => !t.includes('Swap'));
-    const hasSwap = types.some(t => t.includes('Swap'));
+    const types = selectedUtxos.map(
+      (index) => availableUtxos[index]?.type || ''
+    );
+    const hasRegular = types.some((t) => !t.includes('Swap'));
+    const hasSwap = types.some((t) => t.includes('Swap'));
 
     if (hasRegular && hasSwap) {
       warningEl.classList.remove('hidden');
@@ -601,7 +633,7 @@ export function SwapComponent(container) {
 
     // Also check maker max size
     if (availableMakers.length > 0) {
-      const maxMakerSize = Math.max(...availableMakers.map(m => m.maxSize));
+      const maxMakerSize = Math.max(...availableMakers.map((m) => m.maxSize));
       swapAmount = Math.min(swapAmount, maxMakerSize);
     }
 
@@ -627,7 +659,7 @@ export function SwapComponent(container) {
       selectedUtxos,
       useCustomHops,
       customHopCount,
-      networkFeeRate
+      networkFeeRate,
     };
     console.log('💾 Saving current selections:', selections);
     SwapStateManager.saveUserSelections(selections);
@@ -869,7 +901,9 @@ export function SwapComponent(container) {
     saveCurrentSelections();
   });
 
-  content.querySelector('#max-swap-btn').addEventListener('click', setMaxAmount);
+  content
+    .querySelector('#max-swap-btn')
+    .addEventListener('click', setMaxAmount);
 
   content.querySelector('#unit-sats').addEventListener('click', () => {
     switchUnit('sats');
@@ -928,89 +962,94 @@ export function SwapComponent(container) {
     });
   });
 
-  content.querySelector('#start-coinswap-btn').addEventListener('click', async () => {
-    console.log('🚀 Start Coinswap button clicked');
+  content
+    .querySelector('#start-coinswap-btn')
+    .addEventListener('click', async () => {
+      console.log('🚀 Start Coinswap button clicked');
 
-    // Final validation
-    if (swapAmount <= 0) {
-      alert('Please enter a valid swap amount or select UTXOs');
-      return;
-    }
-
-    if (selectionMode === 'manual' && selectedUtxos.length === 0) {
-      alert('Please select at least one UTXO');
-      return;
-    }
-
-    const swapConfig = {
-      amount: swapAmount,
-      makers: getNumberOfMakers(),
-      hops: getNumberOfHops(),
-      selectionMode: selectionMode,
-      selectedUtxos: selectedUtxos,
-      amountUnit: amountUnit,
-      numberOfHops: numberOfHops,
-      useCustomHops: useCustomHops,
-      customHopCount: customHopCount,
-      networkFeeRate: networkFeeRate,
-      startTime: Date.now()
-    };
-
-    console.log('💾 Saving swap configuration:', swapConfig);
-
-    const startBtn = content.querySelector('#start-coinswap-btn');
-    startBtn.disabled = true;
-    startBtn.textContent = 'Starting...';
-    startBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-    try {
-      // IPC call to start coinswap
-      const result = await window.api.coinswap.start({
-        amount: swapAmount,
-        makerCount: swapConfig.makers,
-        outpoints: selectionMode === 'manual' && selectedUtxos.length > 0
-          ? selectedUtxos.map(i => ({
-            txid: availableUtxos[i].txid,
-            vout: availableUtxos[i].vout
-          }))
-          : undefined
-      });
-
-      if (!result.success) {
-        alert('Failed to start swap: ' + result.error);
-        startBtn.disabled = false;
-        startBtn.textContent = 'Start Coinswap';
-        startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      // Final validation
+      if (swapAmount <= 0) {
+        alert('Please enter a valid swap amount or select UTXOs');
         return;
       }
 
-      console.log('✅ Swap started with ID:', result.swapId);
-
-      swapConfig.swapId = result.swapId;
-      SwapStateManager.saveSwapConfig(swapConfig);
-
-      if (window.appManager) {
-        console.log('🔄 Starting background swap manager');
-        window.appManager.startBackgroundSwapManager();
+      if (selectionMode === 'manual' && selectedUtxos.length === 0) {
+        alert('Please select at least one UTXO');
+        return;
       }
 
-      console.log('🔀 Navigating to Coinswap component');
-      import('./Coinswap.js').then((module) => {
-        container.innerHTML = '';
-        module.CoinswapComponent(container, swapConfig);
-      });
+      const swapConfig = {
+        amount: swapAmount,
+        makers: getNumberOfMakers(),
+        hops: getNumberOfHops(),
+        selectionMode: selectionMode,
+        selectedUtxos: selectedUtxos,
+        amountUnit: amountUnit,
+        numberOfHops: numberOfHops,
+        useCustomHops: useCustomHops,
+        customHopCount: customHopCount,
+        networkFeeRate: networkFeeRate,
+        startTime: Date.now(),
+      };
 
-    } catch (error) {
-      console.error('❌ Failed to start coinswap:', error);
-      alert('Failed to start coinswap: ' + error.message);
-      startBtn.disabled = false;
-      startBtn.textContent = 'Start Coinswap';
-      startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-    }
-  });
+      console.log('💾 Saving swap configuration:', swapConfig);
+
+      const startBtn = content.querySelector('#start-coinswap-btn');
+      startBtn.disabled = true;
+      startBtn.textContent = 'Starting...';
+      startBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+      try {
+        // IPC call to start coinswap
+        const result = await window.api.coinswap.start({
+          amount: swapAmount,
+          makerCount: swapConfig.makers,
+          outpoints:
+            selectionMode === 'manual' && selectedUtxos.length > 0
+              ? selectedUtxos.map((i) => ({
+                  txid: availableUtxos[i].txid,
+                  vout: availableUtxos[i].vout,
+                }))
+              : undefined,
+          password: localStorage.getItem('coinswap_config')
+            ? JSON.parse(localStorage.getItem('coinswap_config')).wallet
+                ?.password || ''
+            : '', // ← ADD THIS
+        });
+        if (!result.success) {
+          alert('Failed to start swap: ' + result.error);
+          startBtn.disabled = false;
+          startBtn.textContent = 'Start Coinswap';
+          startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          return;
+        }
+
+        console.log('✅ Swap started with ID:', result.swapId);
+
+        swapConfig.swapId = result.swapId;
+        SwapStateManager.saveSwapConfig(swapConfig);
+
+        if (window.appManager) {
+          console.log('🔄 Starting background swap manager');
+          window.appManager.startBackgroundSwapManager();
+        }
+
+        console.log('🔀 Navigating to Coinswap component');
+        import('./Coinswap.js').then((module) => {
+          container.innerHTML = '';
+          module.CoinswapComponent(container, swapConfig);
+        });
+      } catch (error) {
+        console.error('❌ Failed to start coinswap:', error);
+        alert('Failed to start coinswap: ' + error.message);
+        startBtn.disabled = false;
+        startBtn.textContent = 'Start Coinswap';
+        startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      }
+    });
 
   // INITIALIZE
-  
+
   // Restore selection mode
   if (selectionMode === 'manual') {
     toggleSelectionMode('manual');
@@ -1026,7 +1065,8 @@ export function SwapComponent(container) {
     const customInput = content.querySelector('#custom-hop-input');
     if (customInput) {
       customInput.value = customHopCount;
-      content.querySelector('#custom-makers-display').textContent = customHopCount - 1;
+      content.querySelector('#custom-makers-display').textContent =
+        customHopCount - 1;
     }
   } else if (numberOfHops !== 3) {
     setHopCount(numberOfHops);
@@ -1039,13 +1079,14 @@ export function SwapComponent(container) {
 
     // Restore UTXO selections
     if (selectedUtxos.length > 0) {
-      selectedUtxos.forEach(index => {
+      selectedUtxos.forEach((index) => {
         const checkbox = content.querySelector('#utxo-' + index);
         if (checkbox) {
           checkbox.checked = true;
         }
       });
-      content.querySelector('#selected-utxos-count').textContent = selectedUtxos.length;
+      content.querySelector('#selected-utxos-count').textContent =
+        selectedUtxos.length;
       checkUtxoTypeWarning();
     }
 

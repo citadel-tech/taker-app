@@ -9,7 +9,7 @@ export function AddressListComponent(container) {
 
     // Apply type filter
     if (currentFilter !== 'all') {
-      addresses = addresses.filter(addr => addr.type === currentFilter);
+      addresses = addresses.filter((addr) => addr.type === currentFilter);
     }
 
     // Apply sorting
@@ -28,11 +28,11 @@ export function AddressListComponent(container) {
 
   function getTypeColor(type) {
     const colors = {
-      'P2WPKH': 'green',
-      'P2WSH': 'blue',
-      'P2TR': 'purple',
-      'P2PKH': 'yellow',
-      'P2SH': 'orange'
+      P2WPKH: 'green',
+      P2WSH: 'blue',
+      P2TR: 'purple',
+      P2PKH: 'yellow',
+      P2SH: 'orange',
     };
     return colors[type] || 'gray';
   }
@@ -57,16 +57,21 @@ export function AddressListComponent(container) {
       const utxos = data.utxos || [];
       const addresses = AddressStorage.getAllAddresses();
 
-      addresses.forEach(addr => {
-        const matchingUtxos = utxos.filter(u => u.utxo.address === addr.address);
+      addresses.forEach((addr) => {
+        const matchingUtxos = utxos.filter(
+          (u) => u.utxo.address === addr.address
+        );
 
         if (matchingUtxos.length > 0) {
-          const totalReceived = matchingUtxos.reduce((sum, u) => sum + u.utxo.amount, 0);
+          const totalReceived = matchingUtxos.reduce(
+            (sum, u) => sum + u.utxo.amount,
+            0
+          );
 
           AddressStorage.updateAddress(addr.address, {
             used: matchingUtxos.length,
             received: totalReceived,
-            lastUsed: Date.now()
+            lastUsed: Date.now(),
           });
         }
       });
@@ -93,7 +98,8 @@ export function AddressListComponent(container) {
 
   function showToast(message) {
     const toast = document.createElement('div');
-    toast.className = 'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+    toast.className =
+      'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => {
@@ -112,10 +118,10 @@ export function AddressListComponent(container) {
 
     const csv = [
       'Address,Type,Status,Times Used,Received (BTC),Created At,Last Used',
-      ...addresses.map(addr => {
+      ...addresses.map((addr) => {
         const statusInfo = getStatusInfo(addr);
         return `"${addr.address}","${addr.type}","${statusInfo.text}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${AddressStorage.formatLastUsed(addr.lastUsed)}"`;
-      })
+      }),
     ].join('\n');
 
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -135,7 +141,7 @@ export function AddressListComponent(container) {
     const stats = AddressStorage.getStats();
 
     // Get unique address types for filter buttons
-    const addressTypes = [...new Set(allAddresses.map(a => a.type))];
+    const addressTypes = [...new Set(allAddresses.map((a) => a.type))];
 
     container.innerHTML = `
       <div id="address-list-content">
@@ -186,15 +192,19 @@ export function AddressListComponent(container) {
               <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] text-gray-400 border border-gray-700 hover:bg-[#242d3d]'} px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">
                 All (${allAddresses.length})
               </button>
-              ${addressTypes.map(type => {
-                const count = allAddresses.filter(a => a.type === type).length;
-                const color = getTypeColor(type);
-                return `
+              ${addressTypes
+                .map((type) => {
+                  const count = allAddresses.filter(
+                    (a) => a.type === type
+                  ).length;
+                  const color = getTypeColor(type);
+                  return `
                   <button data-filter="${type}" class="filter-btn ${currentFilter === type ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">
                     ${type} (${count})
                   </button>
                 `;
-              }).join('')}
+                })
+                .join('')}
             </div>
 
             <!-- Sort -->
@@ -214,7 +224,9 @@ export function AddressListComponent(container) {
         <div class="bg-[#1a2332] rounded-lg p-6">
           <h3 class="text-xl font-semibold text-gray-300 mb-4">Address Details</h3>
 
-          ${filteredAddresses.length === 0 ? `
+          ${
+            filteredAddresses.length === 0
+              ? `
             <div class="text-center py-12">
               <div class="text-4xl mb-4">📭</div>
               <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `of type ${currentFilter}` : 'generated yet'}</p>
@@ -222,7 +234,8 @@ export function AddressListComponent(container) {
                 Generate New Address
               </button>
             </div>
-          ` : `
+          `
+              : `
             <div class="overflow-x-auto">
               <table class="w-full">
                 <thead>
@@ -237,23 +250,27 @@ export function AddressListComponent(container) {
                   </tr>
                 </thead>
                 <tbody>
-                  ${filteredAddresses.map((addr) => {
-                    const typeColor = getTypeColor(addr.type);
-                    const statusInfo = getStatusInfo(addr);
-                    const createdDate = new Date(addr.createdAt);
+                  ${filteredAddresses
+                    .map((addr) => {
+                      const typeColor = getTypeColor(addr.type);
+                      const statusInfo = getStatusInfo(addr);
+                      const createdDate = new Date(addr.createdAt);
 
-                    return `
+                      return `
                       <tr class="border-b border-gray-800 hover:bg-[#242d3d] transition-colors address-row" data-address="${addr.address}">
                         <td class="py-3 px-4">
-                          <div class="flex items-center gap-2">
-                            <span class="font-mono text-sm text-gray-300 truncate max-w-[200px]" title="${addr.address}">
-                              ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
-                            </span>
-                            <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
-                              📋
-                            </button>
-                          </div>
-                        </td>
+    <div class="flex items-center gap-2">
+        <a href="https://mempool.space/signet/address/${addr.address}" 
+           target="_blank" 
+           class="font-mono text-sm text-blue-400 hover:text-blue-300 underline truncate max-w-[200px]" 
+           title="${addr.address}">
+            ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
+        </a>
+        <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
+            📋
+        </button>
+    </div>
+</td>
                         <td class="py-3 px-4">
                           <span class="px-2 py-1 rounded text-xs font-semibold bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
                             ${addr.type}
@@ -276,7 +293,8 @@ export function AddressListComponent(container) {
                         </td>
                       </tr>
                     `;
-                  }).join('')}
+                    })
+                    .join('')}
                 </tbody>
               </table>
             </div>
@@ -284,7 +302,8 @@ export function AddressListComponent(container) {
             <div class="mt-4 text-center text-sm text-gray-500">
               Showing ${filteredAddresses.length} of ${allAddresses.length} addresses
             </div>
-          `}
+          `
+          }
         </div>
 
         <!-- Privacy Info -->
@@ -326,7 +345,7 @@ export function AddressListComponent(container) {
 
     // Filter buttons
     const filterButtons = container.querySelectorAll('.filter-btn');
-    filterButtons.forEach(btn => {
+    filterButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         currentFilter = btn.dataset.filter;
         render();
@@ -344,7 +363,7 @@ export function AddressListComponent(container) {
 
     // Copy buttons
     const copyButtons = container.querySelectorAll('.copy-btn');
-    copyButtons.forEach(btn => {
+    copyButtons.forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const address = btn.dataset.address;

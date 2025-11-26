@@ -4,8 +4,19 @@ export function FirstTimeSetupModal(container, onComplete) {
   modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
 
   let currentStep = 1;
-  const totalSteps = 3;
+  const totalSteps = 4;
+  let walletAction = null; // 'create', 'load', or 'restore'
+  let walletData = {};
 
+
+  // Password hashing utility
+  async function hashPassword(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
   modal.innerHTML = `
     <div class="bg-[#1a2332] rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
       <!-- Header -->
@@ -14,9 +25,9 @@ export function FirstTimeSetupModal(container, onComplete) {
         <p class="text-white/90 text-sm">Let's set up your wallet for private Bitcoin swaps</p>
         <div class="flex mt-4">
           <div id="progress-bar" class="bg-white/20 rounded-full h-2 flex-1">
-            <div id="progress-fill" class="bg-white rounded-full h-2 transition-all duration-300" style="width: 33%"></div>
+            <div id="progress-fill" class="bg-white rounded-full h-2 transition-all duration-300" style="width: 25%"></div>
           </div>
-          <span id="step-indicator" class="text-white/90 text-sm ml-3">Step 1 of 3</span>
+          <span id="step-indicator" class="text-white/90 text-sm ml-3">Step 1 of 4</span>
         </div>
       </div>
 
@@ -40,6 +51,10 @@ export function FirstTimeSetupModal(container, onComplete) {
                 <li class="flex items-center">
                   <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
                   ZMQ notifications for real-time updates
+                </li>
+                <li class="flex items-center">
+                  <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
+                  Wallet setup (create, load, or restore)
                 </li>
                 <li class="flex items-center">
                   <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
@@ -120,7 +135,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="text" 
                     id="setup-zmq-rawblock"
-                    value="tcp://127.0.0.1:28332"
+                    value="tcp://127.0.0.1:29332"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
                   />
                 </div>
@@ -152,15 +167,226 @@ export function FirstTimeSetupModal(container, onComplete) {
                 rpcpassword=password<br/>
                 rpcport=18443<br/>
                 rpcallowip=127.0.0.1<br/>
-                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+                zmqpubrawblock=tcp://127.0.0.1:29332<br/>
                 zmqpubrawtx=tcp://127.0.0.1:28333
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Step 3: Tor Configuration -->
-        <div id="step-3" class="setup-step hidden">
+        <!-- Step 3A: Wallet Action Choice -->
+        <div id="step-3a" class="setup-step hidden">
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold text-white mb-2">Wallet Setup</h3>
+            <p class="text-gray-400 text-sm">Choose how you want to set up your wallet.</p>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Choice Cards -->
+            <div class="grid grid-cols-3 gap-4">
+              <!-- Create New Wallet -->
+              <div id="choice-create" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
+                <div class="text-4xl mb-3">🆕</div>
+                <h4 class="text-white font-semibold mb-2">Create New</h4>
+                <p class="text-xs text-gray-400">Start fresh with a new wallet</p>
+              </div>
+
+              <!-- Load Existing Wallet -->
+              <div id="choice-load" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
+                <div class="text-4xl mb-3">📂</div>
+                <h4 class="text-white font-semibold mb-2">Load Existing</h4>
+                <p class="text-xs text-gray-400">Load a wallet from file</p>
+              </div>
+
+              <!-- Restore Wallet -->
+              <div id="choice-restore" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
+                <div class="text-4xl mb-3">♻️</div>
+                <h4 class="text-white font-semibold mb-2">Restore</h4>
+                <p class="text-xs text-gray-400">Restore from backup JSON</p>
+              </div>
+            </div>
+
+            <div id="choice-message" class="hidden bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
+              <p class="text-xs text-blue-400 text-center">
+                Please select an option above to continue
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3B: Create New Wallet -->
+        <div id="step-3b-create" class="setup-step hidden">
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold text-white mb-2">Encrypt Your Wallet</h3>
+            <p class="text-gray-400 text-sm">Set a strong password to protect your wallet (recommended).</p>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+              <p class="text-xs text-yellow-400">
+                <strong>⚠️ Important:</strong> This password encrypts your wallet. If you forget it, you won't be able to access your funds. Make sure to store it safely!
+              </p>
+            </div>
+
+            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm text-gray-400 mb-2">Wallet Password</label>
+                  <input 
+                    type="password" 
+                    id="create-password"
+                    placeholder="Enter a strong password"
+                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm text-gray-400 mb-2">Confirm Password</label>
+                  <input 
+                    type="password" 
+                    id="create-password-confirm"
+                    placeholder="Re-enter your password"
+                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  />
+                </div>
+
+                <div class="flex items-center">
+                  <input 
+                    type="checkbox" 
+                    id="skip-encryption"
+                    class="mr-2"
+                  />
+                  <label for="skip-encryption" class="text-xs text-gray-400">
+                    Skip encryption (not recommended)
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <div id="password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <p class="text-xs text-red-400"></p>
+            </div>
+
+            <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+              <p class="text-xs text-green-400">
+                <strong>✓ Password Tips:</strong>
+              </p>
+              <ul class="text-xs text-green-400 mt-2 space-y-1">
+                <li>• Use at least 12 characters</li>
+                <li>• Mix uppercase, lowercase, numbers, and symbols</li>
+                <li>• Avoid common words or phrases</li>
+                <li>• Store it in a password manager</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3B: Load Existing Wallet -->
+        <div id="step-3b-load" class="setup-step hidden">
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold text-white mb-2">Load Existing Wallet</h3>
+            <p class="text-gray-400 text-sm">Browse for your wallet file and enter the password if encrypted.</p>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+              <label class="block text-sm text-gray-400 mb-2">Wallet File</label>
+              <div class="flex gap-2">
+                <input 
+                  type="text" 
+                  id="load-wallet-path"
+                  placeholder="No file selected"
+                  readonly
+                  class="flex-1 bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none"
+                />
+                <button 
+                  id="browse-wallet-file"
+                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Browse
+                </button>
+              </div>
+              <p class="text-xs text-gray-500 mt-2">Default location: ~/.coinswap/taker/wallets/</p>
+            </div>
+
+            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+              <label class="block text-sm text-gray-400 mb-2">Wallet Password (if encrypted)</label>
+              <input 
+                type="password" 
+                id="load-password"
+                placeholder="Enter wallet password"
+                class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+              />
+              <p class="text-xs text-gray-500 mt-2">Leave empty if wallet is not encrypted</p>
+            </div>
+
+            <div id="load-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+              <p class="text-xs text-red-400"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3B: Restore from Backup -->
+        <div id="step-3b-restore" class="setup-step hidden">
+          <div class="mb-6">
+            <h3 class="text-xl font-semibold text-white mb-2">Restore from Backup</h3>
+            <p class="text-gray-400 text-sm">Select your backup JSON file and enter the password if it was encrypted.</p>
+          </div>
+
+          <div class="space-y-4">
+            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+              <label class="block text-sm text-gray-400 mb-2">Backup File (JSON)</label>
+              <div class="flex gap-2">
+                <input 
+                  type="text" 
+                  id="restore-backup-path"
+                  placeholder="No file selected"
+                  readonly
+                  class="flex-1 bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none"
+                />
+                <button 
+                  id="browse-backup-file"
+                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                >
+                  Browse
+                </button>
+              </div>
+            </div>
+
+            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+              <label class="block text-sm text-gray-400 mb-2">Backup Password (if encrypted)</label>
+              <input 
+                type="password" 
+                id="restore-password"
+                placeholder="Enter backup password"
+                class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+              />
+
+              <div class="flex items-center mt-2">
+  <input 
+    type="checkbox" 
+    id="restore-no-password"
+    class="mr-2"
+  />
+  <label for="restore-no-password" class="text-xs text-gray-400">
+    Backup has no password
+  </label>
+</div>
+            </div>
+
+            <div id="restore-status" class="hidden">
+              <!-- Status will be shown here -->
+            </div>
+
+            <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+              <p class="text-xs text-purple-400">
+                <strong>📋 Note:</strong> Restoring will recreate your wallet from the backup. This may take a moment.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Tor Configuration -->
+        <div id="step-4" class="setup-step hidden">
           <div class="mb-6">
             <h3 class="text-xl font-semibold text-white mb-2">Tor Configuration</h3>
             <p class="text-gray-400 text-sm">Configure Tor for private maker discovery and communication.</p>
@@ -175,7 +401,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="number" 
                     id="setup-tor-control-port"
-                    value="9051"
+                    value="9053"
                     min="1024"
                     max="65535"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -187,7 +413,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="number" 
                     id="setup-tor-socks-port"
-                    value="9050"
+                    value="9052"
                     min="1024"
                     max="65535"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -247,7 +473,10 @@ export function FirstTimeSetupModal(container, onComplete) {
 
   container.appendChild(modal);
 
+  // ============================================================================
   // FUNCTIONS
+  // ============================================================================
+
   function updateProgress() {
     const progressFill = modal.querySelector('#progress-fill');
     const stepIndicator = modal.querySelector('#step-indicator');
@@ -261,8 +490,25 @@ export function FirstTimeSetupModal(container, onComplete) {
     // Hide all steps
     modal.querySelectorAll('.setup-step').forEach(el => el.classList.add('hidden'));
 
-    // Show current step
-    modal.querySelector(`#step-${step}`).classList.remove('hidden');
+    // Determine which substep to show for step 3
+    let stepToShow = `step-${step}`;
+    if (step === 3) {
+      if (!walletAction) {
+        stepToShow = 'step-3a'; // Show choice screen
+      } else if (walletAction === 'create') {
+        stepToShow = 'step-3b-create';
+      } else if (walletAction === 'load') {
+        stepToShow = 'step-3b-load';
+      } else if (walletAction === 'restore') {
+        stepToShow = 'step-3b-restore';
+      }
+    }
+
+    // Show the appropriate step
+    const stepElement = modal.querySelector(`#${stepToShow}`);
+    if (stepElement) {
+      stepElement.classList.remove('hidden');
+    }
 
     // Update buttons
     const backBtn = modal.querySelector('#setup-back-btn');
@@ -282,6 +528,109 @@ export function FirstTimeSetupModal(container, onComplete) {
     updateProgress();
   }
 
+  async function validateStep3() {
+    // If no wallet action selected, show message
+    if (!walletAction) {
+      showMessage('choice-message');
+      return false;
+    }
+
+    // Validate the actual input in Step 3B substeps
+    if (walletAction === 'create') {
+      const password = modal.querySelector('#create-password')?.value || '';
+      const confirmPassword = modal.querySelector('#create-password-confirm')?.value || '';
+      const skipEncryption = modal.querySelector('#skip-encryption')?.checked || false;
+
+      if (!skipEncryption && !password) {
+        showError('password-error', 'Please enter a password or check "Skip encryption"');
+        return false;
+      }
+
+      if (!skipEncryption && password !== confirmPassword) {
+        showError('password-error', 'Passwords do not match');
+        return false;
+      }
+
+      if (!skipEncryption && password.length < 8) {
+        showError('password-error', 'Password must be at least 8 characters');
+        return false;
+      }
+
+      // Save wallet data
+      walletData.password = skipEncryption ? undefined : password;
+
+      // CRITICAL: Store password hash for validation
+      if (!skipEncryption && password) {
+        const passwordHash = await hashPassword(password);
+        localStorage.setItem('wallet_password_hash', passwordHash);
+        console.log('🔐 Password hash stored for validation');
+      }
+
+      return true;
+    }
+
+    if (walletAction === 'load') {
+      const walletPath = modal.querySelector('#load-wallet-path')?.value || '';
+      const password = modal.querySelector('#load-password')?.value || '';
+
+      if (!walletPath) {
+        showError('load-error', 'Please select a wallet file');
+        return false;
+      }
+
+      // Extract filename from path
+      const walletFileName = walletPath.split('/').pop();
+      walletData.walletFileName = walletFileName;
+      walletData.password = password || undefined;
+
+      return true;
+    }
+
+    if (walletAction === 'restore') {
+      const backupPath = modal.querySelector('#restore-backup-path')?.value || '';
+      const password = modal.querySelector('#restore-password')?.value || '';
+      const noPassword = modal.querySelector('#restore-no-password')?.checked || false;
+
+
+      if (!backupPath) {
+        showError('restore-status', 'Please select a backup file', 'red');
+        return false;
+      }
+
+      walletData.backupPath = backupPath;
+      walletData.password = noPassword ? "" : (password || "");
+      return true;
+    }
+
+    return false;
+  }
+
+  function showError(elementId, message) {
+    const errorDiv = modal.querySelector(`#${elementId}`);
+    if (errorDiv) {
+      // Check if there's a <p> tag, if not create the error content
+      const pTag = errorDiv.querySelector('p');
+      if (pTag) {
+        pTag.textContent = message;
+      } else {
+        errorDiv.innerHTML = `
+          <div class="flex items-center">
+            <span class="text-sm text-red-400">❌ ${message}</span>
+          </div>
+        `;
+      }
+      errorDiv.className = 'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      errorDiv.classList.remove('hidden');
+    }
+  }
+
+  function showMessage(elementId) {
+    const messageDiv = modal.querySelector(`#${elementId}`);
+    if (messageDiv) {
+      messageDiv.classList.remove('hidden');
+    }
+  }
+
   function saveConfiguration() {
     const config = {
       rpc: {
@@ -299,6 +648,12 @@ export function FirstTimeSetupModal(container, onComplete) {
         control_port: parseInt(modal.querySelector('#setup-tor-control-port').value),
         socks_port: parseInt(modal.querySelector('#setup-tor-socks-port').value),
         tor_auth_password: modal.querySelector('#setup-tor-auth-password').value || undefined,
+      },
+      wallet: {
+        action: walletAction,
+        fileName: walletData.walletFileName,
+        password: walletData.password,
+        backupPath: walletData.backupPath,
       },
       setupComplete: true,
       setupDate: new Date().toISOString(),
@@ -407,7 +762,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
     } catch (error) {
       console.error('RPC test failed:', error);
-      
+
       let errorMessage = error.message;
       if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
         errorMessage = 'Cannot connect to Bitcoin Core. Is bitcoind running?';
@@ -426,26 +781,255 @@ export function FirstTimeSetupModal(container, onComplete) {
     btn.disabled = false;
   }
 
-  // EVENT LISTENERS
-  modal.querySelector('#setup-next-btn').addEventListener('click', () => {
-    if (currentStep < totalSteps) {
-      currentStep++;
-      showStep(currentStep);
-    } else {
-      // Complete setup
-      const config = saveConfiguration();
-      modal.remove();
-      if (onComplete) onComplete(config);
-    }
-  });
+  // Handle restore wallet
+  async function handleRestore() {
+    const backupPath = modal.querySelector('#restore-backup-path').value;
+    const password = modal.querySelector('#restore-password').value;
+    const statusDiv = modal.querySelector('#restore-status');
 
+    if (!backupPath) {
+      statusDiv.className = 'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      statusDiv.innerHTML = `
+        <div class="flex items-center">
+          <span class="text-sm text-red-400">❌ Please select a backup file</span>
+        </div>
+      `;
+      statusDiv.classList.remove('hidden');
+      return false;
+    }
+
+    try {
+      statusDiv.className = 'bg-blue-500/10 border border-blue-500/30 rounded-lg p-3';
+      statusDiv.innerHTML = `
+        <div class="flex items-center">
+          <span class="text-sm text-blue-400">🔄 Restoring wallet from backup...</span>
+        </div>
+      `;
+      statusDiv.classList.remove('hidden');
+
+      // Call Electron API to restore wallet
+      const result = await window.api.restoreWallet({
+        backupFilePath: backupPath,
+        password: password || ""
+      });
+
+      if (result.success) {
+        statusDiv.className = 'bg-green-500/10 border border-green-500/30 rounded-lg p-3';
+        statusDiv.innerHTML = `
+          <div class="flex items-center">
+            <span class="text-sm text-green-400">✅ Wallet restored successfully!</span>
+          </div>
+        `;
+        return true;
+      } else {
+        throw new Error(result.error || 'Restore failed');
+      }
+    } catch (error) {
+      console.error('Restore error:', error);
+      statusDiv.className = 'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      statusDiv.innerHTML = `
+        <div class="flex items-center">
+          <span class="text-sm text-red-400">❌ ${error.message}</span>
+        </div>
+      `;
+      statusDiv.classList.remove('hidden');
+      return false;
+    }
+  }
+
+  // ============================================================================
+  // EVENT LISTENERS
+  // ============================================================================
+
+  console.log('🔧 Attaching event listeners...');
+
+  // Wallet action choice
+  const choiceCreate = modal.querySelector('#choice-create');
+  console.log('Create button:', choiceCreate);
+
+  if (choiceCreate) {
+    choiceCreate.addEventListener('click', () => {
+      console.log('Create clicked!');
+      walletAction = 'create';
+      modal.querySelectorAll('.wallet-choice').forEach(el => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+      choiceCreate.classList.remove('border-gray-700');
+      choiceCreate.classList.add('border-[#FF6B35]');
+      const msg = modal.querySelector('#choice-message');
+      if (msg) msg.classList.add('hidden');
+
+      // Immediately show the create substep
+      showStep(currentStep);
+    });
+  }
+
+  const choiceLoad = modal.querySelector('#choice-load');
+  if (choiceLoad) {
+    choiceLoad.addEventListener('click', () => {
+      console.log('Load clicked!');
+      walletAction = 'load';
+      modal.querySelectorAll('.wallet-choice').forEach(el => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+      choiceLoad.classList.remove('border-gray-700');
+      choiceLoad.classList.add('border-[#FF6B35]');
+      const msg = modal.querySelector('#choice-message');
+      if (msg) msg.classList.add('hidden');
+
+      // Immediately show the load substep
+      showStep(currentStep);
+    });
+  }
+
+  const choiceRestore = modal.querySelector('#choice-restore');
+  if (choiceRestore) {
+    choiceRestore.addEventListener('click', () => {
+      console.log('Restore clicked!');
+      walletAction = 'restore';
+      modal.querySelectorAll('.wallet-choice').forEach(el => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+      choiceRestore.classList.remove('border-gray-700');
+      choiceRestore.classList.add('border-[#FF6B35]');
+      const msg = modal.querySelector('#choice-message');
+      if (msg) msg.classList.add('hidden');
+
+      // Immediately show the restore substep
+      showStep(currentStep);
+    });
+  }
+
+  // Skip encryption checkbox
+  const skipEncryption = modal.querySelector('#skip-encryption');
+  if (skipEncryption) {
+    skipEncryption.addEventListener('change', (e) => {
+      const passwordInputs = modal.querySelectorAll('#create-password, #create-password-confirm');
+      passwordInputs.forEach(input => {
+        input.disabled = e.target.checked;
+        if (e.target.checked) {
+          input.value = '';
+        }
+      });
+    });
+  }
+
+  // Browse wallet file
+  const browseWalletBtn = modal.querySelector('#browse-wallet-file');
+  if (browseWalletBtn) {
+    browseWalletBtn.addEventListener('click', async () => {
+      try {
+        const result = await window.api.openFile({
+          filters: [{ name: 'All Files', extensions: ['*'] }]
+        });
+
+        if (result.success && result.filePath) {
+          modal.querySelector('#load-wallet-path').value = result.filePath;
+          modal.querySelector('#load-error').classList.add('hidden');
+        }
+      } catch (error) {
+        console.error('File picker error:', error);
+        showError('load-error', 'Failed to open file picker');
+      }
+    });
+  }
+
+  // Browse backup file
+  const browseBackupBtn = modal.querySelector('#browse-backup-file');
+  if (browseBackupBtn) {
+    browseBackupBtn.addEventListener('click', async () => {
+      try {
+        const result = await window.api.openFile({
+          filters: [
+            { name: 'JSON Files', extensions: ['json'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        });
+
+        if (result.success && result.filePath) {
+          modal.querySelector('#restore-backup-path').value = result.filePath;
+          modal.querySelector('#restore-status').classList.add('hidden');
+        }
+      } catch (error) {
+        console.error('File picker error:', error);
+      }
+    });
+  }
+
+  const restoreNoPassword = modal.querySelector('#restore-no-password');
+  if (restoreNoPassword) {
+    restoreNoPassword.addEventListener('change', (e) => {
+      const passwordInput = modal.querySelector('#restore-password');
+      if (passwordInput) {
+        passwordInput.disabled = e.target.checked;
+        if (e.target.checked) {
+          passwordInput.value = '';
+        }
+      }
+    });
+  }
+
+  // Next button
+  const nextBtn = modal.querySelector('#setup-next-btn');
+  console.log('Next button:', nextBtn);
+
+  if (nextBtn) {
+    nextBtn.addEventListener('click', async () => {
+      console.log('Next clicked! Current step:', currentStep, 'Wallet action:', walletAction);
+
+      if (currentStep === 3) {
+        // Validate step 3
+        const valid = await validateStep3(); // Make it await
+        if (!valid) {
+          console.log('Validation failed');
+          return;
+        }
+
+        // If restore, perform restore before proceeding
+        if (walletAction === 'restore') {
+          const restored = await handleRestore();
+          if (!restored) {
+            return;
+          }
+        }
+      }
+
+      if (currentStep < totalSteps) {
+        currentStep++;
+        console.log('Moving to step:', currentStep);
+        showStep(currentStep);
+      } else {
+        // Complete setup
+        console.log('Completing setup...');
+        const config = saveConfiguration();
+        modal.remove();
+        if (onComplete) onComplete(config);
+      }
+    });
+  }
+
+  // Back button
   modal.querySelector('#setup-back-btn').addEventListener('click', () => {
-    if (currentStep > 1) {
+    if (currentStep === 3 && walletAction) {
+      // If in step 3 substep, go back to step 3a (choice)
+      walletAction = null;
+      walletData = {};
+      showStep(currentStep);
+      // Reset choice borders
+      modal.querySelectorAll('.wallet-choice').forEach(el => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+    } else if (currentStep > 1) {
       currentStep--;
       showStep(currentStep);
     }
   });
 
+  // Skip button
   modal.querySelector('#setup-skip-btn').addEventListener('click', () => {
     if (confirm('Are you sure you want to skip setup? You can configure these settings later in the Settings page.')) {
       // Save minimal config to mark setup as complete
@@ -460,6 +1044,7 @@ export function FirstTimeSetupModal(container, onComplete) {
     }
   });
 
+  // Test RPC button
   modal.querySelector('#test-rpc-setup').addEventListener('click', testRPCConnection);
 
   // Initialize

@@ -7,60 +7,32 @@ export function SettingsComponent(container) {
         <p class="text-gray-400 mb-8">Configure your taker wallet and Bitcoin Core connection</p>
 
         <div class="space-y-8">
-            <!-- Wallet Backup & Restore Section -->
+            <!-- Wallet Backup Section -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-300 mb-6">Wallet Backup & Restore</h3>
+                <h3 class="text-xl font-semibold text-gray-300 mb-6">Wallet Backup</h3>
                 
-                <div class="grid grid-cols-2 gap-6">
-                    <!-- Seed Phrase Backup -->
-                    <div class="space-y-4">
-                        <h4 class="text-lg font-medium text-white mb-4">Seed Phrase Backup</h4>
+                <div class="space-y-4">
+                    <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                        <h4 class="text-lg font-medium text-white mb-3">Create Backup</h4>
+                        <p class="text-sm text-gray-400 mb-4">
+                            Export your wallet to an encrypted JSON file. You can use this backup to restore your wallet on another device or after reinstallation.
+                        </p>
                         
-                        <button id="show-seed-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                            Show Seed Phrase
+                        <button id="backup-wallet-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                            💾 Create Backup
                         </button>
-                        
-                        <div id="seed-display" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-                            <div class="flex items-center mb-3">
-                                <span class="text-yellow-400 text-sm">⚠️ Keep this safe and private!</span>
-                            </div>
-                            <div id="seed-words-grid" class="grid grid-cols-3 gap-2 mb-4">
-                                <!-- Seed words will be populated dynamically -->
-                            </div>
-                            <button id="copy-seed-btn" class="w-full bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded text-sm transition-colors">
-                                Copy to Clipboard
-                            </button>
-                        </div>
-                        
-                        <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                            <p class="text-xs text-blue-400">
-                                💡 Write down your seed phrase and store it in a safe place. Anyone with access to your seed phrase can restore your wallet.
-                            </p>
-                        </div>
                     </div>
                     
-                    <!-- Wallet Restore -->
-                    <div class="space-y-4">
-                        <h4 class="text-lg font-medium text-white mb-4">Restore Wallet</h4>
-                        
-                        <div>
-                            <label class="block text-sm text-gray-400 mb-2">Enter Seed Phrase</label>
-                            <textarea 
-                                id="restore-seed-input"
-                                placeholder="Enter your 12-word seed phrase separated by spaces..."
-                                class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors h-24 resize-none"
-                            ></textarea>
-                        </div>
-                        
-                        <button id="restore-wallet-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
-                            Restore Wallet
-                        </button>
-                        
-                        <div class="bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                            <p class="text-xs text-red-400">
-                                ⚠️ Warning: Restoring a wallet will replace your current wallet. Make sure you have backed up your current seed phrase.
-                            </p>
-                        </div>
+                    <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+                        <p class="text-xs text-blue-400">
+                            <strong>💡 Backup Tips:</strong>
+                        </p>
+                        <ul class="text-xs text-blue-400 mt-2 space-y-1">
+                            <li>• Store your backup file in a safe location (external drive, cloud storage)</li>
+                            <li>• Remember your backup password - you'll need it to restore</li>
+                            <li>• Create regular backups after significant transactions</li>
+                            <li>• Keep multiple backup copies in different locations</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -78,7 +50,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="number" 
                                 id="tor-control-port-input"
-                                value="9051"
+                                value="9053"
                                 min="1024"
                                 max="65535"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -91,7 +63,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="number" 
                                 id="tor-socks-port-input"
-                                value="9050"
+                                value="9052"
                                 min="1024"
                                 max="65535"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -242,7 +214,7 @@ export function SettingsComponent(container) {
                             <input 
                                 type="text" 
                                 id="zmq-rawblock-input"
-                                value="tcp://127.0.0.1:28332"
+                                value="tcp://127.0.0.1:29332"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <p class="text-xs text-gray-500 mt-1">ZMQ endpoint for raw block notifications</p>
@@ -253,10 +225,16 @@ export function SettingsComponent(container) {
                             <input 
                                 type="text" 
                                 id="zmq-rawtx-input"
-                                value="tcp://127.0.0.1:28333"
+                                value="tcp://127.0.0.1:29332"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
                             <p class="text-xs text-gray-500 mt-1">ZMQ endpoint for raw transaction notifications</p>
+                        </div>
+                        
+                        <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3">
+                            <p class="text-xs text-yellow-400">
+                                ⚠️ <strong>Note:</strong> Both ZMQ ports should be set to 28332 for proper operation.
+                            </p>
                         </div>
                     </div>
                     
@@ -272,8 +250,8 @@ export function SettingsComponent(container) {
                         
                         <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300">
                             <div id="zmq-config-preview">
-                                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-                                zmqpubrawtx=tcp://127.0.0.1:28333
+                                zmqpubrawblock=tcp://127.0.0.1:29332<br/>
+                                zmqpubrawtx=tcp://127.0.0.1:29332
                             </div>
                         </div>
                         
@@ -294,7 +272,7 @@ export function SettingsComponent(container) {
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-gray-300 mb-4">Complete bitcoin.conf Reference</h3>
                 
-                <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300">
+                <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
                     <div id="full-config-preview">
                         # Network (choose one)<br/>
                         regtest=1<br/>
@@ -303,16 +281,19 @@ export function SettingsComponent(container) {
                         <br/>
                         # Server settings<br/>
                         server=1<br/>
+                        txindex=1<br/>
+                        blockfilterindex=1<br/>
                         <br/>
                         # RPC settings<br/>
                         rpcuser=user<br/>
                         rpcpassword=password<br/>
                         rpcport=18443<br/>
+                        rpcbind=127.0.0.1<br/>
                         rpcallowip=127.0.0.1<br/>
                         <br/>
                         # ZMQ settings (required for Coinswap)<br/>
-                        zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-                        zmqpubrawtx=tcp://127.0.0.1:28333
+                        zmqpubrawblock=tcp://127.0.0.1:29332<br/>
+                        zmqpubrawtx=tcp://127.0.0.1:29332
                     </div>
                 </div>
                 
@@ -331,6 +312,62 @@ export function SettingsComponent(container) {
                 </button>
             </div>
         </div>
+
+        <!-- Backup Password Modal -->
+        <div id="backup-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
+            <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-6">
+                <h3 class="text-xl font-semibold text-white mb-4">Encrypt Backup</h3>
+                <p class="text-gray-400 text-sm mb-6">
+                    Set a password to encrypt your wallet backup. You'll need this password to restore from this backup.
+                </p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Backup Password</label>
+                        <input 
+                            type="password" 
+                            id="backup-password-input"
+                            placeholder="Enter backup password"
+                            class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm text-gray-400 mb-2">Confirm Password</label>
+                        <input 
+                            type="password" 
+                            id="backup-password-confirm-input"
+                            placeholder="Re-enter password"
+                            class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                        />
+                    </div>
+                    
+                    <div class="flex items-center">
+                        <input 
+                            type="checkbox" 
+                            id="skip-backup-encryption"
+                            class="mr-2"
+                        />
+                        <label for="skip-backup-encryption" class="text-xs text-gray-400">
+                            Skip encryption (not recommended)
+                        </label>
+                    </div>
+                    
+                    <div id="backup-password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                        <p class="text-xs text-red-400"></p>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-3 mt-6">
+                    <button id="cancel-backup-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirm-backup-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                        Create Backup
+                    </button>
+                </div>
+            </div>
+        </div>
     `;
 
   container.appendChild(content);
@@ -347,23 +384,38 @@ export function SettingsComponent(container) {
 
         // Populate RPC fields
         if (config.rpc) {
-          if (config.rpc.host) content.querySelector('#rpc-host-input').value = config.rpc.host;
-          if (config.rpc.port) content.querySelector('#rpc-port-input').value = config.rpc.port;
-          if (config.rpc.username) content.querySelector('#rpc-username-input').value = config.rpc.username;
-          if (config.rpc.password) content.querySelector('#rpc-password-input').value = config.rpc.password;
+          if (config.rpc.host)
+            content.querySelector('#rpc-host-input').value = config.rpc.host;
+          if (config.rpc.port)
+            content.querySelector('#rpc-port-input').value = config.rpc.port;
+          if (config.rpc.username)
+            content.querySelector('#rpc-username-input').value =
+              config.rpc.username;
+          if (config.rpc.password)
+            content.querySelector('#rpc-password-input').value =
+              config.rpc.password;
         }
 
         // Populate Taker/Tor config fields
         if (config.taker) {
-          if (config.taker.control_port) content.querySelector('#tor-control-port-input').value = config.taker.control_port;
-          if (config.taker.socks_port) content.querySelector('#tor-socks-port-input').value = config.taker.socks_port;
-          if (config.taker.tor_auth_password) content.querySelector('#tor-auth-password-input').value = config.taker.tor_auth_password;
+          if (config.taker.control_port)
+            content.querySelector('#tor-control-port-input').value =
+              config.taker.control_port;
+          if (config.taker.socks_port)
+            content.querySelector('#tor-socks-port-input').value =
+              config.taker.socks_port;
+          if (config.taker.tor_auth_password)
+            content.querySelector('#tor-auth-password-input').value =
+              config.taker.tor_auth_password;
         }
 
         // Populate ZMQ fields
         if (config.zmq) {
-          if (config.zmq.rawblock) content.querySelector('#zmq-rawblock-input').value = config.zmq.rawblock;
-          if (config.zmq.rawtx) content.querySelector('#zmq-rawtx-input').value = config.zmq.rawtx;
+          if (config.zmq.rawblock)
+            content.querySelector('#zmq-rawblock-input').value =
+              config.zmq.rawblock;
+          if (config.zmq.rawtx)
+            content.querySelector('#zmq-rawtx-input').value = config.zmq.rawtx;
         }
 
         // Update config previews
@@ -378,8 +430,10 @@ export function SettingsComponent(container) {
   function updateConfigPreviews() {
     const rawblock = content.querySelector('#zmq-rawblock-input').value;
     const rawtx = content.querySelector('#zmq-rawtx-input').value;
-    const rpcUser = content.querySelector('#rpc-username-input').value || 'user';
-    const rpcPass = content.querySelector('#rpc-password-input').value || 'password';
+    const rpcUser =
+      content.querySelector('#rpc-username-input').value || 'user';
+    const rpcPass =
+      content.querySelector('#rpc-password-input').value || 'password';
     const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
 
     // Update ZMQ config preview
@@ -398,11 +452,14 @@ regtest=1<br/>
 <br/>
 # Server settings<br/>
 server=1<br/>
+txindex=1<br/>
+blockfilterindex=1<br/>
 <br/>
 # RPC settings<br/>
 rpcuser=${rpcUser}<br/>
 rpcpassword=${rpcPass}<br/>
 rpcport=${rpcPort}<br/>
+rpcbind=127.0.0.1<br/>
 rpcallowip=127.0.0.1<br/>
 <br/>
 # ZMQ settings (required for Coinswap)<br/>
@@ -411,154 +468,208 @@ zmqpubrawtx=${rawtx}`;
     }
   }
 
-  // Fetch and display seed phrase
-  async function fetchSeedPhrase() {
+  // Show backup password modal
+  function showBackupModal() {
+    const modal = content.querySelector('#backup-password-modal');
+    modal.classList.remove('hidden');
+    content.querySelector('#backup-password-input').value = '';
+    content.querySelector('#backup-password-confirm-input').value = '';
+    content.querySelector('#skip-backup-encryption').checked = false;
+    content.querySelector('#backup-password-error').classList.add('hidden');
+  }
+
+  // Hide backup password modal
+  function hideBackupModal() {
+    content.querySelector('#backup-password-modal').classList.add('hidden');
+  }
+
+  // Perform wallet backup
+  async function performBackup(password) {
     try {
-      // IPC call to get seed phrase
-      const data = await window.api.taker.getSeed();
+      // First, open save dialog
+      const saveResult = await window.api.saveFile({
+        defaultPath: `coinswap-wallet-backup-${new Date().toISOString().split('T')[0]}.json`,
+        filters: [
+          { name: 'JSON Files', extensions: ['json'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
 
-      if (data.success && data.seed) {
-        const seedWords = data.seed.split(' ');
-        const grid = content.querySelector('#seed-words-grid');
+      if (!saveResult.success || saveResult.canceled) {
+        return;
+      }
 
-        grid.innerHTML = seedWords.map((word, index) => `
-          <div class="bg-[#0f1419] rounded px-3 py-2 text-center">
-            <span class="text-xs text-gray-500">${index + 1}.</span>
-            <div class="font-mono text-sm text-white">${word}</div>
-          </div>
-        `).join('');
+      const destinationPath = saveResult.filePath;
 
-        return seedWords.join(' ');
+      // Call backup API
+      const result = await window.api.backupWallet({
+        destinationPath,
+        password: password || undefined,
+      });
+
+      if (result.success) {
+        alert(
+          `✅ Backup created successfully!\n\nLocation: ${destinationPath}`
+        );
+      } else {
+        alert(`❌ Backup failed: ${result.error}`);
       }
     } catch (error) {
-      console.error('Failed to fetch seed phrase:', error);
+      console.error('Backup error:', error);
+      alert(`❌ Backup failed: ${error.message}`);
     }
-    return null;
   }
 
   // EVENT LISTENERS
 
-  // ZMQ input changes - update previews
-  content.querySelector('#zmq-rawblock-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#zmq-rawtx-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#rpc-username-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#rpc-password-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#rpc-port-input').addEventListener('input', updateConfigPreviews);
-
-  // Copy ZMQ config
-  content.querySelector('#copy-zmq-config-btn').addEventListener('click', async () => {
-    const rawblock = content.querySelector('#zmq-rawblock-input').value;
-    const rawtx = content.querySelector('#zmq-rawtx-input').value;
-    const configText = `zmqpubrawblock=${rawblock}\nzmqpubrawtx=${rawtx}`;
-
-    try {
-      await navigator.clipboard.writeText(configText);
-      const btn = content.querySelector('#copy-zmq-config-btn');
-      const originalText = btn.textContent;
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => { btn.textContent = originalText; }, 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
+  // Backup wallet button
+  content.querySelector('#backup-wallet-btn').addEventListener('click', () => {
+    showBackupModal();
   });
 
-  // Copy full config
-  content.querySelector('#copy-full-config-btn').addEventListener('click', async () => {
-    const rawblock = content.querySelector('#zmq-rawblock-input').value;
-    const rawtx = content.querySelector('#zmq-rawtx-input').value;
-    const rpcUser = content.querySelector('#rpc-username-input').value || 'user';
-    const rpcPass = content.querySelector('#rpc-password-input').value || 'password';
-    const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
+  // Skip encryption checkbox
+  content
+    .querySelector('#skip-backup-encryption')
+    .addEventListener('change', (e) => {
+      const passwordInputs = content.querySelectorAll(
+        '#backup-password-input, #backup-password-confirm-input'
+      );
+      passwordInputs.forEach((input) => {
+        input.disabled = e.target.checked;
+        if (e.target.checked) {
+          input.value = '';
+        }
+      });
+    });
 
-    const configText = `# Network (choose one)
+  // Cancel backup
+  content.querySelector('#cancel-backup-btn').addEventListener('click', () => {
+    hideBackupModal();
+  });
+
+  // Confirm backup
+  content
+    .querySelector('#confirm-backup-btn')
+    .addEventListener('click', async () => {
+      const password = content.querySelector('#backup-password-input').value;
+      const confirmPassword = content.querySelector(
+        '#backup-password-confirm-input'
+      ).value;
+      const skipEncryption = content.querySelector(
+        '#skip-backup-encryption'
+      ).checked;
+      const errorDiv = content.querySelector('#backup-password-error');
+
+      // Validate
+      if (!skipEncryption) {
+        if (!password) {
+          errorDiv.querySelector('p').textContent =
+            'Please enter a password or check "Skip encryption"';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+
+        if (password !== confirmPassword) {
+          errorDiv.querySelector('p').textContent = 'Passwords do not match';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+
+        if (password.length < 8) {
+          errorDiv.querySelector('p').textContent =
+            'Password must be at least 8 characters';
+          errorDiv.classList.remove('hidden');
+          return;
+        }
+      }
+
+      hideBackupModal();
+      await performBackup(skipEncryption ? '' : password);
+    });
+
+  // ZMQ input changes - update previews
+  content
+    .querySelector('#zmq-rawblock-input')
+    .addEventListener('input', updateConfigPreviews);
+  content
+    .querySelector('#zmq-rawtx-input')
+    .addEventListener('input', updateConfigPreviews);
+  content
+    .querySelector('#rpc-username-input')
+    .addEventListener('input', updateConfigPreviews);
+  content
+    .querySelector('#rpc-password-input')
+    .addEventListener('input', updateConfigPreviews);
+  content
+    .querySelector('#rpc-port-input')
+    .addEventListener('input', updateConfigPreviews);
+
+  // Copy ZMQ config
+  content
+    .querySelector('#copy-zmq-config-btn')
+    .addEventListener('click', async () => {
+      const rawblock = content.querySelector('#zmq-rawblock-input').value;
+      const rawtx = content.querySelector('#zmq-rawtx-input').value;
+      const configText = `zmqpubrawblock=${rawblock}\nzmqpubrawtx=${rawtx}`;
+
+      try {
+        await navigator.clipboard.writeText(configText);
+        const btn = content.querySelector('#copy-zmq-config-btn');
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
+
+  // Copy full config
+  content
+    .querySelector('#copy-full-config-btn')
+    .addEventListener('click', async () => {
+      const rawblock = content.querySelector('#zmq-rawblock-input').value;
+      const rawtx = content.querySelector('#zmq-rawtx-input').value;
+      const rpcUser =
+        content.querySelector('#rpc-username-input').value || 'user';
+      const rpcPass =
+        content.querySelector('#rpc-password-input').value || 'password';
+      const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
+
+      const configText = `# Network (choose one)
 regtest=1
 # testnet=1
 # mainnet (no flag needed)
 
 # Server settings
 server=1
+txindex=1
+blockfilterindex=1
 
 # RPC settings
 rpcuser=${rpcUser}
 rpcpassword=${rpcPass}
 rpcport=${rpcPort}
+rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 
 # ZMQ settings (required for Coinswap)
 zmqpubrawblock=${rawblock}
 zmqpubrawtx=${rawtx}`;
 
-    try {
-      await navigator.clipboard.writeText(configText);
-      const btn = content.querySelector('#copy-full-config-btn');
-      const originalText = btn.textContent;
-      btn.textContent = '✓ Copied!';
-      setTimeout(() => { btn.textContent = originalText; }, 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  });
-
-  // Seed phrase display
-  content.querySelector('#show-seed-btn').addEventListener('click', async () => {
-    const seedDisplay = content.querySelector('#seed-display');
-    const btn = content.querySelector('#show-seed-btn');
-
-    if (seedDisplay.classList.contains('hidden')) {
-      btn.textContent = 'Loading...';
-      btn.disabled = true;
-
-      await fetchSeedPhrase();
-
-      seedDisplay.classList.remove('hidden');
-      btn.textContent = 'Hide Seed Phrase';
-      btn.disabled = false;
-    } else {
-      seedDisplay.classList.add('hidden');
-      btn.textContent = 'Show Seed Phrase';
-    }
-  });
-
-  // Copy seed phrase
-  content.querySelector('#copy-seed-btn').addEventListener('click', async () => {
-    const seedWords = Array.from(content.querySelectorAll('#seed-words-grid .font-mono'))
-      .map(el => el.textContent);
-    const seedPhrase = seedWords.join(' ');
-
-    try {
-      await navigator.clipboard.writeText(seedPhrase);
-      const btn = content.querySelector('#copy-seed-btn');
-      const originalText = btn.textContent;
-      btn.textContent = 'Copied!';
-      btn.classList.add('bg-green-600');
-      setTimeout(() => {
-        btn.textContent = originalText;
-        btn.classList.remove('bg-green-600');
-      }, 2000);
-    } catch (err) {
-      console.error('Failed to copy: ', err);
-    }
-  });
-
-  // Restore wallet
-  content.querySelector('#restore-wallet-btn').addEventListener('click', () => {
-    const seedInput = content.querySelector('#restore-seed-input').value.trim();
-    if (!seedInput) {
-      alert('Please enter a seed phrase');
-      return;
-    }
-
-    const words = seedInput.split(/\s+/);
-    if (words.length !== 12 && words.length !== 24) {
-      alert('Seed phrase must be 12 or 24 words');
-      return;
-    }
-
-    if (confirm('Are you sure you want to restore from this seed phrase? This will replace your current wallet.')) {
-      // TODO: Implement actual restore logic via API
-      alert('Wallet restore functionality would be implemented here');
-    }
-  });
+      try {
+        await navigator.clipboard.writeText(configText);
+        const btn = content.querySelector('#copy-full-config-btn');
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => {
+          btn.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    });
 
   // Enhanced connection status management
   let connectionTimer = null;
@@ -578,9 +689,13 @@ zmqpubrawtx=${rawtx}`;
       disconnectBtn.disabled = false;
       isConnected = true;
 
-      if (info.version) content.querySelector('#bitcoin-version').textContent = info.version;
-      if (info.network) content.querySelector('#bitcoin-network').textContent = info.network;
-      if (info.blocks) content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
+      if (info.version)
+        content.querySelector('#bitcoin-version').textContent = info.version;
+      if (info.network)
+        content.querySelector('#bitcoin-network').textContent = info.network;
+      if (info.blocks)
+        content.querySelector('#block-height').textContent =
+          info.blocks.toLocaleString();
       if (info.verificationprogress) {
         const progress = (info.verificationprogress * 100).toFixed(1);
         content.querySelector('#sync-progress').textContent = `${progress}%`;
@@ -614,19 +729,19 @@ zmqpubrawtx=${rawtx}`;
     const auth = btoa(`${username}:${password}`);
 
     const body = {
-      jsonrpc: "1.0",
+      jsonrpc: '1.0',
       id: Date.now(),
       method: method,
-      params: params
+      params: params,
     };
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${auth}`
+        Authorization: `Basic ${auth}`,
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -649,33 +764,35 @@ zmqpubrawtx=${rawtx}`;
   }
 
   // Test RPC connection
-  content.querySelector('#test-connection-btn').addEventListener('click', async () => {
-    const btn = content.querySelector('#test-connection-btn');
-    const originalText = btn.textContent;
-    btn.textContent = 'Testing...';
-    btn.disabled = true;
+  content
+    .querySelector('#test-connection-btn')
+    .addEventListener('click', async () => {
+      const btn = content.querySelector('#test-connection-btn');
+      const originalText = btn.textContent;
+      btn.textContent = 'Testing...';
+      btn.disabled = true;
 
-    try {
-      const info = await makeRPCCall('getblockchaininfo');
-      const networkInfo = await makeRPCCall('getnetworkinfo');
+      try {
+        const info = await makeRPCCall('getblockchaininfo');
+        const networkInfo = await makeRPCCall('getnetworkinfo');
 
-      updateConnectionStatus(true, {
-        version: networkInfo.subversion || 'Unknown',
-        network: info.chain,
-        blocks: info.blocks,
-        verificationprogress: info.verificationprogress
-      });
+        updateConnectionStatus(true, {
+          version: networkInfo.subversion || 'Unknown',
+          network: info.chain,
+          blocks: info.blocks,
+          verificationprogress: info.verificationprogress,
+        });
 
-      console.log('✅ RPC connection successful:', info);
-    } catch (error) {
-      console.error('❌ RPC connection failed:', error);
-      updateConnectionStatus(false);
-      alert(`Connection failed: ${error.message}`);
-    }
+        console.log('✅ RPC connection successful:', info);
+      } catch (error) {
+        console.error('❌ RPC connection failed:', error);
+        updateConnectionStatus(false);
+        alert(`Connection failed: ${error.message}`);
+      }
 
-    btn.textContent = originalText;
-    btn.disabled = false;
-  });
+      btn.textContent = originalText;
+      btn.disabled = false;
+    });
 
   // Connect button
   content.querySelector('#connect-btn').addEventListener('click', async () => {
@@ -697,7 +814,7 @@ zmqpubrawtx=${rawtx}`;
         version: networkInfo.subversion || 'Unknown',
         network: info.chain,
         blocks: info.blocks,
-        verificationprogress: info.verificationprogress
+        verificationprogress: info.verificationprogress,
       });
 
       // Start status refresh timer
@@ -706,9 +823,11 @@ zmqpubrawtx=${rawtx}`;
         if (isConnected) {
           try {
             const info = await makeRPCCall('getblockchaininfo');
-            content.querySelector('#block-height').textContent = info.blocks.toLocaleString();
+            content.querySelector('#block-height').textContent =
+              info.blocks.toLocaleString();
             const progress = (info.verificationprogress * 100).toFixed(1);
-            content.querySelector('#sync-progress').textContent = `${progress}%`;
+            content.querySelector('#sync-progress').textContent =
+              `${progress}%`;
           } catch (error) {
             console.log('Status refresh failed');
             updateConnectionStatus(false);
@@ -742,33 +861,47 @@ zmqpubrawtx=${rawtx}`;
   });
 
   // Refresh status button
-  content.querySelector('#refresh-status-btn').addEventListener('click', async () => {
-    const btn = content.querySelector('#refresh-status-btn');
-    btn.textContent = 'Refreshing...';
-    btn.disabled = true;
+  content
+    .querySelector('#refresh-status-btn')
+    .addEventListener('click', async () => {
+      const btn = content.querySelector('#refresh-status-btn');
+      btn.textContent = 'Refreshing...';
+      btn.disabled = true;
 
-    try {
-      const info = await makeRPCCall('getblockchaininfo');
-      const networkInfo = await makeRPCCall('getnetworkinfo');
+      try {
+        const info = await makeRPCCall('getblockchaininfo');
+        const networkInfo = await makeRPCCall('getnetworkinfo');
 
-      updateConnectionStatus(true, {
-        version: networkInfo.subversion || 'Unknown',
-        network: info.chain,
-        blocks: info.blocks,
-        verificationprogress: info.verificationprogress
-      });
-    } catch (error) {
-      console.log('Refresh failed:', error.message);
-      updateConnectionStatus(false);
-    }
+        updateConnectionStatus(true, {
+          version: networkInfo.subversion || 'Unknown',
+          network: info.chain,
+          blocks: info.blocks,
+          verificationprogress: info.verificationprogress,
+        });
+      } catch (error) {
+        console.log('Refresh failed:', error.message);
+        updateConnectionStatus(false);
+      }
 
-    btn.textContent = 'Refresh Status';
-    btn.disabled = false;
-  });
+      btn.textContent = 'Refresh Status';
+      btn.disabled = false;
+    });
 
   // Build config object from form values
   function buildConfig() {
+    // Get existing config to preserve wallet info
+    let existingConfig = {};
+    try {
+      const saved = localStorage.getItem('coinswap_config');
+      if (saved) {
+        existingConfig = JSON.parse(saved);
+      }
+    } catch (e) {
+      console.error('Error loading existing config:', e);
+    }
+
     return {
+      ...existingConfig, // Preserve wallet config
       rpc: {
         host: content.querySelector('#rpc-host-input').value,
         port: parseInt(content.querySelector('#rpc-port-input').value),
@@ -776,18 +909,22 @@ zmqpubrawtx=${rawtx}`;
         password: content.querySelector('#rpc-password-input').value,
       },
       taker: {
-        control_port: parseInt(content.querySelector('#tor-control-port-input').value),
-        socks_port: parseInt(content.querySelector('#tor-socks-port-input').value),
-        tor_auth_password: content.querySelector('#tor-auth-password-input').value || undefined,
+        control_port: parseInt(
+          content.querySelector('#tor-control-port-input').value
+        ),
+        socks_port: parseInt(
+          content.querySelector('#tor-socks-port-input').value
+        ),
+        tor_auth_password:
+          content.querySelector('#tor-auth-password-input').value || undefined,
       },
       zmq: {
         rawblock: content.querySelector('#zmq-rawblock-input').value,
         rawtx: content.querySelector('#zmq-rawtx-input').value,
-        // Combined address for backward compatibility (uses rawblock endpoint)
         address: content.querySelector('#zmq-rawblock-input').value,
       },
       setupComplete: true,
-      setupDate: new Date().toISOString(),
+      setupDate: existingConfig.setupDate || new Date().toISOString(),
       lastModified: new Date().toISOString(),
     };
   }
@@ -818,8 +955,8 @@ zmqpubrawtx=${rawtx}`;
   content.querySelector('#reset-settings-btn').addEventListener('click', () => {
     if (confirm('Are you sure you want to reset all settings to defaults?')) {
       // Reset Tor config fields
-      content.querySelector('#tor-control-port-input').value = '9051';
-      content.querySelector('#tor-socks-port-input').value = '9050';
+      content.querySelector('#tor-control-port-input').value = '9053';
+      content.querySelector('#tor-socks-port-input').value = '9052';
       content.querySelector('#tor-auth-password-input').value = '';
 
       // Reset RPC fields
@@ -828,9 +965,10 @@ zmqpubrawtx=${rawtx}`;
       content.querySelector('#rpc-username-input').value = 'user';
       content.querySelector('#rpc-password-input').value = '';
 
-      // Reset ZMQ fields
-      content.querySelector('#zmq-rawblock-input').value = 'tcp://127.0.0.1:28332';
-      content.querySelector('#zmq-rawtx-input').value = 'tcp://127.0.0.1:28333';
+      // Reset ZMQ fields (both to 28332)
+      content.querySelector('#zmq-rawblock-input').value =
+        'tcp://127.0.0.1:29332';
+      content.querySelector('#zmq-rawtx-input').value = 'tcp://127.0.0.1:29332';
 
       // Update previews
       updateConfigPreviews();
@@ -853,7 +991,7 @@ zmqpubrawtx=${rawtx}`;
         version: networkInfo.subversion || 'Unknown',
         network: info.chain,
         blocks: info.blocks,
-        verificationprogress: info.verificationprogress
+        verificationprogress: info.verificationprogress,
       });
     } catch (error) {
       console.log('Initial connection check failed:', error.message);
