@@ -36,10 +36,7 @@ if (fs.existsSync(NODE_MODULES_TARGET)) {
   fs.rmSync(NODE_MODULES_TARGET, { recursive: true, force: true });
 }
 
-fs.mkdirSync(NODE_MODULES_TARGET, { recursive: true });
-
-// copy entire coinswap-napi folder into node_modules
-execSync(`cp -r "${NAPI_DIR}/" "${NODE_MODULES_TARGET}/"`);
+execSync(`cp -r "${NAPI_DIR}" "${path.join(__dirname, "node_modules")}/"`);
 
 console.log("✓ coinswap-napi copied into node_modules\n");
 

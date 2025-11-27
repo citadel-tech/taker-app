@@ -24,22 +24,31 @@ export function SwapReportComponent(container, swapReport) {
   // Extract values with safe defaults
   const report = {
     swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
-    swapDurationSeconds: swapReport.swapDurationSeconds || swapReport.swap_duration_seconds || 0,
+    swapDurationSeconds:
+      swapReport.swapDurationSeconds || swapReport.swap_duration_seconds || 0,
     targetAmount: swapReport.targetAmount || swapReport.target_amount || 0,
-    totalInputAmount: swapReport.totalInputAmount || swapReport.total_input_amount || 0,
-    totalOutputAmount: swapReport.totalOutputAmount || swapReport.total_output_amount || 0,
+    totalInputAmount:
+      swapReport.totalInputAmount || swapReport.total_input_amount || 0,
+    totalOutputAmount:
+      swapReport.totalOutputAmount || swapReport.total_output_amount || 0,
     makersCount: swapReport.makersCount || swapReport.makers_count || 0,
-    makerAddresses: swapReport.makerAddresses || swapReport.maker_addresses || [],
-    totalFundingTxs: swapReport.totalFundingTxs || swapReport.total_funding_txs || 0,
-    fundingTxidsByHop: swapReport.fundingTxidsByHop || swapReport.funding_txids_by_hop || [],
+    makerAddresses:
+      swapReport.makerAddresses || swapReport.maker_addresses || [],
+    totalFundingTxs:
+      swapReport.totalFundingTxs || swapReport.total_funding_txs || 0,
+    fundingTxidsByHop:
+      swapReport.fundingTxidsByHop || swapReport.funding_txids_by_hop || [],
     totalFee: swapReport.totalFee || swapReport.total_fee || 0,
-    totalMakerFees: swapReport.totalMakerFees || swapReport.total_maker_fees || 0,
+    totalMakerFees:
+      swapReport.totalMakerFees || swapReport.total_maker_fees || 0,
     miningFee: swapReport.miningFee || swapReport.mining_fee || 0,
     feePercentage: swapReport.feePercentage || swapReport.fee_percentage || 0,
     makerFeeInfo: swapReport.makerFeeInfo || swapReport.maker_fee_info || [],
     inputUtxos: swapReport.inputUtxos || swapReport.input_utxos || [],
-    outputRegularUtxos: swapReport.outputRegularUtxos || swapReport.output_regular_utxos || [],
-    outputSwapUtxos: swapReport.outputSwapUtxos || swapReport.output_swap_utxos || []
+    outputRegularUtxos:
+      swapReport.outputRegularUtxos || swapReport.output_regular_utxos || [],
+    outputSwapUtxos:
+      swapReport.outputSwapUtxos || swapReport.output_swap_utxos || [],
   };
 
   console.log('📊 Normalized report:', report);
@@ -75,16 +84,20 @@ export function SwapReportComponent(container, swapReport) {
   }
 
   function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-      showNotification('Copied to clipboard!');
-    }).catch(err => {
-      console.error('Copy failed:', err);
-    });
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        showNotification('Copied to clipboard!');
+      })
+      .catch((err) => {
+        console.error('Copy failed:', err);
+      });
   }
 
   function showNotification(message) {
     const notification = document.createElement('div');
-    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+    notification.className =
+      'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
     notification.textContent = message;
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 2000);
@@ -94,7 +107,8 @@ export function SwapReportComponent(container, swapReport) {
   function showMakerPopup(makerIndex) {
     const makerAddr = report.makerAddresses[makerIndex] || 'unknown';
     const makerFee = report.makerFeeInfo[makerIndex] || {};
-    const feePaid = makerFee.feePaid || makerFee.fee_paid || makerFee.amount || 0;
+    const feePaid =
+      makerFee.feePaid || makerFee.fee_paid || makerFee.amount || 0;
     const feeRate = makerFee.feeRate || makerFee.fee_rate || makerFee.rate || 0;
     const color = makerColors[makerIndex % makerColors.length];
 
@@ -103,7 +117,8 @@ export function SwapReportComponent(container, swapReport) {
     if (existingPopup) existingPopup.remove();
 
     const overlay = document.createElement('div');
-    overlay.className = 'maker-popup-overlay fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+    overlay.className =
+      'maker-popup-overlay fixed inset-0 bg-black/60 flex items-center justify-center z-50';
     overlay.innerHTML = `
       <div class="maker-popup bg-[#1a2332] border-2 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform animate-popup"
            style="border-color: ${color};">
@@ -181,7 +196,7 @@ export function SwapReportComponent(container, swapReport) {
     document.body.appendChild(overlay);
 
     // Event listeners for popup
-    overlay.querySelectorAll('.close-popup').forEach(btn => {
+    overlay.querySelectorAll('.close-popup').forEach((btn) => {
       btn.addEventListener('click', () => overlay.remove());
     });
 
@@ -189,7 +204,7 @@ export function SwapReportComponent(container, swapReport) {
       if (e.target === overlay) overlay.remove();
     });
 
-    overlay.querySelectorAll('.copy-addr-btn').forEach(btn => {
+    overlay.querySelectorAll('.copy-addr-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         copyToClipboard(makerAddr);
       });
@@ -204,11 +219,12 @@ export function SwapReportComponent(container, swapReport) {
       return '<p class="text-gray-500 text-sm">No transaction data available</p>';
     }
 
-    return report.fundingTxidsByHop.map((txids, hopIdx) => {
-      const txidArray = Array.isArray(txids) ? txids : [txids];
-      const color = makerColors[hopIdx % makerColors.length];
+    return report.fundingTxidsByHop
+      .map((txids, hopIdx) => {
+        const txidArray = Array.isArray(txids) ? txids : [txids];
+        const color = makerColors[hopIdx % makerColors.length];
 
-      return `
+        return `
         <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800 hover:border-[#FF6B35]/50 transition-colors">
           <p class="text-sm font-semibold mb-2" style="color: ${color}">
             <span class="inline-block w-6 h-6 rounded-full text-center leading-6 text-xs" 
@@ -217,7 +233,9 @@ export function SwapReportComponent(container, swapReport) {
             </span>
             Hop ${hopIdx + 1}
           </p>
-          ${txidArray.map(txid => `
+          ${txidArray
+            .map(
+              (txid) => `
             <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
               <p class="font-mono text-xs text-gray-300 flex-1">${truncateTxid(txid)}</p>
               <div class="flex gap-2">
@@ -227,10 +245,13 @@ export function SwapReportComponent(container, swapReport) {
                         data-txid="${txid}" title="View on Explorer">🔍</button>
               </div>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   // Build maker addresses HTML - Now clickable to show popup
@@ -239,9 +260,10 @@ export function SwapReportComponent(container, swapReport) {
       return '<p class="text-gray-500 text-sm">No maker data available</p>';
     }
 
-    return report.makerAddresses.map((addr, idx) => {
-      const color = makerColors[idx % makerColors.length];
-      return `
+    return report.makerAddresses
+      .map((addr, idx) => {
+        const color = makerColors[idx % makerColors.length];
+        return `
         <div class="maker-card bg-[#0f1419] rounded-lg p-4 border hover:border-[${color}] transition-all cursor-pointer hover:scale-102 hover:shadow-lg"
              style="border-color: ${color}40;" data-maker-index="${idx}">
           <div class="flex items-center gap-3">
@@ -257,7 +279,8 @@ export function SwapReportComponent(container, swapReport) {
           </div>
         </div>
       `;
-    }).join('');
+      })
+      .join('');
   }
 
   // Build circular flow visualization - true circle layout
@@ -266,7 +289,7 @@ export function SwapReportComponent(container, swapReport) {
     const size = 350;
     const centerX = size / 2;
     const centerY = size / 2;
-    const radius = 120;
+    const radius = 160;
 
     // Calculate positions around a circle
     // Start at top (You), go clockwise through makers, back to You
@@ -277,7 +300,7 @@ export function SwapReportComponent(container, swapReport) {
       type: 'you',
       label: 'You',
       angle: -Math.PI / 2, // Top
-      color: '#FF6B35'
+      color: '#FF6B35',
     });
 
     // Makers distributed around the circle clockwise
@@ -291,15 +314,15 @@ export function SwapReportComponent(container, swapReport) {
         index: i,
         label: `M${i + 1}`,
         angle: angle,
-        color: makerColors[i % makerColors.length]
+        color: makerColors[i % makerColors.length],
       });
     }
 
     // Calculate x, y positions
-    const nodePositions = allNodes.map(node => ({
+    const nodePositions = allNodes.map((node) => ({
       ...node,
       x: centerX + radius * Math.cos(node.angle),
-      y: centerY + radius * Math.sin(node.angle)
+      y: centerY + radius * Math.sin(node.angle),
     }));
 
     // Build SVG arrows (curved paths around the circle)
@@ -307,12 +330,10 @@ export function SwapReportComponent(container, swapReport) {
 
     for (let i = 0; i < nodePositions.length; i++) {
       const from = nodePositions[i];
-      const toIndex = (i + 1) % nodePositions.length; // Wrap around to "You"
+      const toIndex = (i + 1) % nodePositions.length;
       const to = nodePositions[toIndex];
 
-      // Calculate arc path
       const midAngle = (from.angle + to.angle) / 2;
-      // If crossing the -PI boundary, adjust
       let adjustedMidAngle = midAngle;
       if (Math.abs(from.angle - to.angle) > Math.PI) {
         adjustedMidAngle = midAngle + Math.PI;
@@ -325,42 +346,63 @@ export function SwapReportComponent(container, swapReport) {
       const color = from.color;
 
       arrowsHtml += `
-      <path d="M ${from.x} ${from.y} Q ${midX} ${midY} ${to.x} ${to.y}" 
-            stroke="${color}" stroke-width="3" fill="none" 
-            marker-end="url(#arrowhead-${i})" opacity="0.8"/>
-      <defs>
-        <marker id="arrowhead-${i}" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill="${color}" />
-        </marker>
-      </defs>
-    `;
+        <defs>
+          <linearGradient id="gradient-${i}" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:${color};stop-opacity:0.6" />
+            <stop offset="100%" style="stop-color:${color};stop-opacity:1" />
+          </linearGradient>
+          <filter id="glow-${i}">
+            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+            <feMerge>
+              <feMergeNode in="coloredBlur"/>
+              <feMergeNode in="SourceGraphic"/>
+            </feMerge>
+          </filter>
+          <marker id="arrowhead-${i}" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
+            <polygon points="0 0, 12 5, 0 10" fill="${color}" />
+          </marker>
+        </defs>
+        <path d="M ${from.x} ${from.y} Q ${midX} ${midY} ${to.x} ${to.y}" 
+              stroke="url(#gradient-${i})" 
+              stroke-width="4" 
+              fill="none" 
+              filter="url(#glow-${i})"
+              marker-end="url(#arrowhead-${i})" 
+              opacity="0.9"/>
+      `;
     }
 
     // Build node elements
-    let nodesHtml = nodePositions.map((node, idx) => {
-      const isYou = node.type === 'you';
+    let nodesHtml = nodePositions
+      .map((node, idx) => {
+        const isYou = node.type === 'you';
 
-      return `
+        return `
       <div class="absolute transform -translate-x-1/2 -translate-y-1/2 
-                  ${!isYou ? 'maker-node cursor-pointer hover:scale-110' : ''} 
-                  transition-transform z-10"
+                  ${!isYou ? 'maker-node cursor-pointer' : ''} 
+                  transition-all duration-300 z-10"
            style="left: ${node.x}px; top: ${node.y}px;"
            ${!isYou ? `data-maker-index="${node.index}"` : ''}>
-        <div class="flex flex-col items-center">
-          <div class="w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-3"
-               style="background: ${isYou ? node.color : node.color + '30'}; 
-                      border: 3px solid ${node.color};">
-            ${isYou
-          ? '<span class="text-xl">👤</span>'
-          : `<span class="font-bold text-sm" style="color: ${node.color};">${node.label}</span>`
-        }
+        <div class="flex flex-col items-center gap-2">
+          <div class="w-20 h-20 rounded-full flex items-center justify-center shadow-2xl border-4 backdrop-blur-sm relative"
+               style="background: ${isYou ? 'linear-gradient(135deg, ' + node.color + ' 0%, ' + node.color + '99 100%)' : 'linear-gradient(135deg, ' + node.color + '40 0%, ' + node.color + '20 100%)'}; 
+                      border-color: ${node.color};
+                      box-shadow: 0 0 30px ${node.color}50;">
+            ${
+              isYou
+                ? '<span class="text-3xl">👤</span>'
+                : `<span class="font-bold text-2xl" style="color: ${node.color};">${node.label}</span>`
+            }
           </div>
-          <p class="text-xs text-white mt-1 font-semibold">${isYou ? 'You' : `Maker ${node.index + 1}`}</p>
-          ${!isYou ? `<p class="text-xs text-gray-500 font-mono">${truncateAddress(report.makerAddresses[node.index] || '', 6, 0)}</p>` : ''}
+          <div class="text-center bg-[#0f1419]/90 px-3 py-1 rounded-lg backdrop-blur-sm border border-gray-700">
+            <p class="text-sm text-white font-bold">${isYou ? 'You' : `Maker ${node.index + 1}`}</p>
+            ${!isYou ? `<p class="text-xs text-gray-400 font-mono">${truncateAddress(report.makerAddresses[node.index] || '', 8, 4)}</p>` : '<p class="text-xs text-gray-400">Start/End</p>'}
+          </div>
         </div>
       </div>
     `;
-    }).join('');
+      })
+      .join('');
 
     // Add "BROKEN" labels between nodes
     let brokenLabelsHtml = '';
@@ -376,7 +418,7 @@ export function SwapReportComponent(container, swapReport) {
         adjustedMidAngle = midAngle + Math.PI;
       }
 
-      const labelRadius = radius + 50;
+      const labelRadius = radius + 65;
       const labelX = centerX + labelRadius * Math.cos(adjustedMidAngle);
       const labelY = centerY + labelRadius * Math.sin(adjustedMidAngle);
 
@@ -391,7 +433,7 @@ export function SwapReportComponent(container, swapReport) {
     }
 
     return `
-    <div class="relative mx-auto" style="width: ${size}px; height: ${size}px;">
+   <div class="relative mx-auto bg-gradient-to-br from-[#0a0f16] to-[#1a2332] rounded-2xl p-8" style="width: ${size}px; height: ${size}px;">
       <svg class="absolute inset-0" width="${size}" height="${size}">
         ${arrowsHtml}
       </svg>
@@ -399,10 +441,10 @@ export function SwapReportComponent(container, swapReport) {
       ${brokenLabelsHtml}
       
       <!-- Center info -->
-      <div class="absolute transform -translate-x-1/2 -translate-y-1/2 text-center"
+      <div class="absolute transform -translate-x-1/2 -translate-y-1/2 text-center bg-[#1a2332]/80 backdrop-blur-sm rounded-xl px-6 py-4 border-2 border-[#FF6B35]/30 shadow-xl"
            style="left: ${centerX}px; top: ${centerY}px;">
-        <p class="text-2xl font-bold text-[#FF6B35]">${report.makersCount + 1}</p>
-        <p class="text-xs text-gray-400">Hops</p>
+        <p class="text-4xl font-black text-[#FF6B35] mb-1">${report.makersCount + 1}</p>
+        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Hops</p>
       </div>
     </div>
   `;
@@ -420,6 +462,16 @@ export function SwapReportComponent(container, swapReport) {
         from { opacity: 0; transform: scale(0.9); }
         to { opacity: 1; transform: scale(1); }
       }
+
+      @keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+.maker-node:hover {
+  z-index: 20 !important;
+  transform: translate(-50%, -50%) scale(1.15) !important;
+}
       
       .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
       .animate-popup { animation: popup 0.2s ease-out forwards; }
@@ -723,7 +775,7 @@ export function SwapReportComponent(container, swapReport) {
   // EVENT LISTENERS
 
   // Maker cards - show popup
-  content.querySelectorAll('.maker-card').forEach(card => {
+  content.querySelectorAll('.maker-card').forEach((card) => {
     card.addEventListener('click', () => {
       const index = parseInt(card.dataset.makerIndex);
       showMakerPopup(index);
@@ -731,7 +783,7 @@ export function SwapReportComponent(container, swapReport) {
   });
 
   // Maker nodes in circular flow - show popup
-  content.querySelectorAll('.maker-node').forEach(node => {
+  content.querySelectorAll('.maker-node').forEach((node) => {
     node.addEventListener('click', () => {
       const index = parseInt(node.dataset.makerIndex);
       showMakerPopup(index);
@@ -739,14 +791,14 @@ export function SwapReportComponent(container, swapReport) {
   });
 
   // Copy transaction IDs
-  content.querySelectorAll('.copy-txid-btn').forEach(btn => {
+  content.querySelectorAll('.copy-txid-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       copyToClipboard(btn.dataset.txid);
     });
   });
 
   // View transaction in explorer
-  content.querySelectorAll('.view-txid-btn').forEach(btn => {
+  content.querySelectorAll('.view-txid-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const txid = btn.dataset.txid;
       window.open(`https://mempool.space/signet/tx/${txid}`, '_blank');

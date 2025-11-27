@@ -27,6 +27,7 @@ const activeSyncs = new Map();
 const DATA_DIR = `${process.env.HOME}/.coinswap/taker`;
 const DEFAULT_WALLET_NAME = 'taker-wallet';
 let currentWalletName = DEFAULT_WALLET_NAME;
+let currentWalletPassword = '';
 
 /**
  * Initialize the native coinswap module
@@ -35,7 +36,8 @@ let currentWalletName = DEFAULT_WALLET_NAME;
 function saveSwapReport(swapId, swapData) {
   try {
     const dataDir = DATA_DIR;
-    const reportsDir = path.join(dataDir, 'swap_reports');
+    const walletName = currentWalletName || getCurrentWalletName();
+    const reportsDir = path.join(dataDir, 'swap_reports', walletName);
 
     // Create swap_reports directory if it doesn't exist
     if (!fs.existsSync(reportsDir)) {
@@ -43,10 +45,20 @@ function saveSwapReport(swapId, swapData) {
       console.log('📁 Created swap_reports directory');
     }
 
+    // Ensure swapId is stored in the data
+    const reportData = {
+      ...swapData,
+      swapId: swapId, // ✅ Make sure swapId is in the data
+      status: swapData.status || 'completed',
+      amount: swapData.amount,
+      startedAt: swapData.startedAt || Date.now(),
+      completedAt: swapData.completedAt || Date.now(),
+    };
+
     const filename = `${swapId}.json`;
     const filepath = path.join(reportsDir, filename);
 
-    fs.writeFileSync(filepath, JSON.stringify(swapData, null, 2), 'utf8');
+    fs.writeFileSync(filepath, JSON.stringify(reportData, null, 2), 'utf8');
     console.log(`💾 Swap report saved: ${filepath}`);
 
     return true;
@@ -176,6 +188,7 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       walletPassword && walletPassword.trim() !== ''
         ? walletPassword
         : undefined;
+    currentWalletPassword = finalPassword || '';
     console.log(
       '🔐 Creating Taker with wallet:',
       walletName,
@@ -198,6 +211,7 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       rpcConfig,
       zmqAddr,
       controlPort: config.taker?.control_port || 9051,
+      password: finalPassword || '',
     };
 
     console.log('✅ Taker initialized with wallet:', walletName);
@@ -255,6 +269,25 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       };
     }
 
+    return { success: false, error: error.message };
+  }
+});
+
+// Get wallet info
+ipcMain.handle('taker:getWalletInfo', async () => {
+  try {
+    const walletName = currentWalletName || DEFAULT_WALLET_NAME;
+    const dataDir = DATA_DIR;
+    const walletPath = path.join(dataDir, 'wallets', walletName);
+
+    return {
+      success: true,
+      walletName: walletName,
+      walletPath: walletPath,
+      dataDir: dataDir,
+    };
+  } catch (error) {
+    console.error('Failed to get wallet info:', error);
     return { success: false, error: error.message };
   }
 });
@@ -612,7 +645,8 @@ ipcMain.handle('taker:syncOfferbook', async () => {
 
     const config = {
       ...storedTakerConfig,
-      password: '',
+      walletName: currentWalletName,
+      password: currentWalletPassword,
     };
 
     const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
@@ -897,58 +931,116 @@ ipcMain.handle('coinswap:getStatus', async (event, swapId) => {
 });
 
 // Get all swap reports
-ipcMain.handle('swapReports:getAll', async () => {
+// Helper function to get current wallet name
+function getCurrentWalletName() {
   try {
     const dataDir = DATA_DIR;
-    const reportsDir = path.join(dataDir, 'swap_reports');
+    const configPath = path.join(dataDir, 'config.toml');
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf-8');
+      const walletMatch = configContent.match(
+        /wallet_file_name\s*=\s*"([^"]+)"/
+      );
+      if (walletMatch) {
+        return walletMatch[1];
+      }
+    }
+  } catch (error) {
+    console.error('Failed to read wallet name from config:', error);
+  }
+  return 'taker-wallet'; // fallback
+}
+
+// Get all swap reports for current wallet
+ipcMain.handle('swapReports:getAll', async () => {
+  try {
+    const walletName = currentWalletName || getCurrentWalletName();
+    const dataDir = DATA_DIR;
+    const reportsDir = path.join(dataDir, 'swap_reports', walletName);
+
+    console.log('📂 Reading swap reports from:', reportsDir);
 
     if (!fs.existsSync(reportsDir)) {
+      console.log(
+        '📂 Swap reports directory does not exist, creating:',
+        reportsDir
+      );
+      fs.mkdirSync(reportsDir, { recursive: true });
       return { success: true, reports: [] };
     }
 
     const files = fs.readdirSync(reportsDir);
-    const reports = [];
+    const jsonFiles = files.filter((f) => f.endsWith('.json'));
 
-    for (const file of files) {
-      if (file.endsWith('.json')) {
+    const reports = jsonFiles
+      .map((file) => {
         try {
-          const filepath = path.join(reportsDir, file);
-          const content = fs.readFileSync(filepath, 'utf8');
+          const filePath = path.join(reportsDir, file);
+          const content = fs.readFileSync(filePath, 'utf-8');
           const report = JSON.parse(content);
-          reports.push(report);
+
+          // ✅ Extract swapId from filename (not from nested report)
+          const swapId = file.replace('.json', '');
+
+          // ✅ Ensure top-level swapId matches filename
+          return {
+            ...report,
+            swapId: swapId,
+          };
         } catch (error) {
-          console.warn(`⚠️ Could not read swap report ${file}:`, error.message);
+          console.error(`Failed to read swap report ${file}:`, error);
+          return null;
         }
-      }
-    }
+      })
+      .filter((r) => r !== null);
 
-    // Sort by start time (newest first)
-    reports.sort((a, b) => b.startedAt - a.startedAt);
-
-    console.log(`📊 Loaded ${reports.length} swap reports`);
+    console.log(
+      `✅ Loaded ${reports.length} swap reports for wallet ${walletName}`
+    );
     return { success: true, reports };
   } catch (error) {
-    console.error('❌ Failed to get swap reports:', error);
+    console.error('Failed to get swap reports:', error);
     return { success: false, error: error.message };
   }
 });
 
-// Get single swap report
+// Get specific swap report for current wallet
 ipcMain.handle('swapReports:get', async (event, swapId) => {
   try {
+    const walletName = currentWalletName || getCurrentWalletName();
     const dataDir = DATA_DIR;
-    const filepath = path.join(dataDir, 'swap_reports', `${swapId}.json`);
+    const reportsDir = path.join(dataDir, 'swap_reports', walletName);
 
-    if (!fs.existsSync(filepath)) {
-      return { success: false, error: 'Report not found' };
+    console.log('🔍 Looking for swap report:', swapId);
+    console.log('📂 In directory:', reportsDir);
+    console.log('💼 Wallet name:', walletName);
+
+    if (!fs.existsSync(reportsDir)) {
+      console.error('❌ Directory does not exist:', reportsDir);
+      return { success: false, error: 'Swap reports directory does not exist' };
     }
 
-    const content = fs.readFileSync(filepath, 'utf8');
+    const files = fs.readdirSync(reportsDir);
+    console.log('📄 Files in directory:', files);
+
+    const matchingFile = files.find(
+      (f) => f.startsWith(swapId) && f.endsWith('.json')
+    );
+
+    if (!matchingFile) {
+      console.error(`❌ Swap report not found for ID: ${swapId}`);
+      console.log('Available files:', files);
+      return { success: false, error: 'Swap report not found' };
+    }
+
+    const filePath = path.join(reportsDir, matchingFile);
+    const content = fs.readFileSync(filePath, 'utf-8');
     const report = JSON.parse(content);
 
+    console.log(`✅ Loaded swap report: ${swapId} for wallet ${walletName}`);
     return { success: true, report };
   } catch (error) {
-    console.error('❌ Failed to get swap report:', error);
+    console.error('Failed to get swap report:', error);
     return { success: false, error: error.message };
   }
 });
@@ -984,7 +1076,6 @@ ipcMain.handle('swapState:load', async () => {
     const content = fs.readFileSync(stateFile, 'utf8');
     const state = JSON.parse(content);
 
-    console.log('📂 Swap state loaded');
     return { success: true, state };
   } catch (error) {
     console.error('❌ Failed to load swap state:', error);

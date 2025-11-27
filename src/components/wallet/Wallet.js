@@ -1,5 +1,6 @@
-export function WalletComponent(container) {
-  // API Functions (using IPC)
+export async function WalletComponent(container) {
+  console.log('🔍 WalletComponent called at', new Date().toISOString());
+
   async function fetchBalance() {
     try {
       const data = await window.api.taker.getBalance();
@@ -275,11 +276,21 @@ export function WalletComponent(container) {
   const content = document.createElement('div');
   content.id = 'wallet-content';
 
+  let walletInfo = { walletName: 'Loading...', walletPath: '...' };
+  try {
+    const info = await window.api.taker.getWalletInfo();
+    if (info.success) {
+      walletInfo = info;
+    }
+  } catch (error) {
+    console.error('Failed to get wallet info:', error);
+  }
+
   content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
             <div>
-                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Wallet</h2>
-                <p class="text-gray-400">Your Bitcoin balance and transaction history</p>
+                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">${walletInfo.walletName}</h2>
+                <p class="text-gray-400 font-mono text-sm">${walletInfo.walletPath}</p>
             </div>
             <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-4 rounded-lg transition-colors">
                 Refresh All Data

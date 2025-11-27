@@ -34,7 +34,7 @@ async function startBackgroundSwapManager() {
 
   // Only start if swap actually exists
   const existing = await SwapStateManager.getActiveSwap();
-  if (!existing) return;   // ❗ DO NOT START MANAGER
+  if (!existing) return; // ❗ DO NOT START MANAGER
 
   backgroundSwapManager = setInterval(async () => {
     const activeSwap = await SwapStateManager.getActiveSwap();
@@ -42,11 +42,8 @@ async function startBackgroundSwapManager() {
       stopBackgroundSwapManager();
       return;
     }
-
-    eventBus.emit('swap:poll', activeSwap);
   }, 1000);
 }
-
 
 function stopBackgroundSwapManager() {
   if (backgroundSwapManager) {
@@ -56,32 +53,43 @@ function stopBackgroundSwapManager() {
 }
 
 // Render component
-async function renderComponent(name) {  // ✅ Make async
+async function renderComponent(name) {
   const contentContainer = document.querySelector('#content-area');
   if (!contentContainer) return;
 
-  const activeSwap = await SwapStateManager.getActiveSwap();  // ✅ Add await
+  const activeSwap = await SwapStateManager.getActiveSwap();
   if (activeSwap && activeSwap.status === 'in_progress' && name === 'swap') {
-    contentContainer.innerHTML = '';
+    // ✅ Remove all event listeners by cloning the node
+    const newContainer = contentContainer.cloneNode(false);
+    contentContainer.parentNode.replaceChild(newContainer, contentContainer);
+
     import('../components/swap/Coinswap.js').then((module) => {
-      module.CoinswapComponent(contentContainer, activeSwap);
+      module.CoinswapComponent(newContainer, activeSwap);
     });
     return;
   }
 
-  contentContainer.innerHTML = '';
+  // ✅ Remove all event listeners by cloning the node
+  const newContainer = contentContainer.cloneNode(false);
+  contentContainer.parentNode.replaceChild(newContainer, contentContainer);
+
   const component = components[name];
   if (component) {
-    component(contentContainer);
+    component(newContainer);
   }
 }
 
+let navigationSetup = false;
+
 // Setup navigation handlers
 function setupNavigation() {
+  if (navigationSetup) return;
+  navigationSetup = true;
   const navItems = document.querySelectorAll('.nav-item');
 
   navItems.forEach((item) => {
-    item.addEventListener('click', async (e) => {  // ✅ Add async
+    item.addEventListener('click', async (e) => {
+      // ✅ Add async
       e.preventDefault();
 
       navItems.forEach((nav) => {
@@ -93,7 +101,7 @@ function setupNavigation() {
       item.classList.add('bg-[#FF6B35]', 'text-white');
 
       const navName = item.getAttribute('data-nav');
-      await renderComponent(navName);  // ✅ Add await
+      await renderComponent(navName);
     });
   });
 }
@@ -126,8 +134,9 @@ async function checkTakerInitialization(config) {
 
   try {
     // Extract wallet name from config
-    const walletName = config.wallet?.name || config.wallet?.fileName || 'taker-wallet';
-    
+    const walletName =
+      config.wallet?.name || config.wallet?.fileName || 'taker-wallet';
+
     console.log('🔍 Checking wallet:', walletName);
 
     // Store it in config so showPasswordPrompt can use it
@@ -136,15 +145,18 @@ async function checkTakerInitialization(config) {
     }
 
     // Check if wallet file is encrypted
-    const isEncrypted = await window.api.taker.isWalletEncrypted(null, walletName);
+    const isEncrypted = await window.api.taker.isWalletEncrypted(
+      null,
+      walletName
+    );
     console.log('🔐 Wallet file encrypted:', isEncrypted);
 
     if (isEncrypted) {
       console.log('🔓 Wallet is encrypted, showing password prompt...');
-      await showPasswordPrompt(config);  // ✅ Config has correct wallet name
+      await showPasswordPrompt(config); // ✅ Config has correct wallet name
     } else {
       console.log('🔓 Wallet is not encrypted');
-      
+
       const result = await window.api.taker.initialize(config);
 
       if (result.success) {
@@ -175,10 +187,12 @@ function startTakerInitWithConfig(config) {
 
 async function showPasswordPrompt(config) {
   // Extract wallet name for display
-  const walletName = config.wallet?.name || config.wallet?.fileName || 'taker-wallet';
-  
+  const walletName =
+    config.wallet?.name || config.wallet?.fileName || 'taker-wallet';
+
   const modal = document.createElement('div');
-  modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+  modal.className =
+    'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
   modal.innerHTML = `
     <div class="bg-[#1a2332] rounded-lg p-6 max-w-md w-full mx-4">
       <h3 class="text-xl font-bold text-white mb-4">🔐 Wallet Password Required</h3>
@@ -281,8 +295,8 @@ async function showPasswordPrompt(config) {
 }
 
 // Start the main app after bitcoind connection is established
-async function startMainApp() {  // ✅ Make async
-  const activeSwap = await SwapStateManager.getActiveSwap();  // ✅ Add await
+async function startMainApp() {
+  const activeSwap = await SwapStateManager.getActiveSwap();
   if (activeSwap && activeSwap.status === 'in_progress') {
     console.log('Found active swap, redirecting to coinswap progress');
     startBackgroundSwapManager();
@@ -325,33 +339,32 @@ function initiateAppStart(config) {
 
 // Initialize app
 // Initialize app
-document.addEventListener('DOMContentLoaded', async () => {  // ✅ Make async
+document.addEventListener('DOMContentLoaded', async () => {
   console.log('App initializing...');
 
   const navContainer = document.querySelector('#nav-container');
   if (navContainer) {
-    await NavComponent(navContainer);  // ✅ Add await
+    await NavComponent(navContainer);
     console.log('Nav rendered');
   } else {
     console.error('Nav container not found!');
   }
 
-  setupNavigation();  // ✅ This now runs AFTER nav is fully rendered
+  setupNavigation();
 
   const appContainer = document.querySelector('body');
 
   // Load config if exists
-  const saved = localStorage.getItem("coinswap_config");
+  const saved = localStorage.getItem('coinswap_config');
 
   if (!saved) {
     // First-time setup ONLY ONCE
     console.log('🔧 Showing setup modal...');
     FirstTimeSetupModal(appContainer, (config) => {
-
-      console.log("Setup completed:", config);
+      console.log('Setup completed:', config);
 
       // save config
-      localStorage.setItem("coinswap_config", JSON.stringify(config));
+      localStorage.setItem('coinswap_config', JSON.stringify(config));
 
       initiateAppStart(config);
       showSetupSuccess();
@@ -380,7 +393,6 @@ function showSetupSuccess() {
     setTimeout(() => successDiv.remove(), 300);
   }, 3000);
 }
-
 
 // Export functions for components to use
 window.appManager = {

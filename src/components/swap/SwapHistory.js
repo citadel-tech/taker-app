@@ -1,12 +1,48 @@
-import { SwapStateManager, formatRelativeTime, formatElapsedTime } from './SwapStateManager.js';
+import {
+  SwapStateManager,
+  formatRelativeTime,
+  formatElapsedTime,
+} from './SwapStateManager.js';
 
-export function SwapHistoryComponent(container) {
+let swapHistory = [];
+
+async function loadSwapHistory() {
+  try {
+    const result = await window.api.swapReports.getAll();
+    if (result.success && result.reports) {
+      swapHistory = result.reports
+        .filter((report) => report.status === 'completed') // ✅ Only show completed
+        .map((report) => ({
+          id: report.swapId || `swap_${Date.now()}`,
+          completedAt: report.completedAt || Date.now(),
+          amount: report.amount || 0,
+          totalOutputAmount: report.report?.totalOutputAmount || 0,
+          makersCount: report.report?.makersCount || 0,
+          hops: (report.report?.makersCount || 0) + 1,
+          totalFee: report.report?.totalFee || 0,
+          feePercentage: report.report?.feePercentage || 0,
+          durationSeconds:
+            Math.floor((report.completedAt - report.startedAt) / 1000) || 0,
+          status: report.status,
+          report: report.report,
+        }));
+    }
+  } catch (error) {
+    console.error('Failed to load swap history:', error);
+  }
+}
+
+export async function SwapHistoryComponent(container) {
+  if (container.querySelector('#swap-history-content')) {
+    console.log('⚠️ SwapHistory component already rendered, skipping');
+    return;
+  }
+
   console.log('📜 SwapHistoryComponent loading...');
+  await loadSwapHistory();
 
   const content = document.createElement('div');
   content.id = 'swap-history-content';
-
-  const swapHistory = SwapStateManager.getSwapHistory();
 
   function satsToBtc(sats) {
     if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
@@ -27,20 +63,25 @@ export function SwapHistoryComponent(container) {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   }
 
-  function viewSwapReport(swapId) {
-    const swap = SwapStateManager.getSwapFromHistory(swapId);
-    if (swap && swap.report) {
-      import('./SwapReport.js').then((module) => {
-        container.innerHTML = '';
-        module.SwapReportComponent(container, swap.report);
-      });
-    } else {
-      console.error('Swap report not found for ID:', swapId);
-      alert('Swap report not found');
+  async function viewSwapReport(swapId) {
+    try {
+      const result = await window.api.swapReports.get(swapId);
+      if (result.success && result.report) {
+        import('./SwapReport.js').then((module) => {
+          container.innerHTML = '';
+          module.SwapReportComponent(container, result.report.report);
+        });
+      } else {
+        console.error('Swap report not found for ID:', swapId);
+        alert('Swap report not found');
+      }
+    } catch (error) {
+      console.error('Failed to load swap report:', error);
+      alert('Failed to load swap report: ' + error.message);
     }
   }
 
@@ -60,14 +101,15 @@ export function SwapHistoryComponent(container) {
 
     return `
       <div class="space-y-4">
-        ${swapHistory.map((swap, index) => {
-          const btcAmount = satsToBtc(swap.amount);
-          const outputBtc = satsToBtc(swap.totalOutputAmount);
-          const timeAgo = formatRelativeTime(swap.completedAt);
-          const dateStr = formatDate(swap.completedAt);
-          const duration = formatDuration(swap.durationSeconds);
-          
-          return `
+        ${swapHistory
+          .map((swap, index) => {
+            const btcAmount = satsToBtc(swap.amount);
+            const outputBtc = satsToBtc(swap.totalOutputAmount);
+            const timeAgo = formatRelativeTime(swap.completedAt);
+            const dateStr = formatDate(swap.completedAt);
+            const duration = formatDuration(swap.durationSeconds);
+
+            return `
             <div class="swap-history-row bg-[#1a2332] hover:bg-[#242d3d] rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-[#FF6B35]/30" data-swap-id="${swap.id}">
               <div class="flex items-center gap-4">
                 <!-- Status Icon -->
@@ -126,7 +168,8 @@ export function SwapHistoryComponent(container) {
               </div>
             </div>
           `;
-        }).join('')}
+          })
+          .join('')}
       </div>
     `;
   }
@@ -135,9 +178,12 @@ export function SwapHistoryComponent(container) {
   const totalSwaps = swapHistory.length;
   const totalVolume = swapHistory.reduce((sum, s) => sum + (s.amount || 0), 0);
   const totalFees = swapHistory.reduce((sum, s) => sum + (s.totalFee || 0), 0);
-  const avgHops = totalSwaps > 0 
-    ? (swapHistory.reduce((sum, s) => sum + (s.hops || 0), 0) / totalSwaps).toFixed(1) 
-    : 0;
+  const avgHops =
+    totalSwaps > 0
+      ? (
+          swapHistory.reduce((sum, s) => sum + (s.hops || 0), 0) / totalSwaps
+        ).toFixed(1)
+      : 0;
 
   content.innerHTML = `
     <div class="max-w-5xl mx-auto">
@@ -154,16 +200,22 @@ export function SwapHistoryComponent(container) {
             <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Swap History</h2>
             <p class="text-gray-400">View all your completed coinswap transactions</p>
           </div>
-          ${totalSwaps > 0 ? `
+          ${
+            totalSwaps > 0
+              ? `
             <button id="clear-history" class="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm transition-colors">
               Clear History
             </button>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
       </div>
 
       <!-- Stats Cards -->
-      ${totalSwaps > 0 ? `
+      ${
+        totalSwaps > 0
+          ? `
         <div class="grid grid-cols-4 gap-4 mb-8">
           <div class="bg-[#1a2332] rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Total Swaps</p>
@@ -182,7 +234,9 @@ export function SwapHistoryComponent(container) {
             <p class="text-2xl font-bold text-cyan-400">${avgHops}</p>
           </div>
         </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <!-- Swap List -->
       <div id="swap-list-container">
@@ -209,7 +263,11 @@ export function SwapHistoryComponent(container) {
   });
 
   content.querySelector('#clear-history')?.addEventListener('click', () => {
-    if (confirm('Are you sure you want to clear all swap history? This cannot be undone.')) {
+    if (
+      confirm(
+        'Are you sure you want to clear all swap history? This cannot be undone.'
+      )
+    ) {
       SwapStateManager.clearSwapHistory();
       // Re-render the component
       container.innerHTML = '';

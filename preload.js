@@ -25,6 +25,7 @@ contextBridge.exposeInMainWorld('api', {
     recover: () => ipcRenderer.invoke('taker:recover'),
     isWalletEncrypted: (walletPath) =>
       ipcRenderer.invoke('taker:isWalletEncrypted', walletPath),
+    getWalletInfo: () => ipcRenderer.invoke('taker:getWalletInfo'),
   },
 
   // Coinswap operations
@@ -38,11 +39,16 @@ contextBridge.exposeInMainWorld('api', {
     get: (lines) => ipcRenderer.invoke('logs:get', lines),
   },
 
+  swapReports: {
+    getAll: () => ipcRenderer.invoke('swapReports:getAll'),
+    get: (swapId) => ipcRenderer.invoke('swapReports:get', swapId),
+  },
+
   swapState: {
-  save: (state) => ipcRenderer.invoke('swapState:save', state),
-  load: () => ipcRenderer.invoke('swapState:load'),
-  clear: () => ipcRenderer.invoke('swapState:clear'),
-},
+    save: (state) => ipcRenderer.invoke('swapState:save', state),
+    load: () => ipcRenderer.invoke('swapState:load'),
+    clear: () => ipcRenderer.invoke('swapState:clear'),
+  },
 
   // File dialogs - TOP LEVEL, NOT INSIDE TAKER!
   openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),

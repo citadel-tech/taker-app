@@ -1,6 +1,13 @@
 import { SwapStateManager, formatRelativeTime } from './SwapStateManager.js';
 
 export async function SwapComponent(container) {
+  const existingContent = container.querySelector('#swap-content');
+  if (existingContent) {
+    console.log(
+      '⚠️ Swap component already rendered, clearing and re-rendering'
+    );
+    container.innerHTML = '';
+  }
   console.log('🔧 SwapComponent loading...');
 
   const content = document.createElement('div');
@@ -204,13 +211,28 @@ export async function SwapComponent(container) {
   // Render Recent Swaps section
   // Render Recent Swaps section
   async function renderRecentSwaps() {
-    // ✅ Make async
     const recentSwapsContainer = content.querySelector(
       '#recent-swaps-container'
     );
     if (!recentSwapsContainer) return;
 
-    const recentSwaps = await SwapStateManager.getRecentSwaps(5); // ✅ Add await
+    let recentSwaps = [];
+    try {
+      const result = await window.api.swapReports.getAll();
+      if (result.success && result.reports) {
+        recentSwaps = result.reports
+          .filter((report) => report.status === 'completed')
+          .slice(0, 5)
+          .map((report) => ({
+            id: report.swapId || `swap_${Date.now()}`,
+            completedAt: report.completedAt || Date.now(),
+            amount: report.amount || 0,
+            hops: (report.report?.makersCount || 0) + 1,
+          }));
+      }
+    } catch (error) {
+      console.error('Failed to load recent swaps:', error);
+    }
 
     if (recentSwaps.length === 0) {
       recentSwapsContainer.innerHTML = `
@@ -259,15 +281,18 @@ export async function SwapComponent(container) {
 
   // View swap report from history
   async function viewSwapReport(swapId) {
-    // ✅ Make async
-    const swap = await SwapStateManager.getSwapFromHistory(swapId); // ✅ Add await
-    if (swap && swap.report) {
-      import('./SwapReport.js').then((module) => {
-        container.innerHTML = '';
-        module.SwapReportComponent(container, swap.report);
-      });
-    } else {
-      console.error('Swap report not found for ID:', swapId);
+    try {
+      const result = await window.api.swapReports.get(swapId);
+      if (result.success && result.report) {
+        import('./SwapReport.js').then((module) => {
+          container.innerHTML = '';
+          module.SwapReportComponent(container, result.report.report);
+        });
+      } else {
+        console.error('Swap report not found for ID:', swapId);
+      }
+    } catch (error) {
+      console.error('Failed to load swap report:', error);
     }
   }
 
@@ -659,7 +684,6 @@ export async function SwapComponent(container) {
 
   // Save current user selections to localStorage
   async function saveCurrentSelections() {
-    // ✅ Make async
     const selections = {
       swapAmount,
       amountUnit,
@@ -671,7 +695,7 @@ export async function SwapComponent(container) {
       networkFeeRate,
     };
     console.log('💾 Saving current selections:', selections);
-    await SwapStateManager.saveUserSelections(selections); // ✅ Add await
+    await SwapStateManager.saveUserSelections(selections);
   }
 
   // UI - Render the HTML template
@@ -905,10 +929,12 @@ export async function SwapComponent(container) {
 
   // EVENT LISTENERS
 
-  content.querySelector('#swap-amount-input').addEventListener('input', async () => {
-    updateSummary();
-    await saveCurrentSelections();
-  });
+  content
+    .querySelector('#swap-amount-input')
+    .addEventListener('input', async () => {
+      updateSummary();
+      await saveCurrentSelections();
+    });
 
   content
     .querySelector('#max-swap-btn')
@@ -1082,7 +1108,7 @@ export async function SwapComponent(container) {
   }
 
   // Fetch real data
-  Promise.all([fetchUtxos(), fetchMakers(), fetchBalance()]).then(async() => {
+  Promise.all([fetchUtxos(), fetchMakers(), fetchBalance()]).then(async () => {
     renderUtxoList();
     await renderRecentSwaps();
 
