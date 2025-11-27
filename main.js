@@ -132,7 +132,7 @@ ipcMain.handle('taker:initialize', async (event, config) => {
     }
 
     const dataDir = DATA_DIR;
-    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:29332';
+    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
 
     // ✅ EXTRACT WALLET NAME FIRST
     const walletName =
@@ -171,8 +171,11 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       console.warn('⚠️ Could not setup logging:', logError.message);
     }
 
-const walletPassword = config.wallet?.password;
-const finalPassword = (walletPassword && walletPassword.trim() !== '') ? walletPassword : undefined;
+    const walletPassword = config.wallet?.password;
+    const finalPassword =
+      walletPassword && walletPassword.trim() !== ''
+        ? walletPassword
+        : undefined;
     console.log(
       '🔐 Creating Taker with wallet:',
       walletName,
@@ -184,13 +187,18 @@ const finalPassword = (walletPassword && walletPassword.trim() !== '') ? walletP
       dataDir,
       walletName,
       rpcConfig,
-      9051,
+      config.taker?.control_port || 9051,
       undefined,
       zmqAddr,
       finalPassword
     );
 
-    storedTakerConfig = { dataDir, rpcConfig, zmqAddr };
+    storedTakerConfig = {
+      dataDir,
+      rpcConfig,
+      zmqAddr,
+      controlPort: config.taker?.control_port || 9051,
+    };
 
     console.log('✅ Taker initialized with wallet:', walletName);
 
@@ -517,7 +525,7 @@ ipcMain.handle(
       console.log(`📁 Restoring to: ${dataDir}/wallets/${restoredWalletName}`);
 
       const rpcConfig = {
-        url: '127.0.0.1:18443',
+        url: '127.0.0.1:38332',
         username: 'user',
         password: 'password',
         walletName: restoredWalletName, // ✅ Use the correct wallet name
@@ -804,13 +812,14 @@ ipcMain.handle(
       const config = {
         dataDir: DATA_DIR,
         walletName: walletName,
+        controlPort: storedTakerConfig.controlPort || 9051,
         rpcConfig: {
-          url: '127.0.0.1:18443',
+          url: '127.0.0.1:38332',
           username: 'user',
           password: 'password',
           walletName: walletName,
         },
-        zmqAddr: 'tcp://127.0.0.1:29332',
+        zmqAddr: 'tcp://127.0.0.1:28332',
         password: password || '',
       };
 

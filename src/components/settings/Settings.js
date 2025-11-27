@@ -116,12 +116,12 @@ export function SettingsComponent(container) {
                             <input 
                                 type="number" 
                                 id="rpc-port-input"
-                                value="18443"
+                                value="38332"
                                 min="1"
                                 max="65535"
                                 class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
                             />
-                            <p class="text-xs text-gray-500 mt-1">Bitcoin Core RPC port (8332 for mainnet, 18332 for testnet, 18443 for regtest)</p>
+                            <p class="text-xs text-gray-500 mt-1">Bitcoin Core RPC port (8332 for mainnet, 18332 for testnet, 38332 for regtest)</p>
                         </div>
                         
                         <div>
@@ -274,38 +274,45 @@ export function SettingsComponent(container) {
                 
                 <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
                     <div id="full-config-preview">
-    # ========================================<br/>
-    # SIGNET CONFIGURATION<br/>
-    # ========================================<br/>
-    [signet]<br/>
-    signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44<br/>
-    rpcuser=user<br/>
-    rpcpassword=password<br/>
-    server=1<br/>
-    txindex=1<br/>
-    blockfilterindex=1<br/>
-    addnode=172.81.178.3:38333<br/>
-    rpcport=38332<br/>
-    rpcbind=127.0.0.1<br/>
-    rpcallowip=127.0.0.1<br/>
-    zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-    zmqpubrawtx=tcp://127.0.0.1:28332<br/>
-    <br/>
-    # ========================================<br/>
-    # REGTEST CONFIGURATION<br/>
-    # ========================================<br/>
-    [regtest]<br/>
-    rpcuser=user<br/>
-    rpcpassword=password<br/>
-    fallbackfee=0.00001000<br/>
-    server=1<br/>
-    txindex=1<br/>
-    blockfilterindex=1<br/>
-    rpcport=18443<br/>
-    rpcbind=127.0.0.1<br/>
-    rpcallowip=127.0.0.1<br/>
-    zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-    zmqpubrawtx=tcp://127.0.0.1:28332
+[signet]<br/>
+# Signet network configuration for running Coinswap Taker and Maker<br/>
+# Mutinynet default signet parameters<br/>
+signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae<br/>
+addnode=45.79.52.207:38333<br/>
+dnsseed=0<br/>
+signetblocktime=30<br/>
+# RPC Configurations for Coinswap operations<br/>
+server=1<br/>
+rpcuser=user<br/>
+rpcpassword=password<br/>
+rpcport=38332<br/>
+rpcbind=127.0.0.1<br/>
+rpcallowip=127.0.0.1<br/>
+# ZMQ Configurations for real-time transaction and block notifications<br/>
+# Needed for the Watchers.<br/>
+zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+zmqpubrawtx=tcp://127.0.0.1:28332<br/>
+# Required indexes for faster wallet sync<br/>
+txindex=1<br/>
+blockfilterindex=1<br/>
+<br/>
+[regtest]<br/>
+# Regtest network configurations for running Coinswap Taker and Maker<br/>
+fallbackfee=0.00001000<br/>
+# RPC Configurations for Coinswap operations<br/>
+server=1<br/>
+rpcuser=user<br/>
+rpcpassword=password<br/>
+rpcport=18442<br/>
+rpcbind=127.0.0.1<br/>
+rpcallowip=127.0.0.1<br/>
+# ZMQ Configurations for real-time transaction and block notifications<br/>
+# Needed for the Watchers.<br/>
+zmqpubrawblock=tcp://127.0.0.1:28332<br/>
+zmqpubrawtx=tcp://127.0.0.1:28332<br/>
+# Required indexes for faster wallet sync<br/>
+txindex=1<br/>
+blockfilterindex=1
 </div>
                 </div>
                 
@@ -446,7 +453,7 @@ export function SettingsComponent(container) {
       content.querySelector('#rpc-username-input').value || 'user';
     const rpcPass =
       content.querySelector('#rpc-password-input').value || 'password';
-    const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
+    const rpcPort = content.querySelector('#rpc-port-input').value || '38332';
 
     // Update ZMQ config preview
     const zmqPreview = content.querySelector('#zmq-config-preview');
@@ -457,38 +464,45 @@ export function SettingsComponent(container) {
     // Update full config preview
     const fullPreview = content.querySelector('#full-config-preview');
     if (fullPreview) {
-      fullPreview.innerHTML = `# ========================================<br/>
-        # SIGNET CONFIGURATION<br/>
-        # ========================================<br/>
-        [signet]<br/>
-        signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44<br/>
-        rpcuser=${rpcUser}<br/>
-        rpcpassword=${rpcPass}<br/>
-        server=1<br/>
-        txindex=1<br/>
-        blockfilterindex=1<br/>
-        addnode=172.81.178.3:38333<br/>
-        rpcport=38332<br/>
-        rpcbind=127.0.0.1<br/>
-        rpcallowip=127.0.0.1<br/>
-        zmqpubrawblock=${rawblock}<br/>
-        zmqpubrawtx=${rawtx}<br/>
-        <br/>
-        # ========================================<br/>
-        # REGTEST CONFIGURATION<br/>
-        # ========================================<br/>
-        [regtest]<br/>
-        rpcuser=${rpcUser}<br/>
-        rpcpassword=${rpcPass}<br/>
-        fallbackfee=0.00001000<br/>
-        server=1<br/>
-        txindex=1<br/>
-        blockfilterindex=1<br/>
-        rpcport=${rpcPort}<br/>
-        rpcbind=127.0.0.1<br/>
-        rpcallowip=127.0.0.1<br/>
-        zmqpubrawblock=${rawblock}<br/>
-        zmqpubrawtx=${rawtx}`;
+      fullPreview.innerHTML = `[signet]<br/>
+# Signet network configuration for running Coinswap Taker and Maker<br/>
+# Mutinynet default signet parameters<br/>
+signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae<br/>
+addnode=45.79.52.207:38333<br/>
+dnsseed=0<br/>
+signetblocktime=30<br/>
+# RPC Configurations for Coinswap operations<br/>
+server=1<br/>
+rpcuser=${rpcUser}<br/>
+rpcpassword=${rpcPass}<br/>
+rpcport=38332<br/>
+rpcbind=127.0.0.1<br/>
+rpcallowip=127.0.0.1<br/>
+# ZMQ Configurations for real-time transaction and block notifications<br/>
+# Needed for the Watchers.<br/>
+zmqpubrawblock=${rawblock}<br/>
+zmqpubrawtx=${rawtx}<br/>
+# Required indexes for faster wallet sync<br/>
+txindex=1<br/>
+blockfilterindex=1<br/>
+<br/>
+[regtest]<br/>
+# Regtest network configurations for running Coinswap Taker and Maker<br/>
+fallbackfee=0.00001000<br/>
+# RPC Configurations for Coinswap operations<br/>
+server=1<br/>
+rpcuser=${rpcUser}<br/>
+rpcpassword=${rpcPass}<br/>
+rpcport=${rpcPort}<br/>
+rpcbind=127.0.0.1<br/>
+rpcallowip=127.0.0.1<br/>
+# ZMQ Configurations for real-time transaction and block notifications<br/>
+# Needed for the Watchers.<br/>
+zmqpubrawblock=${rawblock}<br/>
+zmqpubrawtx=${rawtx}<br/>
+# Required indexes for faster wallet sync<br/>
+txindex=1<br/>
+blockfilterindex=1`;
     }
   }
 
@@ -659,19 +673,21 @@ export function SettingsComponent(container) {
         content.querySelector('#rpc-username-input').value || 'user';
       const rpcPass =
         content.querySelector('#rpc-password-input').value || 'password';
-      const rpcPort = content.querySelector('#rpc-port-input').value || '18443';
+      const rpcPort = content.querySelector('#rpc-port-input').value || '38332';
 
       const configText = `# ========================================
 # SIGNET CONFIGURATION
 # ========================================
 [signet]
-signetchallenge=0014c9e9f8875a25c3cc6d99ad3e5fd54254d00fed44
+signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae
+addnode=45.79.52.207:38333
+dnsseed=0
+signetblocktime=30
 rpcuser=${rpcUser}
 rpcpassword=${rpcPass}
 server=1
 txindex=1
 blockfilterindex=1
-addnode=172.81.178.3:38333
 rpcport=38332
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
@@ -688,7 +704,7 @@ fallbackfee=0.00001000
 server=1
 txindex=1
 blockfilterindex=1
-rpcport=${rpcPort}
+rpcport=18442
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 zmqpubrawblock=${rawblock}
@@ -1016,7 +1032,7 @@ zmqpubrawtx=${rawtx}`;
 
       // Reset RPC fields
       content.querySelector('#rpc-host-input').value = '127.0.0.1';
-      content.querySelector('#rpc-port-input').value = '18443';
+      content.querySelector('#rpc-port-input').value = '38332';
       content.querySelector('#rpc-username-input').value = 'user';
       content.querySelector('#rpc-password-input').value = '';
 

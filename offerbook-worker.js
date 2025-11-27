@@ -29,7 +29,7 @@ const { parentPort, workerData } = require('worker_threads');
       config.dataDir,
       config.walletName || 'taker-wallet',
       config.rpcConfig,
-      9051,
+      config.controlPort || 9051,
       undefined,
       config.zmqAddr,
       config.password || ""

@@ -89,7 +89,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="number" 
                     id="setup-rpc-port"
-                    value="18443"
+                    value="38332"
                     min="1"
                     max="65535"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -127,7 +127,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="text" 
                     id="setup-zmq-rawblock"
-                    value="tcp://127.0.0.1:29332"
+                    value="tcp://127.0.0.1:28332"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
                   />
                 </div>
@@ -157,9 +157,9 @@ export function FirstTimeSetupModal(container, onComplete) {
                 server=1<br/>
                 rpcuser=user<br/>
                 rpcpassword=password<br/>
-                rpcport=18443<br/>
+                rpcport=38332<br/>
                 rpcallowip=127.0.0.1<br/>
-                zmqpubrawblock=tcp://127.0.0.1:29332<br/>
+                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
                 zmqpubrawtx=tcp://127.0.0.1:28332
               </div>
             </div>
