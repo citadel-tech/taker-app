@@ -1,60 +1,85 @@
-// SwapStateManager - Handles all swap state persistence to localStorage
+// SwapStateManager - Handles all swap state persistence to filesystem
 
 const STORAGE_KEYS = {
-  ACTIVE_SWAP: 'coinswap_active_swap',
-  SWAP_PROGRESS: 'coinswap_swap_progress', 
-  USER_SELECTIONS: 'coinswap_user_selections',
-  SWAP_HISTORY: 'coinswap_swap_history'
+  ACTIVE_SWAP: 'active_swap',
+  SWAP_PROGRESS: 'swap_progress',
+  USER_SELECTIONS: 'user_selections',
+  SWAP_HISTORY: 'swap_history',
 };
 
 const MAX_HISTORY_ITEMS = 50; // Keep last 50 swaps
 
 export const SwapStateManager = {
   // Swap Configuration Management
-  saveSwapConfig(swapConfig) {
+  async saveSwapConfig(swapConfig) {
     const swapData = {
       ...swapConfig,
       status: 'configured',
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
-    localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(swapData));
+
+    const state = await this.loadState();
+    state[STORAGE_KEYS.ACTIVE_SWAP] = swapData;
+    await this.saveState(state);
+
     console.log('Swap config saved:', swapData);
   },
 
-  getActiveSwap() {
+  async getActiveSwap() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.ACTIVE_SWAP);
-      return data ? JSON.parse(data) : null;
+      const state = await this.loadState();
+      return state[STORAGE_KEYS.ACTIVE_SWAP] || null;
     } catch (error) {
       console.error('Error getting active swap:', error);
       return null;
     }
   },
 
-  hasActiveSwap() {
-    const activeSwap = this.getActiveSwap();
-    return activeSwap && (activeSwap.status === 'in_progress' || activeSwap.status === 'configured');
+  async hasActiveSwap() {
+    const activeSwap = await this.getActiveSwap();
+    if (!activeSwap) return false;
+
+    const isActive =
+      activeSwap.status === 'in_progress' || activeSwap.status === 'configured';
+
+    // Check if configured swap is stale (older than 5 minutes)
+    if (activeSwap.status === 'configured') {
+      const age = Date.now() - activeSwap.createdAt;
+      if (age > 5 * 60 * 1000) {
+        console.log(
+          '🧹 Clearing stale configured swap from hasActiveSwap check'
+        );
+        await this.clearSwapData();
+        return false;
+      }
+    }
+
+    return isActive;
   },
 
   // Swap Progress Management
-  saveSwapProgress(progressData) {
-    localStorage.setItem(STORAGE_KEYS.SWAP_PROGRESS, JSON.stringify(progressData));
+  async saveSwapProgress(progressData) {
+    const state = await this.loadState();
+    state[STORAGE_KEYS.SWAP_PROGRESS] = progressData;
+
     console.log('Swap progress saved:', progressData);
-    
+
     // Also update the active swap status
-    const activeSwap = this.getActiveSwap();
+    const activeSwap = state[STORAGE_KEYS.ACTIVE_SWAP];
     if (activeSwap) {
       activeSwap.status = progressData.status || 'in_progress';
       activeSwap.currentStep = progressData.currentStep;
       activeSwap.lastUpdated = Date.now();
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(activeSwap));
+      state[STORAGE_KEYS.ACTIVE_SWAP] = activeSwap;
     }
+
+    await this.saveState(state);
   },
 
-  getSwapProgress() {
+  async getSwapProgress() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.SWAP_PROGRESS);
-      return data ? JSON.parse(data) : null;
+      const state = await this.loadState();
+      return state[STORAGE_KEYS.SWAP_PROGRESS] || null;
     } catch (error) {
       console.error('Error getting swap progress:', error);
       return null;
@@ -62,41 +87,48 @@ export const SwapStateManager = {
   },
 
   // User Selections Management
-  saveUserSelections(selections) {
-    localStorage.setItem(STORAGE_KEYS.USER_SELECTIONS, JSON.stringify(selections));
+  async saveUserSelections(selections) {
+    const state = await this.loadState();
+    state[STORAGE_KEYS.USER_SELECTIONS] = selections;
+    await this.saveState(state);
+
     console.log('User selections saved:', selections);
   },
 
-  getUserSelections() {
+  async getUserSelections() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.USER_SELECTIONS);
-      return data ? JSON.parse(data) : null;
+      const state = await this.loadState();
+      return state[STORAGE_KEYS.USER_SELECTIONS] || null;
     } catch (error) {
       console.error('Error getting user selections:', error);
       return null;
     }
   },
 
-  clearUserSelections() {
-    localStorage.removeItem(STORAGE_KEYS.USER_SELECTIONS);
+  async clearUserSelections() {
+    const state = await this.loadState();
+    delete state[STORAGE_KEYS.USER_SELECTIONS];
+    await this.saveState(state);
+
     console.log('User selections cleared');
   },
 
   // Swap History Management
-  getSwapHistory() {
+  async getSwapHistory() {
     try {
-      const data = localStorage.getItem(STORAGE_KEYS.SWAP_HISTORY);
-      return data ? JSON.parse(data) : [];
+      const state = await this.loadState();
+      return state[STORAGE_KEYS.SWAP_HISTORY] || [];
     } catch (error) {
       console.error('Error getting swap history:', error);
       return [];
     }
   },
 
-  addToSwapHistory(swapReport) {
+  async addToSwapHistory(swapReport) {
     try {
-      const history = this.getSwapHistory();
-      
+      const state = await this.loadState();
+      const history = state[STORAGE_KEYS.SWAP_HISTORY] || [];
+
       // Create history entry from report
       const historyEntry = {
         id: swapReport.swapId || `swap_${Date.now()}`,
@@ -110,20 +142,22 @@ export const SwapStateManager = {
         durationSeconds: swapReport.swapDurationSeconds || 0,
         status: 'completed',
         // Store full report for detailed view
-        report: swapReport
+        report: swapReport,
       };
-      
+
       // Add to beginning of array (most recent first)
       history.unshift(historyEntry);
-      
+
       // Keep only last MAX_HISTORY_ITEMS
       if (history.length > MAX_HISTORY_ITEMS) {
         history.splice(MAX_HISTORY_ITEMS);
       }
-      
-      localStorage.setItem(STORAGE_KEYS.SWAP_HISTORY, JSON.stringify(history));
+
+      state[STORAGE_KEYS.SWAP_HISTORY] = history;
+      await this.saveState(state);
+
       console.log('Swap added to history:', historyEntry);
-      
+
       return historyEntry;
     } catch (error) {
       console.error('Error adding to swap history:', error);
@@ -131,64 +165,111 @@ export const SwapStateManager = {
     }
   },
 
-  getSwapFromHistory(swapId) {
-    const history = this.getSwapHistory();
-    return history.find(swap => swap.id === swapId) || null;
+  async getSwapFromHistory(swapId) {
+    const history = await this.getSwapHistory();
+    return history.find((swap) => swap.id === swapId) || null;
   },
 
-  getRecentSwaps(count = 5) {
-    const history = this.getSwapHistory();
+  async getRecentSwaps(count = 5) {
+    const history = await this.getSwapHistory();
     return history.slice(0, count);
   },
 
-  clearSwapHistory() {
-    localStorage.removeItem(STORAGE_KEYS.SWAP_HISTORY);
+  async clearSwapHistory() {
+    const state = await this.loadState();
+    delete state[STORAGE_KEYS.SWAP_HISTORY];
+    await this.saveState(state);
+
     console.log('Swap history cleared');
   },
 
   // Swap Completion
-  completeSwap(report = null) {
-    const activeSwap = this.getActiveSwap();
-    if (activeSwap) {
-      activeSwap.status = 'completed';
-      activeSwap.completedAt = Date.now();
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_SWAP, JSON.stringify(activeSwap));
-    }
-    
+  // Swap Completion
+  async completeSwap(report = null) {
+    const state = await this.loadState();
+
     // Add to history if report provided
     if (report) {
-      this.addToSwapHistory(report);
+      const history = state[STORAGE_KEYS.SWAP_HISTORY] || [];
+
+      const historyEntry = {
+        id: report.swapId || `swap_${Date.now()}`,
+        completedAt: Date.now(),
+        amount: report.targetAmount || 0,
+        totalOutputAmount: report.totalOutputAmount || 0,
+        makersCount: report.makersCount || 0,
+        hops: (report.makersCount || 0) + 1,
+        totalFee: report.totalFee || 0,
+        feePercentage: report.feePercentage || 0,
+        durationSeconds: report.swapDurationSeconds || 0,
+        status: 'completed',
+        report: report,
+      };
+
+      history.unshift(historyEntry);
+      if (history.length > MAX_HISTORY_ITEMS) {
+        history.splice(MAX_HISTORY_ITEMS);
+      }
+
+      state[STORAGE_KEYS.SWAP_HISTORY] = history;
     }
-    
-    // Clear progress data but keep active swap for history
-    localStorage.removeItem(STORAGE_KEYS.SWAP_PROGRESS);
-    console.log('Swap marked as completed');
+
+    // ✅ CLEAR active swap and progress completely
+    delete state[STORAGE_KEYS.ACTIVE_SWAP];
+    delete state[STORAGE_KEYS.SWAP_PROGRESS];
+
+    await this.saveState(state);
+    console.log('Swap marked as completed and cleared from active state');
   },
 
   // Clear all swap data
-  clearSwapData() {
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_SWAP);
-    localStorage.removeItem(STORAGE_KEYS.SWAP_PROGRESS);
-    localStorage.removeItem(STORAGE_KEYS.USER_SELECTIONS);
+  async clearSwapData() {
+    const state = await this.loadState();
+    delete state[STORAGE_KEYS.ACTIVE_SWAP];
+    delete state[STORAGE_KEYS.SWAP_PROGRESS];
+    delete state[STORAGE_KEYS.USER_SELECTIONS];
+    await this.saveState(state);
+
     console.log('Swap data cleared');
   },
 
   // Utility function for debugging
-  getStorageInfo() {
+  async getStorageInfo() {
     return {
-      activeSwap: this.getActiveSwap(),
-      progress: this.getSwapProgress(),
-      selections: this.getUserSelections(),
-      history: this.getSwapHistory()
+      activeSwap: await this.getActiveSwap(),
+      progress: await this.getSwapProgress(),
+      selections: await this.getUserSelections(),
+      history: await this.getSwapHistory(),
     };
   },
 
   // Get elapsed time for active swap
-  getElapsedTime() {
-    const progress = this.getSwapProgress();
+  async getElapsedTime() {
+    const progress = await this.getSwapProgress();
     if (!progress || !progress.startTime) return 0;
     return Date.now() - progress.startTime;
-  }
+  },
+
+  async loadState() {
+    try {
+      const result = await window.api.swapState.load();
+      if (result.success && result.state) {
+        return result.state;
+      }
+      return {};
+    } catch (error) {
+      console.error('Failed to load state:', error);
+      return {};
+    }
+  },
+
+  async saveState(state) {
+    try {
+      await window.api.swapState.save(state);
+    } catch (error) {
+      console.error('Failed to save state:', error);
+    }
+  },
 };
 
 // Utility function to format elapsed time
@@ -196,7 +277,7 @@ export function formatElapsedTime(milliseconds) {
   const seconds = Math.floor(milliseconds / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
-  
+
   if (hours > 0) {
     return `${hours}h ${minutes % 60}m`;
   } else if (minutes > 0) {
@@ -210,12 +291,12 @@ export function formatElapsedTime(milliseconds) {
 export function formatRelativeTime(timestamp) {
   const now = Date.now();
   const diff = now - timestamp;
-  
+
   const seconds = Math.floor(diff / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-  
+
   if (days > 0) {
     return days === 1 ? '1 day ago' : `${days} days ago`;
   } else if (hours > 0) {

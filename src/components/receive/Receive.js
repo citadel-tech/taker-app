@@ -1,5 +1,3 @@
-import { AddressStorage } from './AddressStorage.js';
-
 export function ReceiveComponent(container) {
   const content = document.createElement('div');
   content.id = 'receive-content';
@@ -143,6 +141,69 @@ export function ReceiveComponent(container) {
     `;
   }
 
+  // Detect address type from address string
+  function detectAddressType(address) {
+    if (address.startsWith('bc1q')) return 'P2WPKH';
+    if (address.startsWith('bc1p')) return 'P2TR';
+    if (address.startsWith('3')) return 'P2SH';
+    if (address.startsWith('1')) return 'P2PKH';
+    if (address.startsWith('tb1q')) return 'P2WPKH'; // testnet
+    if (address.startsWith('bcrt1q')) return 'P2WPKH'; // regtest
+    return 'Unknown';
+  }
+
+  // Get addresses from transaction history
+  // Get addresses from transaction history
+async function getAddressesFromTransactions() {
+  try {
+    const result = await window.api.taker.getTransactions(100, 0); 
+    
+    if (!result.success || !result.transactions) {
+      console.log('No transactions found:', result);
+      return [];
+    }
+
+    console.log('📊 Processing transactions:', result.transactions.length);
+    const addressMap = new Map();
+
+    result.transactions.forEach(tx => {
+      // Only process received transactions
+      const category = (tx.detail.category || '').toLowerCase();
+      
+      if (category === 'receive' || category === '"receive"') {
+        const addr = tx.detail.address?.address || tx.detail.address;
+        
+        if (addr) {
+          if (!addressMap.has(addr)) {
+            addressMap.set(addr, {
+              address: addr,
+              used: 0,
+              received: 0,
+              createdAt: (tx.info.blocktime || tx.info.time) * 1000,
+              type: detectAddressType(addr),
+              lastUsed: (tx.info.blocktime || tx.info.time) * 1000
+            });
+          }
+          
+          // Update usage stats
+          const addrData = addressMap.get(addr);
+          addrData.used++;
+          addrData.received += (tx.detail.amount?.sats || 0);
+          addrData.lastUsed = Math.max(addrData.lastUsed, (tx.info.blocktime || tx.info.time) * 1000);
+        }
+      }
+    });
+
+    const addresses = Array.from(addressMap.values()).sort((a, b) => b.createdAt - a.createdAt);
+    console.log('✅ Found addresses:', addresses);
+    return addresses;
+    
+  } catch (error) {
+    console.error('Failed to get addresses from transactions:', error);
+    return [];
+  }
+}
+
   // Copy to clipboard
   async function copyToClipboard(text) {
     try {
@@ -218,74 +279,90 @@ export function ReceiveComponent(container) {
   }
 
   // Update recent addresses list
-  function updateRecentAddresses() {
-    const addresses = AddressStorage.getAllAddresses();
-    totalAddressesEl.textContent = `${addresses.length} total`;
+  // Update recent addresses list
+  // Update recent addresses list
+async function updateRecentAddresses() {
+  const addresses = await getAddressesFromTransactions();
+  
+  // If current address isn't in transaction history yet, add it manually
+  if (currentAddress && !addresses.find(a => a.address === currentAddress)) {
+    addresses.unshift({
+      address: currentAddress,
+      used: 0,
+      received: 0,
+      createdAt: Date.now(),
+      type: detectAddressType(currentAddress),
+      lastUsed: null
+    });
+  }
+  
+  totalAddressesEl.textContent = `${addresses.length} total`;
 
-    if (addresses.length === 0) {
-      recentAddressesEl.innerHTML = `
-        <div class="text-sm text-gray-500 text-center py-4">
-          No addresses generated yet
-        </div>
-      `;
-      return;
-    }
-
-    // Show last 5 addresses
-    const recentAddresses = addresses.slice(0, 5);
-
-    recentAddressesEl.innerHTML = recentAddresses
-      .map((addr, index) => {
-        const isCurrent = addr.address === currentAddress;
-        const typeColors = {
-          P2WPKH: 'text-green-400',
-          P2WSH: 'text-blue-400',
-          P2TR: 'text-purple-400',
-        };
-        const typeColor = typeColors[addr.type] || 'text-gray-400';
-
-        return `
-        <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-[#FF6B35]/10 border border-[#FF6B35]/30' : 'bg-[#0f1419] hover:bg-[#242d3d]'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="font-mono text-xs text-gray-300 truncate">${addr.address.substring(0, 16)}...${addr.address.substring(addr.address.length - 8)}</span>
-              ${isCurrent ? '<span class="text-xs text-[#FF6B35]">●</span>' : ''}
-            </div>
-            <div class="flex items-center gap-2 mt-1">
-              <span class="text-xs ${typeColor}">${addr.type}</span>
-              <span class="text-xs text-gray-500">•</span>
-              <span class="text-xs text-gray-500">${addr.used > 0 ? `Used ${addr.used}x` : 'Unused'}</span>
-            </div>
-          </div>
-          <div class="text-right ml-2">
-            <div class="text-xs ${addr.received > 0 ? 'text-green-400' : 'text-gray-500'} font-mono">
-              ${addr.received > 0 ? (addr.received / 100000000).toFixed(4) : '0'} BTC
-            </div>
-          </div>
-        </div>
-      `;
-      })
-      .join('');
-
-    // Add click handlers to switch to that address
-    recentAddressesEl
-      .querySelectorAll('.recent-address-item')
-      .forEach((item) => {
-        item.addEventListener('click', () => {
-          const address = item.dataset.address;
-          selectAddress(address);
-        });
-      });
+  if (addresses.length === 0) {
+    recentAddressesEl.innerHTML = `
+      <div class="text-sm text-gray-500 text-center py-4">
+        No addresses found in transactions yet
+      </div>
+    `;
+    return;
   }
 
+  // Show last 5 addresses
+  const recentAddresses = addresses.slice(0, 5);
+
+  recentAddressesEl.innerHTML = recentAddresses
+    .map((addr) => {
+      const isCurrent = addr.address === currentAddress;
+      const typeColors = {
+        P2WPKH: 'text-green-400',
+        P2WSH: 'text-blue-400',
+        P2TR: 'text-purple-400',
+      };
+      const typeColor = typeColors[addr.type] || 'text-gray-400';
+
+      return `
+      <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-[#FF6B35]/10 border border-[#FF6B35]/30' : 'bg-[#0f1419] hover:bg-[#242d3d]'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-mono text-xs text-gray-300 truncate">${addr.address.substring(0, 16)}...${addr.address.substring(addr.address.length - 8)}</span>
+            ${isCurrent ? '<span class="text-xs text-[#FF6B35]">● Current</span>' : ''}
+          </div>
+          <div class="flex items-center gap-2 mt-1">
+            <span class="text-xs ${typeColor}">${addr.type}</span>
+            <span class="text-xs text-gray-500">•</span>
+            <span class="text-xs text-gray-500">${addr.used > 0 ? `Used ${addr.used}x` : 'Unused'}</span>
+          </div>
+        </div>
+        <div class="text-right ml-2">
+          <div class="text-xs ${addr.received > 0 ? 'text-green-400' : 'text-gray-500'} font-mono">
+            ${addr.received > 0 ? (addr.received / 100000000).toFixed(4) : '0'} BTC
+          </div>
+        </div>
+      </div>
+    `;
+    })
+    .join('');
+
+  // Add click handlers to switch to that address
+  recentAddressesEl
+    .querySelectorAll('.recent-address-item')
+    .forEach((item) => {
+      item.addEventListener('click', () => {
+        const address = item.dataset.address;
+        selectAddress(address);
+      });
+    });
+}
+
   // Select an existing address
-  function selectAddress(addressString) {
+  async function selectAddress(addressString) {
     currentAddress = addressString;
     currentAddressEl.textContent = addressString;
     copyButton.disabled = false;
     generateQR(addressString);
 
-    const addressData = AddressStorage.getAddress(addressString);
+    const addresses = await getAddressesFromTransactions();
+    const addressData = addresses.find((a) => a.address === addressString);
     updateAddressStatus(addressData);
     updateRecentAddresses();
   }
@@ -322,14 +399,17 @@ export function ReceiveComponent(container) {
         currentAddressEl.textContent = addressString;
         copyButton.disabled = false;
 
-        // Save to address storage
-        const savedAddress = AddressStorage.addAddress(addressString);
-
         // Update QR code
         generateQR(addressString);
 
         // Update status display
-        updateAddressStatus(savedAddress);
+        updateAddressStatus({
+          address: addressString,
+          used: 0,
+          received: 0,
+          createdAt: Date.now(),
+          type: detectAddressType(addressString),
+        });
 
         // Update recent addresses list
         updateRecentAddresses();
@@ -363,7 +443,7 @@ export function ReceiveComponent(container) {
       await generateNewAddress();
 
       // Update recent addresses list
-      updateRecentAddresses();
+      await updateRecentAddresses();
 
       // Enable generate button
       generateButton.disabled = false;

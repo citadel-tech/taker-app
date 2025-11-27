@@ -1,14 +1,14 @@
 import { SwapStateManager, formatRelativeTime } from './SwapStateManager.js';
 
-export function SwapComponent(container) {
+export async function SwapComponent(container) {
   console.log('🔧 SwapComponent loading...');
 
   const content = document.createElement('div');
   content.id = 'swap-content';
 
   // Check for active swap on component load
-  const activeSwap = SwapStateManager.getActiveSwap();
-  const hasActiveSwap = SwapStateManager.hasActiveSwap();
+  const activeSwap = await SwapStateManager.getActiveSwap();
+  const hasActiveSwap = await SwapStateManager.hasActiveSwap();
 
   console.log('📊 Active swap check:', { activeSwap, hasActiveSwap });
 
@@ -17,7 +17,7 @@ export function SwapComponent(container) {
     const age = Date.now() - activeSwap.createdAt;
     if (age > 5 * 60 * 1000) {
       console.log('🧹 Clearing stale configured swap');
-      SwapStateManager.clearSwapData();
+      await SwapStateManager.clearSwapData();
     } else {
       console.log('🔄 Active swap detected, redirecting to progress view');
       import('./Coinswap.js').then((module) => {
@@ -39,7 +39,7 @@ export function SwapComponent(container) {
   let networkFeeRate = 2; // sats/vB
 
   // Restore user selections from saved state if available
-  const savedSelections = SwapStateManager.getUserSelections();
+  const savedSelections = await SwapStateManager.getUserSelections();
   console.log('📂 Attempting to restore selections:', savedSelections);
 
   if (savedSelections) {
@@ -202,22 +202,24 @@ export function SwapComponent(container) {
   }
 
   // Render Recent Swaps section
-  function renderRecentSwaps() {
+  // Render Recent Swaps section
+  async function renderRecentSwaps() {
+    // ✅ Make async
     const recentSwapsContainer = content.querySelector(
       '#recent-swaps-container'
     );
     if (!recentSwapsContainer) return;
 
-    const recentSwaps = SwapStateManager.getRecentSwaps(5);
+    const recentSwaps = await SwapStateManager.getRecentSwaps(5); // ✅ Add await
 
     if (recentSwaps.length === 0) {
       recentSwapsContainer.innerHTML = `
-        <div class="text-center py-8 text-gray-500">
-          <p class="text-4xl mb-2">🔄</p>
-          <p>No swaps yet</p>
-          <p class="text-xs mt-1">Your completed swaps will appear here</p>
-        </div>
-      `;
+      <div class="text-center py-8 text-gray-500">
+        <p class="text-4xl mb-2">🔄</p>
+        <p>No swaps yet</p>
+        <p class="text-xs mt-1">Your completed swaps will appear here</p>
+      </div>
+    `;
       return;
     }
 
@@ -256,8 +258,9 @@ export function SwapComponent(container) {
   }
 
   // View swap report from history
-  function viewSwapReport(swapId) {
-    const swap = SwapStateManager.getSwapFromHistory(swapId);
+  async function viewSwapReport(swapId) {
+    // ✅ Make async
+    const swap = await SwapStateManager.getSwapFromHistory(swapId); // ✅ Add await
     if (swap && swap.report) {
       import('./SwapReport.js').then((module) => {
         container.innerHTML = '';
@@ -357,8 +360,13 @@ export function SwapComponent(container) {
 
     // In manual mode, calculate swap amount from UTXOs
     if (selectionMode === 'manual' && selectedUtxos.length > 0) {
-      // Swap amount = Total UTXOs (fees will be deducted)
-      swapAmount = selectedTotal;
+      const inputAmount = selectedTotal;
+
+      // Calculate what we can actually swap after fees
+      const estimatedFees = calculateFees(inputAmount);
+
+      // Available swap amount = UTXOs - fees - small buffer for fee variance
+      swapAmount = Math.max(0, inputAmount - estimatedFees.totalFeeSats - 1000);
     } else if (selectionMode === 'auto') {
       // In auto mode, read from input
       const input = content.querySelector('#swap-amount-input');
@@ -650,7 +658,8 @@ export function SwapComponent(container) {
   }
 
   // Save current user selections to localStorage
-  function saveCurrentSelections() {
+  async function saveCurrentSelections() {
+    // ✅ Make async
     const selections = {
       swapAmount,
       amountUnit,
@@ -662,7 +671,7 @@ export function SwapComponent(container) {
       networkFeeRate,
     };
     console.log('💾 Saving current selections:', selections);
-    SwapStateManager.saveUserSelections(selections);
+    await SwapStateManager.saveUserSelections(selections); // ✅ Add await
   }
 
   // UI - Render the HTML template
@@ -896,18 +905,18 @@ export function SwapComponent(container) {
 
   // EVENT LISTENERS
 
-  content.querySelector('#swap-amount-input').addEventListener('input', () => {
+  content.querySelector('#swap-amount-input').addEventListener('input', async () => {
     updateSummary();
-    saveCurrentSelections();
+    await saveCurrentSelections();
   });
 
   content
     .querySelector('#max-swap-btn')
     .addEventListener('click', setMaxAmount);
 
-  content.querySelector('#unit-sats').addEventListener('click', () => {
+  content.querySelector('#unit-sats').addEventListener('click', async () => {
     switchUnit('sats');
-    saveCurrentSelections();
+    await saveCurrentSelections();
   });
   content.querySelector('#unit-btc').addEventListener('click', () => {
     switchUnit('btc');
@@ -1073,9 +1082,9 @@ export function SwapComponent(container) {
   }
 
   // Fetch real data
-  Promise.all([fetchUtxos(), fetchMakers(), fetchBalance()]).then(() => {
+  Promise.all([fetchUtxos(), fetchMakers(), fetchBalance()]).then(async() => {
     renderUtxoList();
-    renderRecentSwaps();
+    await renderRecentSwaps();
 
     // Restore UTXO selections
     if (selectedUtxos.length > 0) {

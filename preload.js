@@ -38,6 +38,12 @@ contextBridge.exposeInMainWorld('api', {
     get: (lines) => ipcRenderer.invoke('logs:get', lines),
   },
 
+  swapState: {
+  save: (state) => ipcRenderer.invoke('swapState:save', state),
+  load: () => ipcRenderer.invoke('swapState:load'),
+  clear: () => ipcRenderer.invoke('swapState:clear'),
+},
+
   // File dialogs - TOP LEVEL, NOT INSIDE TAKER!
   openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
   saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),

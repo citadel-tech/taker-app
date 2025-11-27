@@ -69,65 +69,204 @@ export function Market(container) {
 
   async function syncOfferbook() {
     try {
-      console.log('🔄 Starting offerbook sync...');
-
-      // IPC call to start sync in worker thread
-      const result = await window.api.taker.syncOfferbook();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to start sync');
-      }
-
-      const syncId = result.syncId;
-      console.log('📡 Sync started:', syncId);
-
-      // Poll for completion (timeout after 2 minutes)
-      const timeout = 120000; // 2 minutes
-      const startTime = Date.now();
-
-      return new Promise((resolve, reject) => {
-        const pollInterval = setInterval(async () => {
-          try {
-            // Check timeout
-            if (Date.now() - startTime > timeout) {
-              clearInterval(pollInterval);
-              reject(new Error('Sync timeout - operation took too long'));
-              return;
+        // Check if sync is already running
+        const activeSyncId = localStorage.getItem('active_sync_id');
+        if (activeSyncId) {
+            const status = await window.api.taker.getSyncStatus(activeSyncId);
+            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
+                throw new Error('Sync already in progress');
             }
+        }
 
+        console.log('🔄 Starting offerbook sync...');
+
+        const result = await window.api.taker.syncOfferbook();
+
+        if (!result.success) {
+            throw new Error(result.error || 'Failed to start sync');
+        }
+
+        const syncId = result.syncId;
+        console.log('📡 Sync started:', syncId);
+
+        // Store sync ID in localStorage
+        localStorage.setItem('active_sync_id', syncId);
+
+        // Poll for completion
+        const timeout = 120000;
+        const startTime = Date.now();
+
+        return new Promise((resolve, reject) => {
+            const pollInterval = setInterval(async () => {
+                try {
+                    if (Date.now() - startTime > timeout) {
+                        clearInterval(pollInterval);
+                        localStorage.removeItem('active_sync_id'); // Clean up
+                        reject(new Error('Sync timeout - operation took too long'));
+                        return;
+                    }
+
+                    const status = await window.api.taker.getSyncStatus(syncId);
+
+                    if (!status.success) {
+                        clearInterval(pollInterval);
+                        localStorage.removeItem('active_sync_id'); // Clean up
+                        reject(new Error('Failed to get sync status'));
+                        return;
+                    }
+
+                    const sync = status.sync;
+                    console.log('📊 Sync status:', sync.status);
+
+                    if (sync.status === 'completed') {
+                        clearInterval(pollInterval);
+                        localStorage.removeItem('active_sync_id'); // Clean up
+                        console.log('✅ Offerbook synced');
+                        await new Promise((r) => setTimeout(r, 1000));
+                        await fetchMakers();
+                        resolve();
+                    } else if (sync.status === 'failed') {
+                        clearInterval(pollInterval);
+                        localStorage.removeItem('active_sync_id'); // Clean up
+                        reject(new Error(sync.error || 'Sync failed'));
+                    }
+                } catch (error) {
+                    clearInterval(pollInterval);
+                    localStorage.removeItem('active_sync_id'); // Clean up
+                    reject(error);
+                }
+            }, 1000);
+        });
+    } catch (error) {
+        console.error('❌ Sync failed:', error);
+        throw error;
+    }
+}
+
+async function handleRefresh() {
+    const refreshBtn = content.querySelector('#refresh-market-btn');
+    
+    // Check if sync is already running
+    const activeSyncId = localStorage.getItem('active_sync_id');
+    if (activeSyncId) {
+        try {
+            const status = await window.api.taker.getSyncStatus(activeSyncId);
+            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
+                showError('Sync already in progress');
+                return;
+            }
+        } catch (err) {
+            // If we can't get status, clear the stale sync ID
+            localStorage.removeItem('active_sync_id');
+        }
+    }
+
+    const originalText = refreshBtn.innerHTML;
+
+    refreshBtn.disabled = true;
+    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
+
+    try {
+        await syncOfferbook();
+        refreshBtn.innerHTML = '✅ Synced!';
+        setTimeout(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalText;
+        }, 2000);
+    } catch (error) {
+        refreshBtn.innerHTML = '❌ Failed';
+        showError(error.message);
+        setTimeout(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalText;
+        }, 3000);
+    }
+}
+
+// On component initialization, check for active sync
+async function initialize() {
+    const activeSyncId = localStorage.getItem('active_sync_id');
+    if (activeSyncId) {
+        try {
+            const status = await window.api.taker.getSyncStatus(activeSyncId);
+            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
+                // Sync is still running, disable button and show status
+                const refreshBtn = content.querySelector('#refresh-market-btn');
+                if (refreshBtn) {
+                    refreshBtn.disabled = true;
+                    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
+                }
+                
+                // Continue monitoring the existing sync
+                monitorExistingSync(activeSyncId);
+            } else {
+                // Sync completed or failed, clean up
+                localStorage.removeItem('active_sync_id');
+            }
+        } catch (err) {
+            // Stale sync ID, clean up
+            localStorage.removeItem('active_sync_id');
+        }
+    }
+
+    await fetchMakers();
+}
+
+// Monitor an existing sync (when returning to the page)
+async function monitorExistingSync(syncId) {
+    const refreshBtn = content.querySelector('#refresh-market-btn');
+    const originalText = '🔄 Sync Market Data';
+
+    const pollInterval = setInterval(async () => {
+        try {
             const status = await window.api.taker.getSyncStatus(syncId);
 
             if (!status.success) {
-              clearInterval(pollInterval);
-              reject(new Error('Failed to get sync status'));
-              return;
+                clearInterval(pollInterval);
+                localStorage.removeItem('active_sync_id');
+                if (refreshBtn) {
+                    refreshBtn.disabled = false;
+                    refreshBtn.innerHTML = originalText;
+                }
+                return;
             }
 
             const sync = status.sync;
-            console.log('📊 Sync status:', sync.status);
 
             if (sync.status === 'completed') {
-              clearInterval(pollInterval);
-              console.log('✅ Offerbook synced');
-              // Wait a moment for file to be written
-              await new Promise((r) => setTimeout(r, 1000));
-              await fetchMakers();
-              resolve();
+                clearInterval(pollInterval);
+                localStorage.removeItem('active_sync_id');
+                await fetchMakers();
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = '✅ Synced!';
+                    setTimeout(() => {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = originalText;
+                    }, 2000);
+                }
             } else if (sync.status === 'failed') {
-              clearInterval(pollInterval);
-              reject(new Error(sync.error || 'Sync failed'));
+                clearInterval(pollInterval);
+                localStorage.removeItem('active_sync_id');
+                if (refreshBtn) {
+                    refreshBtn.innerHTML = '❌ Failed';
+                    setTimeout(() => {
+                        refreshBtn.disabled = false;
+                        refreshBtn.innerHTML = originalText;
+                    }, 3000);
+                }
             }
-          } catch (error) {
+        } catch (error) {
             clearInterval(pollInterval);
-            reject(error);
-          }
-        }, 1000); // Poll every second
-      });
-    } catch (error) {
-      console.error('❌ Sync failed:', error);
-      throw error;
-    }
-  }
+            localStorage.removeItem('active_sync_id');
+            if (refreshBtn) {
+                refreshBtn.disabled = false;
+                refreshBtn.innerHTML = originalText;
+            }
+        }
+    }, 1000);
+}
+
+
 
   function showError(message) {
     const errorDiv = document.createElement('div');
@@ -457,28 +596,7 @@ export function Market(container) {
     }
   }
 
-  async function handleRefresh() {
-    const refreshBtn = content.querySelector('#refresh-market-btn');
-    const originalText = refreshBtn.innerHTML;
-
-    refreshBtn.disabled = true;
-    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
-
-    try {
-      await syncOfferbook();
-      refreshBtn.innerHTML = '✅ Synced!';
-      setTimeout(() => {
-        refreshBtn.disabled = false;
-        refreshBtn.innerHTML = originalText;
-      }, 2000);
-    } catch (error) {
-      refreshBtn.innerHTML = '❌ Failed';
-      setTimeout(() => {
-        refreshBtn.disabled = false;
-        refreshBtn.innerHTML = originalText;
-      }, 3000);
-    }
-  }
+  
 
   content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
@@ -575,6 +693,5 @@ export function Market(container) {
     .querySelector('#swap-with-makers')
     .addEventListener('click', swapWithSelectedMakers);
 
-  // Initial load
-  fetchMakers();
+initialize();
 }

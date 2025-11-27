@@ -24,9 +24,38 @@ let storedTakerConfig = null;
 const activeSwaps = new Map();
 const activeSyncs = new Map();
 
+const DATA_DIR = `${process.env.HOME}/.coinswap/taker`;
+const DEFAULT_WALLET_NAME = 'taker-wallet';
+let currentWalletName = DEFAULT_WALLET_NAME;
+
 /**
  * Initialize the native coinswap module
  */
+
+function saveSwapReport(swapId, swapData) {
+  try {
+    const dataDir = DATA_DIR;
+    const reportsDir = path.join(dataDir, 'swap_reports');
+
+    // Create swap_reports directory if it doesn't exist
+    if (!fs.existsSync(reportsDir)) {
+      fs.mkdirSync(reportsDir, { recursive: true });
+      console.log('📁 Created swap_reports directory');
+    }
+
+    const filename = `${swapId}.json`;
+    const filepath = path.join(reportsDir, filename);
+
+    fs.writeFileSync(filepath, JSON.stringify(swapData, null, 2), 'utf8');
+    console.log(`💾 Swap report saved: ${filepath}`);
+
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to save swap report:', error);
+    return false;
+  }
+}
+
 async function initNAPI() {
   try {
     coinswapNapi = require('coinswap-napi');
@@ -64,6 +93,22 @@ function createWindow() {
 
   win.loadFile(htmlPath);
 
+  win.webContents.on('did-finish-load', () => {
+    win.webContents.executeJavaScript('localStorage.clear();');
+    console.log('🧹 localStorage cleared');
+  });
+
+  try {
+    const dataDir = DATA_DIR;
+    const stateFile = path.join(dataDir, 'swap_state.json');
+    if (fs.existsSync(stateFile)) {
+      fs.unlinkSync(stateFile);
+      console.log('🧹 Swap state cleared');
+    }
+  } catch (error) {
+    console.warn('⚠️ Could not clear swap state:', error.message);
+  }
+
   // Open DevTools in development
   if (process.env.NODE_ENV === 'development') {
     win.webContents.openDevTools();
@@ -77,6 +122,8 @@ function createWindow() {
 // Initialize taker - SIMPLIFIED
 ipcMain.handle('taker:initialize', async (event, config) => {
   try {
+    console.log('📦 Raw config received:', JSON.stringify(config, null, 2));
+
     if (!coinswapNapi) {
       await initNAPI();
       if (!coinswapNapi) {
@@ -84,18 +131,31 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       }
     }
 
+    const dataDir = DATA_DIR;
+    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:29332';
+
+    // ✅ EXTRACT WALLET NAME FIRST
+    const walletName =
+      config.wallet?.name || config.wallet?.fileName || DEFAULT_WALLET_NAME;
+    currentWalletName = walletName; // ✅ STORE IT GLOBALLY
+
+    console.log('🔧 Wallet name from config:', walletName);
+    console.log('🔧 Full wallet config:', config.wallet);
+
+    // ✅ NOW USE IT IN rpcConfig
     const rpcConfig = {
       url: `${config.rpc?.host || '127.0.0.1'}:${config.rpc?.port || 38332}`,
       username: config.rpc?.username || 'user',
       password: config.rpc?.password || 'password',
-      walletName: 'taker-wallet',
+      walletName: walletName,
     };
 
-    const dataDir = `${process.env.HOME}/.coinswap/taker`;
-    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
+    console.log('🔧 Wallet name from config:', walletName);
+    console.log('🔧 Full wallet config:', config.wallet);
 
     console.log('🔧 Initializing Taker with config:', {
       dataDir,
+      walletName,
       rpcConfig,
       zmqAddr,
     });
@@ -111,25 +171,66 @@ ipcMain.handle('taker:initialize', async (event, config) => {
       console.warn('⚠️ Could not setup logging:', logError.message);
     }
 
-    const walletPassword = config.wallet?.password || '';
+const walletPassword = config.wallet?.password;
+const finalPassword = (walletPassword && walletPassword.trim() !== '') ? walletPassword : undefined;
     console.log(
-      '🔐 Creating Taker with password:',
-      walletPassword ? 'YES' : 'NO'
+      '🔐 Creating Taker with wallet:',
+      walletName,
+      'password:',
+      finalPassword ? 'YES' : 'NO'
     );
 
     takerInstance = new coinswapNapi.Taker(
       dataDir,
-      'taker-wallet',
+      walletName,
       rpcConfig,
       9051,
       undefined,
       zmqAddr,
-      walletPassword
+      finalPassword
     );
 
     storedTakerConfig = { dataDir, rpcConfig, zmqAddr };
 
-    console.log('✅ Taker initialized');
+    console.log('✅ Taker initialized with wallet:', walletName);
+
+    // **NEW: Start background offerbook sync**
+    console.log('🔄 Starting background offerbook sync...');
+    setTimeout(async () => {
+      try {
+        // Delete corrupted offerbook
+        const offerbookPath = path.join(dataDir, 'offerbook.json');
+        if (fs.existsSync(offerbookPath)) {
+          fs.unlinkSync(offerbookPath);
+        }
+
+        // Start sync worker
+        const syncConfig = {
+          ...storedTakerConfig,
+          walletName: walletName,
+          password: walletPassword || '',
+        };
+
+        const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
+          workerData: { config: syncConfig },
+        });
+
+        worker.on('message', (msg) => {
+          if (msg.type === 'complete') {
+            console.log('✅ Background offerbook sync completed');
+          } else if (msg.type === 'error') {
+            console.error('❌ Background offerbook sync failed:', msg.error);
+          }
+        });
+
+        worker.on('error', (err) => {
+          console.error('❌ Background sync worker error:', err);
+        });
+      } catch (error) {
+        console.error('❌ Failed to start background sync:', error);
+      }
+    }, 2000); // Wait 2 seconds after init to avoid conflicts
+
     return { success: true, message: 'Taker initialized and ready' };
   } catch (error) {
     console.error('❌ Initialization failed:', error);
@@ -396,63 +497,85 @@ ipcMain.handle('dialog:saveFile', async (event, options) => {
 });
 
 // Add after taker:backup handler:
-ipcMain.handle('taker:restore', async (event, { backupFilePath, password }) => {
-  try {
-    if (!coinswapNapi) {
-      await initNAPI();
+ipcMain.handle(
+  'taker:restore',
+  async (event, { backupFilePath, password, walletName }) => {
+    try {
       if (!coinswapNapi) {
-        return { success: false, error: 'Failed to load coinswap-napi' };
+        await initNAPI();
+        if (!coinswapNapi) {
+          return { success: false, error: 'Failed to load coinswap-napi' };
+        }
       }
+
+      console.log(`♻️ Restoring wallet from: ${backupFilePath}`);
+
+      const dataDir = DATA_DIR;
+      // ✅ Use the wallet name from parameter, or generate a unique one
+      const restoredWalletName = walletName || `restored-wallet-${Date.now()}`;
+
+      console.log(`📁 Restoring to: ${dataDir}/wallets/${restoredWalletName}`);
+
+      const rpcConfig = {
+        url: '127.0.0.1:18443',
+        username: 'user',
+        password: 'password',
+        walletName: restoredWalletName, // ✅ Use the correct wallet name
+      };
+
+      // Call static restore method
+      coinswapNapi.Taker.restoreWalletGuiApp(
+        dataDir,
+        restoredWalletName, // ✅ Use the correct wallet name
+        rpcConfig,
+        backupFilePath,
+        password || ''
+      );
+
+      console.log('✅ Wallet restored successfully to:', restoredWalletName);
+      return {
+        success: true,
+        message: 'Wallet restored successfully',
+        walletName: restoredWalletName,
+      };
+    } catch (error) {
+      console.error('❌ Restore failed:', error);
+      return { success: false, error: error.message };
     }
-
-    console.log(`♻️ Restoring wallet from: ${backupFilePath}`);
-
-    const dataDir = `${process.env.HOME}/.coinswap/taker`;
-    const rpcConfig = {
-      url: '127.0.0.1:18443', // Will be updated from config later
-      username: 'user',
-      password: 'password',
-      walletName: 'taker-wallet',
-    };
-
-    // Call static restore method
-    coinswapNapi.Taker.restoreWalletGuiApp(
-      dataDir,
-      'taker-wallet',
-      rpcConfig,
-      backupFilePath,
-      password || ''
-    );
-
-    console.log('✅ Wallet restored successfully');
-    return {
-      success: true,
-      message: 'Wallet restored - please initialize taker now',
-    };
-  } catch (error) {
-    console.error('❌ Restore failed:', error);
-    return { success: false, error: error.message };
   }
-});
+);
 
-ipcMain.handle('taker:isWalletEncrypted', async (event, walletPath) => {
-  try {
-    // If no path provided, use default
-    if (!walletPath) {
-      const dataDir = `${process.env.HOME}/.coinswap/taker`;
-      walletPath = path.join(dataDir, 'wallets', 'taker-wallet');
+ipcMain.handle(
+  'taker:isWalletEncrypted',
+  async (event, walletPath, walletName) => {
+    try {
+      // If walletPath is provided, use it directly
+      // Otherwise construct it from walletName
+      if (!walletPath) {
+        const dataDir = DATA_DIR;
+        const name = walletName || currentWalletName || DEFAULT_WALLET_NAME;
+        walletPath = path.join(dataDir, 'wallets', name);
+      }
+
+      // Check if the wallet file exists first
+      if (!fs.existsSync(walletPath)) {
+        console.log(
+          `🔐 Wallet file not found: ${walletPath} -> NOT ENCRYPTED (doesn't exist yet)`
+        );
+        return false; // If wallet doesn't exist yet, it's not encrypted
+      }
+
+      const isEncrypted = coinswapNapi.Taker.isWalletEncrypted(walletPath);
+      console.log(
+        `🔐 Wallet encryption check: ${walletPath} -> ${isEncrypted ? 'ENCRYPTED' : 'NOT ENCRYPTED'}`
+      );
+      return isEncrypted;
+    } catch (error) {
+      console.error('Failed to check wallet encryption:', error);
+      return false;
     }
-
-    const isEncrypted = coinswapNapi.Taker.isWalletEncrypted(walletPath);
-    console.log(
-      `🔐 Wallet encryption check: ${walletPath} -> ${isEncrypted ? 'ENCRYPTED' : 'NOT ENCRYPTED'}`
-    );
-    return isEncrypted;
-  } catch (error) {
-    console.error('Failed to check wallet encryption:', error);
-    return false;
   }
-});
+);
 
 // Sync offerbook (using worker thread to avoid blocking)
 ipcMain.handle('taker:syncOfferbook', async () => {
@@ -465,8 +588,27 @@ ipcMain.handle('taker:syncOfferbook', async () => {
     console.log(`🔄 [${syncId}] Starting offerbook sync in worker...`);
     console.log('Using config:', storedTakerConfig);
 
+    // **FIX: Delete corrupted offerbook before syncing**
+    const offerbookPath = path.join(
+      storedTakerConfig.dataDir,
+      'offerbook.json'
+    );
+    try {
+      if (fs.existsSync(offerbookPath)) {
+        console.log('🗑️ Deleting old offerbook to prevent corruption...');
+        fs.unlinkSync(offerbookPath);
+      }
+    } catch (deleteError) {
+      console.warn('⚠️ Could not delete offerbook:', deleteError.message);
+    }
+
+    const config = {
+      ...storedTakerConfig,
+      password: '',
+    };
+
     const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
-      workerData: { config: storedTakerConfig },
+      workerData: { config },
     });
 
     activeSyncs.set(syncId, {
@@ -656,16 +798,19 @@ ipcMain.handle(
         `🚀 [${swapId}] Starting coinswap in worker: ${amount} sats, ${makerCount} makers`
       );
 
+      const walletName = currentWalletName || DEFAULT_WALLET_NAME;
+
       // Get config for worker
       const config = {
-        dataDir: `${process.env.HOME}/.coinswap/taker`,
+        dataDir: DATA_DIR,
+        walletName: walletName,
         rpcConfig: {
           url: '127.0.0.1:18443',
           username: 'user',
           password: 'password',
-          walletName: 'taker-wallet',
+          walletName: walletName,
         },
-        zmqAddr: 'tcp://127.0.0.1:28332',
+        zmqAddr: 'tcp://127.0.0.1:29332',
         password: password || '',
       };
 
@@ -688,19 +833,29 @@ ipcMain.handle(
             status: msg.status,
           });
         } else if (msg.type === 'complete') {
-          activeSwaps.set(swapId, {
+          const swapData = {
             ...activeSwaps.get(swapId),
             status: 'completed',
             report: msg.report,
             completedAt: Date.now(),
-          });
+          };
+
+          activeSwaps.set(swapId, swapData);
+
+          // ✅ Save swap report to disk
+          saveSwapReport(swapId, swapData);
         } else if (msg.type === 'error') {
-          activeSwaps.set(swapId, {
+          const swapData = {
             ...activeSwaps.get(swapId),
             status: 'failed',
             error: msg.error,
             failedAt: Date.now(),
-          });
+          };
+
+          activeSwaps.set(swapId, swapData);
+
+          // ✅ Save failed swap report too
+          saveSwapReport(swapId, swapData);
         }
       });
 
@@ -730,6 +885,120 @@ ipcMain.handle('coinswap:getStatus', async (event, swapId) => {
   }
 
   return { success: true, swap };
+});
+
+// Get all swap reports
+ipcMain.handle('swapReports:getAll', async () => {
+  try {
+    const dataDir = DATA_DIR;
+    const reportsDir = path.join(dataDir, 'swap_reports');
+
+    if (!fs.existsSync(reportsDir)) {
+      return { success: true, reports: [] };
+    }
+
+    const files = fs.readdirSync(reportsDir);
+    const reports = [];
+
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        try {
+          const filepath = path.join(reportsDir, file);
+          const content = fs.readFileSync(filepath, 'utf8');
+          const report = JSON.parse(content);
+          reports.push(report);
+        } catch (error) {
+          console.warn(`⚠️ Could not read swap report ${file}:`, error.message);
+        }
+      }
+    }
+
+    // Sort by start time (newest first)
+    reports.sort((a, b) => b.startedAt - a.startedAt);
+
+    console.log(`📊 Loaded ${reports.length} swap reports`);
+    return { success: true, reports };
+  } catch (error) {
+    console.error('❌ Failed to get swap reports:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get single swap report
+ipcMain.handle('swapReports:get', async (event, swapId) => {
+  try {
+    const dataDir = DATA_DIR;
+    const filepath = path.join(dataDir, 'swap_reports', `${swapId}.json`);
+
+    if (!fs.existsSync(filepath)) {
+      return { success: false, error: 'Report not found' };
+    }
+
+    const content = fs.readFileSync(filepath, 'utf8');
+    const report = JSON.parse(content);
+
+    return { success: true, report };
+  } catch (error) {
+    console.error('❌ Failed to get swap report:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Add after swapReports handlers (around line 920)
+
+// Save swap state
+ipcMain.handle('swapState:save', async (event, state) => {
+  try {
+    const dataDir = DATA_DIR;
+    const stateFile = path.join(dataDir, 'swap_state.json');
+
+    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2), 'utf8');
+    console.log('💾 Swap state saved');
+
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to save swap state:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Load swap state
+ipcMain.handle('swapState:load', async () => {
+  try {
+    const dataDir = DATA_DIR;
+    const stateFile = path.join(dataDir, 'swap_state.json');
+
+    if (!fs.existsSync(stateFile)) {
+      return { success: true, state: null };
+    }
+
+    const content = fs.readFileSync(stateFile, 'utf8');
+    const state = JSON.parse(content);
+
+    console.log('📂 Swap state loaded');
+    return { success: true, state };
+  } catch (error) {
+    console.error('❌ Failed to load swap state:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear swap state
+ipcMain.handle('swapState:clear', async () => {
+  try {
+    const dataDir = DATA_DIR;
+    const stateFile = path.join(dataDir, 'swap_state.json');
+
+    if (fs.existsSync(stateFile)) {
+      fs.unlinkSync(stateFile);
+      console.log('🗑️ Swap state cleared');
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('❌ Failed to clear swap state:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 /**

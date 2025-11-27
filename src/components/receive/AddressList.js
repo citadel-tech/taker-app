@@ -1,11 +1,64 @@
-import { AddressStorage } from './AddressStorage.js';
-
 export function AddressListComponent(container) {
   let currentFilter = 'all';
   let sortBy = 'newest';
+  let allAddresses = [];
+
+  // Fetch addresses from transactions
+  async function fetchAddresses() {
+    try {
+const result = await window.api.taker.getTransactions(200, 0);
+      
+      if (!result.success || !result.transactions) {
+        return [];
+      }
+
+      const addressMap = new Map();
+
+      result.transactions.forEach(tx => {
+        const category = (tx.detail.category || '').toLowerCase();
+        
+        if (category === 'receive' || category === '"receive"') {
+          const addr = tx.detail.address?.address || tx.detail.address;
+          
+          if (addr) {
+            if (!addressMap.has(addr)) {
+              addressMap.set(addr, {
+                address: addr,
+                used: 0,
+                received: 0,
+                createdAt: (tx.info.blocktime || tx.info.time) * 1000,
+                type: detectAddressType(addr),
+                lastUsed: (tx.info.blocktime || tx.info.time) * 1000
+              });
+            }
+            
+            const addrData = addressMap.get(addr);
+            addrData.used++;
+            addrData.received += (tx.detail.amount?.sats || 0);
+            addrData.lastUsed = Math.max(addrData.lastUsed, (tx.info.blocktime || tx.info.time) * 1000);
+          }
+        }
+      });
+
+      return Array.from(addressMap.values());
+    } catch (error) {
+      console.error('Failed to fetch addresses:', error);
+      return [];
+    }
+  }
+
+  function detectAddressType(address) {
+    if (address.startsWith('bc1q')) return 'P2WPKH';
+    if (address.startsWith('bc1p')) return 'P2TR';
+    if (address.startsWith('3')) return 'P2SH';
+    if (address.startsWith('1')) return 'P2PKH';
+    if (address.startsWith('tb1q')) return 'P2WPKH';
+    if (address.startsWith('bcrt1q')) return 'P2WPKH';
+    return 'Unknown';
+  }
 
   function getFilteredAddresses() {
-    let addresses = AddressStorage.getAllAddresses();
+    let addresses = [...allAddresses];
 
     // Apply type filter
     if (currentFilter !== 'all') {
@@ -47,37 +100,31 @@ export function AddressListComponent(container) {
     }
   }
 
-  async function syncAddressUsage() {
-    try {
-      // IPC call to get UTXOs
-      const data = await window.api.taker.getUtxos();
+  function formatLastUsed(timestamp) {
+    if (!timestamp) return 'Never';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} weeks ago`;
+    return date.toLocaleDateString();
+  }
 
-      if (!data.success) return;
-
-      const utxos = data.utxos || [];
-      const addresses = AddressStorage.getAllAddresses();
-
-      addresses.forEach((addr) => {
-        const matchingUtxos = utxos.filter(
-          (u) => u.utxo.address === addr.address
-        );
-
-        if (matchingUtxos.length > 0) {
-          const totalReceived = matchingUtxos.reduce(
-            (sum, u) => sum + u.utxo.amount,
-            0
-          );
-
-          AddressStorage.updateAddress(addr.address, {
-            used: matchingUtxos.length,
-            received: totalReceived,
-            lastUsed: Date.now(),
-          });
-        }
-      });
-    } catch (err) {
-      console.error('Failed to sync address usage:', err);
-    }
+  function getStats() {
+    const used = allAddresses.filter(a => a.used > 0).length;
+    const reused = allAddresses.filter(a => a.used > 1).length;
+    const totalReceived = allAddresses.reduce((sum, a) => sum + a.received, 0);
+    
+    return {
+      total: allAddresses.length,
+      used,
+      reused,
+      totalReceived
+    };
   }
 
   async function copyToClipboard(text) {
@@ -109,18 +156,16 @@ export function AddressListComponent(container) {
   }
 
   function exportAddresses() {
-    const addresses = AddressStorage.getAllAddresses();
-
-    if (addresses.length === 0) {
+    if (allAddresses.length === 0) {
       showToast('No addresses to export');
       return;
     }
 
     const csv = [
       'Address,Type,Status,Times Used,Received (BTC),Created At,Last Used',
-      ...addresses.map((addr) => {
+      ...allAddresses.map((addr) => {
         const statusInfo = getStatusInfo(addr);
-        return `"${addr.address}","${addr.type}","${statusInfo.text}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${AddressStorage.formatLastUsed(addr.lastUsed)}"`;
+        return `"${addr.address}","${addr.type}","${statusInfo.text}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
       }),
     ].join('\n');
 
@@ -136,9 +181,8 @@ export function AddressListComponent(container) {
   }
 
   function render() {
-    const allAddresses = AddressStorage.getAllAddresses();
     const filteredAddresses = getFilteredAddresses();
-    const stats = AddressStorage.getStats();
+    const stats = getStats();
 
     // Get unique address types for filter buttons
     const addressTypes = [...new Set(allAddresses.map((a) => a.type))];
@@ -151,7 +195,7 @@ export function AddressListComponent(container) {
               <span>←</span> Back to Receive
             </button>
             <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Addresses</h2>
-            <p class="text-gray-400">Complete list of generated addresses</p>
+            <p class="text-gray-400">Addresses derived from transaction history</p>
           </div>
           <div class="flex gap-2">
             <button id="export-addresses" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
@@ -229,7 +273,7 @@ export function AddressListComponent(container) {
               ? `
             <div class="text-center py-12">
               <div class="text-4xl mb-4">📭</div>
-              <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `of type ${currentFilter}` : 'generated yet'}</p>
+              <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `of type ${currentFilter}` : 'found in transaction history'}</p>
               <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold px-6 py-2 rounded-lg transition-colors">
                 Generate New Address
               </button>
@@ -259,18 +303,18 @@ export function AddressListComponent(container) {
                       return `
                       <tr class="border-b border-gray-800 hover:bg-[#242d3d] transition-colors address-row" data-address="${addr.address}">
                         <td class="py-3 px-4">
-    <div class="flex items-center gap-2">
-        <a href="https://mempool.space/signet/address/${addr.address}" 
-           target="_blank" 
-           class="font-mono text-sm text-blue-400 hover:text-blue-300 underline truncate max-w-[200px]" 
-           title="${addr.address}">
-            ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
-        </a>
-        <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
-            📋
-        </button>
-    </div>
-</td>
+                          <div class="flex items-center gap-2">
+                            <a href="https://mempool.space/signet/address/${addr.address}" 
+                               target="_blank" 
+                               class="font-mono text-sm text-blue-400 hover:text-blue-300 underline truncate max-w-[200px]" 
+                               title="${addr.address}">
+                                ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
+                            </a>
+                            <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
+                                📋
+                            </button>
+                          </div>
+                        </td>
                         <td class="py-3 px-4">
                           <span class="px-2 py-1 rounded text-xs font-semibold bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
                             ${addr.type}
@@ -289,7 +333,7 @@ export function AddressListComponent(container) {
                           ${createdDate.toLocaleDateString()}
                         </td>
                         <td class="py-3 px-4 text-sm text-gray-400">
-                          ${AddressStorage.formatLastUsed(addr.lastUsed)}
+                          ${formatLastUsed(addr.lastUsed)}
                         </td>
                       </tr>
                     `;
@@ -332,7 +376,7 @@ export function AddressListComponent(container) {
       });
     }
 
-    // Go to receive button (when no addresses)
+    // Go to receive button
     const goToReceiveButton = container.querySelector('#go-to-receive');
     if (goToReceiveButton) {
       goToReceiveButton.addEventListener('click', () => {
@@ -385,18 +429,27 @@ export function AddressListComponent(container) {
     const refreshButton = container.querySelector('#refresh-addresses');
     if (refreshButton) {
       refreshButton.addEventListener('click', async () => {
-        refreshButton.innerHTML = '⏳ Syncing...';
+        refreshButton.innerHTML = '⏳ Loading...';
         refreshButton.disabled = true;
-        await syncAddressUsage();
+        allAddresses = await fetchAddresses();
         render();
-        showToast('Address list synced with wallet');
+        showToast('Address list refreshed');
       });
     }
   }
 
   // Initialize
   (async () => {
-    await syncAddressUsage();
+    container.innerHTML = `
+      <div class="flex items-center justify-center h-64">
+        <div class="text-center">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+          <p class="text-gray-400">Loading addresses...</p>
+        </div>
+      </div>
+    `;
+    
+    allAddresses = await fetchAddresses();
     render();
   })();
 }

@@ -1,11 +1,11 @@
 import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
 
-export function CoinswapComponent(container, swapConfig) {
+export async function CoinswapComponent(container, swapConfig) {
   const content = document.createElement('div');
   content.id = 'coinswap-content';
 
-  const existingSwap = SwapStateManager.getActiveSwap();
-  const savedProgress = SwapStateManager.getSwapProgress();
+  const existingSwap = await SwapStateManager.getActiveSwap();
+  const savedProgress = await SwapStateManager.getSwapProgress();
 
   let actualSwapConfig;
   let shouldStartNew = true;
@@ -357,6 +357,10 @@ export function CoinswapComponent(container, swapConfig) {
     });
 
     SwapStateManager.completeSwap(transformedReport);
+
+    setTimeout(() => {
+  SwapStateManager.clearSwapData();
+}, 3000);
 
     if (window.appManager) window.appManager.stopBackgroundSwapManager();
   }

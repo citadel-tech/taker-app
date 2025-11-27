@@ -27,11 +27,12 @@ const { parentPort, workerData } = require('worker_threads');
     // Create a new Taker instance for this worker
     const taker = new coinswapNapi.Taker(
       config.dataDir,
-      'taker-wallet',
+      config.walletName || 'taker-wallet',
       config.rpcConfig,
       9051,
       undefined,
-      config.zmqAddr
+      config.zmqAddr,
+      config.password || ""
     );
 
     // Notify that we're in progress

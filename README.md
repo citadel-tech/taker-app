@@ -35,7 +35,7 @@ rpcport=38332
 rpcbind=127.0.0.1
 rpcallowip=127.0.0.1
 zmqpubrawblock=tcp://127.0.0.1:28332
-zmqpubrawtx=tcp://127.0.0.1:28333
+zmqpubrawtx=tcp://127.0.0.1:28332
 
 # Regtest
 [regtest]
