@@ -8,6 +8,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   const totalSteps = 4;
   let walletAction = null; // 'create', 'load', or 'restore'
   let walletData = {};
+  let protocolVersion = 'v1'; // 'v1' (P2WSH) or 'v2' (Taproot)
 
   modal.innerHTML = `
     <div class="bg-[#1a2332] rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -25,14 +26,54 @@ export function FirstTimeSetupModal(container, onComplete) {
 
       <!-- Content -->
       <div class="p-6">
-        <!-- Step 1: Introduction -->
+        <!-- Step 1: Introduction & Protocol Selection -->
         <div id="step-1" class="setup-step">
           <div class="text-center mb-6">
             <h3 class="text-xl font-semibold text-white mb-2">Getting Started</h3>
-            <p class="text-gray-400 text-sm">We need to configure a few settings to connect your wallet to Bitcoin Core and enable private swaps.</p>
+            <p class="text-gray-400 text-sm">Choose your swap protocol and we'll configure your wallet for private Bitcoin swaps.</p>
           </div>
 
           <div class="space-y-4">
+            <!-- Protocol Selection -->
+            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+              <h4 class="text-white font-semibold mb-3">Select Swap Protocol</h4>
+              <div class="grid grid-cols-2 gap-4">
+                <!-- P2WSH (V1) -->
+                <div id="protocol-v1" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-[#FF6B35] cursor-pointer hover:border-[#FF6B35] transition-colors">
+                  <div class="flex items-center mb-2">
+                    <span class="text-2xl mr-2">🔐</span>
+                    <h5 class="text-white font-semibold">P2WSH (Stable)</h5>
+                  </div>
+                  <p class="text-xs text-gray-400 mb-2">ECDSA-based 2-of-2 multisig contracts</p>
+                  <ul class="text-xs text-gray-500 space-y-1">
+                    <li>• Battle-tested protocol</li>
+                    <li>• Wider maker support</li>
+                    <li>• Recommended for most users</li>
+                  </ul>
+                  <div class="mt-2">
+                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Recommended</span>
+                  </div>
+                </div>
+
+                <!-- Taproot (V2) -->
+                <div id="protocol-v2" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors">
+                  <div class="flex items-center mb-2">
+                    <span class="text-2xl mr-2">⚡</span>
+                    <h5 class="text-white font-semibold">Taproot (Beta)</h5>
+                  </div>
+                  <p class="text-xs text-gray-400 mb-2">MuSig2-based scriptless scripts</p>
+                  <ul class="text-xs text-gray-500 space-y-1">
+                    <li>• Enhanced privacy</li>
+                    <li>• Lower fees</li>
+                    <li>• Experimental - limited makers</li>
+                  </ul>
+                  <div class="mt-2">
+                    <span class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">Experimental</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
               <h4 class="text-white font-semibold mb-2">What we'll set up:</h4>
               <ul class="text-sm text-gray-400 space-y-2">
@@ -221,8 +262,8 @@ export function FirstTimeSetupModal(container, onComplete) {
                 <!-- NEW: Wallet Name Input -->
                 <div>
                   <label class="block text-sm text-gray-400 mb-2">Wallet Name</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     id="create-wallet-name"
                     value="taker-wallet-${Math.floor(100000 + Math.random() * 900000)}"
                     placeholder="my-wallet"
@@ -548,7 +589,7 @@ export function FirstTimeSetupModal(container, onComplete) {
     // Validate the actual input in Step 3B substeps
     if (walletAction === 'create') {
       const walletName =
-        modal.querySelector('#create-wallet-name')?.value || 'taker-wallet';
+        modal.querySelector('#create-wallet-name')?.value || defaultWalletName;
       const password = modal.querySelector('#create-password')?.value || '';
       const confirmPassword =
         modal.querySelector('#create-password-confirm')?.value || '';
@@ -658,6 +699,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
   function buildConfiguration() {
     const config = {
+      protocol: protocolVersion, // 'v1' (P2WSH) or 'v2' (Taproot)
       rpc: {
         host: modal.querySelector('#setup-rpc-host').value,
         port: parseInt(modal.querySelector('#setup-rpc-port').value),
@@ -683,12 +725,13 @@ export function FirstTimeSetupModal(container, onComplete) {
         action: walletAction,
         name: walletData.walletName,
         fileName: walletData.walletFileName,
-        password: walletData.password === undefined ? '' : walletData.password,  
+        password: walletData.password === undefined ? '' : walletData.password,
         backupPath: walletData.backupPath,
       },
     };
 
     console.log('✅ Configuration built:', config);
+    console.log('📋 Protocol version:', protocolVersion === 'v1' ? 'P2WSH (V1)' : 'Taproot (V2)');
     return config;
   }
 
@@ -883,6 +926,36 @@ export function FirstTimeSetupModal(container, onComplete) {
   // ============================================================================
 
   console.log('🔧 Attaching event listeners...');
+
+  // Protocol selection
+  const protocolV1 = modal.querySelector('#protocol-v1');
+  const protocolV2 = modal.querySelector('#protocol-v2');
+
+  if (protocolV1) {
+    protocolV1.addEventListener('click', () => {
+      protocolVersion = 'v1';
+      modal.querySelectorAll('.protocol-choice').forEach((el) => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+      protocolV1.classList.remove('border-gray-700');
+      protocolV1.classList.add('border-[#FF6B35]');
+      console.log('Protocol selected: V1 (P2WSH)');
+    });
+  }
+
+  if (protocolV2) {
+    protocolV2.addEventListener('click', () => {
+      protocolVersion = 'v2';
+      modal.querySelectorAll('.protocol-choice').forEach((el) => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+      protocolV2.classList.remove('border-gray-700');
+      protocolV2.classList.add('border-[#FF6B35]');
+      console.log('Protocol selected: V2 (Taproot)');
+    });
+  }
 
   // Wallet action choice
   const choiceCreate = modal.querySelector('#choice-create');

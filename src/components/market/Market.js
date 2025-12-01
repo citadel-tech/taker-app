@@ -92,20 +92,10 @@ export function Market(container) {
         // Store sync ID in localStorage
         localStorage.setItem('active_sync_id', syncId);
 
-        // Poll for completion
-        const timeout = 120000;
-        const startTime = Date.now();
-
+        // Poll for completion (no timeout - sync can take a while)
         return new Promise((resolve, reject) => {
             const pollInterval = setInterval(async () => {
                 try {
-                    if (Date.now() - startTime > timeout) {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id'); // Clean up
-                        reject(new Error('Sync timeout - operation took too long'));
-                        return;
-                    }
-
                     const status = await window.api.taker.getSyncStatus(syncId);
 
                     if (!status.success) {
