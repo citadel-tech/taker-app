@@ -188,11 +188,15 @@ export async function CoinswapComponent(container, swapConfig) {
     // Add raw message to log
     addLog(message, type);
 
-    // Update UI based on message content
+    // Update UI based on message content (supports both V1 and V2 protocols)
+
+    // V1: "Initiating coinswap with id" | V2: "Initiating coinswap with id"
     if (message.includes('Initiating coinswap with id')) {
       updateYouSend(true);
       updateHopStatus(0, 'Initializing...', 'yellow');
     }
+    // V1: "Broadcasted Funding tx" / "Waiting for funding transaction confirmation"
+    // V2: "Registered watcher for taker's outgoing contract"
     else if (message.includes('Broadcasted Funding tx') || message.includes('Waiting for funding transaction confirmation. Txids')) {
       const txMatch = message.match(/(?:txid:|Txids\s*:\s*\[)([a-f0-9]+)/i);
       if (txMatch) {
@@ -203,6 +207,22 @@ export async function CoinswapComponent(container, swapConfig) {
         }
       }
     }
+    // V2: "Registered watcher for taker's outgoing contract: txid:vout"
+    else if (message.includes("Registered watcher for taker's outgoing contract")) {
+      const txMatch = message.match(/([a-f0-9]{64}):(\d+)/i);
+      if (txMatch) {
+        const emptySlot = swapData.transactions.findIndex(tx => !tx.txid);
+        if (emptySlot !== -1) {
+          setTransactionTxid(emptySlot, txMatch[1]);
+          updateHopStatus(emptySlot, 'Broadcasting...', 'orange');
+        }
+      }
+    }
+    // V2: "Persisted outgoing swapcoin to wallet store"
+    else if (message.includes('Persisted outgoing swapcoin to wallet store')) {
+      updateHopStatus(0, 'Confirming...', 'orange');
+    }
+    // V1: "Tx [txid] | Confirmed at"
     else if (message.match(/Tx [a-f0-9]+ \| Confirmed at/i)) {
       const txMatch = message.match(/Tx ([a-f0-9]+)/i);
       if (txMatch) {
@@ -213,17 +233,109 @@ export async function CoinswapComponent(container, swapConfig) {
           if (slot < swapData.hops - 1) {
             updateMakerVisibility(slot + 1, true);
           }
-
         }
       }
     }
+    // V2: "Transaction confirmed at blockheight: {ht}, txid : {txid}"
+    else if (message.includes('Transaction confirmed at blockheight')) {
+      const txMatch = message.match(/txid\s*:\s*([a-f0-9]{64})/i);
+      if (txMatch) {
+        const slot = swapData.transactions.findIndex(tx => tx.txid?.startsWith(txMatch[1].substring(0, 8)));
+        if (slot !== -1) {
+          setTransactionConfirmed(slot);
+          updateHopStatus(slot, '✓ Confirmed', 'green');
+          if (slot < swapData.hops - 1) {
+            updateMakerVisibility(slot + 1, true);
+          }
+        }
+      }
+    }
+    // V2: "Transaction seen in mempool,waiting for confirmation, txid: {txid}"
+    else if (message.includes('Transaction seen in mempool')) {
+      const txMatch = message.match(/txid\s*:\s*([a-f0-9]{64})/i);
+      if (txMatch) {
+        const slot = swapData.transactions.findIndex(tx => tx.txid?.startsWith(txMatch[1].substring(0, 8)));
+        if (slot !== -1) {
+          updateHopStatus(slot, 'In mempool...', 'yellow');
+        }
+      }
+    }
+    // V2: Negotiating with makers
+    else if (message.includes('Received AckResponse from maker')) {
+      updateHopStatus(0, 'Negotiating...', 'yellow');
+    }
+    // V2: "All makers have responded with their outgoing keys"
+    else if (message.includes('All makers have responded with their outgoing keys')) {
+      updateHopStatus(0, 'Keys received', 'green');
+    }
+    // V2: "Sweeping taker's incoming contract"
+    else if (message.includes("Sweeping taker's incoming contract")) {
+      updateHopStatus(0, 'Sweeping...', 'yellow');
+    }
+    // V2: "Broadcast taker sweep transaction"
+    else if (message.includes('Broadcast taker sweep transaction')) {
+      const txMatch = message.match(/([a-f0-9]{64})/i);
+      if (txMatch) {
+        // Update the transaction with sweep txid
+        const slot = swapData.transactions.findIndex(tx => tx.txid);
+        if (slot !== -1) {
+          setTransactionConfirmed(slot);
+          updateHopStatus(slot, '✓ Swept', 'green');
+        }
+      }
+    }
+    // V1: "Swaps settled successfully" | V2: "Swaps settled successfully"
     else if (message.includes('Swaps settled successfully')) {
       for (let i = 0; i < swapData.hops; i++) {
         updateHopStatus(i, '✓ Complete', 'green');
       }
     }
+    // V2: "Taker sweep completed successfully"
+    else if (message.includes('Taker sweep completed successfully')) {
+      for (let i = 0; i < swapData.hops; i++) {
+        updateHopStatus(i, '✓ Complete', 'green');
+      }
+      updateYouReceive(true);
+    }
+    // V2: "Successfully Completed Taproot Coinswap"
+    else if (message.includes('Successfully Completed Taproot Coinswap')) {
+      for (let i = 0; i < swapData.hops; i++) {
+        updateHopStatus(i, '✓ Complete', 'green');
+      }
+      updateYouReceive(true);
+    }
+    // V1: "Successfully swept incoming swap coin"
     else if (message.includes('Successfully swept incoming swap coin')) {
       updateYouReceive(true);
+    }
+    // V2: "Recorded swept incoming swapcoin V2"
+    else if (message.includes('Recorded swept incoming swapcoin V2')) {
+      updateYouReceive(true);
+    }
+    // V2: "Starting forward-flow private key handover"
+    else if (message.includes('Starting forward-flow private key handover')) {
+      updateHopStatus(0, 'Key exchange...', 'yellow');
+    }
+    // V2: "Downloading offer from taproot maker"
+    else if (message.includes('Downloading offer from taproot maker')) {
+      updateHopStatus(0, 'Fetching offers...', 'yellow');
+    }
+    // V2: "Successfully downloaded offer from taproot maker"
+    else if (message.includes('Successfully downloaded offer from taproot maker')) {
+      updateHopStatus(0, 'Offers received', 'blue');
+    }
+    // V2: Recovery started
+    else if (message.includes('Starting taproot swap recovery')) {
+      addLog('Recovery initiated...', 'warn');
+      updateHopStatus(0, 'Recovering...', 'orange');
+    }
+    // V2: Recovery success (hashlock)
+    else if (message.includes('Successfully recovered incoming contract via hashlock')) {
+      addLog('Recovered via hashlock', 'success');
+    }
+    // V2: Recovery success (timelock)
+    else if (message.includes('Successfully recovered outgoing contract via timelock')) {
+      addLog('Recovered via timelock', 'success');
     }
   }
 
