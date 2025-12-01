@@ -224,7 +224,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   <input 
                     type="text" 
                     id="create-wallet-name"
-                    value="taker-wallet"
+                    value="taker-wallet-${Math.floor(100000 + Math.random() * 900000)}"
                     placeholder="my-wallet"
                     class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                   />
