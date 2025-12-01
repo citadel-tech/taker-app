@@ -16,6 +16,7 @@ const api1State = {
   DEFAULT_WALLET_NAME: 'taker-wallet',
   currentWalletName: 'taker-wallet',
   currentWalletPassword: '',
+  protocolVersion: 'v1', // 'v1' (P2WSH/Taker) or 'v2' (Taproot/TaprootTaker)
 };
 
 // ============================================================================
@@ -89,7 +90,11 @@ function registerTakerHandlers() {
   // Initialize taker
   ipcMain.handle('taker:initialize', async (event, config) => {
     try {
-      console.log('📦 [API v1] Initializing taker...');
+      // Determine protocol version
+      const protocol = config.protocol || 'v1';
+      api1State.protocolVersion = protocol;
+      const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
+      console.log(`📦 [API] Initializing taker with ${protocolName} protocol...`);
 
       if (!api1State.coinswapNapi) {
         await initNAPI();
@@ -109,12 +114,22 @@ function registerTakerHandlers() {
         walletName: walletName,
       };
 
-      console.log('🔧 Initializing Taker with:', { walletName, zmqAddr });
+      console.log('🔧 Initializing Taker with:', { walletName, zmqAddr, protocol });
+
+      // Select the appropriate Taker class based on protocol
+      const TakerClass = protocol === 'v2'
+        ? api1State.coinswapNapi.TaprootTaker
+        : api1State.coinswapNapi.Taker;
+
+      if (!TakerClass) {
+        const missing = protocol === 'v2' ? 'TaprootTaker' : 'Taker';
+        return { success: false, error: `${missing} class not found in coinswap-napi. Please rebuild the native module.` };
+      }
 
       // Setup logging
       try {
-        if (api1State.coinswapNapi.Taker.setupLogging) {
-          api1State.coinswapNapi.Taker.setupLogging(api1State.DATA_DIR);
+        if (TakerClass.setupLogging) {
+          TakerClass.setupLogging(api1State.DATA_DIR);
         }
       } catch (logError) {
         console.warn('⚠️ Could not setup logging:', logError.message);
@@ -124,12 +139,14 @@ function registerTakerHandlers() {
       const finalPassword = walletPassword && walletPassword.trim() !== '' ? walletPassword : undefined;
       api1State.currentWalletPassword = finalPassword || '';
 
-      api1State.takerInstance = new api1State.coinswapNapi.Taker(
+      const torAuthPassword = config.taker?.tor_auth_password || undefined;
+
+      api1State.takerInstance = new TakerClass(
         api1State.DATA_DIR,
         walletName,
         rpcConfig,
         config.taker?.control_port || 9051,
-        undefined,
+        torAuthPassword,
         zmqAddr,
         finalPassword
       );
@@ -139,10 +156,12 @@ function registerTakerHandlers() {
         rpcConfig,
         zmqAddr,
         controlPort: config.taker?.control_port || 9051,
+        torAuthPassword: torAuthPassword,
         password: finalPassword || '',
+        protocol: protocol,
       };
 
-      console.log('✅ Taker initialized with wallet:', walletName);
+      console.log(`✅ ${protocolName} Taker initialized with wallet:`, walletName);
 
       // Background offerbook sync
       setTimeout(async () => {
@@ -156,6 +175,7 @@ function registerTakerHandlers() {
             ...api1State.storedTakerConfig,
             walletName: walletName,
             password: walletPassword || '',
+            protocol: protocol,
           };
 
           const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
@@ -178,7 +198,7 @@ function registerTakerHandlers() {
         }
       }, 2000);
 
-      return { success: true, message: 'Taker initialized and ready' };
+      return { success: true, message: `${protocolName} Taker initialized and ready`, protocol };
     } catch (error) {
       console.error('❌ Initialization failed:', error);
 
@@ -467,6 +487,7 @@ function registerTakerHandlers() {
         ...api1State.storedTakerConfig,
         walletName: api1State.currentWalletName,
         password: api1State.currentWalletPassword,
+        protocol: api1State.protocolVersion || 'v1',
       };
 
       const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
@@ -609,23 +630,26 @@ function registerCoinswapHandlers() {
         return { success: false, error: 'Invalid amount' };
       }
 
+      const protocol = api1State.protocolVersion || 'v1';
+      const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
       const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      console.log(`🚀 [${swapId}] Starting coinswap: ${amount} sats, ${makerCount} makers`);
+      console.log(`🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} sats, ${makerCount} makers`);
 
       const walletName = api1State.currentWalletName || api1State.DEFAULT_WALLET_NAME;
 
       const config = {
         dataDir: api1State.DATA_DIR,
         walletName: walletName,
-        controlPort: api1State.storedTakerConfig.controlPort || 9051,
-        rpcConfig: {
+        controlPort: api1State.storedTakerConfig?.controlPort || 9051,
+        rpcConfig: api1State.storedTakerConfig?.rpcConfig || {
           url: '127.0.0.1:38332',
           username: 'user',
           password: 'password',
           walletName: walletName,
         },
-        zmqAddr: 'tcp://127.0.0.1:28332',
+        zmqAddr: api1State.storedTakerConfig?.zmqAddr || 'tcp://127.0.0.1:28332',
         password: password || '',
+        protocol: protocol,
       };
 
       const worker = new Worker(path.join(__dirname, 'coinswap-worker.js'), {
