@@ -18,7 +18,11 @@ if (!fs.existsSync(FFI_DIR)) {
   );
   console.log("✓ Cloned coinswap-ffi\n");
 } else {
-  console.log("✓ coinswap-ffi already present\n");
+  execSync(
+    "cd coinswap-ffi && git pull",
+    { stdio: "inherit" }
+  );
+  console.log("✓ coinswap-ffi updated with upstream\n");
 }
 
 // STEP 2 — Install deps & build coinswap-napi
