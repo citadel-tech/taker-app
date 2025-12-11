@@ -198,10 +198,10 @@ export function FirstTimeSetupModal(container, onComplete) {
                 server=1<br/>
                 rpcuser=user<br/>
                 rpcpassword=password<br/>
-                rpcport=38332<br/>
-                rpcallowip=127.0.0.1<br/>
-                zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-                zmqpubrawtx=tcp://127.0.0.1:28332
+                rpcport=48332<br/>
+                rpcallowip=172.81.178.3<br/>
+                zmqpubrawblock=tcp://172.81.178.3:58332<br/>
+                zmqpubrawtx=tcp://172.81.178.3:58332
               </div>
             </div>
           </div>
@@ -645,27 +645,33 @@ export function FirstTimeSetupModal(container, onComplete) {
       return true;
     }
 
-  if (walletAction === 'restore') {
-  const backupPath = modal.querySelector('#restore-backup-path')?.value || '';
-  const password = modal.querySelector('#restore-password')?.value || '';
-  const noPassword = modal.querySelector('#restore-no-password')?.checked || false;
-  const walletName = modal.querySelector('#restore-wallet-name')?.value?.trim() || '';
+    if (walletAction === 'restore') {
+      const backupPath =
+        modal.querySelector('#restore-backup-path')?.value || '';
+      const password = modal.querySelector('#restore-password')?.value || '';
+      const noPassword =
+        modal.querySelector('#restore-no-password')?.checked || false;
+      const walletName =
+        modal.querySelector('#restore-wallet-name')?.value?.trim() || '';
 
-  if (!backupPath) {
-    showError('restore-status', 'Please select a backup file');
-    return false;
-  }
+      if (!backupPath) {
+        showError('restore-status', 'Please select a backup file');
+        return false;
+      }
 
-  if (!walletName) {
-    showError('restore-status', 'Please enter a name for the restored wallet');
-    return false;
-  }
+      if (!walletName) {
+        showError(
+          'restore-status',
+          'Please enter a name for the restored wallet'
+        );
+        return false;
+      }
 
-  walletData.backupPath = backupPath;
-  walletData.password = noPassword ? '' : password || '';
-  walletData.walletName = walletName;  // ✅ Save wallet name
-  return true;
-}
+      walletData.backupPath = backupPath;
+      walletData.password = noPassword ? '' : password || '';
+      walletData.walletName = walletName; // ✅ Save wallet name
+      return true;
+    }
 
     return false;
   }
@@ -731,7 +737,10 @@ export function FirstTimeSetupModal(container, onComplete) {
     };
 
     console.log('✅ Configuration built:', config);
-    console.log('📋 Protocol version:', protocolVersion === 'v1' ? 'P2WSH (V1)' : 'Taproot (V2)');
+    console.log(
+      '📋 Protocol version:',
+      protocolVersion === 'v1' ? 'P2WSH (V1)' : 'Taproot (V2)'
+    );
     return config;
   }
 
