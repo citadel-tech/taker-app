@@ -316,7 +316,7 @@ function registerTakerHandlers() {
 
       const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => ({
         utxo: {
-          txid: utxoEntry.txid.hex,
+          txid: utxoEntry.txid.value,
           vout: utxoEntry.vout,
           amount: utxoEntry.amount.sats,
           confirmations: utxoEntry.confirmations,
