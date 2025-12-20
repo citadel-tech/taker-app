@@ -148,14 +148,30 @@ export function FirstTimeSetupModal(container, onComplete) {
                   />
                 </div>
                 <div>
-                  <label class="block text-sm text-gray-400 mb-2">RPC Password</label>
-                  <input 
-                    type="password" 
-                    id="setup-rpc-password"
-                    value="password"
-                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
+  <label class="block text-sm text-gray-400 mb-2">RPC Password</label>
+  <div class="relative">
+    <input 
+      type="password" 
+      id="setup-rpc-password"
+      value="password"
+      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+    />
+    <button
+      type="button"
+      id="toggle-rpc-password"
+      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+      aria-label="Toggle password visibility"
+    >
+      <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+      </svg>
+    </button>
+  </div>
+</div>
               </div>
             </div>
 
@@ -273,23 +289,55 @@ export function FirstTimeSetupModal(container, onComplete) {
                 </div>
 
                 <div>
-                  <label class="block text-sm text-gray-400 mb-2">Wallet Password</label>
-                  <input 
-                    type="password" 
-                    id="create-password"
-                    placeholder="Enter a strong password"
-                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-400 mb-2">Confirm Password</label>
-                  <input 
-                    type="password" 
-                    id="create-password-confirm"
-                    placeholder="Re-enter your password"
-                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                </div>
+  <label class="block text-sm text-gray-400 mb-2">Wallet Password</label>
+  <div class="relative">
+    <input 
+      type="password" 
+      id="create-password"
+      placeholder="Enter a strong password"
+      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+    />
+    <button
+      type="button"
+      id="toggle-create-password"
+      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+      aria-label="Toggle password visibility"
+    >
+      <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+      </svg>
+    </button>
+  </div>
+</div>
+<div>
+  <label class="block text-sm text-gray-400 mb-2">Confirm Password</label>
+  <div class="relative">
+    <input 
+      type="password" 
+      id="create-password-confirm"
+      placeholder="Re-enter your password"
+      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+    />
+    <button
+      type="button"
+      id="toggle-create-password-confirm"
+      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+      aria-label="Toggle password visibility"
+    >
+      <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+      </svg>
+    </button>
+  </div>
+</div>
 
                 <div class="flex items-center">
                   <input 
@@ -351,15 +399,31 @@ export function FirstTimeSetupModal(container, onComplete) {
             </div>
 
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <label class="block text-sm text-gray-400 mb-2">Wallet Password (if encrypted)</label>
-              <input 
-                type="password" 
-                id="load-password"
-                placeholder="Enter wallet password"
-                class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-              />
-              <p class="text-xs text-gray-500 mt-2">Leave empty if wallet is not encrypted</p>
-            </div>
+  <label class="block text-sm text-gray-400 mb-2">Wallet Password (if encrypted)</label>
+  <div class="relative">
+    <input 
+      type="password" 
+      id="load-password"
+      placeholder="Enter wallet password"
+      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+    />
+    <button
+      type="button"
+      id="toggle-load-password"
+      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+      aria-label="Toggle password visibility"
+    >
+      <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+      </svg>
+    </button>
+  </div>
+  <p class="text-xs text-gray-500 mt-2">Leave empty if wallet is not encrypted</p>
+</div>
 
             <div id="load-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
               <p class="text-xs text-red-400"></p>
@@ -476,16 +540,31 @@ export function FirstTimeSetupModal(container, onComplete) {
             </div>
 
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <label class="block text-sm text-gray-400 mb-2">Tor Auth Password (optional)</label>
-              <input 
-                type="password" 
-                id="setup-tor-auth-password"
-                placeholder="Leave empty if no password required"
-                class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-              />
-              <p class="text-xs text-gray-500 mt-1">Authentication password for Tor control interface</p>
-            </div>
-
+  <label class="block text-sm text-gray-400 mb-2">Tor Auth Password (optional)</label>
+  <div class="relative">
+    <input 
+      type="password" 
+      id="setup-tor-auth-password"
+      placeholder="Leave empty if no password required"
+      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+    />
+    <button
+      type="button"
+      id="toggle-setup-tor-password"
+      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+      aria-label="Toggle password visibility"
+    >
+      <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+      </svg>
+      <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+      </svg>
+    </button>
+  </div>
+  <p class="text-xs text-gray-500 mt-1">Authentication password for Tor control interface</p>
+</div>
             <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
               <p class="text-xs text-purple-400 mb-2">
                 <strong>🧅 Privacy Notice:</strong>
@@ -1088,6 +1167,38 @@ export function FirstTimeSetupModal(container, onComplete) {
       }
     });
   }
+
+  // Reusable function to toggle password visibility
+  function setupPasswordToggle(toggleButtonId, passwordInputId) {
+    const toggleButton = modal.querySelector(toggleButtonId);
+    if (!toggleButton) return;
+
+    toggleButton.addEventListener('click', () => {
+      const passwordInput = modal.querySelector(passwordInputId);
+      const eyeIcon = toggleButton.querySelector('.eye-icon');
+      const eyeSlashIcon = toggleButton.querySelector('.eye-slash-icon');
+
+      if (passwordInput.type === 'password') {
+        passwordInput.type = 'text';
+        eyeIcon.classList.add('hidden');
+        eyeSlashIcon.classList.remove('hidden');
+      } else {
+        passwordInput.type = 'password';
+        eyeIcon.classList.remove('hidden');
+        eyeSlashIcon.classList.add('hidden');
+      }
+    });
+  }
+
+  // Setup all password toggles
+  setupPasswordToggle('#toggle-setup-tor-password', '#setup-tor-auth-password');
+  setupPasswordToggle('#toggle-create-password', '#create-password');
+  setupPasswordToggle(
+    '#toggle-create-password-confirm',
+    '#create-password-confirm'
+  );
+  setupPasswordToggle('#toggle-rpc-password', '#setup-rpc-password');
+  setupPasswordToggle('#toggle-load-password', '#load-password');
 
   // Next button
   const nextBtn = modal.querySelector('#setup-next-btn');
