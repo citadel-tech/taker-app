@@ -28,8 +28,8 @@ export function UtxoListComponent(container) {
   }
 
   function truncateTxid(txid) {
-    if (typeof txid === 'object' && txid.hex) {
-      txid = txid.hex;
+    if (typeof txid === 'object' && txid.value) {
+      txid = txid.value;
     }
     return `${txid.substring(0, 12)}...${txid.substring(txid.length - 4)}`;
   }
@@ -354,7 +354,7 @@ export function UtxoListComponent(container) {
         const spendInfo = utxoData.spendInfo;
         const txidShort = truncateTxid(utxo.txid);
         const typeColor = getUtxoTypeColor(spendInfo.spendType);
-        const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+        const txid = typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
         const scriptType = getScriptType(utxoData);
         const scriptColor = getScriptTypeColor(scriptType);
 

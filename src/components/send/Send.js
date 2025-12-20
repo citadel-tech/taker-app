@@ -29,7 +29,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         availableUtxos = data.utxos.map((item, index) => {
           const utxo = item.utxo || item;
           const spendInfo = item.spendInfo || {};
-          const txid = typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+          const txid = typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
 
           return {
             txid: txid,
@@ -731,7 +731,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         );
 
         if (data.success) {
-          const txid = typeof data.txid === 'object' ? data.txid.hex : data.txid;
+          const txid = typeof data.txid === 'object' ? data.txid.value : data.txid;
           txids.push({ address: recipient.address, txid });
         } else {
           throw new Error(data.error || 'Failed to broadcast transaction');

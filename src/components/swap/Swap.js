@@ -80,7 +80,7 @@ export async function SwapComponent(container) {
           const utxo = item.utxo || item;
           const spendInfo = item.spendInfo || {};
           const txid =
-            typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid;
+            typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
 
           return {
             txid: txid,
