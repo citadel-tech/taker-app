@@ -76,7 +76,7 @@ export function Market(container) {
     if (!savedConfig) {
       throw new Error('No RPC configuration found');
     }
-    
+
     const config = JSON.parse(savedConfig);
     const host = config.rpc?.host || '127.0.0.1';
     const port = config.rpc?.port || 38332;
@@ -123,7 +123,7 @@ export function Market(container) {
     try {
       // Get current blockchain height from Bitcoin Core via RPC (same as Settings.js)
       const blockchainInfo = await makeRPCCall('getblockchaininfo');
-      
+
       if (blockchainInfo && blockchainInfo.blocks) {
         currentHeight = blockchainInfo.blocks;
       }
@@ -131,7 +131,6 @@ export function Market(container) {
       // For lastSyncedHeight, we can check the offerbook file timestamp
       // or just assume it's current if recently synced
       lastSyncedHeight = currentHeight; // Will be updated after sync completes
-      
     } catch (error) {
       console.error('Failed to update heights:', error);
       // Don't throw - just set nulls
@@ -142,114 +141,125 @@ export function Market(container) {
 
   async function syncOfferbook() {
     try {
-        // Check if sync is already running
-        const activeSyncId = localStorage.getItem('active_sync_id');
-        if (activeSyncId) {
-            const status = await window.api.taker.getSyncStatus(activeSyncId);
-            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
-                throw new Error('Sync already in progress');
+      // Check if sync is already running
+      const activeSyncId = localStorage.getItem('active_sync_id');
+      if (activeSyncId) {
+        const status = await window.api.taker.getSyncStatus(activeSyncId);
+        if (
+          status.success &&
+          (status.sync.status === 'syncing' ||
+            status.sync.status === 'starting')
+        ) {
+          throw new Error('Sync already in progress');
+        }
+      }
+
+      console.log('🔄 Starting offerbook sync...');
+
+      const result = await window.api.taker.syncOfferbook();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start sync');
+      }
+
+      const syncId = result.syncId;
+      console.log('📡 Sync started:', syncId);
+
+      // Store sync ID in localStorage
+      localStorage.setItem('active_sync_id', syncId);
+
+      // Poll for completion and update progress
+      return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        const pollInterval = setInterval(async () => {
+          try {
+            const status = await window.api.taker.getSyncStatus(syncId);
+
+            if (!status.success) {
+              clearInterval(pollInterval);
+              localStorage.removeItem('active_sync_id');
+              syncProgress = null;
+              updateUI();
+              reject(new Error('Failed to get sync status'));
+              return;
             }
-        }
 
-        console.log('🔄 Starting offerbook sync...');
+            const sync = status.sync;
+            console.log('📊 Sync status:', sync.status);
 
-        const result = await window.api.taker.syncOfferbook();
+            // Update progress data - simplified version
+            syncProgress = {
+              percent: 50, // Default to 50% during sync
+              status: sync.status,
+              message:
+                sync.status === 'syncing'
+                  ? 'Discovering makers...'
+                  : 'Starting...',
+            };
 
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to start sync');
-        }
+            // If we have actual progress data from backend, use it
+            if (sync.progress !== undefined) {
+              syncProgress.percent = sync.progress;
+            }
+            if (sync.message) {
+              syncProgress.message = sync.message;
+            }
 
-        const syncId = result.syncId;
-        console.log('📡 Sync started:', syncId);
+            updateUI();
 
-        // Store sync ID in localStorage
-        localStorage.setItem('active_sync_id', syncId);
-
-        // Poll for completion and update progress
-        return new Promise((resolve, reject) => {
-            const startTime = Date.now();
-            const pollInterval = setInterval(async () => {
-                try {
-                    const status = await window.api.taker.getSyncStatus(syncId);
-
-                    if (!status.success) {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id');
-                        syncProgress = null;
-                        updateUI();
-                        reject(new Error('Failed to get sync status'));
-                        return;
-                    }
-
-                    const sync = status.sync;
-                    console.log('📊 Sync status:', sync.status);
-
-                    // Update progress data - simplified version
-                    syncProgress = {
-                        percent: 50, // Default to 50% during sync
-                        status: sync.status,
-                        message: sync.status === 'syncing' ? 'Discovering makers...' : 'Starting...'
-                    };
-                    
-                    // If we have actual progress data from backend, use it
-                    if (sync.progress !== undefined) {
-                        syncProgress.percent = sync.progress;
-                    }
-                    if (sync.message) {
-                        syncProgress.message = sync.message;
-                    }
-                    
-                    updateUI();
-
-                    if (sync.status === 'completed') {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id');
-                        lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
-                        syncProgress = null;
-                        console.log('✅ Offerbook synced');
-                        await new Promise((r) => setTimeout(r, 1000));
-                        await fetchMakers();
-                        await updateSyncHeights();
-                        resolve();
-                    } else if (sync.status === 'failed') {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id');
-                        syncProgress = null;
-                        updateUI();
-                        reject(new Error(sync.error || 'Sync failed'));
-                    }
-                } catch (error) {
-                    clearInterval(pollInterval);
-                    localStorage.removeItem('active_sync_id');
-                    syncProgress = null;
-                    updateUI();
-                    reject(error);
-                }
-            }, 1000);
-        });
+            if (sync.status === 'completed') {
+              clearInterval(pollInterval);
+              localStorage.removeItem('active_sync_id');
+              lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
+              syncProgress = null;
+              console.log('✅ Offerbook synced');
+              await new Promise((r) => setTimeout(r, 1000));
+              await fetchMakers();
+              await updateSyncHeights();
+              resolve();
+            } else if (sync.status === 'failed') {
+              clearInterval(pollInterval);
+              localStorage.removeItem('active_sync_id');
+              syncProgress = null;
+              updateUI();
+              reject(new Error(sync.error || 'Sync failed'));
+            }
+          } catch (error) {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            updateUI();
+            reject(error);
+          }
+        }, 1000);
+      });
     } catch (error) {
-        console.error('❌ Sync failed:', error);
-        syncProgress = null;
-        updateUI();
-        throw error;
+      console.error('❌ Sync failed:', error);
+      syncProgress = null;
+      updateUI();
+      throw error;
     }
-}
+  }
 
-async function handleRefresh() {
+  async function handleRefresh() {
     const refreshBtn = content.querySelector('#refresh-market-btn');
-    
+
     // Check if sync is already running
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
-        try {
-            const status = await window.api.taker.getSyncStatus(activeSyncId);
-            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
-                showError('Sync already in progress');
-                return;
-            }
-        } catch (err) {
-            localStorage.removeItem('active_sync_id');
+      try {
+        const status = await window.api.taker.getSyncStatus(activeSyncId);
+        if (
+          status.success &&
+          (status.sync.status === 'syncing' ||
+            status.sync.status === 'starting')
+        ) {
+          showError('Sync already in progress');
+          return;
         }
+      } catch (err) {
+        localStorage.removeItem('active_sync_id');
+      }
     }
 
     const originalText = refreshBtn.innerHTML;
@@ -258,119 +268,128 @@ async function handleRefresh() {
     refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
 
     try {
-        await syncOfferbook();
-        refreshBtn.innerHTML = '✅ Synced!';
-        setTimeout(() => {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalText;
-        }, 2000);
+      await syncOfferbook();
+      refreshBtn.innerHTML = '✅ Synced!';
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalText;
+      }, 2000);
     } catch (error) {
-        refreshBtn.innerHTML = '❌ Failed';
-        showError(error.message);
-        setTimeout(() => {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalText;
-        }, 3000);
+      refreshBtn.innerHTML = '❌ Failed';
+      showError(error.message);
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalText;
+      }, 3000);
     }
-}
+  }
 
-async function initialize() {
+  async function initialize() {
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
-        try {
-            const status = await window.api.taker.getSyncStatus(activeSyncId);
-            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
-                const refreshBtn = content.querySelector('#refresh-market-btn');
-                if (refreshBtn) {
-                    refreshBtn.disabled = true;
-                    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
-                }
-                
-                monitorExistingSync(activeSyncId);
-            } else {
-                localStorage.removeItem('active_sync_id');
-            }
-        } catch (err) {
-            localStorage.removeItem('active_sync_id');
+      try {
+        const status = await window.api.taker.getSyncStatus(activeSyncId);
+        if (
+          status.success &&
+          (status.sync.status === 'syncing' ||
+            status.sync.status === 'starting')
+        ) {
+          const refreshBtn = content.querySelector('#refresh-market-btn');
+          if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML =
+              '<span class="animate-pulse">Syncing...</span>';
+          }
+
+          monitorExistingSync(activeSyncId);
+        } else {
+          localStorage.removeItem('active_sync_id');
         }
+      } catch (err) {
+        localStorage.removeItem('active_sync_id');
+      }
     }
 
     await updateSyncHeights();
     await fetchMakers();
-}
+  }
 
-async function monitorExistingSync(syncId) {
+  async function monitorExistingSync(syncId) {
     const refreshBtn = content.querySelector('#refresh-market-btn');
     const originalText = '🔄 Sync Market Data';
     const startTime = Date.now();
 
     const pollInterval = setInterval(async () => {
-        try {
-            const status = await window.api.taker.getSyncStatus(syncId);
+      try {
+        const status = await window.api.taker.getSyncStatus(syncId);
 
-            if (!status.success) {
-                clearInterval(pollInterval);
-                localStorage.removeItem('active_sync_id');
-                syncProgress = null;
-                if (refreshBtn) {
-                    refreshBtn.disabled = false;
-                    refreshBtn.innerHTML = originalText;
-                }
-                updateUI();
-                return;
-            }
-
-            const sync = status.sync;
-
-            // Update progress - simplified
-            if (sync.status === 'syncing' || sync.status === 'starting') {
-                syncProgress = {
-                    percent: sync.progress || 50,
-                    status: sync.status,
-                    message: sync.message || (sync.status === 'syncing' ? 'Discovering makers...' : 'Starting...')
-                };
-                updateUI();
-            }
-
-            if (sync.status === 'completed') {
-                clearInterval(pollInterval);
-                localStorage.removeItem('active_sync_id');
-                lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
-                syncProgress = null;
-                await fetchMakers();
-                await updateSyncHeights();
-                if (refreshBtn) {
-                    refreshBtn.innerHTML = '✅ Synced!';
-                    setTimeout(() => {
-                        refreshBtn.disabled = false;
-                        refreshBtn.innerHTML = originalText;
-                    }, 2000);
-                }
-            } else if (sync.status === 'failed') {
-                clearInterval(pollInterval);
-                localStorage.removeItem('active_sync_id');
-                syncProgress = null;
-                updateUI();
-                if (refreshBtn) {
-                    refreshBtn.innerHTML = '❌ Failed';
-                    setTimeout(() => {
-                        refreshBtn.disabled = false;
-                        refreshBtn.innerHTML = originalText;
-                    }, 3000);
-                }
-            }
-        } catch (error) {
-            clearInterval(pollInterval);
-            localStorage.removeItem('active_sync_id');
-            syncProgress = null;
-            if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalText;
-            }
-            updateUI();
+        if (!status.success) {
+          clearInterval(pollInterval);
+          localStorage.removeItem('active_sync_id');
+          syncProgress = null;
+          if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalText;
+          }
+          updateUI();
+          return;
         }
+
+        const sync = status.sync;
+
+        // Update progress - simplified
+        if (sync.status === 'syncing' || sync.status === 'starting') {
+          syncProgress = {
+            percent: sync.progress || 50,
+            status: sync.status,
+            message:
+              sync.message ||
+              (sync.status === 'syncing'
+                ? 'Discovering makers...'
+                : 'Starting...'),
+          };
+          updateUI();
+        }
+
+        if (sync.status === 'completed') {
+          clearInterval(pollInterval);
+          localStorage.removeItem('active_sync_id');
+          lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
+          syncProgress = null;
+          await fetchMakers();
+          await updateSyncHeights();
+          if (refreshBtn) {
+            refreshBtn.innerHTML = '✅ Synced!';
+            setTimeout(() => {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalText;
+            }, 2000);
+          }
+        } else if (sync.status === 'failed') {
+          clearInterval(pollInterval);
+          localStorage.removeItem('active_sync_id');
+          syncProgress = null;
+          updateUI();
+          if (refreshBtn) {
+            refreshBtn.innerHTML = '❌ Failed';
+            setTimeout(() => {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalText;
+            }, 3000);
+          }
+        }
+      } catch (error) {
+        clearInterval(pollInterval);
+        localStorage.removeItem('active_sync_id');
+        syncProgress = null;
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = originalText;
+        }
+        updateUI();
+      }
     }, 1000);
-}
+  }
 
   function showError(message) {
     const errorDiv = document.createElement('div');
@@ -414,20 +433,25 @@ async function monitorExistingSync(syncId) {
   }
 
   window.viewFidelityBond = (makerAddress) => {
-    const maker = makers.find(m => m.address === makerAddress);
+    const maker = makers.find((m) => m.address === makerAddress);
     if (!maker || !maker.bondTxid) {
-        alert('No fidelity bond data available');
-        return;
+      alert('No fidelity bond data available');
+      return;
     }
 
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+    modal.className =
+      'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
     modal.onclick = (e) => {
-        if (e.target === modal) modal.remove();
+      if (e.target === modal) modal.remove();
     };
 
-    const locktimeDays = maker.bondLocktime ? Math.floor(maker.bondLocktime / 144) : 0;
-    const certExpiryDays = maker.bondCertExpiry ? Math.floor((maker.bondCertExpiry * 2016) / 144) : null;
+    const locktimeDays = maker.bondLocktime
+      ? Math.floor(maker.bondLocktime / 144)
+      : 0;
+    const certExpiryDays = maker.bondCertExpiry
+      ? Math.floor((maker.bondCertExpiry * 2016) / 144)
+      : null;
 
     modal.innerHTML = `
         <div class="bg-[#1a2332] rounded-lg p-6 max-w-3xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
@@ -481,20 +505,28 @@ async function monitorExistingSync(syncId) {
                     </div>
                 </div>
 
-                ${maker.bondCertExpiry !== null ? `
+                ${
+                  maker.bondCertExpiry !== null
+                    ? `
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-1">Certificate Expiry</p>
                     <p class="text-lg font-mono text-orange-400">${maker.bondCertExpiry} difficulty periods</p>
                     <p class="text-xs text-gray-500 mt-1">${maker.bondCertExpiry * 2016} blocks (~${certExpiryDays} days)</p>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
 
-                ${maker.bondPubkey ? `
+                ${
+                  maker.bondPubkey
+                    ? `
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-1">Bond Public Key</p>
                     <p class="text-white font-mono text-xs break-all">${maker.bondPubkey}</p>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
 
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-[#0f1419] p-4 rounded-lg">
@@ -529,7 +561,7 @@ async function monitorExistingSync(syncId) {
     `;
 
     document.body.appendChild(modal);
-};
+  };
 
   function toggleMakerSelection(index) {
     const makerIndex = selectedMakers.indexOf(index);
@@ -612,12 +644,12 @@ async function monitorExistingSync(syncId) {
     // Update sync status display
     const syncStatusDiv = content.querySelector('#sync-status');
     if (syncStatusDiv) {
-        if (currentHeight !== null) {
-            const lastSynced = lastSyncedHeight || currentHeight;
-            const needsSync = currentHeight > lastSynced;
-            const heightDiff = currentHeight - lastSynced;
-            
-            syncStatusDiv.innerHTML = `
+      if (currentHeight !== null) {
+        const lastSynced = lastSyncedHeight || currentHeight;
+        const needsSync = currentHeight > lastSynced;
+        const heightDiff = currentHeight - lastSynced;
+
+        syncStatusDiv.innerHTML = `
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-4">
                         <div class="text-sm">
@@ -628,24 +660,28 @@ async function monitorExistingSync(syncId) {
                             <span class="text-gray-400">Current:</span>
                             <span class="font-mono text-blue-400">${currentHeight.toLocaleString()}</span>
                         </div>
-                        ${needsSync ? `
+                        ${
+                          needsSync
+                            ? `
                             <div class="text-sm">
                                 <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-semibold">
                                     ${heightDiff} blocks behind
                                 </span>
                             </div>
-                        ` : `
+                        `
+                            : `
                             <div class="text-sm">
                                 <span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-semibold">
                                     ✓ Up to date
                                 </span>
                             </div>
-                        `}
+                        `
+                        }
                     </div>
                 </div>
             `;
-        } else {
-            syncStatusDiv.innerHTML = `
+      } else {
+        syncStatusDiv.innerHTML = `
                 <div class="text-sm text-gray-400">
                     <span class="text-gray-400">Market Data:</span>
                     <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
@@ -653,15 +689,19 @@ async function monitorExistingSync(syncId) {
                     </span>
                 </div>
             `;
-        }
+      }
     }
 
     // Update progress bar - simplified
     const progressContainer = content.querySelector('#sync-progress-container');
     if (progressContainer) {
-        if (syncProgress && (syncProgress.status === 'syncing' || syncProgress.status === 'starting')) {
-            progressContainer.classList.remove('hidden');
-            progressContainer.innerHTML = `
+      if (
+        syncProgress &&
+        (syncProgress.status === 'syncing' ||
+          syncProgress.status === 'starting')
+      ) {
+        progressContainer.classList.remove('hidden');
+        progressContainer.innerHTML = `
                 <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
                     <div class="flex items-center justify-between mb-2">
                         <span class="text-sm font-semibold text-blue-400">
@@ -686,9 +726,9 @@ async function monitorExistingSync(syncId) {
                     </div>
                 </div>
             `;
-        } else {
-            progressContainer.classList.add('hidden');
-        }
+      } else {
+        progressContainer.classList.add('hidden');
+      }
     }
 
     if (statsContainer) {
@@ -800,7 +840,7 @@ async function monitorExistingSync(syncId) {
                     <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
                     <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
                     <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
-                        Total Fee = Base Fee + (Amount × Volume Fee %) + (Locktime × Time Fee %)
+                        Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Lock Time × Swap Amount × % Time Rate)
                     </code>
                     <p class="text-gray-400 text-sm mt-2">
                         Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
@@ -840,9 +880,9 @@ async function monitorExistingSync(syncId) {
                     <span class="font-semibold text-sm">Select</span>
                 </div>
                 <div class="font-semibold">Maker Address</div>
-                <div class="font-semibold">Fixed Fee</div>
-                <div class="font-semibold">% Fee</div>
-                <div class="font-semibold">Timelock Fee</div>
+                <div class="font-semibold">Base Fee</div>
+                <div class="font-semibold">% Fee Rate</div>
+                <div class="font-semibold">% Time Rate</div>
                 <div class="font-semibold">Min Swap Size</div>
                 <div class="font-semibold">Max Swap Size</div>
                 <div class="font-semibold">Fidelity Bond</div>
