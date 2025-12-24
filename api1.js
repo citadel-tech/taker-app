@@ -843,6 +843,21 @@ function registerLogsHandlers() {
   });
 }
 
+function registerShellHandlers() {
+  const { shell } = require('electron');
+  
+  ipcMain.handle('shell:showItemInFolder', async (event, filePath) => {
+    try {
+      // This opens the file explorer/finder and highlights the file
+      shell.showItemInFolder(filePath);
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to show item in folder:', error);
+      return { success: false, error: error.message };
+    }
+  });
+}
+
 // ============================================================================
 // DIALOG API HANDLERS
 // ============================================================================
@@ -893,6 +908,7 @@ function registerAPI1() {
   registerSwapStateHandlers();
   registerLogsHandlers();
   registerDialogHandlers();
+  registerShellHandlers();
   
   console.log('✅ API v1 handlers registered');
 }
