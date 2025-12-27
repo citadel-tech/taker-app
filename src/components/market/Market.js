@@ -10,6 +10,41 @@ export function Market(container) {
   let lastSyncedHeight = null;
   let currentHeight = null;
 
+  let syncCheckInterval = null;
+
+  // Check sync state every second
+  function startSyncStateMonitor() {
+    if (syncCheckInterval) return;
+
+    syncCheckInterval = setInterval(async () => {
+      const state = await window.api.taker.getCurrentSyncState();
+
+      if (state.success) {
+        const refreshBtn = content.querySelector('#refresh-market-btn');
+
+        if (state.isRunning) {
+          // Sync is running - disable button
+          if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML =
+              '<span class="animate-pulse">⏳ Syncing...</span>';
+          }
+
+          // Monitor the current sync
+          if (state.currentSyncId && !localStorage.getItem('active_sync_id')) {
+            localStorage.setItem('active_sync_id', state.currentSyncId);
+          }
+        } else {
+          // No sync running - enable button
+          if (refreshBtn && refreshBtn.disabled) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '🔄 Sync Market Data';
+          }
+        }
+      }
+    }, 1000); // Check every second
+  }
+
   // API FUNCTIONS
   async function fetchMakers() {
     try {
@@ -258,6 +293,7 @@ export function Market(container) {
           return;
         }
       } catch (err) {
+        // If we can't get status, clear the stale sync ID
         localStorage.removeItem('active_sync_id');
       }
     }
@@ -284,6 +320,7 @@ export function Market(container) {
     }
   }
 
+  // On component initialization, check for active sync
   async function initialize() {
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
@@ -294,6 +331,7 @@ export function Market(container) {
           (status.sync.status === 'syncing' ||
             status.sync.status === 'starting')
         ) {
+          // Sync is still running, disable button and show status
           const refreshBtn = content.querySelector('#refresh-market-btn');
           if (refreshBtn) {
             refreshBtn.disabled = true;
@@ -301,11 +339,14 @@ export function Market(container) {
               '<span class="animate-pulse">Syncing...</span>';
           }
 
+          // Continue monitoring the existing sync
           monitorExistingSync(activeSyncId);
         } else {
+          // Sync completed or failed, clean up
           localStorage.removeItem('active_sync_id');
         }
       } catch (err) {
+        // Stale sync ID, clean up
         localStorage.removeItem('active_sync_id');
       }
     }
@@ -314,81 +355,62 @@ export function Market(container) {
     await fetchMakers();
   }
 
+  // Monitor an existing sync (when returning to the page)
   async function monitorExistingSync(syncId) {
-    const refreshBtn = content.querySelector('#refresh-market-btn');
-    const originalText = '🔄 Sync Market Data';
-    const startTime = Date.now();
+    return new Promise((resolve, reject) => {
+      console.log(`📡 Monitoring existing sync: ${syncId}`);
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const status = await window.api.taker.getSyncStatus(syncId);
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await window.api.taker.getSyncStatus(syncId);
 
-        if (!status.success) {
-          clearInterval(pollInterval);
-          localStorage.removeItem('active_sync_id');
-          syncProgress = null;
-          if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalText;
+          if (!status || !status.success) {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            updateUI();
+            reject(new Error('Failed to get sync status'));
+            return;
           }
-          updateUI();
-          return;
-        }
 
-        const sync = status.sync;
+          const sync = status.sync;
 
-        // Update progress - simplified
-        if (sync.status === 'syncing' || sync.status === 'starting') {
-          syncProgress = {
-            percent: sync.progress || 50,
-            status: sync.status,
-            message:
-              sync.message ||
-              (sync.status === 'syncing'
-                ? 'Discovering makers...'
-                : 'Starting...'),
-          };
-          updateUI();
-        }
-
-        if (sync.status === 'completed') {
-          clearInterval(pollInterval);
-          localStorage.removeItem('active_sync_id');
-          lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
-          syncProgress = null;
-          await fetchMakers();
-          await updateSyncHeights();
-          if (refreshBtn) {
-            refreshBtn.innerHTML = '✅ Synced!';
-            setTimeout(() => {
-              refreshBtn.disabled = false;
-              refreshBtn.innerHTML = originalText;
-            }, 2000);
+          // Update progress - simplified
+          if (sync.status === 'syncing' || sync.status === 'starting') {
+            syncProgress = {
+              percent: sync.progress || 50,
+              status: sync.status,
+              message:
+                sync.message ||
+                (sync.status === 'syncing'
+                  ? 'Discovering makers...'
+                  : 'Starting...'),
+            };
+            updateUI();
           }
-        } else if (sync.status === 'failed') {
+
+          if (sync.status === 'completed') {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            await fetchMakers();
+            resolve();
+          } else if (sync.status === 'failed') {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            updateUI();
+            reject(new Error(sync.error || 'Sync failed'));
+          }
+        } catch (error) {
           clearInterval(pollInterval);
           localStorage.removeItem('active_sync_id');
           syncProgress = null;
           updateUI();
-          if (refreshBtn) {
-            refreshBtn.innerHTML = '❌ Failed';
-            setTimeout(() => {
-              refreshBtn.disabled = false;
-              refreshBtn.innerHTML = originalText;
-            }, 3000);
-          }
+          reject(error);
         }
-      } catch (error) {
-        clearInterval(pollInterval);
-        localStorage.removeItem('active_sync_id');
-        syncProgress = null;
-        if (refreshBtn) {
-          refreshBtn.disabled = false;
-          refreshBtn.innerHTML = originalText;
-        }
-        updateUI();
-      }
-    }, 1000);
+      }, 1000);
+    });
   }
 
   function showError(message) {
@@ -446,9 +468,12 @@ export function Market(container) {
       if (e.target === modal) modal.remove();
     };
 
+    // Calculate locktime in days (assuming 10 min blocks)
     const locktimeDays = maker.bondLocktime
       ? Math.floor(maker.bondLocktime / 144)
       : 0;
+
+    // Calculate cert expiry in days (multiples of 2016 blocks)
     const certExpiryDays = maker.bondCertExpiry
       ? Math.floor((maker.bondCertExpiry * 2016) / 144)
       : null;
@@ -505,6 +530,7 @@ export function Market(container) {
                     </div>
                 </div>
 
+                <!-- Certificate Expiry -->
                 ${
                   maker.bondCertExpiry !== null
                     ? `
@@ -517,6 +543,7 @@ export function Market(container) {
                     : ''
                 }
 
+                <!-- Public Key -->
                 ${
                   maker.bondPubkey
                     ? `
@@ -682,13 +709,14 @@ export function Market(container) {
             `;
       } else {
         syncStatusDiv.innerHTML = `
-                <div class="text-sm text-gray-400">
-                    <span class="text-gray-400">Market Data:</span>
-                    <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
-                        ${makers.length} makers available
-                    </span>
-                </div>
-            `;
+  <div class="text-sm text-gray-400">
+    <span class="text-gray-400">Market Data:</span>
+    <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
+      ${makers.length} makers available
+    </span>
+  </div>
+`;
+
       }
     }
 
@@ -914,4 +942,13 @@ export function Market(container) {
     .addEventListener('click', swapWithSelectedMakers);
 
   initialize();
+  startSyncStateMonitor();
+
+  // Clean up when component unloads or page changes
+  window.addEventListener('beforeunload', () => {
+    if (syncCheckInterval) {
+      clearInterval(syncCheckInterval);
+      syncCheckInterval = null;
+    }
+  });
 }

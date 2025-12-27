@@ -55,13 +55,30 @@ function stopBackgroundSwapManager() {
 // Render component
 async function renderComponent(name) {
   const contentContainer = document.querySelector('#content-area');
-  if (!contentContainer) return;
+  
+  if (!contentContainer) {
+    console.error('❌ Content container not found');
+    return;
+  }
+
+  const parentNode = contentContainer.parentNode;
+  
+  if (!parentNode) {
+    console.error('❌ Content container has no parent');
+    return;
+  }
 
   const activeSwap = await SwapStateManager.getActiveSwap();
   if (activeSwap && activeSwap.status === 'in_progress' && name === 'swap') {
-    // ✅ Remove all event listeners by cloning the node
     const newContainer = contentContainer.cloneNode(false);
-    contentContainer.parentNode.replaceChild(newContainer, contentContainer);
+    newContainer.id = 'content-area';
+    
+    try {
+      parentNode.replaceChild(newContainer, contentContainer);
+    } catch (e) {
+      console.error('Failed to replace container:', e);
+      return;
+    }
 
     import('../components/swap/Coinswap.js').then((module) => {
       module.CoinswapComponent(newContainer, activeSwap);
@@ -69,9 +86,15 @@ async function renderComponent(name) {
     return;
   }
 
-  // ✅ Remove all event listeners by cloning the node
   const newContainer = contentContainer.cloneNode(false);
-  contentContainer.parentNode.replaceChild(newContainer, contentContainer);
+  newContainer.id = 'content-area';
+  
+  try {
+    parentNode.replaceChild(newContainer, contentContainer);
+  } catch (e) {
+    console.error('Failed to replace container:', e);
+    return;
+  }
 
   const component = components[name];
   if (component) {
