@@ -6,6 +6,9 @@ export function Market(container) {
   let makers = [];
   let selectedMakers = [];
   let isLoading = true;
+  let syncProgress = null;
+  let lastSyncedHeight = null;
+  let currentHeight = null;
 
   // API FUNCTIONS
   async function fetchMakers() {
@@ -67,88 +70,196 @@ export function Market(container) {
     }
   }
 
+  async function makeRPCCall(method, params = []) {
+    // Get RPC config from localStorage (same as Settings.js)
+    const savedConfig = localStorage.getItem('coinswap_config');
+    if (!savedConfig) {
+      throw new Error('No RPC configuration found');
+    }
+
+    const config = JSON.parse(savedConfig);
+    const host = config.rpc?.host || '127.0.0.1';
+    const port = config.rpc?.port || 38332;
+    const username = config.rpc?.username || 'user';
+    const password = config.rpc?.password || 'password';
+
+    if (!username || !password) {
+      throw new Error('RPC username and password are required');
+    }
+
+    const url = `http://${host}:${port}`;
+    const auth = btoa(`${username}:${password}`);
+
+    const body = {
+      jsonrpc: '1.0',
+      id: Date.now(),
+      method: method,
+      params: params,
+    };
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Basic ${auth}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.error) {
+      throw new Error(`RPC Error: ${data.error.message}`);
+    }
+
+    return data.result;
+  }
+
+  async function updateSyncHeights() {
+    try {
+      // Get current blockchain height from Bitcoin Core via RPC (same as Settings.js)
+      const blockchainInfo = await makeRPCCall('getblockchaininfo');
+
+      if (blockchainInfo && blockchainInfo.blocks) {
+        currentHeight = blockchainInfo.blocks;
+      }
+
+      // For lastSyncedHeight, we can check the offerbook file timestamp
+      // or just assume it's current if recently synced
+      lastSyncedHeight = currentHeight; // Will be updated after sync completes
+    } catch (error) {
+      console.error('Failed to update heights:', error);
+      // Don't throw - just set nulls
+      currentHeight = null;
+      lastSyncedHeight = null;
+    }
+  }
+
   async function syncOfferbook() {
     try {
-        // Check if sync is already running
-        const activeSyncId = localStorage.getItem('active_sync_id');
-        if (activeSyncId) {
-            const status = await window.api.taker.getSyncStatus(activeSyncId);
-            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
-                throw new Error('Sync already in progress');
+      // Check if sync is already running
+      const activeSyncId = localStorage.getItem('active_sync_id');
+      if (activeSyncId) {
+        const status = await window.api.taker.getSyncStatus(activeSyncId);
+        if (
+          status.success &&
+          (status.sync.status === 'syncing' ||
+            status.sync.status === 'starting')
+        ) {
+          throw new Error('Sync already in progress');
+        }
+      }
+
+      console.log('🔄 Starting offerbook sync...');
+
+      const result = await window.api.taker.syncOfferbook();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start sync');
+      }
+
+      const syncId = result.syncId;
+      console.log('📡 Sync started:', syncId);
+
+      // Store sync ID in localStorage
+      localStorage.setItem('active_sync_id', syncId);
+
+      // Poll for completion and update progress
+      return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        const pollInterval = setInterval(async () => {
+          try {
+            const status = await window.api.taker.getSyncStatus(syncId);
+
+            if (!status.success) {
+              clearInterval(pollInterval);
+              localStorage.removeItem('active_sync_id');
+              syncProgress = null;
+              updateUI();
+              reject(new Error('Failed to get sync status'));
+              return;
             }
-        }
 
-        console.log('🔄 Starting offerbook sync...');
+            const sync = status.sync;
+            console.log('📊 Sync status:', sync.status);
 
-        const result = await window.api.taker.syncOfferbook();
+            // Update progress data - simplified version
+            syncProgress = {
+              percent: 50, // Default to 50% during sync
+              status: sync.status,
+              message:
+                sync.status === 'syncing'
+                  ? 'Discovering makers...'
+                  : 'Starting...',
+            };
 
-        if (!result.success) {
-            throw new Error(result.error || 'Failed to start sync');
-        }
+            // If we have actual progress data from backend, use it
+            if (sync.progress !== undefined) {
+              syncProgress.percent = sync.progress;
+            }
+            if (sync.message) {
+              syncProgress.message = sync.message;
+            }
 
-        const syncId = result.syncId;
-        console.log('📡 Sync started:', syncId);
+            updateUI();
 
-        // Store sync ID in localStorage
-        localStorage.setItem('active_sync_id', syncId);
-
-        // Poll for completion (no timeout - sync can take a while)
-        return new Promise((resolve, reject) => {
-            const pollInterval = setInterval(async () => {
-                try {
-                    const status = await window.api.taker.getSyncStatus(syncId);
-
-                    if (!status.success) {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id'); // Clean up
-                        reject(new Error('Failed to get sync status'));
-                        return;
-                    }
-
-                    const sync = status.sync;
-                    console.log('📊 Sync status:', sync.status);
-
-                    if (sync.status === 'completed') {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id'); // Clean up
-                        console.log('✅ Offerbook synced');
-                        await new Promise((r) => setTimeout(r, 1000));
-                        await fetchMakers();
-                        resolve();
-                    } else if (sync.status === 'failed') {
-                        clearInterval(pollInterval);
-                        localStorage.removeItem('active_sync_id'); // Clean up
-                        reject(new Error(sync.error || 'Sync failed'));
-                    }
-                } catch (error) {
-                    clearInterval(pollInterval);
-                    localStorage.removeItem('active_sync_id'); // Clean up
-                    reject(error);
-                }
-            }, 1000);
-        });
+            if (sync.status === 'completed') {
+              clearInterval(pollInterval);
+              localStorage.removeItem('active_sync_id');
+              lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
+              syncProgress = null;
+              console.log('✅ Offerbook synced');
+              await new Promise((r) => setTimeout(r, 1000));
+              await fetchMakers();
+              await updateSyncHeights();
+              resolve();
+            } else if (sync.status === 'failed') {
+              clearInterval(pollInterval);
+              localStorage.removeItem('active_sync_id');
+              syncProgress = null;
+              updateUI();
+              reject(new Error(sync.error || 'Sync failed'));
+            }
+          } catch (error) {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            updateUI();
+            reject(error);
+          }
+        }, 1000);
+      });
     } catch (error) {
-        console.error('❌ Sync failed:', error);
-        throw error;
+      console.error('❌ Sync failed:', error);
+      syncProgress = null;
+      updateUI();
+      throw error;
     }
-}
+  }
 
-async function handleRefresh() {
+  async function handleRefresh() {
     const refreshBtn = content.querySelector('#refresh-market-btn');
-    
+
     // Check if sync is already running
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
-        try {
-            const status = await window.api.taker.getSyncStatus(activeSyncId);
-            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
-                showError('Sync already in progress');
-                return;
-            }
-        } catch (err) {
-            // If we can't get status, clear the stale sync ID
-            localStorage.removeItem('active_sync_id');
+      try {
+        const status = await window.api.taker.getSyncStatus(activeSyncId);
+        if (
+          status.success &&
+          (status.sync.status === 'syncing' ||
+            status.sync.status === 'starting')
+        ) {
+          showError('Sync already in progress');
+          return;
         }
+      } catch (err) {
+        localStorage.removeItem('active_sync_id');
+      }
     }
 
     const originalText = refreshBtn.innerHTML;
@@ -157,106 +268,128 @@ async function handleRefresh() {
     refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
 
     try {
-        await syncOfferbook();
-        refreshBtn.innerHTML = '✅ Synced!';
-        setTimeout(() => {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalText;
-        }, 2000);
+      await syncOfferbook();
+      refreshBtn.innerHTML = '✅ Synced!';
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalText;
+      }, 2000);
     } catch (error) {
-        refreshBtn.innerHTML = '❌ Failed';
-        showError(error.message);
-        setTimeout(() => {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalText;
-        }, 3000);
+      refreshBtn.innerHTML = '❌ Failed';
+      showError(error.message);
+      setTimeout(() => {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = originalText;
+      }, 3000);
     }
-}
+  }
 
-// On component initialization, check for active sync
-async function initialize() {
+  async function initialize() {
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
-        try {
-            const status = await window.api.taker.getSyncStatus(activeSyncId);
-            if (status.success && (status.sync.status === 'syncing' || status.sync.status === 'starting')) {
-                // Sync is still running, disable button and show status
-                const refreshBtn = content.querySelector('#refresh-market-btn');
-                if (refreshBtn) {
-                    refreshBtn.disabled = true;
-                    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
-                }
-                
-                // Continue monitoring the existing sync
-                monitorExistingSync(activeSyncId);
-            } else {
-                // Sync completed or failed, clean up
-                localStorage.removeItem('active_sync_id');
-            }
-        } catch (err) {
-            // Stale sync ID, clean up
-            localStorage.removeItem('active_sync_id');
+      try {
+        const status = await window.api.taker.getSyncStatus(activeSyncId);
+        if (
+          status.success &&
+          (status.sync.status === 'syncing' ||
+            status.sync.status === 'starting')
+        ) {
+          const refreshBtn = content.querySelector('#refresh-market-btn');
+          if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML =
+              '<span class="animate-pulse">Syncing...</span>';
+          }
+
+          monitorExistingSync(activeSyncId);
+        } else {
+          localStorage.removeItem('active_sync_id');
         }
+      } catch (err) {
+        localStorage.removeItem('active_sync_id');
+      }
     }
 
+    await updateSyncHeights();
     await fetchMakers();
-}
+  }
 
-// Monitor an existing sync (when returning to the page)
-async function monitorExistingSync(syncId) {
+  async function monitorExistingSync(syncId) {
     const refreshBtn = content.querySelector('#refresh-market-btn');
     const originalText = '🔄 Sync Market Data';
+    const startTime = Date.now();
 
     const pollInterval = setInterval(async () => {
-        try {
-            const status = await window.api.taker.getSyncStatus(syncId);
+      try {
+        const status = await window.api.taker.getSyncStatus(syncId);
 
-            if (!status.success) {
-                clearInterval(pollInterval);
-                localStorage.removeItem('active_sync_id');
-                if (refreshBtn) {
-                    refreshBtn.disabled = false;
-                    refreshBtn.innerHTML = originalText;
-                }
-                return;
-            }
-
-            const sync = status.sync;
-
-            if (sync.status === 'completed') {
-                clearInterval(pollInterval);
-                localStorage.removeItem('active_sync_id');
-                await fetchMakers();
-                if (refreshBtn) {
-                    refreshBtn.innerHTML = '✅ Synced!';
-                    setTimeout(() => {
-                        refreshBtn.disabled = false;
-                        refreshBtn.innerHTML = originalText;
-                    }, 2000);
-                }
-            } else if (sync.status === 'failed') {
-                clearInterval(pollInterval);
-                localStorage.removeItem('active_sync_id');
-                if (refreshBtn) {
-                    refreshBtn.innerHTML = '❌ Failed';
-                    setTimeout(() => {
-                        refreshBtn.disabled = false;
-                        refreshBtn.innerHTML = originalText;
-                    }, 3000);
-                }
-            }
-        } catch (error) {
-            clearInterval(pollInterval);
-            localStorage.removeItem('active_sync_id');
-            if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.innerHTML = originalText;
-            }
+        if (!status.success) {
+          clearInterval(pollInterval);
+          localStorage.removeItem('active_sync_id');
+          syncProgress = null;
+          if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = originalText;
+          }
+          updateUI();
+          return;
         }
+
+        const sync = status.sync;
+
+        // Update progress - simplified
+        if (sync.status === 'syncing' || sync.status === 'starting') {
+          syncProgress = {
+            percent: sync.progress || 50,
+            status: sync.status,
+            message:
+              sync.message ||
+              (sync.status === 'syncing'
+                ? 'Discovering makers...'
+                : 'Starting...'),
+          };
+          updateUI();
+        }
+
+        if (sync.status === 'completed') {
+          clearInterval(pollInterval);
+          localStorage.removeItem('active_sync_id');
+          lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
+          syncProgress = null;
+          await fetchMakers();
+          await updateSyncHeights();
+          if (refreshBtn) {
+            refreshBtn.innerHTML = '✅ Synced!';
+            setTimeout(() => {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalText;
+            }, 2000);
+          }
+        } else if (sync.status === 'failed') {
+          clearInterval(pollInterval);
+          localStorage.removeItem('active_sync_id');
+          syncProgress = null;
+          updateUI();
+          if (refreshBtn) {
+            refreshBtn.innerHTML = '❌ Failed';
+            setTimeout(() => {
+              refreshBtn.disabled = false;
+              refreshBtn.innerHTML = originalText;
+            }, 3000);
+          }
+        }
+      } catch (error) {
+        clearInterval(pollInterval);
+        localStorage.removeItem('active_sync_id');
+        syncProgress = null;
+        if (refreshBtn) {
+          refreshBtn.disabled = false;
+          refreshBtn.innerHTML = originalText;
+        }
+        updateUI();
+      }
     }, 1000);
-}
-
-
+  }
 
   function showError(message) {
     const errorDiv = document.createElement('div');
@@ -287,29 +420,38 @@ async function monitorExistingSync(syncId) {
       totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
       avgFee: avgFee.toFixed(1),
       onlineMakers: makers.length,
-      avgResponse: '2.3',
     };
   }
 
+  function formatTime(seconds) {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs}s`;
+  }
+
   window.viewFidelityBond = (makerAddress) => {
-    const maker = makers.find(m => m.address === makerAddress);
+    const maker = makers.find((m) => m.address === makerAddress);
     if (!maker || !maker.bondTxid) {
-        alert('No fidelity bond data available');
-        return;
+      alert('No fidelity bond data available');
+      return;
     }
 
-    // Create modal overlay
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+    modal.className =
+      'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
     modal.onclick = (e) => {
-        if (e.target === modal) modal.remove();
+      if (e.target === modal) modal.remove();
     };
 
-    // Calculate locktime in days (assuming 10 min blocks)
-    const locktimeDays = maker.bondLocktime ? Math.floor(maker.bondLocktime / 144) : 0;
-    
-    // Calculate cert expiry in days (multiples of 2016 blocks)
-    const certExpiryDays = maker.bondCertExpiry ? Math.floor((maker.bondCertExpiry * 2016) / 144) : null;
+    const locktimeDays = maker.bondLocktime
+      ? Math.floor(maker.bondLocktime / 144)
+      : 0;
+    const certExpiryDays = maker.bondCertExpiry
+      ? Math.floor((maker.bondCertExpiry * 2016) / 144)
+      : null;
 
     modal.innerHTML = `
         <div class="bg-[#1a2332] rounded-lg p-6 max-w-3xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
@@ -319,13 +461,11 @@ async function monitorExistingSync(syncId) {
             </div>
             
             <div class="space-y-4">
-                <!-- Maker Address -->
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-1">Maker Address</p>
                     <p class="text-white font-mono text-sm break-all">${maker.address}</p>
                 </div>
 
-                <!-- Bond Amount & Status -->
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-[#0f1419] p-4 rounded-lg">
                         <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
@@ -341,7 +481,6 @@ async function monitorExistingSync(syncId) {
                     </div>
                 </div>
 
-                <!-- Outpoint -->
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-1">Bond Outpoint (UTXO)</p>
                     <p class="text-white font-mono text-sm break-all">${maker.bondOutpoint}</p>
@@ -351,7 +490,6 @@ async function monitorExistingSync(syncId) {
                     </div>
                 </div>
 
-                <!-- Locktime & Confirmations -->
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-[#0f1419] p-4 rounded-lg">
                         <p class="text-sm text-gray-400 mb-1">Bond Locktime</p>
@@ -367,24 +505,29 @@ async function monitorExistingSync(syncId) {
                     </div>
                 </div>
 
-                <!-- Certificate Expiry -->
-                ${maker.bondCertExpiry !== null ? `
+                ${
+                  maker.bondCertExpiry !== null
+                    ? `
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-1">Certificate Expiry</p>
                     <p class="text-lg font-mono text-orange-400">${maker.bondCertExpiry} difficulty periods</p>
                     <p class="text-xs text-gray-500 mt-1">${maker.bondCertExpiry * 2016} blocks (~${certExpiryDays} days)</p>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
 
-                <!-- Public Key -->
-                ${maker.bondPubkey ? `
+                ${
+                  maker.bondPubkey
+                    ? `
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-1">Bond Public Key</p>
                     <p class="text-white font-mono text-xs break-all">${maker.bondPubkey}</p>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
 
-                <!-- Required Confirms & Minimum Locktime -->
                 <div class="grid grid-cols-2 gap-4">
                     <div class="bg-[#0f1419] p-4 rounded-lg">
                         <p class="text-sm text-gray-400 mb-1">Required Confirmations</p>
@@ -398,7 +541,6 @@ async function monitorExistingSync(syncId) {
                     </div>
                 </div>
 
-                <!-- Block Explorer Link -->
                 <div class="bg-[#0f1419] p-4 rounded-lg">
                     <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
                     <button 
@@ -419,7 +561,7 @@ async function monitorExistingSync(syncId) {
     `;
 
     document.body.appendChild(modal);
-};
+  };
 
   function toggleMakerSelection(index) {
     const makerIndex = selectedMakers.indexOf(index);
@@ -499,6 +641,96 @@ async function monitorExistingSync(syncId) {
     const tableBody = content.querySelector('#maker-table-body');
     const statsContainer = content.querySelector('#market-stats');
 
+    // Update sync status display
+    const syncStatusDiv = content.querySelector('#sync-status');
+    if (syncStatusDiv) {
+      if (currentHeight !== null) {
+        const lastSynced = lastSyncedHeight || currentHeight;
+        const needsSync = currentHeight > lastSynced;
+        const heightDiff = currentHeight - lastSynced;
+
+        syncStatusDiv.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-sm">
+                            <span class="text-gray-400">Last Synced:</span>
+                            <span class="font-mono text-cyan-400">${lastSynced.toLocaleString()}</span>
+                        </div>
+                        <div class="text-sm">
+                            <span class="text-gray-400">Current:</span>
+                            <span class="font-mono text-blue-400">${currentHeight.toLocaleString()}</span>
+                        </div>
+                        ${
+                          needsSync
+                            ? `
+                            <div class="text-sm">
+                                <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-semibold">
+                                    ${heightDiff} blocks behind
+                                </span>
+                            </div>
+                        `
+                            : `
+                            <div class="text-sm">
+                                <span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-semibold">
+                                    ✓ Up to date
+                                </span>
+                            </div>
+                        `
+                        }
+                    </div>
+                </div>
+            `;
+      } else {
+        syncStatusDiv.innerHTML = `
+                <div class="text-sm text-gray-400">
+                    <span class="text-gray-400">Market Data:</span>
+                    <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
+                        ${makers.length} makers available
+                    </span>
+                </div>
+            `;
+      }
+    }
+
+    // Update progress bar - simplified
+    const progressContainer = content.querySelector('#sync-progress-container');
+    if (progressContainer) {
+      if (
+        syncProgress &&
+        (syncProgress.status === 'syncing' ||
+          syncProgress.status === 'starting')
+      ) {
+        progressContainer.classList.remove('hidden');
+        progressContainer.innerHTML = `
+                <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-sm font-semibold text-blue-400">
+                            ${syncProgress.message || 'Syncing market data...'}
+                        </span>
+                        <span class="text-sm text-gray-400">
+                            Please wait...
+                        </span>
+                    </div>
+                    
+                    <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
+                        <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
+                             style="width: 100%">
+                            <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
+                        <div class="text-cyan-400">
+                            🔍 Discovering makers over Tor network...
+                        </div>
+                    </div>
+                </div>
+            `;
+      } else {
+        progressContainer.classList.add('hidden');
+      }
+    }
+
     if (statsContainer) {
       statsContainer.innerHTML = `
                 <div class="bg-[#1a2332] rounded-lg p-6">
@@ -512,10 +744,6 @@ async function monitorExistingSync(syncId) {
                 <div class="bg-[#1a2332] rounded-lg p-6">
                     <p class="text-sm text-gray-400 mb-2">Online Makers</p>
                     <p class="text-2xl font-mono text-blue-400">${stats.onlineMakers}</p>
-                </div>
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <p class="text-sm text-gray-400 mb-2">Avg Response</p>
-                    <p class="text-2xl font-mono text-cyan-400">${stats.avgResponse}s</p>
                 </div>
             `;
     }
@@ -586,8 +814,6 @@ async function monitorExistingSync(syncId) {
     }
   }
 
-  
-
   content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
             <div>
@@ -598,24 +824,32 @@ async function monitorExistingSync(syncId) {
                 🔄 Sync Market Data
             </button>
         </div>
-<div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-    <div class="flex items-start gap-3">
-        <span class="text-2xl">ℹ️</span>
-        <div>
-            <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
-            <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
-            <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
-                Total Fee = Base Fee + (Amount × Volume Fee %) + (Locktime × Time Fee %)
-            </code>
-            <p class="text-gray-400 text-sm mt-2">
-                Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
-            </p>
+
+        <!-- Sync Status Display -->
+        <div class="bg-[#1a2332] rounded-lg p-4 mb-4">
+            <div id="sync-status"></div>
         </div>
-    </div>
-</div>
 
+        <!-- Progress Bar (hidden by default) -->
+        <div id="sync-progress-container" class="mb-4 hidden"></div>
 
-        <div id="market-stats" class="grid grid-cols-4 gap-4 mb-6">
+        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+            <div class="flex items-start gap-3">
+                <span class="text-2xl">ℹ️</span>
+                <div>
+                    <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
+                    <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
+                    <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
+                        Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Lock Time × Swap Amount × % Time Rate)
+                    </code>
+                    <p class="text-gray-400 text-sm mt-2">
+                        Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div id="market-stats" class="grid grid-cols-3 gap-4 mb-6">
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
                 <p class="text-2xl font-mono text-[#FF6B35]">0.00 BTC</p>
@@ -627,10 +861,6 @@ async function monitorExistingSync(syncId) {
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Online Makers</p>
                 <p class="text-2xl font-mono text-blue-400">0</p>
-            </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
-                <p class="text-sm text-gray-400 mb-2">Avg Response</p>
-                <p class="text-2xl font-mono text-cyan-400">0.0s</p>
             </div>
         </div>
 
@@ -645,18 +875,18 @@ async function monitorExistingSync(syncId) {
             </div>
 
             <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4">
-    <div class="flex items-center">
-        <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
-        <span class="font-semibold text-sm">Select</span>
-    </div>
-    <div class="font-semibold">Maker Address</div>
-    <div class="font-semibold">Fixed Fee</div>
-    <div class="font-semibold">% Fee</div>
-    <div class="font-semibold">Timelock Fee</div>
-    <div class="font-semibold">Min Swap Size</div>
-    <div class="font-semibold">Max Swap Size</div>
-    <div class="font-semibold">Fidelity Bond</div>
-</div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
+                    <span class="font-semibold text-sm">Select</span>
+                </div>
+                <div class="font-semibold">Maker Address</div>
+                <div class="font-semibold">Base Fee</div>
+                <div class="font-semibold">% Fee Rate</div>
+                <div class="font-semibold">% Time Rate</div>
+                <div class="font-semibold">Min Swap Size</div>
+                <div class="font-semibold">Max Swap Size</div>
+                <div class="font-semibold">Fidelity Bond</div>
+            </div>
 
             <div id="maker-table-body" class="divide-y divide-gray-700">
                 <div class="col-span-8 text-center py-12">
@@ -683,5 +913,5 @@ async function monitorExistingSync(syncId) {
     .querySelector('#swap-with-makers')
     .addEventListener('click', swapWithSelectedMakers);
 
-initialize();
+  initialize();
 }
