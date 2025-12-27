@@ -193,7 +193,7 @@ export function TransactionsListComponent(container) {
         const amountData = formatAmount(tx.detail.amount.sats);
         const statusBadge = getStatusBadge(tx.info.confirmations);
         const txid =
-          typeof tx.info.txid === 'object' ? tx.info.txid.hex : tx.info.txid;
+          typeof tx.info.txid === 'object' ? tx.info.txid.value : tx.info.txid;
         const timestamp = tx.info.time || tx.info.timereceived;
         const label = tx.detail.label || '';
 

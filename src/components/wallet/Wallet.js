@@ -69,8 +69,8 @@ export async function WalletComponent(container) {
     return date.toLocaleDateString();
   }
   function truncateTxid(txid) {
-    if (typeof txid === 'object' && txid.hex) {
-      txid = txid.hex;
+    if (typeof txid === 'object' && txid.value) {
+      txid = txid.value;
     }
     return `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
   }
@@ -158,7 +158,7 @@ export async function WalletComponent(container) {
             const txType = getTransactionType(tx);
             const txid =
               typeof tx.info.txid === 'object'
-                ? tx.info.txid.hex
+                ? tx.info.txid.value
                 : tx.info.txid;
             const txidShort = `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
 
@@ -220,7 +220,7 @@ export async function WalletComponent(container) {
             return `
             <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
               <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
-                  onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.hex : utxo.txid}')">${txidShort}:${utxo.vout}</td>
+                  onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid}')">${txidShort}:${utxo.vout}</td>
               <td class="py-3 px-4 text-${color}-400 font-mono">${satsToBtc(utxo.amount)}</td>
               <td class="py-3 px-4 text-gray-300">${utxo.confirmations}</td>
               <td class="py-3 px-4 text-${color}-400">${spendInfo.spendType}</td>
