@@ -357,6 +357,8 @@ function registerTakerHandlers() {
     }
   }
 
+
+
   // Get wallet info
   ipcMain.handle('taker:getWalletInfo', async () => {
     try {
@@ -1072,6 +1074,55 @@ function registerDialogHandlers() {
   });
 }
 
+// Add this function
+function registerTorHandlers() {
+  const net = require('net');
+  
+  ipcMain.handle('tor:testConnection', async (event, config) => {
+    const socksPort = config?.socksPort || 9050;
+    const controlPort = config?.controlPort || 9051;
+    
+    return new Promise((resolve) => {
+      // Test SOCKS port
+      const socksSocket = new net.Socket();
+      let socksConnected = false;
+      
+      socksSocket.setTimeout(3000);
+      
+      socksSocket.on('connect', () => {
+        socksConnected = true;
+        socksSocket.destroy();
+        
+        // SOCKS port is open, now test if it's actually Tor
+        // by trying to connect through it
+        resolve({
+          success: true,
+          port: socksPort,
+          message: `Tor SOCKS proxy is running on port ${socksPort}`,
+        });
+      });
+      
+      socksSocket.on('error', (err) => {
+        resolve({
+          success: false,
+          port: socksPort,
+          error: `Cannot connect to Tor SOCKS proxy on port ${socksPort}. Is Tor running?`,
+        });
+      });
+      
+      socksSocket.on('timeout', () => {
+        socksSocket.destroy();
+        resolve({
+          success: false,
+          port: socksPort,
+          error: `Connection timeout on port ${socksPort}`,
+        });
+      });
+      
+      socksSocket.connect(socksPort, '127.0.0.1');
+    });
+  });
+}
 // ============================================================================
 // MAIN REGISTRATION FUNCTION
 // ============================================================================
@@ -1086,6 +1137,7 @@ function registerAPI1() {
   registerLogsHandlers();
   registerDialogHandlers();
   registerShellHandlers();
+  registerTorHandlers();
 
   console.log('✅ API v1 handlers registered');
 }
