@@ -191,19 +191,18 @@ export function FirstTimeSetupModal(container, onComplete) {
             <div id="rpc-test-result" class="hidden"></div>
 
             <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-              <p class="text-xs text-yellow-400 mb-2">
-                <strong>Required bitcoin.conf settings:</strong>
-              </p>
-              <div class="bg-[#0f1419] rounded mt-2 p-2 font-mono text-xs text-gray-300">
-                server=1<br/>
-                rpcuser=user<br/>
-                rpcpassword=password<br/>
-                rpcport=48332<br/>
-                rpcallowip=172.81.178.3<br/>
-                zmqpubrawblock=tcp://172.81.178.3:58332<br/>
-                zmqpubrawtx=tcp://172.81.178.3:58332
-              </div>
-            </div>
+  <p class=" text-yellow-400 mb-2">
+    <strong>Required bitcoin.conf settings:</strong>
+  </p>
+  <p class="text-sm text-gray-300 mt-2">
+    See the reference configuration: 
+    <a href="https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoin.conf" 
+       class="text-bitcoin-orange hover:underline" 
+       target="_blank">
+      bitcoin.conf example
+    </a>
+  </p>
+</div>
           </div>
         </div>
 

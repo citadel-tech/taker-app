@@ -17,67 +17,31 @@ Unlike traditional Bitcoin transactions that create an on-chain trail, coinswaps
 
 ### Required
 
-1. **Bitcoin Core** - Fully synced node with RPC and ZMQ enabled (non-pruned, `-txindex=1` and `blockfilterindex=1`)
-2. **Tor** - Required for anonymous maker discovery ([setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/tor.md))
+The Taker app requires the following components to operate:
+
+1. **Bitcoin Core (Mutinynet)** - A fully synced Mutinynet node with proper RPC and ZMQ configuration
+   - See the [Bitcoin Core setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoind.md) for detailed instructions
+
+2. **Tor** - Required for anonymous maker discovery and privacy
+   - See the [Tor setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/tor.md) for configuration instructions
+
 3. **Node.js** (v18 or higher)
+
 4. **Rust toolchain** - Install from [rustup.rs](https://rustup.rs/)
 
-**Alternative**: Use the [Coinswap Docker setup](https://github.com/citadel-tech/coinswap/blob/master/docs/docker.md) for a pre-configured environment.
+### Alternative: Docker Setup
+
+If you prefer a pre-configured environment, you can use Docker Compose to spin up Tor, Bitcoin Core (Mutinynet), and maker services automatically.
+
+See the [Docker setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/docker.md) for instructions.
 
 ## Quick Start
-
 ```bash
 git clone https://github.com/citadel-tech/taker-app.git
 cd taker-app
 npm install
 npm run dev
 ```
-
-## Bitcoin Core Configuration
-
-Add to your `bitcoin.conf`:
-
-### For Signet (Mutinynet)
-
-```conf
-[signet]
-signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae
-addnode=45.79.52.207:38333
-dnsseed=0
-signetblocktime=30
-
-server=1
-rpcuser=user
-rpcpassword=password
-rpcport=38332
-rpcbind=127.0.0.1
-rpcallowip=127.0.0.1
-
-zmqpubrawblock=tcp://127.0.0.1:28332
-zmqpubrawtx=tcp://127.0.0.1:28332
-
-txindex=1
-blockfilterindex=1
-```
-
-### For Regtest
-
-```conf
-[regtest]
-fallbackfee=0.00001000
-server=1
-rpcuser=user
-rpcpassword=password
-rpcport=18442
-rpcbind=127.0.0.1
-rpcallowip=127.0.0.1
-zmqpubrawblock=tcp://127.0.0.1:28332
-zmqpubrawtx=tcp://127.0.0.1:28332
-txindex=1
-blockfilterindex=1
-```
-
-After updating `bitcoin.conf`, restart Bitcoin Core.
 
 ## Architecture
 
