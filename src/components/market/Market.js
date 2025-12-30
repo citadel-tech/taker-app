@@ -7,8 +7,100 @@ export function Market(container) {
   let selectedMakers = [];
   let isLoading = true;
   let syncProgress = null;
-  let lastSyncedHeight = null;
-  let currentHeight = null;
+  let currentMakerStatus = 'good'; // 'good', 'bad', or 'unresponsive'
+  let syncCheckInterval = null;
+
+  // Check sync state every second
+  function startSyncStateMonitor() {
+    if (syncCheckInterval) return;
+
+    syncCheckInterval = setInterval(async () => {
+      const state = await window.api.taker.getCurrentSyncState();
+
+      if (state.success) {
+        const refreshBtn = content.querySelector('#refresh-market-btn');
+
+        if (state.isRunning) {
+          // Sync is running - disable button
+          if (refreshBtn) {
+            refreshBtn.disabled = true;
+            refreshBtn.innerHTML =
+              '<span class="animate-pulse">⏳ Syncing...</span>';
+          }
+
+          // Monitor the current sync
+          if (state.currentSyncId && !localStorage.getItem('active_sync_id')) {
+            localStorage.setItem('active_sync_id', state.currentSyncId);
+          }
+        } else {
+          // No sync running - enable button
+          if (refreshBtn && refreshBtn.disabled) {
+            refreshBtn.disabled = false;
+            refreshBtn.innerHTML = '🔄 Sync Market Data';
+          }
+        }
+      }
+    }, 1000); // Check every second
+  }
+
+  function transformMaker(item, index) {
+    const offer = item.offer;
+    const addressObj = item.address || {};
+    const onionAddr = addressObj.onion_addr || '';
+    const port = addressObj.port || '6102';
+    const fullAddress = `${onionAddr}:${port}`;
+
+    // Handle null offers (unresponsive makers)
+    if (!offer) {
+      return {
+        address: fullAddress,
+        protocol: 'Unknown',
+        baseFee: 0,
+        volumeFee: '0.00',
+        timeFee: '0.00',
+        minSize: 0,
+        maxSize: 0,
+        bond: 0,
+        bondTxid: '',
+        bondVout: '0',
+        bondOutpoint: '',
+        bondLocktime: 0,
+        bondPubkey: '',
+        bondConfHeight: null,
+        bondCertExpiry: null,
+        bondIsSpent: false,
+        requiredConfirms: 0,
+        minimumLocktime: 0,
+        index: index,
+      };
+    }
+
+    const fidelity = offer.fidelity || {};
+    const bond = fidelity.bond || {};
+    const outpoint = bond.outpoint || '';
+
+    return {
+      address: fullAddress,
+      protocol: offer.tweakablePoint ? 'Taproot' : 'Legacy P2WSH',
+      baseFee: offer.baseFee || 0,
+      volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
+      timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
+      minSize: offer.minSize || 0,
+      maxSize: offer.maxSize || 0,
+      bond: bond.amount || 0,
+      bondTxid: outpoint.split(':')[0] || '',
+      bondVout: outpoint.split(':')[1] || '0',
+      bondOutpoint: outpoint,
+      bondLocktime: bond.lock_time || 0,
+      bondPubkey: bond.pubkey || '',
+      bondConfHeight: bond.conf_height || null,
+      bondCertExpiry: bond.cert_expiry || null,
+      bondIsSpent: bond.is_spent || false,
+      requiredConfirms: offer.requiredConfirms || 0,
+      minimumLocktime: offer.minimumLocktime || 0,
+      index: index,
+    };
+  }
 
   // API FUNCTIONS
   async function fetchMakers() {
@@ -21,42 +113,32 @@ export function Market(container) {
 
       if (data.success && data.offerbook) {
         const goodMakers = data.offerbook.goodMakers || [];
+        const badMakers = data.offerbook.badMakers || [];
+        const unresponsiveMakers = data.offerbook.unresponsiveMakers || [];
 
-        makers = goodMakers.map((item, index) => {
-          const offer = item.offer;
-          const addressObj = item.address || {};
-          const onionAddr = addressObj.onion_addr || '';
-          const port = addressObj.port || '6102';
-          const fullAddress = `${onionAddr}:${port}`;
+        makers = [
+          ...goodMakers.map((item, index) => ({
+            ...transformMaker(item, index),
+            status: 'good',
+          })),
+          ...badMakers.map((item, index) => ({
+            ...transformMaker(item, index + goodMakers.length),
+            status: 'bad',
+          })),
+          ...unresponsiveMakers.map((item, index) => ({
+            ...transformMaker(
+              item,
+              index + goodMakers.length + badMakers.length
+            ),
+            status: 'unresponsive',
+          })),
+        ];
 
-          // Extract full fidelity bond data
-          const fidelity = offer.fidelity || {};
-          const bond = fidelity.bond || {};
-          const outpoint = bond.outpoint || '';
-
-          return {
-            address: fullAddress,
-            baseFee: offer.baseFee || 0,
-            volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
-            timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
-            minSize: offer.minSize || 0,
-            maxSize: offer.maxSize || 0,
-            bond: bond.amount || 0,
-            bondTxid: outpoint.split(':')[0] || '',
-            bondVout: outpoint.split(':')[1] || '0',
-            bondOutpoint: outpoint,
-            bondLocktime: bond.lock_time || 0,
-            bondPubkey: bond.pubkey || '',
-            bondConfHeight: bond.conf_height || null,
-            bondCertExpiry: bond.cert_expiry || null,
-            bondIsSpent: bond.is_spent || false,
-            requiredConfirms: offer.requiredConfirms || 0,
-            minimumLocktime: offer.minimumLocktime || 0,
-            index: index,
-          };
+        console.log('✅ Loaded', makers.length, 'makers:', {
+          good: goodMakers.length,
+          bad: badMakers.length,
+          unresponsive: unresponsiveMakers.length,
         });
-
-        console.log('✅ Loaded', makers.length, 'makers');
         isLoading = false;
         updateUI();
       } else {
@@ -67,75 +149,6 @@ export function Market(container) {
       isLoading = false;
       showError('Failed to load makers: ' + error.message);
       updateUI();
-    }
-  }
-
-  async function makeRPCCall(method, params = []) {
-    // Get RPC config from localStorage (same as Settings.js)
-    const savedConfig = localStorage.getItem('coinswap_config');
-    if (!savedConfig) {
-      throw new Error('No RPC configuration found');
-    }
-
-    const config = JSON.parse(savedConfig);
-    const host = config.rpc?.host || '127.0.0.1';
-    const port = config.rpc?.port || 38332;
-    const username = config.rpc?.username || 'user';
-    const password = config.rpc?.password || 'password';
-
-    if (!username || !password) {
-      throw new Error('RPC username and password are required');
-    }
-
-    const url = `http://${host}:${port}`;
-    const auth = btoa(`${username}:${password}`);
-
-    const body = {
-      jsonrpc: '1.0',
-      id: Date.now(),
-      method: method,
-      params: params,
-    };
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Basic ${auth}`,
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-
-    if (data.error) {
-      throw new Error(`RPC Error: ${data.error.message}`);
-    }
-
-    return data.result;
-  }
-
-  async function updateSyncHeights() {
-    try {
-      // Get current blockchain height from Bitcoin Core via RPC (same as Settings.js)
-      const blockchainInfo = await makeRPCCall('getblockchaininfo');
-
-      if (blockchainInfo && blockchainInfo.blocks) {
-        currentHeight = blockchainInfo.blocks;
-      }
-
-      // For lastSyncedHeight, we can check the offerbook file timestamp
-      // or just assume it's current if recently synced
-      lastSyncedHeight = currentHeight; // Will be updated after sync completes
-    } catch (error) {
-      console.error('Failed to update heights:', error);
-      // Don't throw - just set nulls
-      currentHeight = null;
-      lastSyncedHeight = null;
     }
   }
 
@@ -170,7 +183,6 @@ export function Market(container) {
 
       // Poll for completion and update progress
       return new Promise((resolve, reject) => {
-        const startTime = Date.now();
         const pollInterval = setInterval(async () => {
           try {
             const status = await window.api.taker.getSyncStatus(syncId);
@@ -189,7 +201,7 @@ export function Market(container) {
 
             // Update progress data - simplified version
             syncProgress = {
-              percent: 50, // Default to 50% during sync
+              percent: 50,
               status: sync.status,
               message:
                 sync.status === 'syncing'
@@ -197,7 +209,6 @@ export function Market(container) {
                   : 'Starting...',
             };
 
-            // If we have actual progress data from backend, use it
             if (sync.progress !== undefined) {
               syncProgress.percent = sync.progress;
             }
@@ -210,12 +221,10 @@ export function Market(container) {
             if (sync.status === 'completed') {
               clearInterval(pollInterval);
               localStorage.removeItem('active_sync_id');
-              lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
               syncProgress = null;
               console.log('✅ Offerbook synced');
               await new Promise((r) => setTimeout(r, 1000));
               await fetchMakers();
-              await updateSyncHeights();
               resolve();
             } else if (sync.status === 'failed') {
               clearInterval(pollInterval);
@@ -310,85 +319,63 @@ export function Market(container) {
       }
     }
 
-    await updateSyncHeights();
     await fetchMakers();
   }
 
   async function monitorExistingSync(syncId) {
-    const refreshBtn = content.querySelector('#refresh-market-btn');
-    const originalText = '🔄 Sync Market Data';
-    const startTime = Date.now();
+    return new Promise((resolve, reject) => {
+      console.log(`📡 Monitoring existing sync: ${syncId}`);
 
-    const pollInterval = setInterval(async () => {
-      try {
-        const status = await window.api.taker.getSyncStatus(syncId);
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await window.api.taker.getSyncStatus(syncId);
 
-        if (!status.success) {
-          clearInterval(pollInterval);
-          localStorage.removeItem('active_sync_id');
-          syncProgress = null;
-          if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = originalText;
+          if (!status || !status.success) {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            updateUI();
+            reject(new Error('Failed to get sync status'));
+            return;
           }
-          updateUI();
-          return;
-        }
 
-        const sync = status.sync;
+          const sync = status.sync;
 
-        // Update progress - simplified
-        if (sync.status === 'syncing' || sync.status === 'starting') {
-          syncProgress = {
-            percent: sync.progress || 50,
-            status: sync.status,
-            message:
-              sync.message ||
-              (sync.status === 'syncing'
-                ? 'Discovering makers...'
-                : 'Starting...'),
-          };
-          updateUI();
-        }
-
-        if (sync.status === 'completed') {
-          clearInterval(pollInterval);
-          localStorage.removeItem('active_sync_id');
-          lastSyncedHeight = syncProgress?.targetHeight || currentHeight;
-          syncProgress = null;
-          await fetchMakers();
-          await updateSyncHeights();
-          if (refreshBtn) {
-            refreshBtn.innerHTML = '✅ Synced!';
-            setTimeout(() => {
-              refreshBtn.disabled = false;
-              refreshBtn.innerHTML = originalText;
-            }, 2000);
+          if (sync.status === 'syncing' || sync.status === 'starting') {
+            syncProgress = {
+              percent: sync.progress || 50,
+              status: sync.status,
+              message:
+                sync.message ||
+                (sync.status === 'syncing'
+                  ? 'Discovering makers...'
+                  : 'Starting...'),
+            };
+            updateUI();
           }
-        } else if (sync.status === 'failed') {
+
+          if (sync.status === 'completed') {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            await fetchMakers();
+            resolve();
+          } else if (sync.status === 'failed') {
+            clearInterval(pollInterval);
+            localStorage.removeItem('active_sync_id');
+            syncProgress = null;
+            updateUI();
+            reject(new Error(sync.error || 'Sync failed'));
+          }
+        } catch (error) {
           clearInterval(pollInterval);
           localStorage.removeItem('active_sync_id');
           syncProgress = null;
           updateUI();
-          if (refreshBtn) {
-            refreshBtn.innerHTML = '❌ Failed';
-            setTimeout(() => {
-              refreshBtn.disabled = false;
-              refreshBtn.innerHTML = originalText;
-            }, 3000);
-          }
+          reject(error);
         }
-      } catch (error) {
-        clearInterval(pollInterval);
-        localStorage.removeItem('active_sync_id');
-        syncProgress = null;
-        if (refreshBtn) {
-          refreshBtn.disabled = false;
-          refreshBtn.innerHTML = originalText;
-        }
-        updateUI();
-      }
-    }, 1000);
+      }, 1000);
+    });
   }
 
   function showError(message) {
@@ -396,40 +383,37 @@ export function Market(container) {
     errorDiv.className =
       'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
     errorDiv.innerHTML = `
-            <div class="flex items-start gap-3">
-                <span class="text-xl">❌</span>
-                <div class="flex-1">
-                    <div class="font-semibold mb-1">Error</div>
-                    <div class="text-sm">${message}</div>
-                </div>
-            </div>
-        `;
+      <div class="flex items-start gap-3">
+        <span class="text-xl">❌</span>
+        <div class="flex-1">
+          <div class="font-semibold mb-1">Error</div>
+          <div class="text-sm">${message}</div>
+        </div>
+      </div>
+    `;
     document.body.appendChild(errorDiv);
     setTimeout(() => errorDiv.remove(), 5000);
   }
 
   function calculateStats() {
-    const totalLiquidity = makers.reduce((sum, m) => sum + m.maxSize, 0);
+    const displayedMakers = makers.filter(
+      (m) => m.status === currentMakerStatus
+    );
+    const totalLiquidity = displayedMakers.reduce(
+      (sum, m) => sum + m.maxSize,
+      0
+    );
     const avgFee =
-      makers.length > 0
-        ? makers.reduce((sum, m) => sum + parseFloat(m.volumeFee), 0) /
-          makers.length
+      displayedMakers.length > 0
+        ? displayedMakers.reduce((sum, m) => sum + parseFloat(m.volumeFee), 0) /
+          displayedMakers.length
         : 0;
 
     return {
       totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
       avgFee: avgFee.toFixed(1),
-      onlineMakers: makers.length,
+      onlineMakers: displayedMakers.length,
     };
-  }
-
-  function formatTime(seconds) {
-    if (seconds < 60) {
-      return `${seconds}s`;
-    }
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}m ${secs}s`;
   }
 
   window.viewFidelityBond = (makerAddress) => {
@@ -449,115 +433,116 @@ export function Market(container) {
     const locktimeDays = maker.bondLocktime
       ? Math.floor(maker.bondLocktime / 144)
       : 0;
+
     const certExpiryDays = maker.bondCertExpiry
       ? Math.floor((maker.bondCertExpiry * 2016) / 144)
       : null;
 
     modal.innerHTML = `
-        <div class="bg-[#1a2332] rounded-lg p-6 max-w-3xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-            <div class="flex justify-between items-start mb-6">
-                <h3 class="text-2xl font-bold text-[#FF6B35]">Fidelity Bond Details</h3>
-                <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
-            </div>
-            
-            <div class="space-y-4">
-                <div class="bg-[#0f1419] p-4 rounded-lg">
-                    <p class="text-sm text-gray-400 mb-1">Maker Address</p>
-                    <p class="text-white font-mono text-sm break-all">${maker.address}</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-[#0f1419] p-4 rounded-lg">
-                        <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
-                        <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
-                        <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
-                    </div>
-
-                    <div class="bg-[#0f1419] p-4 rounded-lg">
-                        <p class="text-sm text-gray-400 mb-1">Bond Status</p>
-                        <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
-                            ${maker.bondIsSpent ? '❌ Spent' : '✅ Active'}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="bg-[#0f1419] p-4 rounded-lg">
-                    <p class="text-sm text-gray-400 mb-1">Bond Outpoint (UTXO)</p>
-                    <p class="text-white font-mono text-sm break-all">${maker.bondOutpoint}</p>
-                    <div class="flex gap-2 mt-2 text-xs">
-                        <span class="text-gray-400">Txid: <span class="text-cyan-400">${maker.bondTxid}</span></span>
-                        <span class="text-gray-400">Vout: <span class="text-cyan-400">${maker.bondVout}</span></span>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-[#0f1419] p-4 rounded-lg">
-                        <p class="text-sm text-gray-400 mb-1">Bond Locktime</p>
-                        <p class="text-lg font-mono text-yellow-400">${maker.bondLocktime.toLocaleString()} blocks</p>
-                        <p class="text-xs text-gray-500 mt-1">~${locktimeDays} days</p>
-                    </div>
-
-                    <div class="bg-[#0f1419] p-4 rounded-lg">
-                        <p class="text-sm text-gray-400 mb-1">Confirmation Height</p>
-                        <p class="text-lg font-mono text-blue-400">
-                            ${maker.bondConfHeight !== null ? maker.bondConfHeight.toLocaleString() : 'N/A'}
-                        </p>
-                    </div>
-                </div>
-
-                ${
-                  maker.bondCertExpiry !== null
-                    ? `
-                <div class="bg-[#0f1419] p-4 rounded-lg">
-                    <p class="text-sm text-gray-400 mb-1">Certificate Expiry</p>
-                    <p class="text-lg font-mono text-orange-400">${maker.bondCertExpiry} difficulty periods</p>
-                    <p class="text-xs text-gray-500 mt-1">${maker.bondCertExpiry * 2016} blocks (~${certExpiryDays} days)</p>
-                </div>
-                `
-                    : ''
-                }
-
-                ${
-                  maker.bondPubkey
-                    ? `
-                <div class="bg-[#0f1419] p-4 rounded-lg">
-                    <p class="text-sm text-gray-400 mb-1">Bond Public Key</p>
-                    <p class="text-white font-mono text-xs break-all">${maker.bondPubkey}</p>
-                </div>
-                `
-                    : ''
-                }
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div class="bg-[#0f1419] p-4 rounded-lg">
-                        <p class="text-sm text-gray-400 mb-1">Required Confirmations</p>
-                        <p class="text-lg font-mono text-blue-400">${maker.requiredConfirms}</p>
-                    </div>
-
-                    <div class="bg-[#0f1419] p-4 rounded-lg">
-                        <p class="text-sm text-gray-400 mb-1">Minimum Locktime</p>
-                        <p class="text-lg font-mono text-yellow-400">${maker.minimumLocktime} blocks</p>
-                        <p class="text-xs text-gray-500 mt-1">~${Math.floor(maker.minimumLocktime / 144)} days</p>
-                    </div>
-                </div>
-
-                <div class="bg-[#0f1419] p-4 rounded-lg">
-                    <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
-                    <button 
-                        onclick="window.open('https://mempool.space/signet/tx/${maker.bondTxid}', '_blank')"
-                        class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold transition-colors">
-                        View on Block Explorer →
-                    </button>
-                </div>
-            </div>
-
-            <div class="mt-6 flex justify-end">
-                <button onclick="this.closest('.fixed').remove()" 
-                    class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                    Close
-                </button>
-            </div>
+      <div class="bg-[#1a2332] rounded-lg p-6 max-w-3xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+        <div class="flex justify-between items-start mb-6">
+          <h3 class="text-2xl font-bold text-[#FF6B35]">Fidelity Bond Details</h3>
+          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
         </div>
+        
+        <div class="space-y-4">
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-1">Maker Address</p>
+            <p class="text-white font-mono text-sm break-all">${maker.address}</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-[#0f1419] p-4 rounded-lg">
+              <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
+              <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
+              <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
+            </div>
+
+            <div class="bg-[#0f1419] p-4 rounded-lg">
+              <p class="text-sm text-gray-400 mb-1">Bond Status</p>
+              <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
+                ${maker.bondIsSpent ? '❌ Spent' : '✅ Active'}
+              </p>
+            </div>
+          </div>
+
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-1">Bond Outpoint (UTXO)</p>
+            <p class="text-white font-mono text-sm break-all">${maker.bondOutpoint}</p>
+            <div class="flex gap-2 mt-2 text-xs">
+              <span class="text-gray-400">Txid: <span class="text-cyan-400">${maker.bondTxid}</span></span>
+              <span class="text-gray-400">Vout: <span class="text-cyan-400">${maker.bondVout}</span></span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-[#0f1419] p-4 rounded-lg">
+              <p class="text-sm text-gray-400 mb-1">Bond Locktime</p>
+              <p class="text-lg font-mono text-yellow-400">${maker.bondLocktime.toLocaleString()} blocks</p>
+              <p class="text-xs text-gray-500 mt-1">~${locktimeDays} days</p>
+            </div>
+
+            <div class="bg-[#0f1419] p-4 rounded-lg">
+              <p class="text-sm text-gray-400 mb-1">Confirmation Height</p>
+              <p class="text-lg font-mono text-blue-400">
+                ${maker.bondConfHeight !== null ? maker.bondConfHeight.toLocaleString() : 'N/A'}
+              </p>
+            </div>
+          </div>
+
+          ${
+            maker.bondCertExpiry !== null
+              ? `
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-1">Certificate Expiry</p>
+            <p class="text-lg font-mono text-orange-400">${maker.bondCertExpiry} difficulty periods</p>
+            <p class="text-xs text-gray-500 mt-1">${maker.bondCertExpiry * 2016} blocks (~${certExpiryDays} days)</p>
+          </div>
+          `
+              : ''
+          }
+
+          ${
+            maker.bondPubkey
+              ? `
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-1">Bond Public Key</p>
+            <p class="text-white font-mono text-xs break-all">${maker.bondPubkey}</p>
+          </div>
+          `
+              : ''
+          }
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="bg-[#0f1419] p-4 rounded-lg">
+              <p class="text-sm text-gray-400 mb-1">Required Confirmations</p>
+              <p class="text-lg font-mono text-blue-400">${maker.requiredConfirms}</p>
+            </div>
+
+            <div class="bg-[#0f1419] p-4 rounded-lg">
+              <p class="text-sm text-gray-400 mb-1">Minimum Locktime</p>
+              <p class="text-lg font-mono text-yellow-400">${maker.minimumLocktime} blocks</p>
+              <p class="text-xs text-gray-500 mt-1">~${Math.floor(maker.minimumLocktime / 144)} days</p>
+            </div>
+          </div>
+
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
+            <button 
+              onclick="window.open('https://mempool.space/signet/tx/${maker.bondTxid}', '_blank')"
+              class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+              View on Block Explorer →
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+          <button onclick="this.closest('.fixed').remove()" 
+            class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+            Close
+          </button>
+        </div>
+      </div>
     `;
 
     document.body.appendChild(modal);
@@ -574,19 +559,28 @@ export function Market(container) {
   }
 
   function updateSelectionUI() {
-    makers.forEach((_, index) => {
-      const checkbox = content.querySelector(`#maker-${index}`);
+    const displayedMakers = makers.filter(
+      (m) => m.status === currentMakerStatus
+    );
+
+    displayedMakers.forEach((maker) => {
+      const checkbox = content.querySelector(`#maker-${maker.index}`);
       if (checkbox) {
-        checkbox.checked = selectedMakers.includes(index);
+        checkbox.checked = selectedMakers.includes(maker.index);
       }
     });
 
     const selectAllCheckbox = content.querySelector('#select-all-makers');
     if (selectAllCheckbox) {
-      if (selectedMakers.length === 0) {
+      const displayedIndices = displayedMakers.map((m) => m.index);
+      const selectedDisplayed = selectedMakers.filter((i) =>
+        displayedIndices.includes(i)
+      );
+
+      if (selectedDisplayed.length === 0) {
         selectAllCheckbox.checked = false;
         selectAllCheckbox.indeterminate = false;
-      } else if (selectedMakers.length === makers.length) {
+      } else if (selectedDisplayed.length === displayedMakers.length) {
         selectAllCheckbox.checked = true;
         selectAllCheckbox.indeterminate = false;
       } else {
@@ -608,10 +602,21 @@ export function Market(container) {
 
   function selectAllMakers() {
     const selectAllCheckbox = content.querySelector('#select-all-makers');
+    const displayedMakers = makers.filter(
+      (m) => m.status === currentMakerStatus
+    );
+
     if (selectAllCheckbox.checked) {
-      selectedMakers = makers.map((_, index) => index);
+      displayedMakers.forEach((maker) => {
+        if (!selectedMakers.includes(maker.index)) {
+          selectedMakers.push(maker.index);
+        }
+      });
     } else {
-      selectedMakers = [];
+      const displayedIndices = displayedMakers.map((m) => m.index);
+      selectedMakers = selectedMakers.filter(
+        (i) => !displayedIndices.includes(i)
+      );
     }
     updateSelectionUI();
   }
@@ -622,7 +627,9 @@ export function Market(container) {
       return;
     }
 
-    const selectedMakerData = selectedMakers.map((index) => makers[index]);
+    const selectedMakerData = selectedMakers.map((index) =>
+      makers.find((m) => m.index === index)
+    );
     console.log(
       '🔄 Starting swap with',
       selectedMakerData.length,
@@ -644,55 +651,17 @@ export function Market(container) {
     // Update sync status display
     const syncStatusDiv = content.querySelector('#sync-status');
     if (syncStatusDiv) {
-      if (currentHeight !== null) {
-        const lastSynced = lastSyncedHeight || currentHeight;
-        const needsSync = currentHeight > lastSynced;
-        const heightDiff = currentHeight - lastSynced;
-
-        syncStatusDiv.innerHTML = `
-                <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-4">
-                        <div class="text-sm">
-                            <span class="text-gray-400">Last Synced:</span>
-                            <span class="font-mono text-cyan-400">${lastSynced.toLocaleString()}</span>
-                        </div>
-                        <div class="text-sm">
-                            <span class="text-gray-400">Current:</span>
-                            <span class="font-mono text-blue-400">${currentHeight.toLocaleString()}</span>
-                        </div>
-                        ${
-                          needsSync
-                            ? `
-                            <div class="text-sm">
-                                <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 rounded text-xs font-semibold">
-                                    ${heightDiff} blocks behind
-                                </span>
-                            </div>
-                        `
-                            : `
-                            <div class="text-sm">
-                                <span class="px-2 py-1 bg-green-500/20 text-green-400 rounded text-xs font-semibold">
-                                    ✓ Up to date
-                                </span>
-                            </div>
-                        `
-                        }
-                    </div>
-                </div>
-            `;
-      } else {
-        syncStatusDiv.innerHTML = `
-                <div class="text-sm text-gray-400">
-                    <span class="text-gray-400">Market Data:</span>
-                    <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
-                        ${makers.length} makers available
-                    </span>
-                </div>
-            `;
-      }
+      syncStatusDiv.innerHTML = `
+        <div class="text-sm text-gray-400">
+          <span class="text-gray-400">Market Data:</span>
+          <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
+            ${makers.length} makers available
+          </span>
+        </div>
+      `;
     }
 
-    // Update progress bar - simplified
+    // Update progress bar
     const progressContainer = content.querySelector('#sync-progress-container');
     if (progressContainer) {
       if (
@@ -702,30 +671,30 @@ export function Market(container) {
       ) {
         progressContainer.classList.remove('hidden');
         progressContainer.innerHTML = `
-                <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
-                    <div class="flex items-center justify-between mb-2">
-                        <span class="text-sm font-semibold text-blue-400">
-                            ${syncProgress.message || 'Syncing market data...'}
-                        </span>
-                        <span class="text-sm text-gray-400">
-                            Please wait...
-                        </span>
-                    </div>
-                    
-                    <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
-                        <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
-                             style="width: 100%">
-                            <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
-                        </div>
-                    </div>
-                    
-                    <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
-                        <div class="text-cyan-400">
-                            🔍 Discovering makers over Tor network...
-                        </div>
-                    </div>
-                </div>
-            `;
+          <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm font-semibold text-blue-400">
+                ${syncProgress.message || 'Syncing market data...'}
+              </span>
+              <span class="text-sm text-gray-400">
+                Please wait...
+              </span>
+            </div>
+            
+            <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
+              <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
+                   style="width: 100%">
+                <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+              </div>
+            </div>
+            
+            <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
+              <div class="text-cyan-400">
+                🔍 Discovering makers over Tor network...
+              </div>
+            </div>
+          </div>
+        `;
       } else {
         progressContainer.classList.add('hidden');
       }
@@ -733,72 +702,100 @@ export function Market(container) {
 
     if (statsContainer) {
       statsContainer.innerHTML = `
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-                    <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
-                </div>
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <p class="text-sm text-gray-400 mb-2">Average Fee</p>
-                    <p class="text-2xl font-mono text-green-400">${stats.avgFee}%</p>
-                </div>
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <p class="text-sm text-gray-400 mb-2">Online Makers</p>
-                    <p class="text-2xl font-mono text-blue-400">${stats.onlineMakers}</p>
-                </div>
-            `;
+        <div class="bg-[#1a2332] rounded-lg p-6">
+          <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
+          <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
+        </div>
+        <div class="bg-[#1a2332] rounded-lg p-6">
+          <p class="text-sm text-gray-400 mb-2">Average Fee</p>
+          <p class="text-2xl font-mono text-green-400">${stats.avgFee}%</p>
+        </div>
+        <div class="bg-[#1a2332] rounded-lg p-6">
+          <p class="text-sm text-gray-400 mb-2">Online Makers</p>
+          <p class="text-2xl font-mono text-blue-400">${stats.onlineMakers}</p>
+        </div>
+      `;
     }
+
+    // Update tab counts
+    const goodCount = content.querySelector('#good-count');
+    const badCount = content.querySelector('#bad-count');
+    const unresponsiveCount = content.querySelector('#unresponsive-count');
+
+    if (goodCount)
+      goodCount.textContent = makers.filter((m) => m.status === 'good').length;
+    if (badCount)
+      badCount.textContent = makers.filter((m) => m.status === 'bad').length;
+    if (unresponsiveCount)
+      unresponsiveCount.textContent = makers.filter(
+        (m) => m.status === 'unresponsive'
+      ).length;
 
     if (tableBody) {
       if (isLoading) {
         tableBody.innerHTML = `
-                    <div class="col-span-8 text-center py-12">
-                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
-                        <p class="text-gray-400">Loading makers...</p>
-                    </div>
-                `;
+          <div class="col-span-9 text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+            <p class="text-gray-400">Loading makers...</p>
+          </div>
+        `;
       } else if (makers.length === 0) {
         tableBody.innerHTML = `
-                    <div class="col-span-8 text-center py-12">
-                        <p class="text-gray-400 mb-4">No makers found</p>
-                    </div>
-                `;
-
-        setTimeout(() => {
-          const retryBtn = content.querySelector('#retry-fetch');
-          if (retryBtn) {
-            retryBtn.addEventListener('click', () => fetchMakers());
-          }
-        }, 100);
+          <div class="col-span-9 text-center py-12">
+            <p class="text-gray-400 mb-4">No makers found</p>
+          </div>
+        `;
       } else {
-        tableBody.innerHTML = makers
-          .map(
-            (maker, index) => `
-                    <div class="grid grid-cols-8 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
-                        <div class="flex items-center">
-                            <input type="checkbox" id="maker-${index}" class="w-4 h-4 accent-[#FF6B35]" />
-                        </div>
-                        <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${maker.address.substring(0, 20)}...</div>
-                        <div class="text-green-400">${maker.baseFee}</div>
-                        <div class="text-blue-400">${maker.volumeFee}%</div>
-                        <div class="text-cyan-400">${maker.timeFee}%</div>
-                        <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
-                        <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
-                        <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
-                            ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
-                        </div>
-                    </div>
-                `
-          )
-          .join('');
+        const displayedMakers = makers.filter(
+          (m) => m.status === currentMakerStatus
+        );
 
-        makers.forEach((_, index) => {
-          const checkbox = content.querySelector(`#maker-${index}`);
-          if (checkbox) {
-            checkbox.addEventListener('change', () =>
-              toggleMakerSelection(index)
-            );
-          }
-        });
+        if (displayedMakers.length === 0) {
+          tableBody.innerHTML = `
+            <div class="col-span-9 text-center py-12">
+              <p class="text-gray-400">No ${currentMakerStatus} makers found</p>
+            </div>
+          `;
+        } else {
+          tableBody.innerHTML = displayedMakers
+            .map(
+              (maker) => `
+            <div class="grid grid-cols-9 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
+              <div class="flex items-center">
+                <input type="checkbox" id="maker-${maker.index}" class="w-4 h-4 accent-[#FF6B35]" />
+              </div>
+              <div class="text-sm">
+                <span class="px-2 py-1 ${
+                  maker.protocol === 'Taproot'
+                    ? 'bg-purple-500/20 text-purple-400'
+                    : 'bg-blue-500/20 text-blue-400'
+                } rounded text-xs font-semibold">
+                  ${maker.protocol === 'Taproot' ? '⚡ Taproot' : '🔒 Legacy'}
+                </span>
+              </div>
+              <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${maker.address.substring(0, 18)}...</div>
+              <div class="text-green-400">${maker.baseFee}</div>
+              <div class="text-blue-400">${maker.volumeFee}%</div>
+              <div class="text-cyan-400">${maker.timeFee}%</div>
+              <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
+              <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
+              <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
+                ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
+              </div>
+            </div>
+          `
+            )
+            .join('');
+
+          displayedMakers.forEach((maker) => {
+            const checkbox = content.querySelector(`#maker-${maker.index}`);
+            if (checkbox) {
+              checkbox.addEventListener('change', () =>
+                toggleMakerSelection(maker.index)
+              );
+            }
+          });
+        }
       }
     }
 
@@ -810,99 +807,119 @@ export function Market(container) {
         minute: '2-digit',
         second: '2-digit',
       });
-      footer.innerHTML = `Showing ${makers.length} active offers • ${timeStr}`;
+      const displayedCount = makers.filter(
+        (m) => m.status === currentMakerStatus
+      ).length;
+      footer.innerHTML = `Showing ${displayedCount} ${currentMakerStatus} offers • ${timeStr}`;
     }
+
+    updateSelectionUI();
   }
 
   content.innerHTML = `
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
-                <p class="text-gray-400">Live view of the current coinswap market</p>
-            </div>
-            <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold transition-colors">
-                🔄 Sync Market Data
-            </button>
+    <div class="flex justify-between items-center mb-8">
+      <div>
+        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
+        <p class="text-gray-400">Live view of the current coinswap market</p>
+      </div>
+      <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+        🔄 Sync Market Data
+      </button>
+    </div>
+
+    <!-- Sync Status Display -->
+    <div class="bg-[#1a2332] rounded-lg p-4 mb-4">
+      <div id="sync-status"></div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div id="sync-progress-container" class="mb-4 hidden"></div>
+
+    <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+      <div class="flex items-start gap-3">
+        <span class="text-2xl">ℹ️</span>
+        <div>
+          <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
+          <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
+          <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
+            Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Lock Time × Swap Amount × % Time Rate)
+          </code>
+          <p class="text-gray-400 text-sm mt-2">
+            Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
+          </p>
         </div>
+      </div>
+    </div>
 
-        <!-- Sync Status Display -->
-        <div class="bg-[#1a2332] rounded-lg p-4 mb-4">
-            <div id="sync-status"></div>
+    <div id="market-stats" class="grid grid-cols-3 gap-4 mb-6">
+      <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
+        <p class="text-2xl font-mono text-[#FF6B35]">0.00 BTC</p>
+      </div>
+      <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Average Fee</p>
+        <p class="text-2xl font-mono text-green-400">0.0%</p>
+      </div>
+      <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Online Makers</p>
+        <p class="text-2xl font-mono text-blue-400">0</p>
+      </div>
+    </div>
+
+    <div class="bg-[#1a2332] rounded-lg overflow-hidden">
+      <!-- Maker Status Tabs -->
+      <div class="flex border-b-2 border-[#FF6B35]">
+  <button id="tab-good" class="flex-1 px-6 py-4 font-semibold bg-[#FF6B35] text-white border-b-4 border-[#FF6B35] transition-all">
+    ✅ Good Makers (<span id="good-count">0</span>)
+  </button>
+  <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
+    ❌ Bad Makers (<span id="bad-count">0</span>)
+  </button>
+  <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
+    ⏸️ Unresponsive (<span id="unresponsive-count">0</span>)
+  </button>
+</div>
+
+      <div id="maker-actions" class="hidden bg-[#FF6B35] p-4 flex justify-between items-center">
+        <span class="text-white font-semibold">
+          <span id="selected-makers-count">0</span> makers selected
+        </span>
+        <button id="swap-with-makers" class="bg-white text-[#FF6B35] px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+          Swap with Selected →
+        </button>
+      </div>
+
+      <div class="grid grid-cols-9 gap-4 bg-[#FF6B35] p-4">
+        <div class="flex items-center">
+          <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
+          <span class="font-semibold text-sm">Select</span>
         </div>
+        <div class="font-semibold">Protocol</div>
+        <div class="font-semibold">Maker Address</div>
+        <div class="font-semibold">Base Fee</div>
+        <div class="font-semibold">% Fee Rate</div>
+        <div class="font-semibold">% Time Rate</div>
+        <div class="font-semibold">Min Swap Size</div>
+        <div class="font-semibold">Max Swap Size</div>
+        <div class="font-semibold">Fidelity Bond</div>
+      </div>
 
-        <!-- Progress Bar (hidden by default) -->
-        <div id="sync-progress-container" class="mb-4 hidden"></div>
-
-        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-            <div class="flex items-start gap-3">
-                <span class="text-2xl">ℹ️</span>
-                <div>
-                    <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
-                    <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
-                    <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
-                        Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Lock Time × Swap Amount × % Time Rate)
-                    </code>
-                    <p class="text-gray-400 text-sm mt-2">
-                        Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
-                    </p>
-                </div>
-            </div>
+      <div id="maker-table-body" class="divide-y divide-gray-700">
+        <div class="col-span-9 text-center py-12">
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+          <p class="text-gray-400">Loading makers...</p>
         </div>
+      </div>
 
-        <div id="market-stats" class="grid grid-cols-3 gap-4 mb-6">
-            <div class="bg-[#1a2332] rounded-lg p-6">
-                <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-                <p class="text-2xl font-mono text-[#FF6B35]">0.00 BTC</p>
-            </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
-                <p class="text-sm text-gray-400 mb-2">Average Fee</p>
-                <p class="text-2xl font-mono text-green-400">0.0%</p>
-            </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
-                <p class="text-sm text-gray-400 mb-2">Online Makers</p>
-                <p class="text-2xl font-mono text-blue-400">0</p>
-            </div>
-        </div>
-
-        <div class="bg-[#1a2332] rounded-lg overflow-hidden">
-            <div id="maker-actions" class="hidden bg-[#FF6B35] p-4 flex justify-between items-center">
-                <span class="text-white font-semibold">
-                    <span id="selected-makers-count">0</span> makers selected
-                </span>
-                <button id="swap-with-makers" class="bg-white text-[#FF6B35] px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
-                    Swap with Selected →
-                </button>
-            </div>
-
-            <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4">
-                <div class="flex items-center">
-                    <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
-                    <span class="font-semibold text-sm">Select</span>
-                </div>
-                <div class="font-semibold">Maker Address</div>
-                <div class="font-semibold">Base Fee</div>
-                <div class="font-semibold">% Fee Rate</div>
-                <div class="font-semibold">% Time Rate</div>
-                <div class="font-semibold">Min Swap Size</div>
-                <div class="font-semibold">Max Swap Size</div>
-                <div class="font-semibold">Fidelity Bond</div>
-            </div>
-
-            <div id="maker-table-body" class="divide-y divide-gray-700">
-                <div class="col-span-8 text-center py-12">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
-                    <p class="text-gray-400">Loading makers...</p>
-                </div>
-            </div>
-
-            <div id="market-footer" class="p-4 text-center text-gray-400 text-sm border-t border-gray-700">
-                Loading...
-            </div>
-        </div>
-    `;
+      <div id="market-footer" class="p-4 text-center text-gray-400 text-sm border-t border-gray-700">
+        Loading...
+      </div>
+    </div>
+  `;
 
   container.appendChild(content);
 
+  // Event listeners
   content
     .querySelector('#refresh-market-btn')
     .addEventListener('click', handleRefresh);
@@ -913,5 +930,51 @@ export function Market(container) {
     .querySelector('#swap-with-makers')
     .addEventListener('click', swapWithSelectedMakers);
 
+  // Tab switching
+  function switchTab(status) {
+    currentMakerStatus = status;
+
+    // Update tab styling
+    ['good', 'bad', 'unresponsive'].forEach((s) => {
+      const tab = content.querySelector(`#tab-${s}`);
+      if (s === status) {
+        tab.classList.add('bg-[#FF6B35]', 'text-white', 'border-[#FF6B35]');
+        tab.classList.remove(
+          'bg-[#1a2332]',
+          'text-gray-400',
+          'border-transparent'
+        );
+      } else {
+        tab.classList.remove('bg-[#FF6B35]', 'text-white', 'border-[#FF6B35]');
+        tab.classList.add(
+          'bg-[#1a2332]',
+          'text-gray-400',
+          'border-transparent'
+        );
+      }
+    });
+
+    updateUI();
+  }
+
+  content
+    .querySelector('#tab-good')
+    .addEventListener('click', () => switchTab('good'));
+  content
+    .querySelector('#tab-bad')
+    .addEventListener('click', () => switchTab('bad'));
+  content
+    .querySelector('#tab-unresponsive')
+    .addEventListener('click', () => switchTab('unresponsive'));
+
   initialize();
+  startSyncStateMonitor();
+
+  // Clean up
+  window.addEventListener('beforeunload', () => {
+    if (syncCheckInterval) {
+      clearInterval(syncCheckInterval);
+      syncCheckInterval = null;
+    }
+  });
 }

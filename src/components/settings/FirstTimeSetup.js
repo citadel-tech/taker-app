@@ -500,89 +500,95 @@ export function FirstTimeSetupModal(container, onComplete) {
           </div>
         </div>
 
-        <!-- Step 4: Tor Configuration -->
-        <div id="step-4" class="setup-step hidden">
-          <div class="mb-6">
-            <h3 class="text-xl font-semibold text-white mb-2">Tor Configuration</h3>
-            <p class="text-gray-400 text-sm">Configure Tor for private maker discovery and communication.</p>
+  <!-- Step 4: Tor Configuration -->
+  <div id="step-4" class="setup-step hidden">
+    <div class="mb-6">
+      <h3 class="text-xl font-semibold text-white mb-2">Tor Configuration</h3>
+      <p class="text-gray-400 text-sm">Configure Tor for private maker discovery and communication.</p>
+    </div>
+
+    <div class="space-y-4">
+      <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+        <h4 class="text-white font-semibold mb-3">Tor Ports</h4>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Tor Control Port</label>
+            <input 
+              type="number" 
+              id="setup-tor-control-port"
+              value="9051"
+              min="1024"
+              max="65535"
+              class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+            />
+            <p class="text-xs text-gray-500 mt-1">Control port for Tor interface</p>
           </div>
-
-          <div class="space-y-4">
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <h4 class="text-white font-semibold mb-3">Tor Ports</h4>
-              <div class="grid grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-sm text-gray-400 mb-2">Tor Control Port</label>
-                  <input 
-                    type="number" 
-                    id="setup-tor-control-port"
-                    value="9051"
-                    min="1024"
-                    max="65535"
-                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                  <p class="text-xs text-gray-500 mt-1">Control port for Tor interface</p>
-                </div>
-                <div>
-                  <label class="block text-sm text-gray-400 mb-2">Tor SOCKS Port</label>
-                  <input 
-                    type="number" 
-                    id="setup-tor-socks-port"
-                    value="9050"
-                    min="1024"
-                    max="65535"
-                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-                  />
-                  <p class="text-xs text-gray-500 mt-1">SOCKS port for Tor proxy</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-  <label class="block text-sm text-gray-400 mb-2">Tor Auth Password (optional)</label>
-  <div class="relative">
-    <input 
-      type="password" 
-      id="setup-tor-auth-password"
-      placeholder="Leave empty if no password required"
-      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
-    />
-    <button
-      type="button"
-      id="toggle-setup-tor-password"
-      class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
-      aria-label="Toggle password visibility"
-    >
-      <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-      </svg>
-      <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-      </svg>
-    </button>
-  </div>
-  <p class="text-xs text-gray-500 mt-1">Authentication password for Tor control interface</p>
-</div>
-            <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-              <p class="text-xs text-purple-400 mb-2">
-                <strong>🧅 Privacy Notice:</strong>
-              </p>
-              <ul class="text-xs text-purple-400 space-y-1">
-                <li>• All maker connections go through Tor</li>
-                <li>• Maker discovery is anonymous</li>
-                <li>• Your IP address stays hidden</li>
-              </ul>
-            </div>
-
-            <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-              <p class="text-xs text-green-400">
-                <strong>✓ Ready to complete!</strong> Click "Complete Setup" to finish configuration and start using Coinswap.
-              </p>
-            </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">Tor SOCKS Port</label>
+            <input 
+              type="number" 
+              id="setup-tor-socks-port"
+              value="9050"
+              min="1024"
+              max="65535"
+              class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+            />
+            <p class="text-xs text-gray-500 mt-1">SOCKS port for Tor proxy</p>
           </div>
         </div>
       </div>
+
+      <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+        <label class="block text-sm text-gray-400 mb-2">Tor Auth Password (optional)</label>
+        <div class="relative">
+          <input 
+            type="password" 
+            id="setup-tor-auth-password"
+            placeholder="Leave empty if no password required"
+            class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+          />
+          <button
+            type="button"
+            id="toggle-setup-tor-password"
+            class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+            aria-label="Toggle password visibility"
+          >
+            <svg class="eye-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+            </svg>
+            <svg class="eye-slash-icon w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
+            </svg>
+          </button>
+        </div>
+        <p class="text-xs text-gray-500 mt-1">Authentication password for Tor control interface</p>
+      </div>
+
+      <button id="test-tor-setup" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+        🧅 Test Tor Connection
+      </button>
+
+      <div id="tor-test-result" class="hidden"></div>
+
+      <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+        <p class="text-xs text-purple-400 mb-2">
+          <strong>🧅 Privacy Notice:</strong>
+        </p>
+        <ul class="text-xs text-purple-400 space-y-1">
+          <li>• All maker connections go through Tor</li>
+          <li>• Maker discovery is anonymous</li>
+          <li>• Your IP address stays hidden</li>
+        </ul>
+      </div>
+
+      <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+        <p class="text-xs text-green-400">
+          <strong>✓ Ready to complete!</strong> Click "Complete Setup" to finish configuration and start using Coinswap.
+        </p>
+      </div>
+    </div>
+  </div>
 
       <!-- Footer -->
       <div class="bg-[#0f1419] rounded-b-lg p-6 flex justify-between">
@@ -1008,6 +1014,70 @@ export function FirstTimeSetupModal(container, onComplete) {
     }
   }
 
+  // Test Tor connection
+  async function testTorConnection() {
+    const btn = modal.querySelector('#test-tor-setup');
+    const resultDiv = modal.querySelector('#tor-test-result');
+
+    if (!btn || !resultDiv) return;
+
+    const originalText = btn.textContent;
+    btn.textContent = 'Testing...';
+    btn.disabled = true;
+
+    const socksPort = parseInt(
+      modal.querySelector('#setup-tor-socks-port').value
+    );
+    const controlPort = parseInt(
+      modal.querySelector('#setup-tor-control-port').value
+    );
+
+    try {
+      const result = await window.api.taker.testTorConnection({
+        socksPort,
+        controlPort,
+      });
+
+      if (result.success) {
+        resultDiv.className =
+          'bg-green-500/10 border border-green-500/30 rounded-lg p-3';
+        resultDiv.innerHTML = `
+        <div class="space-y-1">
+          <div class="flex items-center">
+            <span class="text-sm text-green-400">✅ ${result.message}</span>
+          </div>
+          <div class="text-xs text-gray-400">
+            Tor SOCKS proxy is accessible on port ${socksPort}
+          </div>
+        </div>
+      `;
+      } else {
+        throw new Error(result.error);
+      }
+
+      resultDiv.classList.remove('hidden');
+    } catch (error) {
+      console.error('Tor test failed:', error);
+
+      resultDiv.className =
+        'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      resultDiv.innerHTML = `
+      <div class="space-y-1">
+        <div class="flex items-center">
+          <span class="text-sm text-red-400">❌ ${error.message || error}</span>
+        </div>
+        <div class="text-xs text-gray-500">
+          Make sure Tor is running with SOCKS proxy on port ${socksPort}
+        </div>
+      </div>
+    `;
+      resultDiv.classList.remove('hidden');
+    }
+
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+
   // ============================================================================
   // EVENT LISTENERS
   // ============================================================================
@@ -1258,10 +1328,20 @@ export function FirstTimeSetupModal(container, onComplete) {
     }
   });
 
+  // Test Tor button
+  const testTorBtn = modal.querySelector('#test-tor-setup');
+  if (testTorBtn) {
+    testTorBtn.addEventListener('click', testTorConnection);
+  }
+
   // Test RPC button
   modal
     .querySelector('#test-rpc-setup')
     .addEventListener('click', testRPCConnection);
+
+  modal
+    .querySelector('#test-tor-setup')
+    .addEventListener('click', testTorConnection);
 
   // Initialize
   showStep(currentStep);

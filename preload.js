@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld('api', {
     isWalletEncrypted: (walletPath) =>
       ipcRenderer.invoke('taker:isWalletEncrypted', walletPath),
     getWalletInfo: () => ipcRenderer.invoke('taker:getWalletInfo'),
+    getCurrentSyncState: () => ipcRenderer.invoke('taker:getCurrentSyncState'),
+    testTorConnection: (config) => ipcRenderer.invoke('tor:testConnection', config),
   },
 
   // Coinswap operations
@@ -48,6 +50,11 @@ contextBridge.exposeInMainWorld('api', {
     save: (state) => ipcRenderer.invoke('swapState:save', state),
     load: () => ipcRenderer.invoke('swapState:load'),
     clear: () => ipcRenderer.invoke('swapState:clear'),
+  },
+
+  shell: {
+    showItemInFolder: (path) =>
+      ipcRenderer.invoke('shell:showItemInFolder', path),
   },
 
   // File dialogs - TOP LEVEL, NOT INSIDE TAKER!

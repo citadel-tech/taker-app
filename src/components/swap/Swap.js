@@ -103,17 +103,27 @@ export async function SwapComponent(container) {
       // IPC call to get offers
       const data = await window.api.taker.getOffers();
 
-      if (data.success && data.offerbook && data.offerbook.goodMakers) {
-        availableMakers = data.offerbook.goodMakers.map((item, index) => {
-          const offer = item.offer;
-          return {
-            minSize: offer.minSize || 0,
-            maxSize: offer.maxSize || 0,
-            fee: (offer.amountRelativeFeePct || 0).toFixed(1),
-            index: index,
-          };
-        });
-        console.log('✅ Loaded', availableMakers.length, 'makers for swap');
+      if (data.success && data.offerbook) {
+        // Use only goodMakers for swaps
+        const goodMakers = data.offerbook.goodMakers || [];
+
+        availableMakers = goodMakers
+          .filter((item) => item.offer !== null) // Filter out makers without offers
+          .map((item, index) => {
+            const offer = item.offer;
+            return {
+              minSize: offer.minSize || 0,
+              maxSize: offer.maxSize || 0,
+              fee: (offer.amountRelativeFeePct || 0).toFixed(1),
+              index: index,
+            };
+          });
+
+        console.log(
+          '✅ Loaded',
+          availableMakers.length,
+          'good makers for swap'
+        );
 
         // Update available makers count
         const makersCountEl = content.querySelector('#available-makers-count');
@@ -123,9 +133,9 @@ export async function SwapComponent(container) {
       }
     } catch (error) {
       console.error('Failed to fetch makers:', error);
+      availableMakers = [];
     }
   }
-
   // Fetch balance
   async function fetchBalance() {
     try {

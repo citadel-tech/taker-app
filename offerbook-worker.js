@@ -16,12 +16,13 @@ const { parentPort, workerData } = require('worker_threads');
     console.log(`🔧 Offerbook worker starting with ${protocolName} protocol`);
 
     // Select the appropriate Taker class based on protocol
-    const TakerClass = protocol === 'v2'
-      ? coinswapNapi.TaprootTaker
-      : coinswapNapi.Taker;
+    const TakerClass =
+      protocol === 'v2' ? coinswapNapi.TaprootTaker : coinswapNapi.Taker;
 
     if (!TakerClass) {
-      throw new Error(`${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Please rebuild coinswap-napi.`);
+      throw new Error(
+        `${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Please rebuild coinswap-napi.`
+      );
     }
 
     // Setup logging if available
@@ -29,7 +30,9 @@ const { parentPort, workerData } = require('worker_threads');
     try {
       if (TakerClass.setupLogging) {
         TakerClass.setupLogging(config.dataDir);
-        console.log(`✅ Worker logging setup via ${protocol === 'v2' ? 'TaprootTaker' : 'Taker'}.setupLogging`);
+        console.log(
+          `✅ Worker logging setup via ${protocol === 'v2' ? 'TaprootTaker' : 'Taker'}.setupLogging`
+        );
       } else if (coinswapNapi.setupLogging) {
         coinswapNapi.setupLogging(config.dataDir);
         console.log('✅ Worker logging setup via setupLogging');
@@ -46,15 +49,18 @@ const { parentPort, workerData } = require('worker_threads');
       config.controlPort || 9051,
       config.torAuthPassword || undefined,
       config.zmqAddr,
-      config.password || ""
+      config.password || ''
     );
 
     // Notify that we're in progress
     parentPort.postMessage({ type: 'status', status: 'syncing', protocol });
 
+    // Small delay to ensure status message is received
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
     // Sync the offerbook (this will block for 30-60s in the worker)
     console.log(`🔄 Syncing offerbook with ${protocolName}...`);
-    taker.syncOfferbook();
+    taker.fetchOffers();
 
     // Send success message
     parentPort.postMessage({
