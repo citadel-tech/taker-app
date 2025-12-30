@@ -80,6 +80,7 @@
     --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     --default-font-family: var(--font-sans);
     --default-mono-font-family: var(--font-mono);
+    --color-bitcoin-orange: #FF6B35;
   }
 }
 @layer base {
@@ -1268,6 +1269,9 @@
   }
   .text-\[\#FF6B35\] {
     color: #FF6B35;
+  }
+  .text-bitcoin-orange {
+    color: var(--color-bitcoin-orange);
   }
   .text-blue-300 {
     color: var(--color-blue-300);
