@@ -1,9 +1,34 @@
 @import "tailwindcss";
 
+/* Add font-face declarations */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+}
+
 @theme {
   --color-bitcoin-orange: #FF6B35;
   --color-dark-bg: #0f1419;
   --color-dark-surface: #1a2332;
   --color-dark-card: #242d3d;
   --color-text-muted: #8b95a8;
+  
+  /* Add font family */
+  --font-family-mono: 'JetBrains Mono', monospace;
 }
