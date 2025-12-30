@@ -326,7 +326,7 @@ export function sendToAddress(address, amount) {
 }
 
 export function syncOfferbook() {
-  return window.api.taker.syncOfferbook();
+  return window.api.taker.fetchOffers();
 }
 
 export function getOfferbook() {

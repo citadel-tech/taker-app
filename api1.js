@@ -712,62 +712,88 @@ function registerTakerHandlers() {
 
       if (fs.existsSync(offerbookPath)) {
         const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
-        const offerbook = JSON.parse(offerbookData);
 
-        if (offerbook.all_makers) {
-          const badMakerAddresses = new Set(
-            (offerbook.bad_makers || []).map(
-              (m) => `${m.address.onion_addr}:${m.address.port}`
-            )
-          );
-
-          const goodMakers = offerbook.all_makers.filter((maker) => {
-            const makerAddr = `${maker.address.onion_addr}:${maker.address.port}`;
-            return !badMakerAddresses.has(makerAddr);
-          });
-
-          const transformedOfferbook = {
-            goodMakers: goodMakers.map((m) => ({
-              address: m.address,
-              offer: {
-                baseFee: m.offer.base_fee,
-                amountRelativeFeePct: m.offer.amount_relative_fee_pct,
-                timeRelativeFeePct: m.offer.time_relative_fee_pct,
-                requiredConfirms: m.offer.required_confirms,
-                minimumLocktime: m.offer.minimum_locktime,
-                maxSize: m.offer.max_size,
-                minSize: m.offer.min_size,
-                tweakablePoint: m.offer.tweakable_point,
-                fidelity: m.offer.fidelity,
-              },
-            })),
-            allMakers: offerbook.all_makers.map((m) => ({
-              address: m.address,
-              offer: {
-                baseFee: m.offer.base_fee,
-                amountRelativeFeePct: m.offer.amount_relative_fee_pct,
-                timeRelativeFeePct: m.offer.time_relative_fee_pct,
-                requiredConfirms: m.offer.required_confirms,
-                minimumLocktime: m.offer.minimum_locktime,
-                maxSize: m.offer.max_size,
-                minSize: m.offer.min_size,
-                tweakablePoint: m.offer.tweakable_point,
-                fidelity: m.offer.fidelity,
-              },
-            })),
-          };
-
+        let offerbook;
+        try {
+          offerbook = JSON.parse(offerbookData);
+        } catch (parseError) {
+          console.error('❌ Malformed offerbook.json:', parseError.message);
           return {
             success: true,
-            offerbook: transformedOfferbook,
-            cached: true,
+            offerbook: {
+              goodMakers: [],
+              badMakers: [],
+              unresponsiveMakers: [],
+              allMakers: [],
+            },
+            cached: false,
+            message: 'Offerbook file is malformed',
           };
         }
+
+        // NEW STRUCTURE: Single "makers" array with state
+        const makers = offerbook.makers || [];
+
+        // Categorize makers based on state
+        const goodMakers = [];
+        const badMakers = [];
+        const unresponsiveMakers = [];
+
+        makers.forEach((maker) => {
+          const state = maker.state;
+
+          if (state && state.Unresponsive) {
+            unresponsiveMakers.push(maker);
+          } else if (state && state.Bad) {
+            badMakers.push(maker);
+          } else if (maker.offer !== null) {
+            // Good makers have offers
+            goodMakers.push(maker);
+          } else {
+            // Fallback: makers without offers go to unresponsive
+            unresponsiveMakers.push(maker);
+          }
+        });
+
+        const transformMaker = (m) => ({
+          address: m.address,
+          offer: m.offer
+            ? {
+                baseFee: m.offer.base_fee,
+                amountRelativeFeePct: m.offer.amount_relative_fee_pct,
+                timeRelativeFeePct: m.offer.time_relative_fee_pct,
+                requiredConfirms: m.offer.required_confirms,
+                minimumLocktime: m.offer.minimum_locktime,
+                maxSize: m.offer.max_size,
+                minSize: m.offer.min_size,
+                tweakablePoint: m.offer.tweakable_point,
+                fidelity: m.offer.fidelity,
+              }
+            : null,
+        });
+
+        const transformedOfferbook = {
+          goodMakers: goodMakers.map(transformMaker),
+          badMakers: badMakers.map(transformMaker),
+          unresponsiveMakers: unresponsiveMakers.map(transformMaker),
+          allMakers: makers.map(transformMaker),
+        };
+
+        return {
+          success: true,
+          offerbook: transformedOfferbook,
+          cached: true,
+        };
       }
 
       return {
         success: true,
-        offerbook: { goodMakers: [], allMakers: [] },
+        offerbook: {
+          goodMakers: [],
+          badMakers: [],
+          unresponsiveMakers: [],
+          allMakers: [],
+        },
         cached: false,
         message: 'No cached data - click sync to fetch offers',
       };

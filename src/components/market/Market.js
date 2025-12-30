@@ -49,6 +49,32 @@ export function Market(container) {
     const onionAddr = addressObj.onion_addr || '';
     const port = addressObj.port || '6102';
     const fullAddress = `${onionAddr}:${port}`;
+
+    // Handle null offers (unresponsive makers)
+    if (!offer) {
+      return {
+        address: fullAddress,
+        protocol: 'Unknown',
+        baseFee: 0,
+        volumeFee: '0.00',
+        timeFee: '0.00',
+        minSize: 0,
+        maxSize: 0,
+        bond: 0,
+        bondTxid: '',
+        bondVout: '0',
+        bondOutpoint: '',
+        bondLocktime: 0,
+        bondPubkey: '',
+        bondConfHeight: null,
+        bondCertExpiry: null,
+        bondIsSpent: false,
+        requiredConfirms: 0,
+        minimumLocktime: 0,
+        index: index,
+      };
+    }
+
     const fidelity = offer.fidelity || {};
     const bond = fidelity.bond || {};
     const outpoint = bond.outpoint || '';
@@ -87,15 +113,8 @@ export function Market(container) {
 
       if (data.success && data.offerbook) {
         const goodMakers = data.offerbook.goodMakers || [];
-        const allMakers = data.offerbook.allMakers || [];
-
-        const goodMakerAddresses = new Set(
-          goodMakers.map((m) => `${m.address.onion_addr}:${m.address.port}`)
-        );
-        const badMakers = allMakers.filter((item) => {
-          const addr = `${item.address.onion_addr}:${item.address.port}`;
-          return !goodMakerAddresses.has(addr);
-        });
+        const badMakers = data.offerbook.badMakers || [];
+        const unresponsiveMakers = data.offerbook.unresponsiveMakers || [];
 
         makers = [
           ...goodMakers.map((item, index) => ({
@@ -106,9 +125,20 @@ export function Market(container) {
             ...transformMaker(item, index + goodMakers.length),
             status: 'bad',
           })),
+          ...unresponsiveMakers.map((item, index) => ({
+            ...transformMaker(
+              item,
+              index + goodMakers.length + badMakers.length
+            ),
+            status: 'unresponsive',
+          })),
         ];
 
-        console.log('✅ Loaded', makers.length, 'makers');
+        console.log('✅ Loaded', makers.length, 'makers:', {
+          good: goodMakers.length,
+          bad: badMakers.length,
+          unresponsive: unresponsiveMakers.length,
+        });
         isLoading = false;
         updateUI();
       } else {
