@@ -17,6 +17,7 @@ const api1State = {
   currentWalletName: 'taker-wallet',
   currentWalletPassword: '',
   protocolVersion: 'v1', // 'v1' (P2WSH/Taker) or 'v2' (Taproot/TaprootTaker)
+  walletSyncInterval: null,
 
   syncState: {
     isRunning: false, // Is any sync currently running?
@@ -201,6 +202,7 @@ function registerTakerHandlers() {
 
         // Start periodic syncs (every 5 minutes)
         startPeriodicSync();
+        startPeriodicWalletSync();
       }, 2000);
 
       return {
@@ -335,15 +337,15 @@ function registerTakerHandlers() {
       clearInterval(api1State.syncState.periodicInterval);
     }
 
-    console.log('⏰ Starting periodic sync scheduler (every 5 minutes)');
+    console.log('⏰ Starting periodic sync scheduler (every 15 minutes)');
 
     api1State.syncState.periodicInterval = setInterval(
       async () => {
         console.log('⏰ Periodic sync triggered');
         await startOfferbookSync('periodic');
       },
-      5 * 60 * 1000
-    ); // 5 minutes
+      15 * 60 * 1000
+    ); // 15 minutes
   }
 
   /**
@@ -356,8 +358,6 @@ function registerTakerHandlers() {
       console.log('⏰ Periodic sync scheduler stopped');
     }
   }
-
-
 
   // Get wallet info
   ipcMain.handle('taker:getWalletInfo', async () => {
@@ -403,6 +403,30 @@ function registerTakerHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // Start periodic wallet sync (every 5 minutes)
+  function startPeriodicWalletSync() {
+    if (api1State.walletSyncInterval) {
+      clearInterval(api1State.walletSyncInterval);
+    }
+
+    console.log('⏰ Starting periodic wallet sync (every 5 minutes)');
+
+    api1State.walletSyncInterval = setInterval(
+      async () => {
+        if (api1State.takerInstance) {
+          try {
+            console.log('⏰ Periodic wallet sync triggered');
+            api1State.takerInstance.syncAndSave();
+            console.log('✅ Periodic wallet sync completed');
+          } catch (error) {
+            console.error('❌ Periodic wallet sync failed:', error);
+          }
+        }
+      },
+      5 * 60 * 1000 // 5 minutes
+    );
+  }
 
   // Get next address
   ipcMain.handle('taker:getNextAddress', async () => {
@@ -1077,22 +1101,22 @@ function registerDialogHandlers() {
 // Add this function
 function registerTorHandlers() {
   const net = require('net');
-  
+
   ipcMain.handle('tor:testConnection', async (event, config) => {
     const socksPort = config?.socksPort || 9050;
     const controlPort = config?.controlPort || 9051;
-    
+
     return new Promise((resolve) => {
       // Test SOCKS port
       const socksSocket = new net.Socket();
       let socksConnected = false;
-      
+
       socksSocket.setTimeout(3000);
-      
+
       socksSocket.on('connect', () => {
         socksConnected = true;
         socksSocket.destroy();
-        
+
         // SOCKS port is open, now test if it's actually Tor
         // by trying to connect through it
         resolve({
@@ -1101,7 +1125,7 @@ function registerTorHandlers() {
           message: `Tor SOCKS proxy is running on port ${socksPort}`,
         });
       });
-      
+
       socksSocket.on('error', (err) => {
         resolve({
           success: false,
@@ -1109,7 +1133,7 @@ function registerTorHandlers() {
           error: `Cannot connect to Tor SOCKS proxy on port ${socksPort}. Is Tor running?`,
         });
       });
-      
+
       socksSocket.on('timeout', () => {
         socksSocket.destroy();
         resolve({
@@ -1118,7 +1142,7 @@ function registerTorHandlers() {
           error: `Connection timeout on port ${socksPort}`,
         });
       });
-      
+
       socksSocket.connect(socksPort, '127.0.0.1');
     });
   });
