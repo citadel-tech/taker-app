@@ -245,9 +245,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
       return `
       <div class="recipient-row mb-4 p-4 bg-[#0f1419] rounded-lg border border-gray-700">
         <div class="flex justify-between items-center mb-3">
-          <label class="text-sm font-semibold text-gray-300">Recipient ${index + 1}</label>
+          <label class="text-sm font-semibold text-lg text-gray-300">Recipient ${index + 1}</label>
           ${recipients.length > 1 ? `
-            <button class="remove-recipient text-red-400 hover:text-red-300 text-sm font-semibold" data-index="${index}">
+            <button class="remove-recipient text-red-400 hover:text-red-300 text-sm font-semibold text-lg" data-index="${index}">
               ✕ Remove
             </button>
           ` : ''}
@@ -271,13 +271,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <div class="flex justify-between items-center mb-1">
             <label class="block text-xs text-gray-400">Amount</label>
             <div class="flex gap-1">
-              <button class="unit-btn ${amountUnit === 'sats' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold transition-colors" data-unit="sats" data-recipient="${index}">
+              <button class="unit-btn ${amountUnit === 'sats' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="sats" data-recipient="${index}">
                 Sats
               </button>
-              <button class="unit-btn ${amountUnit === 'btc' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold transition-colors" data-unit="btc" data-recipient="${index}">
+              <button class="unit-btn ${amountUnit === 'btc' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="btc" data-recipient="${index}">
                 BTC
               </button>
-              <button class="unit-btn ${amountUnit === 'usd' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold transition-colors" data-unit="usd" data-recipient="${index}">
+              <button class="unit-btn ${amountUnit === 'usd' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="usd" data-recipient="${index}">
                 USD
               </button>
             </div>
@@ -300,7 +300,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         <div>
           <div class="flex justify-between items-center mb-2">
             <label class="block text-xs text-gray-400">Amount (from selected UTXOs)</label>
-            <button class="use-utxo-minus-fees text-[#FF6B35] hover:text-[#ff7d4d] text-[10px] font-semibold" data-index="${index}">
+            <button class="use-utxo-minus-fees text-[#FF6B35] hover:text-[#ff7d4d] text-[10px] font-semibold text-lg" data-index="${index}">
               UTXO - Fees
             </button>
           </div>
@@ -382,9 +382,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
     selectionMode = mode;
 
     content.querySelectorAll('.mode-btn').forEach((btn) => {
-      btn.className = 'mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors';
+      btn.className = 'mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
     });
-    content.querySelector('#mode-' + mode).className = 'mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold';
+    content.querySelector('#mode-' + mode).className = 'mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
 
     const manualSection = content.querySelector('#manual-selection-section');
     
@@ -811,7 +811,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     
     <!-- Warning Banner -->
     <div class="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-      <p class="text-sm text-yellow-400 font-semibold">
+      <p class="text-sm text-yellow-400 font-semibold text-lg">
         ⚠️ Regular and Swap UTXOs cannot be selected together in a single transaction
       </p>
       <p class="text-xs text-yellow-400/80 mt-1">Mixing these UTXO types compromises privacy. Use one type per send.</p>
@@ -825,7 +825,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <div class="mb-6">
             <div class="flex justify-between items-center mb-3">
               <label class="block text-sm text-gray-400">Recipients</label>
-              <button id="add-recipient-btn" class="text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold">
+              <button id="add-recipient-btn" class="text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg">
                 + Add Recipient
               </button>
             </div>
@@ -836,10 +836,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <div class="mb-6">
             <label class="block text-sm text-gray-400 mb-2">UTXO Selection</label>
             <div class="flex gap-2">
-              <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold">
+              <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
                 Auto Select
               </button>
-              <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold transition-colors">
+              <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 Manual Select
               </button>
             </div>
@@ -854,15 +854,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
             
             <div class="grid grid-cols-3 gap-2 mb-4">
               <button id="fee-low" class="fee-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg p-3 text-center transition-colors">
-                <div class="text-white font-semibold">Low</div>
+                <div class="text-white font-semibold text-lg">Low</div>
                 <div class="text-xs text-gray-400 mt-1">1 sat/vB</div>
               </button>
               <button id="fee-medium" class="fee-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg p-3 text-center">
-                <div class="text-white font-semibold">Medium</div>
+                <div class="text-white font-semibold text-lg">Medium</div>
                 <div class="text-xs text-white/80 mt-1">2 sat/vB</div>
               </button>
               <button id="fee-high" class="fee-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg p-3 text-center transition-colors">
-                <div class="text-white font-semibold">High</div>
+                <div class="text-white font-semibold text-lg">High</div>
                 <div class="text-xs text-gray-400 mt-1">4 sat/vB</div>
               </button>
             </div>
@@ -884,7 +884,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         <div id="manual-selection-section" class="hidden">
           <div class="bg-[#1a2332] rounded-lg p-6">
             <div class="flex justify-between items-center mb-4">
-              <h3 class="text-xl font-semibold text-gray-300">Select UTXOs</h3>
+              <h3 class="text-xl font-semibold text-lg text-gray-300">Select UTXOs</h3>
               <div class="text-sm text-gray-400">
                 Selected: <span id="selected-utxos-count">0</span> UTXOs 
                 (<span id="selected-utxos-value">0.00000000 BTC</span>)
@@ -892,7 +892,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             </div>
             
             <div id="utxo-warning" class="hidden mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-              <p class="text-xs text-red-400 font-semibold">
+              <p class="text-xs text-red-400 font-semibold text-lg">
                 ⚠️ PRIVACY WARNING: You've selected both Regular and Swap UTXOs!
               </p>
               <p class="text-xs text-red-400/80 mt-1">This compromises your privacy. Please use only one type.</p>
@@ -908,7 +908,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
         <!-- Hex Display -->
         <div id="hex-panel" class="hidden bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-lg font-semibold text-gray-300 mb-3">Transaction Hex</h3>
+          <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Transaction Hex</h3>
           <div class="bg-[#0f1419] border border-gray-700 rounded-lg p-4 max-h-40 overflow-auto">
             <pre id="tx-hex-content" class="text-xs text-green-400 font-mono whitespace-pre-wrap break-all"></pre>
           </div>
@@ -928,7 +928,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       <!-- Right: Summary -->
       <div class="col-span-1">
         <div class="bg-[#1a2332] rounded-lg p-6 sticky top-8">
-          <h3 class="text-lg font-semibold text-gray-300 mb-4">Transaction Summary</h3>
+          <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Transaction Summary</h3>
           
           <div class="space-y-4">
             <div>
@@ -949,8 +949,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
                 <span id="summary-fee" class="text-sm font-mono text-yellow-400">~280 sats</span>
               </div>
               <div class="flex justify-between pt-2 border-t border-gray-700">
-                <span class="text-sm font-semibold text-gray-300">Total Sent</span>
-                <span id="summary-total" class="text-sm font-mono font-semibold text-[#FF6B35]">280 sats</span>
+                <span class="text-sm font-semibold text-lg text-gray-300">Total Sent</span>
+                <span id="summary-total" class="text-sm font-mono font-semibold text-lg text-[#FF6B35]">280 sats</span>
               </div>
               <p id="summary-total-usd" class="text-xs text-gray-500 text-right mt-1">≈ $0.00</p>
             </div>

@@ -114,10 +114,10 @@ export function TransactionsListComponent(container) {
       const filter = btn.dataset.filter;
       if (filter === currentFilter) {
         btn.className =
-          'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
+          'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
       } else {
         btn.className =
-          'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors';
+          'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
       }
     });
   }
@@ -205,7 +205,7 @@ export function TransactionsListComponent(container) {
                 </div>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 mb-1 flex-wrap">
-                        <p class="text-white font-semibold capitalize">
+                        <p class="text-white font-semibold text-lg capitalize">
                           ${type === 'swap' ? '🔄 Coinswap' : type === 'received' ? '📥 Received' : '📤 Sent'}
                         </p>
                         <span class="text-xs px-2 py-0.5 rounded ${statusBadge.class}">${statusBadge.text}</span>
@@ -222,7 +222,7 @@ export function TransactionsListComponent(container) {
                 </div>
             </div>
             <div class="text-right flex-shrink-0">
-                <p class="${amountData.colorClass} font-mono text-lg font-semibold">${amountData.text}</p>
+                <p class="${amountData.colorClass} font-mono text-lg font-semibold text-lg">${amountData.text}</p>
                 ${tx.detail.fee ? `<p class="text-gray-500 text-xs">Fee: ${satsToBtc(Math.abs(tx.detail.fee.sats))} BTC</p>` : ''}
             </div>
         </div>
@@ -371,7 +371,7 @@ export function TransactionsListComponent(container) {
                 <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Transactions</h2>
                 <p class="text-gray-400">Complete transaction history (newest first)</p>
             </div>
-            <button id="refresh-transactions-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-6 rounded-lg transition-colors">
+            <button id="refresh-transactions-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors">
                 Refresh
             </button>
         </div>
@@ -399,19 +399,19 @@ export function TransactionsListComponent(container) {
         <!-- Transactions List -->
         <div class="bg-[#1a2332] rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
-                <h3 class="text-xl font-semibold text-gray-300">Transaction History</h3>
+                <h3 class="text-xl font-semibold text-lg text-gray-300">Transaction History</h3>
                 <!-- Filter buttons -->
                 <div class="flex gap-2">
-                    <button data-filter="all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    <button data-filter="all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         All (<span id="filter-all-count">--</span>)
                     </button>
-                    <button data-filter="received" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    <button data-filter="received" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         📥 Received (<span id="filter-received-count">--</span>)
                     </button>
-                    <button data-filter="sent" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    <button data-filter="sent" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         📤 Sent (<span id="filter-sent-count">--</span>)
                     </button>
-                    <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+                    <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         🔄 Swaps (<span id="filter-swaps-count">--</span>)
                     </button>
                 </div>
@@ -424,7 +424,7 @@ export function TransactionsListComponent(container) {
 
             <!-- Load More Button -->
             <div class="mt-6 text-center">
-                <button id="load-more-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+                <button id="load-more-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
                     Load More Transactions
                 </button>
             </div>

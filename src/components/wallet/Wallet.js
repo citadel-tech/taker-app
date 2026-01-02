@@ -394,14 +394,14 @@ export async function WalletComponent(container) {
                 <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">${walletInfo.walletName}</h2>
                 <p class="text-gray-400 font-mono text-sm">${walletInfo.walletPath}</p>
             </div>
-            <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+            <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
                 Refresh All Data
             </button>
         </div>
 
         <!-- Balance Card -->
         <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-300">Balance</h3>
+            <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">Balance</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Regular</p>
@@ -428,22 +428,22 @@ export async function WalletComponent(container) {
 
        <!-- UTXOs Section -->
         <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-300">UTXOs</h3>
+            <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">UTXOs</h3>
             <div class="overflow-x-auto">
                 <table class="w-full">
                     <thead>
                         <tr class="border-b border-gray-700">
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Txid:Vout</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Amount</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Confirmations</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold">Type</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Txid:Vout</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Amount</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Confirmations</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Type</th>
                         </tr>
                     </thead>
                     <tbody id="utxo-table-body">
                         <!-- UTXOs will be populated here -->
                     </tbody>
                 </table>
-                <button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
+                <button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
                     View All UTXOs →
                 </button>
             </div>
@@ -451,11 +451,11 @@ export async function WalletComponent(container) {
 
         <!-- Recent Transactions -->
         <div class="bg-[#1a2332] rounded-lg p-6">
-            <h3 class="text-xl font-semibold mb-4 text-gray-300">Recent Transactions</h3>
+            <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">Recent Transactions</h3>
             <div id="transactions-container" class="space-y-3">
                 <!-- Transactions will be populated here -->
             </div>
-            <button id="view-all-transactions" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors">
+            <button id="view-all-transactions" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
                 View All Transactions →
             </button>
         </div>

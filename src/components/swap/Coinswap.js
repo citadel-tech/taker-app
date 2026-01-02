@@ -933,7 +933,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
     <div class="grid grid-cols-3 gap-4 mb-6">
       <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-gray-300 mb-3">Progress</h3>
+        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Progress</h3>
         <div class="space-y-2 text-sm">
           <div class="flex justify-between">
             <span class="text-gray-400">Amount</span>
@@ -951,12 +951,12 @@ export async function CoinswapComponent(container, swapConfig) {
       </div>
 
       <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-gray-300 mb-3">Transactions</h3>
+        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Transactions</h3>
         <div id="transaction-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
       </div>
 
       <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-gray-300 mb-3">Status</h3>
+        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Status</h3>
         <div class="space-y-2">
           <div class="p-2 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400">
             ℹ️ Do not close window
@@ -969,7 +969,7 @@ export async function CoinswapComponent(container, swapConfig) {
     </div>
 
     <div class="bg-[#1a2332] rounded-lg p-4">
-      <h3 class="text-lg font-semibold text-gray-300 mb-3">Activity Log</h3>
+      <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Activity Log</h3>
       <div id="log-container" class="bg-[#0f1419] rounded p-3 h-40 overflow-y-auto font-mono text-xs"></div>
     </div>
 

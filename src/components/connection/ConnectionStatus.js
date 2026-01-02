@@ -36,7 +36,7 @@ export function ConnectionStatusComponent(container, onConnected) {
 
             <!-- Connection Details -->
             <div id="connection-details" class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-                <h4 class="text-white text-sm font-semibold mb-2">Connection Details:</h4>
+                <h4 class="text-white text-sm font-semibold text-lg mb-2">Connection Details:</h4>
                 <div class="space-y-1 text-xs text-gray-400">
                     <div class="flex justify-between">
                         <span>Host:</span>

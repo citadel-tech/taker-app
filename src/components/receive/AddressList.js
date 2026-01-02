@@ -198,10 +198,10 @@ const result = await window.api.taker.getTransactions(200, 0);
             <p class="text-gray-400">Addresses derived from transaction history</p>
           </div>
           <div class="flex gap-2">
-            <button id="export-addresses" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+            <button id="export-addresses" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
               📥 Export CSV
             </button>
-            <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+            <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
               🔄 Refresh
             </button>
           </div>
@@ -233,7 +233,7 @@ const result = await window.api.taker.getTransactions(200, 0);
             <!-- Type Filter -->
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-400 mr-2">Filter:</span>
-              <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] text-gray-400 border border-gray-700 hover:bg-[#242d3d]'} px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">
+              <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] text-gray-400 border border-gray-700 hover:bg-[#242d3d]'} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
                 All (${allAddresses.length})
               </button>
               ${addressTypes
@@ -243,7 +243,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                   ).length;
                   const color = getTypeColor(type);
                   return `
-                  <button data-filter="${type}" class="filter-btn ${currentFilter === type ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors">
+                  <button data-filter="${type}" class="filter-btn ${currentFilter === type ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
                     ${type} (${count})
                   </button>
                 `;
@@ -266,7 +266,7 @@ const result = await window.api.taker.getTransactions(200, 0);
 
         <!-- Address Table -->
         <div class="bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-xl font-semibold text-gray-300 mb-4">Address Details</h3>
+          <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Address Details</h3>
 
           ${
             filteredAddresses.length === 0
@@ -274,7 +274,7 @@ const result = await window.api.taker.getTransactions(200, 0);
             <div class="text-center py-12">
               <div class="text-4xl mb-4">📭</div>
               <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `of type ${currentFilter}` : 'found in transaction history'}</p>
-              <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold px-6 py-2 rounded-lg transition-colors">
+              <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-2 rounded-lg transition-colors">
                 Generate New Address
               </button>
             </div>
@@ -284,13 +284,13 @@ const result = await window.api.taker.getTransactions(200, 0);
               <table class="w-full">
                 <thead>
                   <tr class="border-b border-gray-700">
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Address</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Type</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Status</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Times Used</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Received</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Created</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-sm">Last Used</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Address</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Type</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Status</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Times Used</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Received</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Created</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Last Used</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -316,12 +316,12 @@ const result = await window.api.taker.getTransactions(200, 0);
                           </div>
                         </td>
                         <td class="py-3 px-4">
-                          <span class="px-2 py-1 rounded text-xs font-semibold bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
+                          <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
                             ${addr.type}
                           </span>
                         </td>
                         <td class="py-3 px-4">
-                          <span class="px-2 py-1 rounded text-xs font-semibold bg-${statusInfo.color}-500/20 text-${statusInfo.color}-400">
+                          <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${statusInfo.color}-500/20 text-${statusInfo.color}-400">
                             ${statusInfo.text}
                           </span>
                         </td>
@@ -352,7 +352,7 @@ const result = await window.api.taker.getTransactions(200, 0);
 
         <!-- Privacy Info -->
         <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <h4 class="text-sm font-semibold text-blue-400 mb-2">💡 Privacy Tip</h4>
+          <h4 class="text-sm font-semibold text-lg text-blue-400 mb-2">💡 Privacy Tip</h4>
           <p class="text-xs text-blue-300">
             For best privacy, generate a new address for each transaction. Address reuse can link your transactions together and reduce your anonymity.
             Addresses marked as "Reused" have received multiple transactions and may have reduced privacy.

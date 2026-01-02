@@ -12,7 +12,7 @@ export function ReceiveComponent(container) {
         <div class="grid grid-cols-2 gap-6">
             <!-- Left: Address Display -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-300 mb-6">Your Bitcoin Address</h3>
+                <h3 class="text-lg font-semibold text-lg text-gray-300 mb-6">Your Bitcoin Address</h3>
                 
                 <!-- QR Code -->
                 <div class="bg-white p-4 rounded-lg mb-6 flex items-center justify-center">
@@ -30,7 +30,7 @@ export function ReceiveComponent(container) {
                         <span id="current-address" class="font-mono text-sm text-white break-all flex-1 mr-4">
                             Loading...
                         </span>
-                        <button id="copy-address" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold transition-colors whitespace-nowrap">
+                        <button id="copy-address" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors whitespace-nowrap">
                             Copy
                         </button>
                     </div>
@@ -40,7 +40,7 @@ export function ReceiveComponent(container) {
                 </div>
 
                 <!-- Generate New Address Button -->
-                <button id="generate-new" disabled class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors border border-gray-700">
+                <button id="generate-new" disabled class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
                     <span class="generate-text">Generate New Address</span>
                     <span class="generate-loading hidden">
                         <span class="inline-block animate-spin mr-2">⟳</span>
@@ -60,7 +60,7 @@ export function ReceiveComponent(container) {
 
                 <!-- Address Status Card -->
                 <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">Address Status</h3>
+                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Address Status</h3>
                     <div id="address-status" class="space-y-3">
                         <div class="flex justify-between items-center text-sm">
                             <span class="text-gray-400">Generated:</span>
@@ -84,7 +84,7 @@ export function ReceiveComponent(container) {
                 <!-- Recent Addresses -->
                 <div class="bg-[#1a2332] rounded-lg p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-300">Recent Addresses</h3>
+                        <h3 class="text-lg font-semibold text-lg text-gray-300">Recent Addresses</h3>
                         <span id="total-addresses" class="text-xs text-gray-500">0 total</span>
                     </div>
                     <div id="recent-addresses" class="space-y-2 max-h-48 overflow-y-auto">
@@ -93,7 +93,7 @@ export function ReceiveComponent(container) {
                         </div>
                     </div>
                     
-                    <button id="view-all-addresses" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors w-full text-left">
+                    <button id="view-all-addresses" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors w-full text-left">
                         View All Addresses →
                     </button>
                 </div>

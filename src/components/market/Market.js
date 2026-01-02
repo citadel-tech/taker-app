@@ -448,7 +448,7 @@ export function Market(container) {
       <div class="flex items-start gap-3">
         <span class="text-xl">❌</span>
         <div class="flex-1">
-          <div class="font-semibold mb-1">Error</div>
+          <div class="font-semibold text-lg mb-1">Error</div>
           <div class="text-sm">${message}</div>
         </div>
       </div>
@@ -592,7 +592,7 @@ export function Market(container) {
             <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
             <button 
               onclick="window.open('https://mempool.space/signet/tx/${maker.bondTxid}', '_blank')"
-              class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold transition-colors">
+              class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold text-lg transition-colors">
               View on Block Explorer →
             </button>
           </div>
@@ -600,7 +600,7 @@ export function Market(container) {
 
         <div class="mt-6 flex justify-end">
           <button onclick="this.closest('.fixed').remove()" 
-            class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
+            class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold text-lg transition-colors">
             Close
           </button>
         </div>
@@ -738,7 +738,7 @@ export function Market(container) {
       syncStatusDiv.innerHTML = `
       <div class="text-sm text-gray-400">
         <span class="text-gray-400">Market Data:</span>
-        <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
+        <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold text-lg ml-2">
           ${makers.length} makers available
         </span>
       </div>
@@ -754,7 +754,7 @@ export function Market(container) {
         progressContainer.innerHTML = `
         <div class="bg-[#0f1419] rounded-lg p-6 border border-blue-500/30">
           <div class="flex items-center justify-between mb-4">
-            <span class="text-lg font-semibold text-blue-400">
+            <span class="text-lg font-semibold text-lg text-blue-400">
               🔄 Syncing Market Data...
             </span>
             <span class="text-sm text-gray-400">
@@ -786,7 +786,7 @@ export function Market(container) {
         progressContainer.innerHTML = `
         <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold text-blue-400">
+            <span class="text-sm font-semibold text-lg text-blue-400">
               ${syncProgress.message || 'Syncing market data...'}
             </span>
             <span class="text-sm text-gray-400">
@@ -855,7 +855,7 @@ export function Market(container) {
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
           </div>
-          <p class="text-gray-400 text-lg font-semibold mb-2">Syncing Market Data...</p>
+          <p class="text-gray-400 text-lg font-semibold text-lg mb-2">Syncing Market Data...</p>
           <p class="text-gray-500 text-sm">Fetching makers over Tor network</p>
         </div>
       `;
@@ -892,7 +892,7 @@ export function Market(container) {
                 maker.protocol === 'Taproot'
                   ? 'bg-purple-500/20 text-purple-400'
                   : 'bg-blue-500/20 text-blue-400'
-              } rounded text-xs font-semibold">
+              } rounded text-xs font-semibold text-lg">
                 ${maker.protocol === 'Taproot' ? '⚡ Taproot' : '🔒 Legacy'}
               </span>
             </div>
@@ -945,7 +945,7 @@ export function Market(container) {
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
         <p class="text-gray-400">Live view of the current coinswap market</p>
       </div>
-      <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold transition-colors">
+      <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
         🔄 Sync Market Data
       </button>
     </div>
@@ -973,7 +973,7 @@ export function Market(container) {
       <div class="flex items-start gap-3">
         <span class="text-2xl">ℹ️</span>
         <div>
-          <h3 class="text-lg font-semibold text-[#FF6B35] mb-2">Fee Calculation</h3>
+          <h3 class="text-lg font-semibold text-lg text-[#FF6B35] mb-2">Fee Calculation</h3>
           <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
           <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
             Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Lock Time × Swap Amount × % Time Rate)
@@ -1003,22 +1003,22 @@ export function Market(container) {
     <div class="bg-[#1a2332] rounded-lg overflow-hidden">
       <!-- Maker Status Tabs -->
       <div class="flex border-b-2 border-[#FF6B35]">
-  <button id="tab-good" class="flex-1 px-6 py-4 font-semibold bg-[#FF6B35] text-white border-b-4 border-[#FF6B35] transition-all">
+  <button id="tab-good" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#FF6B35] text-white border-b-4 border-[#FF6B35] transition-all">
     ✅ Good Makers (<span id="good-count">0</span>)
   </button>
-  <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
+  <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
     ❌ Bad Makers (<span id="bad-count">0</span>)
   </button>
-  <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
+  <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
     ⏸️ Unresponsive (<span id="unresponsive-count">0</span>)
   </button>
 </div>
 
       <div id="maker-actions" class="hidden bg-[#FF6B35] p-4 flex justify-between items-center">
-        <span class="text-white font-semibold">
+        <span class="text-white font-semibold text-lg">
           <span id="selected-makers-count">0</span> makers selected
         </span>
-        <button id="swap-with-makers" class="bg-white text-[#FF6B35] px-6 py-2 rounded-lg font-semibold hover:bg-gray-100 transition-colors">
+        <button id="swap-with-makers" class="bg-white text-[#FF6B35] px-6 py-2 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors">
           Swap with Selected →
         </button>
       </div>
@@ -1026,16 +1026,16 @@ export function Market(container) {
       <div class="grid grid-cols-9 gap-4 bg-[#FF6B35] p-4">
         <div class="flex items-center">
           <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
-          <span class="font-semibold text-sm">Select</span>
+          <span class="font-semibold text-lg text-sm">Select</span>
         </div>
-        <div class="font-semibold">Protocol</div>
-        <div class="font-semibold">Maker Address</div>
-        <div class="font-semibold">Base Fee</div>
-        <div class="font-semibold">% Fee Rate</div>
-        <div class="font-semibold">% Time Rate</div>
-        <div class="font-semibold">Min Swap Size</div>
-        <div class="font-semibold">Max Swap Size</div>
-        <div class="font-semibold">Fidelity Bond</div>
+        <div class="font-semibold text-lg">Protocol</div>
+        <div class="font-semibold text-lg">Maker Address</div>
+        <div class="font-semibold text-lg">Base Fee</div>
+        <div class="font-semibold text-lg">% Fee Rate</div>
+        <div class="font-semibold text-lg">% Time Rate</div>
+        <div class="font-semibold text-lg">Min Swap Size</div>
+        <div class="font-semibold text-lg">Max Swap Size</div>
+        <div class="font-semibold text-lg">Fidelity Bond</div>
       </div>
 
       <div id="maker-table-body" class="divide-y divide-gray-700">

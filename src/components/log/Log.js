@@ -116,9 +116,9 @@ export function LogComponent(container) {
   function setFilter(filter) {
     currentFilter = filter;
     content.querySelectorAll('.filter-btn').forEach(btn => {
-      btn.className = 'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors';
+      btn.className = 'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold text-lg transition-colors';
     });
-    content.querySelector(`#filter-${filter}`).className = 'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold';
+    content.querySelector(`#filter-${filter}`).className = 'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold text-lg';
     renderLogs();
   }
 
@@ -143,16 +143,16 @@ export function LogComponent(container) {
         <div class="bg-[#1a2332] rounded-lg p-6">
           <div class="flex justify-between items-center mb-6">
             <div class="flex gap-2">
-              <button id="filter-all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold">All</button>
-              <button id="filter-info" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Info</button>
-              <button id="filter-warn" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Warning</button>
-              <button id="filter-error" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Error</button>
+              <button id="filter-all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold text-lg">All</button>
+              <button id="filter-info" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold text-lg transition-colors">Info</button>
+              <button id="filter-warn" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold text-lg transition-colors">Warning</button>
+              <button id="filter-error" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold text-lg transition-colors">Error</button>
             </div>
             <div class="flex gap-2">
               <button id="refresh-logs" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded text-sm transition-colors">
                 🔄 Refresh
               </button>
-              <button id="open-log-file" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded text-sm font-semibold transition-colors">
+              <button id="open-log-file" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors">
                 📁 Open Log File
               </button>
             </div>
@@ -163,12 +163,12 @@ export function LogComponent(container) {
       
       <div class="col-span-1 space-y-6">
         <div class="bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-lg font-semibold text-gray-300 mb-4">Log Stats</h3>
+          <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Log Stats</h3>
           <div class="space-y-4">
             <div>
               <div class="flex justify-between items-center mb-1">
                 <span class="text-sm text-gray-400">Info</span>
-                <span id="info-count" class="text-blue-400 font-semibold">0</span>
+                <span id="info-count" class="text-blue-400 font-semibold text-lg">0</span>
               </div>
               <div class="w-full bg-[#0f1419] rounded-full h-2">
                 <div id="info-bar" class="bg-blue-400 h-2 rounded-full" style="width:0%"></div>
@@ -177,7 +177,7 @@ export function LogComponent(container) {
             <div>
               <div class="flex justify-between items-center mb-1">
                 <span class="text-sm text-gray-400">Warning</span>
-                <span id="warn-count" class="text-yellow-400 font-semibold">0</span>
+                <span id="warn-count" class="text-yellow-400 font-semibold text-lg">0</span>
               </div>
               <div class="w-full bg-[#0f1419] rounded-full h-2">
                 <div id="warn-bar" class="bg-yellow-400 h-2 rounded-full" style="width:0%"></div>
@@ -186,7 +186,7 @@ export function LogComponent(container) {
             <div>
               <div class="flex justify-between items-center mb-1">
                 <span class="text-sm text-gray-400">Error</span>
-                <span id="error-count" class="text-red-400 font-semibold">0</span>
+                <span id="error-count" class="text-red-400 font-semibold text-lg">0</span>
               </div>
               <div class="w-full bg-[#0f1419] rounded-full h-2">
                 <div id="error-bar" class="bg-red-400 h-2 rounded-full" style="width:0%"></div>
@@ -196,7 +196,7 @@ export function LogComponent(container) {
         </div>
         
         <div class="bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-lg font-semibold text-gray-300 mb-4">Settings</h3>
+          <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Settings</h3>
           <div class="space-y-3">
             <label class="flex items-center gap-3 cursor-pointer">
               <input type="checkbox" id="auto-scroll" checked class="w-4 h-4 accent-[#FF6B35]" />

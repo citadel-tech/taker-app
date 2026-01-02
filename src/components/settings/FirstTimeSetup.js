@@ -29,13 +29,13 @@ export function FirstTimeSetupModal(container, onComplete) {
         <!-- Step 1: Introduction & Protocol Selection -->
         <div id="step-1" class="setup-step">
           <div class="text-center mb-6">
-            <h3 class="text-xl font-semibold text-white mb-2">Getting Started</h3>
+            <h3 class="text-xl font-semibold text-lg text-white mb-2">Getting Started</h3>
             <p class="text-gray-400 text-sm">Choose your swap protocol and we'll configure your wallet for private Bitcoin swaps.</p>
           </div>
 
           <!-- Protocol Selection -->
 <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-  <h4 class="text-white font-semibold mb-3">Select Swap Protocol Type</h4>
+  <h4 class="text-white font-semibold text-lg mb-3">Select Swap Protocol Type</h4>
   <p class="text-sm text-gray-400 mb-4">
     This determines which type of coinswaps you'll perform. You can only use one protocol type at a time.
   </p>
@@ -45,7 +45,7 @@ export function FirstTimeSetupModal(container, onComplete) {
     <div id="protocol-v2" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-[#FF6B35] cursor-pointer hover:border-[#FF6B35] transition-colors">
       <div class="flex items-center mb-2">
         <span class="text-2xl mr-2">⚡</span>
-        <h5 class="text-white font-semibold">Taproot</h5>
+        <h5 class="text-white font-semibold text-lg">Taproot</h5>
       </div>
       <p class="text-xs text-gray-400 mb-3">
         Contract Tx with <span class="font-mono text-cyan-400">MuSig2 + Taproot HTLC</span>
@@ -56,7 +56,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <li>✓ Modern protocol</li>
       </ul>
       <div class="mt-2">
-        <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-semibold">Recommended</span>
+        <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-semibold text-lg">Recommended</span>
       </div>
     </div>
 
@@ -64,7 +64,7 @@ export function FirstTimeSetupModal(container, onComplete) {
     <div id="protocol-v1" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors">
       <div class="flex items-center mb-2">
         <span class="text-2xl mr-2">🔐</span>
-        <h5 class="text-white font-semibold">Legacy P2WSH</h5>
+        <h5 class="text-white font-semibold text-lg">Legacy P2WSH</h5>
       </div>
       <p class="text-xs text-gray-400 mb-3">
         Contract Tx with <span class="font-mono text-orange-400">2-of-2 Multisig + P2WSH HTLC</span>
@@ -94,14 +94,14 @@ export function FirstTimeSetupModal(container, onComplete) {
         <!-- Step 2: Bitcoin Core RPC + ZMQ -->
         <div id="step-2" class="setup-step hidden">
           <div class="mb-6">
-            <h3 class="text-xl font-semibold text-white mb-2">Bitcoin Core Configuration</h3>
+            <h3 class="text-xl font-semibold text-lg text-white mb-2">Bitcoin Core Configuration</h3>
             <p class="text-gray-400 text-sm">Connect to your Bitcoin Core node for transactions and real-time notifications.</p>
           </div>
 
           <div class="space-y-4">
             <!-- RPC Settings -->
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <h4 class="text-white font-semibold mb-3">RPC Connection</h4>
+              <h4 class="text-white font-semibold text-lg mb-3">RPC Connection</h4>
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm text-gray-400 mb-2">RPC Host</label>
@@ -164,7 +164,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
             <!-- ZMQ Settings -->
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <h4 class="text-white font-semibold mb-3">ZMQ Notifications</h4>
+              <h4 class="text-white font-semibold text-lg mb-3">ZMQ Notifications</h4>
               <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm text-gray-400 mb-2">ZMQ Raw Block</label>
@@ -187,7 +187,7 @@ export function FirstTimeSetupModal(container, onComplete) {
               </div>
             </div>
 
-            <button id="test-rpc-setup" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+            <button id="test-rpc-setup" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
               Test RPC Connection
             </button>
 
@@ -212,7 +212,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <!-- Step 3A: Wallet Action Choice -->
         <div id="step-3a" class="setup-step hidden">
           <div class="mb-6">
-            <h3 class="text-xl font-semibold text-white mb-2">Wallet Setup</h3>
+            <h3 class="text-xl font-semibold text-lg text-white mb-2">Wallet Setup</h3>
             <p class="text-gray-400 text-sm">Choose how you want to set up your wallet.</p>
           </div>
 
@@ -222,21 +222,21 @@ export function FirstTimeSetupModal(container, onComplete) {
               <!-- Create New Wallet -->
               <div id="choice-create" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
                 <div class="text-4xl mb-3">🆕</div>
-                <h4 class="text-white font-semibold mb-2">Create New</h4>
+                <h4 class="text-white font-semibold text-lg mb-2">Create New</h4>
                 <p class="text-xs text-gray-400">Start fresh with a new wallet</p>
               </div>
 
               <!-- Load Existing Wallet -->
               <div id="choice-load" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
                 <div class="text-4xl mb-3">📂</div>
-                <h4 class="text-white font-semibold mb-2">Load Existing</h4>
+                <h4 class="text-white font-semibold text-lg mb-2">Load Existing</h4>
                 <p class="text-xs text-gray-400">Load a wallet from file</p>
               </div>
 
               <!-- Restore Wallet -->
               <div id="choice-restore" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
                 <div class="text-4xl mb-3">♻️</div>
-                <h4 class="text-white font-semibold mb-2">Restore</h4>
+                <h4 class="text-white font-semibold text-lg mb-2">Restore</h4>
                 <p class="text-xs text-gray-400">Restore from backup JSON</p>
               </div>
             </div>
@@ -359,7 +359,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <!-- Step 3B: Load Existing Wallet -->
         <div id="step-3b-load" class="setup-step hidden">
           <div class="mb-6">
-            <h3 class="text-xl font-semibold text-white mb-2">Load Existing Wallet</h3>
+            <h3 class="text-xl font-semibold text-lg text-white mb-2">Load Existing Wallet</h3>
             <p class="text-gray-400 text-sm">Browse for your wallet file and enter the password if encrypted.</p>
           </div>
 
@@ -376,7 +376,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 />
                 <button 
                   id="browse-wallet-file"
-                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors"
                 >
                   Browse
                 </button>
@@ -420,7 +420,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <!-- Step 3B: Restore from Backup -->
         <div id="step-3b-restore" class="setup-step hidden">
           <div class="mb-6">
-            <h3 class="text-xl font-semibold text-white mb-2">Restore from Backup</h3>
+            <h3 class="text-xl font-semibold text-lg text-white mb-2">Restore from Backup</h3>
             <p class="text-gray-400 text-sm">Select your backup JSON file and enter the password if it was encrypted.</p>
           </div>
 
@@ -447,7 +447,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 />
                 <button 
                   id="browse-backup-file"
-                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-2 px-6 rounded-lg transition-colors"
+                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors"
                 >
                   Browse
                 </button>
@@ -490,13 +490,13 @@ export function FirstTimeSetupModal(container, onComplete) {
   <!-- Step 4: Tor Configuration -->
   <div id="step-4" class="setup-step hidden">
     <div class="mb-6">
-      <h3 class="text-xl font-semibold text-white mb-2">Tor Configuration</h3>
+      <h3 class="text-xl font-semibold text-lg text-white mb-2">Tor Configuration</h3>
       <p class="text-gray-400 text-sm">Configure Tor for private maker discovery and communication.</p>
     </div>
 
     <div class="space-y-4">
       <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-        <h4 class="text-white font-semibold mb-3">Tor Ports</h4>
+        <h4 class="text-white font-semibold text-lg mb-3">Tor Ports</h4>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm text-gray-400 mb-2">Tor Control Port</label>
@@ -552,7 +552,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <p class="text-xs text-gray-500 mt-1">Authentication password for Tor control interface</p>
       </div>
 
-      <button id="test-tor-setup" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+      <button id="test-tor-setup" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
         🧅 Test Tor Connection
       </button>
 
@@ -579,11 +579,11 @@ export function FirstTimeSetupModal(container, onComplete) {
 
       <!-- Footer -->
       <div class="bg-[#0f1419] rounded-b-lg p-6 flex justify-between">
-        <button id="setup-back-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-3 px-6 rounded-lg transition-colors border border-gray-700 hidden">
+        <button id="setup-back-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors border border-gray-700 hidden">
           Back
         </button>
         <div class="flex space-x-3 ml-auto">
-          <button id="setup-next-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+          <button id="setup-next-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors">
             Get Started
           </button>
         </div>

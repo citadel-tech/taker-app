@@ -92,7 +92,7 @@ export async function SwapHistoryComponent(container) {
           <div class="text-6xl mb-4">🔄</div>
           <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
           <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
-          <button id="start-first-swap" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+          <button id="start-first-swap" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-3 rounded-lg transition-colors">
             Start Your First Swap →
           </button>
         </div>
@@ -120,7 +120,7 @@ export async function SwapHistoryComponent(container) {
                 <!-- Main Info -->
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-3 mb-1">
-                    <span class="text-white font-semibold">Coinswap</span>
+                    <span class="text-white font-semibold text-lg">Coinswap</span>
                     <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">Completed</span>
                     <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">${swap.hops} hops</span>
                   </div>

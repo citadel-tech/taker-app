@@ -50,7 +50,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                 <div id="password-error" class="hidden mt-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                     <p class="text-xs text-red-400"></p>
                 </div>
-                <button id="unlock-submit-btn" class="w-full mt-4 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                <button id="unlock-submit-btn" class="w-full mt-4 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                     Unlock Wallet
                 </button>
                 <div class="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
