@@ -433,12 +433,22 @@ function registerTakerHandlers() {
         return { success: false, error: 'Taker not initialized' };
       }
 
-      const address = api1State.takerInstance.getNextExternalAddress(1);
+      // ✅ Determine address type based on protocol
+      const protocol = api1State.protocolVersion || 'v1';
+      const addressType = protocol === 'v2' ? 1 : 0; // 1 = Taproot (P2TR), 0 = Legacy (P2WPKH)
+
+      console.log(
+        `📍 Generating ${protocol === 'v2' ? 'Taproot (P2TR)' : 'Legacy (P2WPKH)'} address...`
+      );
+
+      const address =
+        api1State.takerInstance.getNextExternalAddress(addressType);
       api1State.takerInstance.syncAndSave();
 
       return {
         success: true,
         address: address.address || address,
+        addressType: protocol === 'v2' ? 'P2TR' : 'P2WPKH',
       };
     } catch (error) {
       console.error('❌ Failed to generate address:', error);
