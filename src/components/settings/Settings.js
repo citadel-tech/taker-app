@@ -9,7 +9,7 @@ export function SettingsComponent(container) {
         <div class="space-y-8">
             <!-- Wallet Backup Section -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-300 mb-6">Wallet Backup</h3>
+                <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Wallet Backup</h3>
                 
                 <div class="space-y-4">
                     <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
@@ -18,7 +18,7 @@ export function SettingsComponent(container) {
                             Export your wallet to an encrypted JSON file. You can use this backup to restore your wallet on another device or after reinstallation.
                         </p>
                         
-                        <button id="backup-wallet-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                        <button id="backup-wallet-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                             💾 Create Backup
                         </button>
                     </div>
@@ -39,7 +39,7 @@ export function SettingsComponent(container) {
 
             <!-- Taker Configuration Section -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-300 mb-6">Taker Configuration</h3>
+                <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Taker Configuration</h3>
                 
                 <div class="space-y-4">
                     <h4 class="text-lg font-medium text-white mb-4">Tor Configuration</h4>
@@ -109,7 +109,7 @@ export function SettingsComponent(container) {
 
             <!-- Bitcoin Core RPC Configuration -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-300 mb-6">Bitcoin Core RPC Configuration</h3>
+                <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Bitcoin Core RPC Configuration</h3>
                 
                 <div class="grid grid-cols-2 gap-6">
                     <!-- RPC Connection Settings -->
@@ -173,7 +173,7 @@ export function SettingsComponent(container) {
                                     <div id="connection-indicator" class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
                                     <span class="text-sm text-gray-400">Connection Status</span>
                                 </div>
-                                <span id="rpc-status" class="text-sm font-semibold text-red-400">Not Connected</span>
+                                <span id="rpc-status" class="text-sm font-semibold text-lg text-red-400">Not Connected</span>
                             </div>
                             <div class="space-y-2 text-xs">
                                 <div class="flex justify-between">
@@ -196,15 +196,15 @@ export function SettingsComponent(container) {
                         </div>
                         
                         <div class="space-y-3">
-                            <button id="test-connection-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                            <button id="test-connection-btn" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                                 Test Connection
                             </button>
                             
                             <div class="grid grid-cols-2 gap-2">
-                                <button id="connect-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors">
+                                <button id="connect-btn" class="bg-green-500 hover:bg-green-600 text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
                                     Connect
                                 </button>
-                                <button id="disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" disabled>
+                                <button id="disconnect-btn" class="bg-red-500 hover:bg-red-600 text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors" disabled>
                                     Disconnect
                                 </button>
                             </div>
@@ -219,7 +219,7 @@ export function SettingsComponent(container) {
 
             <!-- ZMQ Configuration -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-300 mb-6">ZMQ Configuration</h3>
+                <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">ZMQ Configuration</h3>
                 
                 <div class="grid grid-cols-2 gap-6">
                     <div class="space-y-4">
@@ -286,7 +286,7 @@ export function SettingsComponent(container) {
 
             <!-- Full Bitcoin.conf Reference -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-gray-300 mb-4">Complete bitcoin.conf Reference</h3>
+                <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Complete bitcoin.conf Reference</h3>
                 
                 <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
                     <div id="full-config-preview">
@@ -339,10 +339,10 @@ blockfilterindex=1
 
             <!-- Save Settings Button -->
             <div class="flex justify-end space-x-4">
-                <button id="reset-settings-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-3 px-6 rounded-lg transition-colors border border-gray-700">
+                <button id="reset-settings-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors border border-gray-700">
                     Reset to Defaults
                 </button>
-                <button id="save-settings-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+                <button id="save-settings-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors">
                     Save Settings
                 </button>
             </div>
@@ -351,7 +351,7 @@ blockfilterindex=1
         <!-- Backup Password Modal -->
         <div id="backup-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
             <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-6">
-                <h3 class="text-xl font-semibold text-white mb-4">Encrypt Backup</h3>
+                <h3 class="text-xl font-semibold text-lg text-white mb-4">Encrypt Backup</h3>
                 <p class="text-gray-400 text-sm mb-6">
                     Set a password to encrypt your wallet backup. You'll need this password to restore from this backup.
                 </p>
@@ -394,10 +394,10 @@ blockfilterindex=1
                 </div>
                 
                 <div class="flex space-x-3 mt-6">
-                    <button id="cancel-backup-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                    <button id="cancel-backup-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                         Cancel
                     </button>
-                    <button id="confirm-backup-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold py-3 px-4 rounded-lg transition-colors">
+                    <button id="confirm-backup-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                         Create Backup
                     </button>
                 </div>
@@ -751,7 +751,7 @@ zmqpubrawtx=${rawtx}`;
     if (connected) {
       indicator.className = 'w-3 h-3 bg-green-500 rounded-full mr-2';
       status.textContent = 'Connected';
-      status.className = 'text-sm font-semibold text-green-400';
+      status.className = 'text-sm font-semibold text-lg text-green-400';
       connectBtn.disabled = true;
       disconnectBtn.disabled = false;
       isConnected = true;
@@ -770,7 +770,7 @@ zmqpubrawtx=${rawtx}`;
     } else {
       indicator.className = 'w-3 h-3 bg-red-500 rounded-full mr-2';
       status.textContent = 'Not Connected';
-      status.className = 'text-sm font-semibold text-red-400';
+      status.className = 'text-sm font-semibold text-lg text-red-400';
       connectBtn.disabled = false;
       disconnectBtn.disabled = true;
       isConnected = false;

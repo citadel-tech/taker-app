@@ -20,7 +20,7 @@ export function RecoveryComponent(container) {
         <div class="grid grid-cols-2 gap-6">
             <!-- Left: Recovery Status -->
               <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">Manual Recovery</h3>
+                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Manual Recovery</h3>
                     <p class="text-sm text-gray-400 mb-4">If automatic recovery fails, you can manually recover funds</p>
                    <button id="manual-recovery-btn" 
     class="w-full bg-[#ff6b35] hover:bg-[#ff7f50] text-white font-bold py-4 text-lg rounded-xl transition-all border border-[#ff6b35] shadow-lg shadow-black/30 hover:shadow-xl hover:scale-[1.02]">
@@ -33,7 +33,7 @@ export function RecoveryComponent(container) {
             <div class="col-span-1 space-y-6">
                 <!-- How Recovery Works -->
                 <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">How Recovery Works</h3>
+                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">How Recovery Works</h3>
                     <div class="space-y-3 text-sm text-gray-400">
                         <div class="flex gap-3">
                             <span class="text-[#FF6B35] font-bold">1.</span>
@@ -62,7 +62,7 @@ export function RecoveryComponent(container) {
 
                 <!-- Recovery Stats -->
                 <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">Recovery Stats</h3>
+                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Recovery Stats</h3>
                     <div class="space-y-4">
                         <div>
                             <p class="text-sm text-gray-400 mb-1">Total Recovered</p>

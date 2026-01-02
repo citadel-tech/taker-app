@@ -226,7 +226,7 @@ export function SwapReportComponent(container, swapReport) {
 
         return `
         <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800 hover:border-[#FF6B35]/50 transition-colors">
-          <p class="text-sm font-semibold mb-2" style="color: ${color}">
+          <p class="text-sm font-semibold text-lg mb-2" style="color: ${color}">
             <span class="inline-block w-6 h-6 rounded-full text-center leading-6 text-xs" 
                   style="background: ${color}20; border: 2px solid ${color}">
               ${hopIdx + 1}
@@ -444,7 +444,7 @@ export function SwapReportComponent(container, swapReport) {
       <div class="absolute transform -translate-x-1/2 -translate-y-1/2 text-center bg-[#1a2332]/80 backdrop-blur-sm rounded-xl px-6 py-4 border-2 border-[#FF6B35]/30 shadow-xl"
            style="left: ${centerX}px; top: ${centerY}px;">
         <p class="text-4xl font-black text-[#FF6B35] mb-1">${report.makersCount + 1}</p>
-        <p class="text-xs text-gray-400 font-semibold uppercase tracking-wider">Total Hops</p>
+        <p class="text-xs text-gray-400 font-semibold text-lg uppercase tracking-wider">Total Hops</p>
       </div>
     </div>
   `;
@@ -549,7 +549,7 @@ export function SwapReportComponent(container, swapReport) {
         
         <div class="flex items-center gap-4">
           <div class="px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg backdrop-blur-sm">
-            <span class="text-green-400 font-semibold">✅ SWAP COMPLETED SUCCESSFULLY</span>
+            <span class="text-green-400 font-semibold text-lg">✅ SWAP COMPLETED SUCCESSFULLY</span>
           </div>
           <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
             <span class="text-gray-400 text-sm">ID: </span>
@@ -640,7 +640,7 @@ export function SwapReportComponent(container, swapReport) {
           
           <!-- Funding Transactions -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
-            <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
               <span>📝</span> Funding Transactions
             </h3>
             <div class="space-y-3">
@@ -650,7 +650,7 @@ export function SwapReportComponent(container, swapReport) {
 
           <!-- Swap Partners / Makers -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-3">
-            <h3 class="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
               <span>🤝</span> Swap Partners
               <span class="text-xs text-gray-500 font-normal ml-2">(Click for details)</span>
             </h3>
@@ -666,7 +666,7 @@ export function SwapReportComponent(container, swapReport) {
           
           <!-- Fee Breakdown -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
-            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
               <span>💰</span> Fee Details
             </h3>
             <div class="space-y-3">
@@ -679,7 +679,7 @@ export function SwapReportComponent(container, swapReport) {
                 <span class="font-mono text-sm text-cyan-400">${formatNumber(report.miningFee)}</span>
               </div>
               <div class="flex justify-between items-center pt-2">
-                <span class="text-sm font-semibold text-white">Total</span>
+                <span class="text-sm font-semibold text-lg text-white">Total</span>
                 <div class="text-right">
                   <p class="font-mono text-lg text-[#FF6B35] font-bold">${formatNumber(report.totalFee)}</p>
                   <p class="text-xs text-gray-500">${satsToBtc(report.totalFee)} BTC</p>
@@ -690,7 +690,7 @@ export function SwapReportComponent(container, swapReport) {
 
           <!-- Privacy Impact -->
           <div class="bg-purple-500/20 border border-purple-500/30 rounded-lg p-6 animate-fade-in-up stagger-3">
-            <h3 class="text-lg font-semibold text-purple-300 mb-3 flex items-center gap-2">
+            <h3 class="text-lg font-semibold text-lg text-purple-300 mb-3 flex items-center gap-2">
               <span>🔒</span> Privacy Achieved
             </h3>
             <ul class="space-y-2 text-sm">
@@ -715,7 +715,7 @@ export function SwapReportComponent(container, swapReport) {
 
           <!-- UTXO Summary with Tooltip -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-4">
-            <h3 class="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+            <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
               <span>📦</span> UTXO Summary
               <span class="tooltip-trigger">
                 <span class="text-gray-500 text-sm cursor-help">ⓘ</span>
@@ -760,7 +760,7 @@ export function SwapReportComponent(container, swapReport) {
 
       <!-- Action Buttons -->
       <div class="mt-8 flex gap-4 animate-fade-in-up stagger-4">
-        <button id="export-report" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-4 rounded-lg transition-all hover:scale-105">
+        <button id="export-report" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-4 rounded-lg transition-all hover:scale-105">
           📥 Export Report
         </button>
         <button id="done-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">

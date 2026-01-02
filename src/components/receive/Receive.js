@@ -12,7 +12,7 @@ export function ReceiveComponent(container) {
         <div class="grid grid-cols-2 gap-6">
             <!-- Left: Address Display -->
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-gray-300 mb-6">Your Bitcoin Address</h3>
+                <h3 class="text-lg font-semibold text-lg text-gray-300 mb-6">Your Bitcoin Address</h3>
                 
                 <!-- QR Code -->
                 <div class="bg-white p-4 rounded-lg mb-6 flex items-center justify-center">
@@ -30,7 +30,7 @@ export function ReceiveComponent(container) {
                         <span id="current-address" class="font-mono text-sm text-white break-all flex-1 mr-4">
                             Loading...
                         </span>
-                        <button id="copy-address" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold transition-colors whitespace-nowrap">
+                        <button id="copy-address" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors whitespace-nowrap">
                             Copy
                         </button>
                     </div>
@@ -40,7 +40,7 @@ export function ReceiveComponent(container) {
                 </div>
 
                 <!-- Generate New Address Button -->
-                <button id="generate-new" disabled class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors border border-gray-700">
+                <button id="generate-new" disabled class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
                     <span class="generate-text">Generate New Address</span>
                     <span class="generate-loading hidden">
                         <span class="inline-block animate-spin mr-2">⟳</span>
@@ -60,7 +60,7 @@ export function ReceiveComponent(container) {
 
                 <!-- Address Status Card -->
                 <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-gray-300 mb-4">Address Status</h3>
+                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Address Status</h3>
                     <div id="address-status" class="space-y-3">
                         <div class="flex justify-between items-center text-sm">
                             <span class="text-gray-400">Generated:</span>
@@ -84,7 +84,7 @@ export function ReceiveComponent(container) {
                 <!-- Recent Addresses -->
                 <div class="bg-[#1a2332] rounded-lg p-6">
                     <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-gray-300">Recent Addresses</h3>
+                        <h3 class="text-lg font-semibold text-lg text-gray-300">Recent Addresses</h3>
                         <span id="total-addresses" class="text-xs text-gray-500">0 total</span>
                     </div>
                     <div id="recent-addresses" class="space-y-2 max-h-48 overflow-y-auto">
@@ -93,7 +93,7 @@ export function ReceiveComponent(container) {
                         </div>
                     </div>
                     
-                    <button id="view-all-addresses" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold transition-colors w-full text-left">
+                    <button id="view-all-addresses" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors w-full text-left">
                         View All Addresses →
                     </button>
                 </div>
@@ -149,60 +149,67 @@ export function ReceiveComponent(container) {
     if (address.startsWith('1')) return 'P2PKH';
     if (address.startsWith('tb1q')) return 'P2WPKH'; // testnet
     if (address.startsWith('bcrt1q')) return 'P2WPKH'; // regtest
+    if (address.startsWith('bcrt1p')) return 'P2TR';
+    if (address.startsWith('tb1q')) return 'P2WPKH';
+    if (address.startsWith('tb1p')) return 'P2TR';
     return 'Unknown';
   }
 
   // Get addresses from transaction history
   // Get addresses from transaction history
-async function getAddressesFromTransactions() {
-  try {
-    const result = await window.api.taker.getTransactions(100, 0); 
-    
-    if (!result.success || !result.transactions) {
-      console.log('No transactions found:', result);
+  async function getAddressesFromTransactions() {
+    try {
+      const result = await window.api.taker.getTransactions(100, 0);
+
+      if (!result.success || !result.transactions) {
+        console.log('No transactions found:', result);
+        return [];
+      }
+
+      console.log('📊 Processing transactions:', result.transactions.length);
+      const addressMap = new Map();
+
+      result.transactions.forEach((tx) => {
+        // Only process received transactions
+        const category = (tx.detail.category || '').toLowerCase();
+
+        if (category === 'receive' || category === '"receive"') {
+          const addr = tx.detail.address?.address || tx.detail.address;
+
+          if (addr) {
+            if (!addressMap.has(addr)) {
+              addressMap.set(addr, {
+                address: addr,
+                used: 0,
+                received: 0,
+                createdAt: (tx.info.blocktime || tx.info.time) * 1000,
+                type: detectAddressType(addr),
+                lastUsed: (tx.info.blocktime || tx.info.time) * 1000,
+              });
+            }
+
+            // Update usage stats
+            const addrData = addressMap.get(addr);
+            addrData.used++;
+            addrData.received += tx.detail.amount?.sats || 0;
+            addrData.lastUsed = Math.max(
+              addrData.lastUsed,
+              (tx.info.blocktime || tx.info.time) * 1000
+            );
+          }
+        }
+      });
+
+      const addresses = Array.from(addressMap.values()).sort(
+        (a, b) => b.createdAt - a.createdAt
+      );
+      console.log('✅ Found addresses:', addresses);
+      return addresses;
+    } catch (error) {
+      console.error('Failed to get addresses from transactions:', error);
       return [];
     }
-
-    console.log('📊 Processing transactions:', result.transactions.length);
-    const addressMap = new Map();
-
-    result.transactions.forEach(tx => {
-      // Only process received transactions
-      const category = (tx.detail.category || '').toLowerCase();
-      
-      if (category === 'receive' || category === '"receive"') {
-        const addr = tx.detail.address?.address || tx.detail.address;
-        
-        if (addr) {
-          if (!addressMap.has(addr)) {
-            addressMap.set(addr, {
-              address: addr,
-              used: 0,
-              received: 0,
-              createdAt: (tx.info.blocktime || tx.info.time) * 1000,
-              type: detectAddressType(addr),
-              lastUsed: (tx.info.blocktime || tx.info.time) * 1000
-            });
-          }
-          
-          // Update usage stats
-          const addrData = addressMap.get(addr);
-          addrData.used++;
-          addrData.received += (tx.detail.amount?.sats || 0);
-          addrData.lastUsed = Math.max(addrData.lastUsed, (tx.info.blocktime || tx.info.time) * 1000);
-        }
-      }
-    });
-
-    const addresses = Array.from(addressMap.values()).sort((a, b) => b.createdAt - a.createdAt);
-    console.log('✅ Found addresses:', addresses);
-    return addresses;
-    
-  } catch (error) {
-    console.error('Failed to get addresses from transactions:', error);
-    return [];
   }
-}
 
   // Copy to clipboard
   async function copyToClipboard(text) {
@@ -281,46 +288,49 @@ async function getAddressesFromTransactions() {
   // Update recent addresses list
   // Update recent addresses list
   // Update recent addresses list
-async function updateRecentAddresses() {
-  const addresses = await getAddressesFromTransactions();
-  
-  // If current address isn't in transaction history yet, add it manually
-  if (currentAddress && !addresses.find(a => a.address === currentAddress)) {
-    addresses.unshift({
-      address: currentAddress,
-      used: 0,
-      received: 0,
-      createdAt: Date.now(),
-      type: detectAddressType(currentAddress),
-      lastUsed: null
-    });
-  }
-  
-  totalAddressesEl.textContent = `${addresses.length} total`;
+  async function updateRecentAddresses() {
+    const addresses = await getAddressesFromTransactions();
 
-  if (addresses.length === 0) {
-    recentAddressesEl.innerHTML = `
+    // If current address isn't in transaction history yet, add it manually
+    if (
+      currentAddress &&
+      !addresses.find((a) => a.address === currentAddress)
+    ) {
+      addresses.unshift({
+        address: currentAddress,
+        used: 0,
+        received: 0,
+        createdAt: Date.now(),
+        type: detectAddressType(currentAddress),
+        lastUsed: null,
+      });
+    }
+
+    totalAddressesEl.textContent = `${addresses.length} total`;
+
+    if (addresses.length === 0) {
+      recentAddressesEl.innerHTML = `
       <div class="text-sm text-gray-500 text-center py-4">
         No addresses found in transactions yet
       </div>
     `;
-    return;
-  }
+      return;
+    }
 
-  // Show last 5 addresses
-  const recentAddresses = addresses.slice(0, 5);
+    // Show last 5 addresses
+    const recentAddresses = addresses.slice(0, 5);
 
-  recentAddressesEl.innerHTML = recentAddresses
-    .map((addr) => {
-      const isCurrent = addr.address === currentAddress;
-      const typeColors = {
-        P2WPKH: 'text-green-400',
-        P2WSH: 'text-blue-400',
-        P2TR: 'text-purple-400',
-      };
-      const typeColor = typeColors[addr.type] || 'text-gray-400';
+    recentAddressesEl.innerHTML = recentAddresses
+      .map((addr) => {
+        const isCurrent = addr.address === currentAddress;
+        const typeColors = {
+          P2WPKH: 'text-green-400',
+          P2WSH: 'text-blue-400',
+          P2TR: 'text-purple-400',
+        };
+        const typeColor = typeColors[addr.type] || 'text-gray-400';
 
-      return `
+        return `
       <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-[#FF6B35]/10 border border-[#FF6B35]/30' : 'bg-[#0f1419] hover:bg-[#242d3d]'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
@@ -340,19 +350,19 @@ async function updateRecentAddresses() {
         </div>
       </div>
     `;
-    })
-    .join('');
+      })
+      .join('');
 
-  // Add click handlers to switch to that address
-  recentAddressesEl
-    .querySelectorAll('.recent-address-item')
-    .forEach((item) => {
-      item.addEventListener('click', () => {
-        const address = item.dataset.address;
-        selectAddress(address);
+    // Add click handlers to switch to that address
+    recentAddressesEl
+      .querySelectorAll('.recent-address-item')
+      .forEach((item) => {
+        item.addEventListener('click', () => {
+          const address = item.dataset.address;
+          selectAddress(address);
+        });
       });
-    });
-}
+  }
 
   // Select an existing address
   async function selectAddress(addressString) {
