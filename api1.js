@@ -16,7 +16,7 @@ const api1State = {
   DEFAULT_WALLET_NAME: 'taker-wallet',
   currentWalletName: 'taker-wallet',
   currentWalletPassword: '',
-  protocolVersion: 'v1', // 'v1' (P2WSH/Taker) or 'v2' (Taproot/TaprootTaker)
+  protocolVersion: 'v2', // 'v1' (P2WSH/Taker) or 'v2' (Taproot/TaprootTaker)
   walletSyncInterval: null,
 
   syncState: {
@@ -164,9 +164,7 @@ function registerTakerHandlers() {
 
       const walletPassword = config.wallet?.password;
       const finalPassword =
-        walletPassword && walletPassword.trim() !== ''
-          ? walletPassword
-          : undefined;
+        walletPassword && walletPassword.trim() !== '' ? walletPassword : '';
       api1State.currentWalletPassword = finalPassword || '';
 
       const torAuthPassword = config.taker?.tor_auth_password || undefined;
@@ -435,7 +433,7 @@ function registerTakerHandlers() {
         return { success: false, error: 'Taker not initialized' };
       }
 
-      const address = api1State.takerInstance.getNextExternalAddress();
+      const address = api1State.takerInstance.getNextExternalAddress(1);
       api1State.takerInstance.syncAndSave();
 
       return {
@@ -488,6 +486,59 @@ function registerTakerHandlers() {
       }
     }
   );
+
+  // Add this IPC handler with the other taker handlers
+  ipcMain.handle('taker:getProtocol', async () => {
+    try {
+      if (!api1State.protocolVersion) {
+        // Read from config if not in memory
+        const configPath = path.join(api1State.DATA_DIR, 'config.toml');
+        if (fs.existsSync(configPath)) {
+          const configContent = fs.readFileSync(configPath, 'utf-8');
+          const protocolMatch = configContent.match(/protocol\s*=\s*"([^"]+)"/);
+          if (protocolMatch) {
+            api1State.protocolVersion = protocolMatch[1];
+          }
+        }
+      }
+
+      const protocol = api1State.protocolVersion || 'v1';
+      const protocolName = protocol === 'v2' ? 'Taproot' : 'Legacy';
+
+      return {
+        success: true,
+        protocol: protocol,
+        protocolName: protocolName,
+      };
+    } catch (error) {
+      console.error('Failed to get protocol:', error);
+      return {
+        success: false,
+        error: error.message,
+        protocol: 'v1',
+        protocolName: 'Legacy',
+      };
+    }
+  });
+
+  // Check if offerbook is syncing
+  ipcMain.handle('taker:isOfferbookSyncing', async () => {
+    try {
+      if (!api1State.takerInstance) {
+        return { success: false, error: 'Taker not initialized' };
+      }
+
+      const isSyncing = api1State.takerInstance.isOfferbookSyncing();
+
+      return {
+        success: true,
+        isSyncing: isSyncing,
+      };
+    } catch (error) {
+      console.error('Failed to check offerbook sync status:', error);
+      return { success: false, error: error.message, isSyncing: false };
+    }
+  });
 
   // Get UTXOs
   ipcMain.handle('taker:getUtxos', async () => {
@@ -757,6 +808,7 @@ function registerTakerHandlers() {
 
         const transformMaker = (m) => ({
           address: m.address,
+          protocol: m.protocol,
           offer: m.offer
             ? {
                 baseFee: m.offer.base_fee,
@@ -843,6 +895,95 @@ function registerCoinswapHandlers() {
         console.log(
           `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} sats, ${makerCount} makers`
         );
+
+        // WAIT FOR OFFERBOOK SYNC TO COMPLETE
+        console.log('⏳ Waiting for offerbook sync to complete...');
+        let retries = 0;
+        const maxRetries = 30; // 30 seconds max wait
+
+        while (retries < maxRetries) {
+          try {
+            // Check if sync is still running
+            const isSyncing = api1State.takerInstance.isOfferbookSyncing();
+
+            if (!isSyncing) {
+              // Sync complete - now check if we have enough makers
+              const offerbookPath = path.join(
+                api1State.DATA_DIR,
+                'offerbook.json'
+              );
+
+              if (fs.existsSync(offerbookPath)) {
+                const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
+                const offerbook = JSON.parse(offerbookData);
+                const makers = offerbook.makers || [];
+                const goodMakersCount = makers.filter(
+                  (m) =>
+                    m.offer !== null &&
+                    !(m.state && (m.state.Unresponsive || m.state.Bad))
+                ).length;
+
+                if (goodMakersCount >= makerCount) {
+                  console.log(
+                    `✅ Offerbook ready with ${goodMakersCount} good makers`
+                  );
+                  break;
+                }
+              }
+            }
+
+            console.log(
+              `⏳ Waiting for offerbook sync... (attempt ${retries + 1}/${maxRetries})`
+            );
+          } catch (err) {
+            console.log(
+              `⏳ Error checking sync status (attempt ${retries + 1}/${maxRetries}):`,
+              err.message
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          retries++;
+        }
+
+        // Final check
+        try {
+          if (fs.existsSync(offerbookPath)) {
+            const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
+            const offerbook = JSON.parse(offerbookData);
+            const makers = offerbook.makers || [];
+            const goodMakersCount = makers.filter(
+              (m) =>
+                m.offer !== null &&
+                !(m.state && (m.state.Unresponsive || m.state.Bad))
+            ).length;
+
+            if (goodMakersCount < makerCount) {
+              console.error(
+                `❌ Not enough makers available: ${goodMakersCount}/${makerCount}`
+              );
+              return {
+                success: false,
+                error: `Not enough makers available. Found ${goodMakersCount}, need ${makerCount}. Please sync market data first.`,
+              };
+            }
+
+            console.log(
+              `✅ Ready to start swap with ${goodMakersCount} makers`
+            );
+          } else {
+            return {
+              success: false,
+              error: 'Offerbook not found. Please sync market data first.',
+            };
+          }
+        } catch (err) {
+          console.error('❌ Failed to read offerbook:', err);
+          return {
+            success: false,
+            error: 'Failed to load offerbook. Please sync market data first.',
+          };
+        }
 
         const walletName =
           api1State.currentWalletName || api1State.DEFAULT_WALLET_NAME;

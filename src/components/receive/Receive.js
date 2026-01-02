@@ -149,60 +149,67 @@ export function ReceiveComponent(container) {
     if (address.startsWith('1')) return 'P2PKH';
     if (address.startsWith('tb1q')) return 'P2WPKH'; // testnet
     if (address.startsWith('bcrt1q')) return 'P2WPKH'; // regtest
+    if (address.startsWith('bcrt1p')) return 'P2TR';
+    if (address.startsWith('tb1q')) return 'P2WPKH';
+    if (address.startsWith('tb1p')) return 'P2TR';
     return 'Unknown';
   }
 
   // Get addresses from transaction history
   // Get addresses from transaction history
-async function getAddressesFromTransactions() {
-  try {
-    const result = await window.api.taker.getTransactions(100, 0); 
-    
-    if (!result.success || !result.transactions) {
-      console.log('No transactions found:', result);
+  async function getAddressesFromTransactions() {
+    try {
+      const result = await window.api.taker.getTransactions(100, 0);
+
+      if (!result.success || !result.transactions) {
+        console.log('No transactions found:', result);
+        return [];
+      }
+
+      console.log('📊 Processing transactions:', result.transactions.length);
+      const addressMap = new Map();
+
+      result.transactions.forEach((tx) => {
+        // Only process received transactions
+        const category = (tx.detail.category || '').toLowerCase();
+
+        if (category === 'receive' || category === '"receive"') {
+          const addr = tx.detail.address?.address || tx.detail.address;
+
+          if (addr) {
+            if (!addressMap.has(addr)) {
+              addressMap.set(addr, {
+                address: addr,
+                used: 0,
+                received: 0,
+                createdAt: (tx.info.blocktime || tx.info.time) * 1000,
+                type: detectAddressType(addr),
+                lastUsed: (tx.info.blocktime || tx.info.time) * 1000,
+              });
+            }
+
+            // Update usage stats
+            const addrData = addressMap.get(addr);
+            addrData.used++;
+            addrData.received += tx.detail.amount?.sats || 0;
+            addrData.lastUsed = Math.max(
+              addrData.lastUsed,
+              (tx.info.blocktime || tx.info.time) * 1000
+            );
+          }
+        }
+      });
+
+      const addresses = Array.from(addressMap.values()).sort(
+        (a, b) => b.createdAt - a.createdAt
+      );
+      console.log('✅ Found addresses:', addresses);
+      return addresses;
+    } catch (error) {
+      console.error('Failed to get addresses from transactions:', error);
       return [];
     }
-
-    console.log('📊 Processing transactions:', result.transactions.length);
-    const addressMap = new Map();
-
-    result.transactions.forEach(tx => {
-      // Only process received transactions
-      const category = (tx.detail.category || '').toLowerCase();
-      
-      if (category === 'receive' || category === '"receive"') {
-        const addr = tx.detail.address?.address || tx.detail.address;
-        
-        if (addr) {
-          if (!addressMap.has(addr)) {
-            addressMap.set(addr, {
-              address: addr,
-              used: 0,
-              received: 0,
-              createdAt: (tx.info.blocktime || tx.info.time) * 1000,
-              type: detectAddressType(addr),
-              lastUsed: (tx.info.blocktime || tx.info.time) * 1000
-            });
-          }
-          
-          // Update usage stats
-          const addrData = addressMap.get(addr);
-          addrData.used++;
-          addrData.received += (tx.detail.amount?.sats || 0);
-          addrData.lastUsed = Math.max(addrData.lastUsed, (tx.info.blocktime || tx.info.time) * 1000);
-        }
-      }
-    });
-
-    const addresses = Array.from(addressMap.values()).sort((a, b) => b.createdAt - a.createdAt);
-    console.log('✅ Found addresses:', addresses);
-    return addresses;
-    
-  } catch (error) {
-    console.error('Failed to get addresses from transactions:', error);
-    return [];
   }
-}
 
   // Copy to clipboard
   async function copyToClipboard(text) {
@@ -281,46 +288,49 @@ async function getAddressesFromTransactions() {
   // Update recent addresses list
   // Update recent addresses list
   // Update recent addresses list
-async function updateRecentAddresses() {
-  const addresses = await getAddressesFromTransactions();
-  
-  // If current address isn't in transaction history yet, add it manually
-  if (currentAddress && !addresses.find(a => a.address === currentAddress)) {
-    addresses.unshift({
-      address: currentAddress,
-      used: 0,
-      received: 0,
-      createdAt: Date.now(),
-      type: detectAddressType(currentAddress),
-      lastUsed: null
-    });
-  }
-  
-  totalAddressesEl.textContent = `${addresses.length} total`;
+  async function updateRecentAddresses() {
+    const addresses = await getAddressesFromTransactions();
 
-  if (addresses.length === 0) {
-    recentAddressesEl.innerHTML = `
+    // If current address isn't in transaction history yet, add it manually
+    if (
+      currentAddress &&
+      !addresses.find((a) => a.address === currentAddress)
+    ) {
+      addresses.unshift({
+        address: currentAddress,
+        used: 0,
+        received: 0,
+        createdAt: Date.now(),
+        type: detectAddressType(currentAddress),
+        lastUsed: null,
+      });
+    }
+
+    totalAddressesEl.textContent = `${addresses.length} total`;
+
+    if (addresses.length === 0) {
+      recentAddressesEl.innerHTML = `
       <div class="text-sm text-gray-500 text-center py-4">
         No addresses found in transactions yet
       </div>
     `;
-    return;
-  }
+      return;
+    }
 
-  // Show last 5 addresses
-  const recentAddresses = addresses.slice(0, 5);
+    // Show last 5 addresses
+    const recentAddresses = addresses.slice(0, 5);
 
-  recentAddressesEl.innerHTML = recentAddresses
-    .map((addr) => {
-      const isCurrent = addr.address === currentAddress;
-      const typeColors = {
-        P2WPKH: 'text-green-400',
-        P2WSH: 'text-blue-400',
-        P2TR: 'text-purple-400',
-      };
-      const typeColor = typeColors[addr.type] || 'text-gray-400';
+    recentAddressesEl.innerHTML = recentAddresses
+      .map((addr) => {
+        const isCurrent = addr.address === currentAddress;
+        const typeColors = {
+          P2WPKH: 'text-green-400',
+          P2WSH: 'text-blue-400',
+          P2TR: 'text-purple-400',
+        };
+        const typeColor = typeColors[addr.type] || 'text-gray-400';
 
-      return `
+        return `
       <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-[#FF6B35]/10 border border-[#FF6B35]/30' : 'bg-[#0f1419] hover:bg-[#242d3d]'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
@@ -340,19 +350,19 @@ async function updateRecentAddresses() {
         </div>
       </div>
     `;
-    })
-    .join('');
+      })
+      .join('');
 
-  // Add click handlers to switch to that address
-  recentAddressesEl
-    .querySelectorAll('.recent-address-item')
-    .forEach((item) => {
-      item.addEventListener('click', () => {
-        const address = item.dataset.address;
-        selectAddress(address);
+    // Add click handlers to switch to that address
+    recentAddressesEl
+      .querySelectorAll('.recent-address-item')
+      .forEach((item) => {
+        item.addEventListener('click', () => {
+          const address = item.dataset.address;
+          selectAddress(address);
+        });
       });
-    });
-}
+  }
 
   // Select an existing address
   async function selectAddress(addressString) {

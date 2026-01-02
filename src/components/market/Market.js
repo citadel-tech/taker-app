@@ -81,7 +81,8 @@ export function Market(container) {
 
     return {
       address: fullAddress,
-      protocol: offer.tweakablePoint ? 'Taproot' : 'Legacy P2WSH',
+      protocol:
+        item.protocol || (offer.tweakablePoint ? 'Taproot' : 'Legacy P2WSH'),
       baseFee: offer.baseFee || 0,
       volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
       timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
@@ -225,6 +226,7 @@ export function Market(container) {
               console.log('✅ Offerbook synced');
               await new Promise((r) => setTimeout(r, 1000));
               await fetchMakers();
+              updateUI();
               resolve();
             } else if (sync.status === 'failed') {
               clearInterval(pollInterval);
@@ -276,14 +278,52 @@ export function Market(container) {
     refreshBtn.disabled = true;
     refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
 
+    // ✅ SHOW LOADER IMMEDIATELY
+    isLoading = true;
+    updateUI();
+
     try {
-      await syncOfferbook();
+      const result = await window.api.taker.syncOfferbook();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to start sync');
+      }
+
+      const syncId = result.syncId;
+      console.log('📡 Sync started:', syncId);
+      localStorage.setItem('active_sync_id', syncId);
+
+      // ✅ SIMPLE: Just poll isOfferbookSyncing() until it's false
+      let isSyncing = true;
+      while (isSyncing) {
+        await new Promise((resolve) => setTimeout(resolve, 1000)); // Check every second
+
+        const statusResult = await window.api.taker.isOfferbookSyncing();
+        if (statusResult.success) {
+          isSyncing = statusResult.isSyncing;
+          if (isSyncing) {
+            console.log('⏳ Still syncing...');
+          }
+        }
+      }
+
+      // ✅ Sync is done - wait 2 more seconds for file write
+      console.log('✅ Offerbook synced - waiting for file write...');
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      // ✅ NOW fetch makers
+      console.log('✅ Now fetching makers...');
+      localStorage.removeItem('active_sync_id');
+      await fetchMakers(); // This sets isLoading = false
+
       refreshBtn.innerHTML = '✅ Synced!';
       setTimeout(() => {
         refreshBtn.disabled = false;
         refreshBtn.innerHTML = originalText;
       }, 2000);
     } catch (error) {
+      isLoading = false;
+      updateUI();
       refreshBtn.innerHTML = '❌ Failed';
       showError(error.message);
       setTimeout(() => {
@@ -292,8 +332,44 @@ export function Market(container) {
       }, 3000);
     }
   }
-
   async function initialize() {
+    // Get protocol version
+    const protocolResult = await window.api.taker.getProtocol();
+    const protocol = protocolResult.protocol;
+    const protocolName = protocolResult.protocolName;
+
+    // Show protocol warning banner
+    const banner = content.querySelector('#protocol-banner');
+    const title = content.querySelector('#protocol-warning-title');
+    const text = content.querySelector('#protocol-warning-text');
+
+    if (protocol === 'v2') {
+      title.textContent = '⚡ You Can Only Swap With Taproot Makers';
+      text.textContent =
+        'Your wallet is configured for Taproot swaps. Legacy makers will be filtered out.';
+    } else {
+      title.textContent = '🔒 You Can Only Swap With Legacy Makers';
+      text.textContent =
+        'Your wallet is configured for Legacy swaps. Taproot makers will be filtered out.';
+    }
+    banner.classList.remove('hidden');
+
+    // ✅ CHECK: Is offerbook currently syncing?
+    try {
+      const syncingResult = await window.api.taker.isOfferbookSyncing();
+
+      if (syncingResult.success && syncingResult.isSyncing) {
+        console.log('⏳ Background sync in progress, waiting...');
+        isLoading = true;
+        updateUI();
+        await monitorExistingSync();
+        return; // Exit - monitorExistingSync will fetch when done
+      }
+    } catch (err) {
+      console.error('Failed to check if syncing:', err);
+    }
+
+    // Check localStorage for active sync
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
       try {
@@ -307,10 +383,13 @@ export function Market(container) {
           if (refreshBtn) {
             refreshBtn.disabled = true;
             refreshBtn.innerHTML =
-              '<span class="animate-pulse">Syncing...</span>';
+              '<span class="animate-pulse">⏳ Syncing...</span>';
           }
 
-          monitorExistingSync(activeSyncId);
+          isLoading = true;
+          updateUI();
+          await monitorExistingSync();
+          return;
         } else {
           localStorage.removeItem('active_sync_id');
         }
@@ -319,63 +398,46 @@ export function Market(container) {
       }
     }
 
+    // ✅ Safe to fetch - no sync running
     await fetchMakers();
+    isLoading = false;
+    updateUI();
   }
 
-  async function monitorExistingSync(syncId) {
-    return new Promise((resolve, reject) => {
-      console.log(`📡 Monitoring existing sync: ${syncId}`);
+  async function monitorExistingSync() {
+    console.log('🔍 Monitoring existing offerbook sync...');
 
-      const pollInterval = setInterval(async () => {
-        try {
-          const status = await window.api.taker.getSyncStatus(syncId);
+    // Show loading state
+    isLoading = true;
+    updateUI();
 
-          if (!status || !status.success) {
-            clearInterval(pollInterval);
-            localStorage.removeItem('active_sync_id');
-            syncProgress = null;
-            updateUI();
-            reject(new Error('Failed to get sync status'));
-            return;
+    // ✅ SIMPLE: Just poll until sync is done
+    let isSyncing = true;
+    while (isSyncing) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      try {
+        const result = await window.api.taker.isOfferbookSyncing();
+        if (result.success) {
+          isSyncing = result.isSyncing;
+          if (isSyncing) {
+            console.log('⏳ Still syncing...');
           }
-
-          const sync = status.sync;
-
-          if (sync.status === 'syncing' || sync.status === 'starting') {
-            syncProgress = {
-              percent: sync.progress || 50,
-              status: sync.status,
-              message:
-                sync.message ||
-                (sync.status === 'syncing'
-                  ? 'Discovering makers...'
-                  : 'Starting...'),
-            };
-            updateUI();
-          }
-
-          if (sync.status === 'completed') {
-            clearInterval(pollInterval);
-            localStorage.removeItem('active_sync_id');
-            syncProgress = null;
-            await fetchMakers();
-            resolve();
-          } else if (sync.status === 'failed') {
-            clearInterval(pollInterval);
-            localStorage.removeItem('active_sync_id');
-            syncProgress = null;
-            updateUI();
-            reject(new Error(sync.error || 'Sync failed'));
-          }
-        } catch (error) {
-          clearInterval(pollInterval);
-          localStorage.removeItem('active_sync_id');
-          syncProgress = null;
-          updateUI();
-          reject(error);
         }
-      }, 1000);
-    });
+      } catch (error) {
+        console.error('Error checking sync status:', error);
+        break; // Exit on error
+      }
+    }
+
+    // ✅ CHANGE THIS: Wait 10 seconds (same as handleRefresh)
+    console.log('✅ Offerbook sync completed - waiting for file write...');
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    // ✅ NOW fetch makers
+    console.log('✅ Now fetching makers...');
+    await fetchMakers(); // This sets isLoading = false
+    updateUI();
   }
 
   function showError(message) {
@@ -621,7 +683,7 @@ export function Market(container) {
     updateSelectionUI();
   }
 
-  function swapWithSelectedMakers() {
+  async function swapWithSelectedMakers() {
     if (selectedMakers.length === 0) {
       alert('Please select at least one maker');
       return;
@@ -630,6 +692,28 @@ export function Market(container) {
     const selectedMakerData = selectedMakers.map((index) =>
       makers.find((m) => m.index === index)
     );
+
+    // Get protocol
+    const protocolResult = await window.api.taker.getProtocol();
+    const protocol = protocolResult.protocol;
+    const protocolName = protocolResult.protocolName;
+
+    // Validate all makers match protocol
+    const incompatibleMakers = selectedMakerData.filter((maker) => {
+      if (protocol === 'v2') {
+        return maker.protocol !== 'Taproot';
+      } else {
+        return maker.protocol !== 'Legacy P2WSH';
+      }
+    });
+
+    if (incompatibleMakers.length > 0) {
+      showError(
+        `❌ Protocol Mismatch: You selected ${incompatibleMakers.length} ${protocol === 'v2' ? 'Legacy' : 'Taproot'} maker(s), but your wallet is configured for ${protocolName} swaps. Please only select ${protocolName} makers.`
+      );
+      return;
+    }
+
     console.log(
       '🔄 Starting swap with',
       selectedMakerData.length,
@@ -652,49 +736,78 @@ export function Market(container) {
     const syncStatusDiv = content.querySelector('#sync-status');
     if (syncStatusDiv) {
       syncStatusDiv.innerHTML = `
-        <div class="text-sm text-gray-400">
-          <span class="text-gray-400">Market Data:</span>
-          <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
-            ${makers.length} makers available
-          </span>
-        </div>
-      `;
+      <div class="text-sm text-gray-400">
+        <span class="text-gray-400">Market Data:</span>
+        <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold ml-2">
+          ${makers.length} makers available
+        </span>
+      </div>
+    `;
     }
 
-    // Update progress bar
+    // Update progress bar - SHOW WHILE LOADING
     const progressContainer = content.querySelector('#sync-progress-container');
     if (progressContainer) {
-      if (
+      if (isLoading) {
+        // ✅ SHOW LOADING ANIMATION
+        progressContainer.classList.remove('hidden');
+        progressContainer.innerHTML = `
+        <div class="bg-[#0f1419] rounded-lg p-6 border border-blue-500/30">
+          <div class="flex items-center justify-between mb-4">
+            <span class="text-lg font-semibold text-blue-400">
+              🔄 Syncing Market Data...
+            </span>
+            <span class="text-sm text-gray-400">
+              Please wait
+            </span>
+          </div>
+          
+          <div class="bg-gray-700 rounded-full h-4 overflow-hidden mb-4">
+            <div class="bg-gradient-to-r from-[#FF6B35] via-[#ff7d4d] to-[#FF6B35] h-4 rounded-full animate-pulse"
+                 style="width: 100%; animation: shimmer 2s infinite linear;">
+            </div>
+          </div>
+          
+          <div class="flex items-center justify-center text-sm text-cyan-400">
+            <svg class="animate-spin h-5 w-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            Discovering makers over Tor network...
+          </div>
+        </div>
+      `;
+      } else if (
         syncProgress &&
         (syncProgress.status === 'syncing' ||
           syncProgress.status === 'starting')
       ) {
         progressContainer.classList.remove('hidden');
         progressContainer.innerHTML = `
-          <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
-            <div class="flex items-center justify-between mb-2">
-              <span class="text-sm font-semibold text-blue-400">
-                ${syncProgress.message || 'Syncing market data...'}
-              </span>
-              <span class="text-sm text-gray-400">
-                Please wait...
-              </span>
-            </div>
-            
-            <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
-              <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
-                   style="width: 100%">
-                <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
-              </div>
-            </div>
-            
-            <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
-              <div class="text-cyan-400">
-                🔍 Discovering makers over Tor network...
-              </div>
+        <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-sm font-semibold text-blue-400">
+              ${syncProgress.message || 'Syncing market data...'}
+            </span>
+            <span class="text-sm text-gray-400">
+              Please wait...
+            </span>
+          </div>
+          
+          <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
+                 style="width: 100%">
+              <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
             </div>
           </div>
-        `;
+          
+          <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
+            <div class="text-cyan-400">
+              🔍 Discovering makers over Tor network...
+            </div>
+          </div>
+        </div>
+      `;
       } else {
         progressContainer.classList.add('hidden');
       }
@@ -702,19 +815,19 @@ export function Market(container) {
 
     if (statsContainer) {
       statsContainer.innerHTML = `
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-          <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
-        </div>
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <p class="text-sm text-gray-400 mb-2">Average Fee</p>
-          <p class="text-2xl font-mono text-green-400">${stats.avgFee}%</p>
-        </div>
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <p class="text-sm text-gray-400 mb-2">Online Makers</p>
-          <p class="text-2xl font-mono text-blue-400">${stats.onlineMakers}</p>
-        </div>
-      `;
+      <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
+        <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
+      </div>
+      <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Average Fee</p>
+        <p class="text-2xl font-mono text-green-400">${stats.avgFee}%</p>
+      </div>
+      <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Online Makers</p>
+        <p class="text-2xl font-mono text-blue-400">${stats.onlineMakers}</p>
+      </div>
+    `;
     }
 
     // Update tab counts
@@ -733,18 +846,28 @@ export function Market(container) {
 
     if (tableBody) {
       if (isLoading) {
+        // ✅ SHOW BIG LOADING SPINNER IN TABLE
         tableBody.innerHTML = `
-          <div class="col-span-9 text-center py-12">
-            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
-            <p class="text-gray-400">Loading makers...</p>
+        <div class="col-span-9 text-center py-16">
+          <div class="inline-block">
+            <svg class="animate-spin h-16 w-16 text-[#FF6B35] mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
           </div>
-        `;
+          <p class="text-gray-400 text-lg font-semibold mb-2">Syncing Market Data...</p>
+          <p class="text-gray-500 text-sm">Fetching makers over Tor network</p>
+        </div>
+      `;
       } else if (makers.length === 0) {
         tableBody.innerHTML = `
-          <div class="col-span-9 text-center py-12">
-            <p class="text-gray-400 mb-4">No makers found</p>
-          </div>
-        `;
+        <div class="col-span-9 text-center py-12">
+          <p class="text-gray-400 mb-4">No makers found</p>
+          <button onclick="document.querySelector('#refresh-market-btn').click()" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg">
+            Sync Market Data
+          </button>
+        </div>
+      `;
       } else {
         const displayedMakers = makers.filter(
           (m) => m.status === currentMakerStatus
@@ -752,38 +875,38 @@ export function Market(container) {
 
         if (displayedMakers.length === 0) {
           tableBody.innerHTML = `
-            <div class="col-span-9 text-center py-12">
-              <p class="text-gray-400">No ${currentMakerStatus} makers found</p>
-            </div>
-          `;
+          <div class="col-span-9 text-center py-12">
+            <p class="text-gray-400">No ${currentMakerStatus} makers found</p>
+          </div>
+        `;
         } else {
           tableBody.innerHTML = displayedMakers
             .map(
               (maker) => `
-            <div class="grid grid-cols-9 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
-              <div class="flex items-center">
-                <input type="checkbox" id="maker-${maker.index}" class="w-4 h-4 accent-[#FF6B35]" />
-              </div>
-              <div class="text-sm">
-                <span class="px-2 py-1 ${
-                  maker.protocol === 'Taproot'
-                    ? 'bg-purple-500/20 text-purple-400'
-                    : 'bg-blue-500/20 text-blue-400'
-                } rounded text-xs font-semibold">
-                  ${maker.protocol === 'Taproot' ? '⚡ Taproot' : '🔒 Legacy'}
-                </span>
-              </div>
-              <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${maker.address.substring(0, 18)}...</div>
-              <div class="text-green-400">${maker.baseFee}</div>
-              <div class="text-blue-400">${maker.volumeFee}%</div>
-              <div class="text-cyan-400">${maker.timeFee}%</div>
-              <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
-              <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
-              <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
-                ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
-              </div>
+          <div class="grid grid-cols-9 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
+            <div class="flex items-center">
+              <input type="checkbox" id="maker-${maker.index}" class="w-4 h-4 accent-[#FF6B35]" />
             </div>
-          `
+            <div class="text-sm">
+              <span class="px-2 py-1 ${
+                maker.protocol === 'Taproot'
+                  ? 'bg-purple-500/20 text-purple-400'
+                  : 'bg-blue-500/20 text-blue-400'
+              } rounded text-xs font-semibold">
+                ${maker.protocol === 'Taproot' ? '⚡ Taproot' : '🔒 Legacy'}
+              </span>
+            </div>
+            <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${maker.address.substring(0, 18)}...</div>
+            <div class="text-green-400">${maker.baseFee}</div>
+            <div class="text-blue-400">${maker.volumeFee}%</div>
+            <div class="text-cyan-400">${maker.timeFee}%</div>
+            <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
+            <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
+            <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
+              ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
+            </div>
+          </div>
+        `
             )
             .join('');
 
@@ -826,6 +949,17 @@ export function Market(container) {
         🔄 Sync Market Data
       </button>
     </div>
+
+     <div id="protocol-banner" class="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-lg p-4 mb-6 hidden">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">⚠️</span>
+        <div>
+          <h3 class="text-lg font-bold text-yellow-400 mb-1" id="protocol-warning-title"></h3>
+          <p class="text-sm text-gray-300" id="protocol-warning-text"></p>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Sync Status Display -->
     <div class="bg-[#1a2332] rounded-lg p-4 mb-4">

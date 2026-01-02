@@ -8,7 +8,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   const totalSteps = 4;
   let walletAction = null; // 'create', 'load', or 'restore'
   let walletData = {};
-  let protocolVersion = 'v1'; // 'v1' (P2WSH) or 'v2' (Taproot)
+  let protocolVersion = 'v2'; // 'v1' (P2WSH) or 'v2' (Taproot)
 
   modal.innerHTML = `
     <div class="bg-[#1a2332] rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -33,75 +33,62 @@ export function FirstTimeSetupModal(container, onComplete) {
             <p class="text-gray-400 text-sm">Choose your swap protocol and we'll configure your wallet for private Bitcoin swaps.</p>
           </div>
 
-          <div class="space-y-4">
-            <!-- Protocol Selection -->
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <h4 class="text-white font-semibold mb-3">Select Swap Protocol</h4>
-              <div class="grid grid-cols-2 gap-4">
-                <!-- P2WSH (V1) -->
-                <div id="protocol-v1" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-[#FF6B35] cursor-pointer hover:border-[#FF6B35] transition-colors">
-                  <div class="flex items-center mb-2">
-                    <span class="text-2xl mr-2">🔐</span>
-                    <h5 class="text-white font-semibold">P2WSH (Stable)</h5>
-                  </div>
-                  <p class="text-xs text-gray-400 mb-2">ECDSA-based 2-of-2 multisig contracts</p>
-                  <ul class="text-xs text-gray-500 space-y-1">
-                    <li>• Battle-tested protocol</li>
-                    <li>• Wider maker support</li>
-                    <li>• Recommended for most users</li>
-                  </ul>
-                  <div class="mt-2">
-                    <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded">Recommended</span>
-                  </div>
-                </div>
+          <!-- Protocol Selection -->
+<div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+  <h4 class="text-white font-semibold mb-3">Select Swap Protocol Type</h4>
+  <p class="text-sm text-gray-400 mb-4">
+    This determines which type of coinswaps you'll perform. You can only use one protocol type at a time.
+  </p>
+  
+  <div class="grid grid-cols-2 gap-4">
+    <!-- Taproot (V2) - Recommended -->
+    <div id="protocol-v2" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-[#FF6B35] cursor-pointer hover:border-[#FF6B35] transition-colors">
+      <div class="flex items-center mb-2">
+        <span class="text-2xl mr-2">⚡</span>
+        <h5 class="text-white font-semibold">Taproot</h5>
+      </div>
+      <p class="text-xs text-gray-400 mb-3">
+        Contract Tx with <span class="font-mono text-cyan-400">MuSig2 + Taproot HTLC</span>
+      </p>
+      <ul class="text-xs text-gray-300 space-y-1.5 mb-3">
+        <li>✓ Cheaper swap fees</li>
+        <li>✓ Enhanced privacy</li>
+        <li>✓ Modern protocol</li>
+      </ul>
+      <div class="mt-2">
+        <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-semibold">Recommended</span>
+      </div>
+    </div>
 
-                <!-- Taproot (V2) -->
-                <div id="protocol-v2" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors">
-                  <div class="flex items-center mb-2">
-                    <span class="text-2xl mr-2">⚡</span>
-                    <h5 class="text-white font-semibold">Taproot (Beta)</h5>
-                  </div>
-                  <p class="text-xs text-gray-400 mb-2">MuSig2-based scriptless scripts</p>
-                  <ul class="text-xs text-gray-500 space-y-1">
-                    <li>• Enhanced privacy</li>
-                    <li>• Lower fees</li>
-                    <li>• Experimental - limited makers</li>
-                  </ul>
-                  <div class="mt-2">
-                    <span class="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">Experimental</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <!-- Legacy (V1) -->
+    <div id="protocol-v1" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors">
+      <div class="flex items-center mb-2">
+        <span class="text-2xl mr-2">🔐</span>
+        <h5 class="text-white font-semibold">Legacy P2WSH</h5>
+      </div>
+      <p class="text-xs text-gray-400 mb-3">
+        Contract Tx with <span class="font-mono text-orange-400">2-of-2 Multisig + P2WSH HTLC</span>
+      </p>
+      <ul class="text-xs text-gray-300 space-y-1.5 mb-3">
+        <li>• Higher swap fees</li>
+        <li>• Less private</li>
+        <li>• Original atomic swap protocol</li>
+      </ul>
+      <div class="mt-2">
+        <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Battle-tested</span>
+      </div>
+    </div>
+  </div>
 
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <h4 class="text-white font-semibold mb-2">What we'll set up:</h4>
-              <ul class="text-sm text-gray-400 space-y-2">
-                <li class="flex items-center">
-                  <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
-                  Bitcoin Core RPC connection
-                </li>
-                <li class="flex items-center">
-                  <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
-                  ZMQ notifications for real-time updates
-                </li>
-                <li class="flex items-center">
-                  <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
-                  Wallet setup (create, load, or restore)
-                </li>
-                <li class="flex items-center">
-                  <span class="w-2 h-2 bg-[#FF6B35] rounded-full mr-3"></span>
-                  Tor configuration for privacy
-                </li>
-              </ul>
-            </div>
-
-            <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-              <p class="text-xs text-blue-400">
-               <strong>Prerequisites:</strong> Make sure Bitcoin Core is running with RPC and ZMQ enabled, and Tor is installed on your system.
-              </p>
-            </div>
-          </div>
+  <!-- Important Notice -->
+  <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mt-4">
+    <p class="text-xs text-yellow-400 leading-relaxed">
+      <strong>⚠️ Important:</strong> You can only perform one protocol type at a time (Taproot OR Legacy swaps). 
+      However, your wallet can handle both Taproot and Legacy transactions for regular operations. 
+      To serve both protocols as a maker, run two separate maker instances (they can share the same Bitcoin Core node).
+    </p>
+  </div>
+</div>
         </div>
 
         <!-- Step 2: Bitcoin Core RPC + ZMQ -->
@@ -1085,21 +1072,8 @@ export function FirstTimeSetupModal(container, onComplete) {
   console.log('🔧 Attaching event listeners...');
 
   // Protocol selection
-  const protocolV1 = modal.querySelector('#protocol-v1');
   const protocolV2 = modal.querySelector('#protocol-v2');
-
-  if (protocolV1) {
-    protocolV1.addEventListener('click', () => {
-      protocolVersion = 'v1';
-      modal.querySelectorAll('.protocol-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
-        el.classList.add('border-gray-700');
-      });
-      protocolV1.classList.remove('border-gray-700');
-      protocolV1.classList.add('border-[#FF6B35]');
-      console.log('Protocol selected: V1 (P2WSH)');
-    });
-  }
+  const protocolV1 = modal.querySelector('#protocol-v1');
 
   if (protocolV2) {
     protocolV2.addEventListener('click', () => {
@@ -1111,6 +1085,19 @@ export function FirstTimeSetupModal(container, onComplete) {
       protocolV2.classList.remove('border-gray-700');
       protocolV2.classList.add('border-[#FF6B35]');
       console.log('Protocol selected: V2 (Taproot)');
+    });
+  }
+
+  if (protocolV1) {
+    protocolV1.addEventListener('click', () => {
+      protocolVersion = 'v1';
+      modal.querySelectorAll('.protocol-choice').forEach((el) => {
+        el.classList.remove('border-[#FF6B35]');
+        el.classList.add('border-gray-700');
+      });
+      protocolV1.classList.remove('border-gray-700');
+      protocolV1.classList.add('border-[#FF6B35]');
+      console.log('Protocol selected: V1 (P2WSH)');
     });
   }
 

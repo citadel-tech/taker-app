@@ -254,8 +254,14 @@ export async function CoinswapComponent(container, swapConfig) {
         if (slot !== -1) {
           setTransactionConfirmed(slot);
           updateHopStatus(slot, '✓ Confirmed', 'green');
+          // Light up next maker, or all makers if this is the last hop
           if (slot < swapData.hops - 1) {
             updateMakerVisibility(slot + 1, true);
+          } else {
+            // Last hop confirmed - ensure all makers are visible
+            for (let i = 0; i < swapData.makers; i++) {
+              updateMakerVisibility(i, true);
+            }
           }
         }
       }

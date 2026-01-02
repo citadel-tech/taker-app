@@ -713,6 +713,16 @@ export async function SwapComponent(container) {
     <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap</h2>
     <p class="text-gray-400 mb-8">Perform private Bitcoin swaps through multiple makers</p>
 
+      <div id="protocol-banner" class="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-lg p-4 mb-6 hidden">
+    <div class="flex items-center gap-3">
+      <span class="text-3xl">⚠️</span>
+      <div>
+        <h3 class="text-lg font-bold text-yellow-400 mb-1" id="protocol-warning-title"></h3>
+        <p class="text-sm text-gray-300" id="protocol-warning-text"></p>
+      </div>
+    </div>
+  </div>
+
     <div class="grid grid-cols-3 gap-6">
       <div class="col-span-2 space-y-6">
         <!-- Swap Form -->
@@ -1023,6 +1033,46 @@ export async function SwapComponent(container) {
         return;
       }
 
+      // ✅ ADD THIS PROTOCOL CHECK
+      try {
+        const protocolResult = await window.api.taker.getProtocol();
+        const protocol = protocolResult.protocol;
+        const protocolName = protocolResult.protocolName;
+
+        // Check if we have compatible makers
+        const data = await window.api.taker.getOffers();
+        if (data.success && data.offerbook) {
+          const goodMakers = data.offerbook.goodMakers || [];
+
+          // Filter makers by protocol
+          const compatibleMakers = goodMakers.filter((maker) => {
+            const makerProtocol = maker.protocol;
+            if (protocol === 'v2') {
+              return makerProtocol === 'Taproot';
+            } else {
+              return makerProtocol === 'Legacy';
+            }
+          });
+
+          const makersNeeded = getNumberOfMakers();
+
+          if (compatibleMakers.length < makersNeeded) {
+            alert(
+              `❌ Not enough ${protocolName} makers available!\n\nYour wallet: ${protocolName}\nCompatible makers available: ${compatibleMakers.length}\nMakers needed: ${makersNeeded}\n\nPlease sync market data or reduce number of hops.`
+            );
+            return;
+          }
+
+          console.log(
+            `✅ Found ${compatibleMakers.length} compatible ${protocolName} makers`
+          );
+        }
+      } catch (error) {
+        console.error('Protocol check failed:', error);
+        alert('Failed to verify maker compatibility: ' + error.message);
+        return;
+      }
+
       const swapConfig = {
         amount: swapAmount,
         makers: getNumberOfMakers(),
@@ -1151,4 +1201,29 @@ export async function SwapComponent(container) {
   });
 
   fetchNetworkFees();
+  (async () => {
+    try {
+      const protocolResult = await window.api.taker.getProtocol();
+      const protocol = protocolResult.protocol;
+
+      const banner = content.querySelector('#protocol-banner');
+      const title = content.querySelector('#protocol-warning-title');
+      const text = content.querySelector('#protocol-warning-text');
+
+      if (banner && title && text) {
+        if (protocol === 'v2') {
+          title.textContent = '⚡ You Can Only Swap With Taproot Makers';
+          text.textContent =
+            'Your wallet is configured for Taproot swaps. Selecting Legacy makers will cause the swap to fail.';
+        } else {
+          title.textContent = '🔒 You Can Only Swap With Legacy Makers';
+          text.textContent =
+            'Your wallet is configured for Legacy swaps. Selecting Taproot makers will cause the swap to fail.';
+        }
+        banner.classList.remove('hidden');
+      }
+    } catch (error) {
+      console.error('Failed to get protocol:', error);
+    }
+  })();
 }

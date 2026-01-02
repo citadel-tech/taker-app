@@ -27,7 +27,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('taker:isWalletEncrypted', walletPath),
     getWalletInfo: () => ipcRenderer.invoke('taker:getWalletInfo'),
     getCurrentSyncState: () => ipcRenderer.invoke('taker:getCurrentSyncState'),
-    testTorConnection: (config) => ipcRenderer.invoke('tor:testConnection', config),
+    testTorConnection: (config) =>
+      ipcRenderer.invoke('tor:testConnection', config),
+    getProtocol: () => ipcRenderer.invoke('taker:getProtocol'),
+    isOfferbookSyncing: () => ipcRenderer.invoke('taker:isOfferbookSyncing'),
   },
 
   // Coinswap operations
