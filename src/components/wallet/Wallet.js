@@ -1,5 +1,54 @@
+const WALLET_CACHE_KEY = 'wallet_data_cache';
+const CACHE_DURATION = 90 * 1000; // 90 seconds
+
+function loadWalletFromCache() {
+  try {
+    const cached = localStorage.getItem(WALLET_CACHE_KEY);
+    if (cached) {
+      const { balance, transactions, utxos, timestamp } = JSON.parse(cached);
+      const age = Date.now() - timestamp;
+
+      console.log(`📦 Cache age: ${Math.floor(age / 1000)}s`);
+
+      return {
+        balance,
+        transactions,
+        utxos,
+        timestamp,
+        isStale: age > CACHE_DURATION,
+      };
+    }
+  } catch (err) {
+    console.error('Failed to load wallet cache:', err);
+  }
+  return null;
+}
+
+function saveWalletToCache(balance, transactions, utxos) {
+  try {
+    localStorage.setItem(
+      WALLET_CACHE_KEY,
+      JSON.stringify({
+        balance,
+        transactions,
+        utxos,
+        timestamp: Date.now(),
+      })
+    );
+    console.log('💾 Saved wallet to cache');
+  } catch (err) {
+    console.error('Failed to save wallet cache:', err);
+  }
+}
+
 export async function WalletComponent(container) {
   console.log('🔍 WalletComponent called at', new Date().toISOString());
+
+  // ✅ LOAD FROM CACHE FIRST
+  const cached = loadWalletFromCache();
+  let shouldFetchFresh = !cached || cached.isStale;
+
+  console.log(`🎯 Should fetch fresh: ${shouldFetchFresh}`);
 
   async function fetchBalance() {
     try {
@@ -116,8 +165,23 @@ export async function WalletComponent(container) {
   }
 
   // UI Update Functions
-  async function updateBalance() {
+  async function updateBalance(useCache = false) {
     try {
+      // Use cached data if requested
+      if (useCache && cached && cached.balance) {
+        content.querySelector('#regular-balance').textContent =
+          satsToBtc(cached.balance.regular) + ' BTC';
+        content.querySelector('#swap-balance').textContent =
+          satsToBtc(cached.balance.swap) + ' BTC';
+        content.querySelector('#contract-balance').textContent =
+          satsToBtc(cached.balance.contract) + ' BTC';
+        content.querySelector('#spendable-balance').textContent =
+          satsToBtc(cached.balance.spendable) + ' BTC';
+        console.log('✅ Balance loaded from cache');
+        return;
+      }
+
+      // Fetch fresh data
       const balance = await fetchBalance();
 
       content.querySelector('#regular-balance').textContent =
@@ -129,40 +193,39 @@ export async function WalletComponent(container) {
       content.querySelector('#spendable-balance').textContent =
         satsToBtc(balance.spendable) + ' BTC';
 
-      console.log('✅ Balance updated:', balance);
+      console.log('✅ Balance updated from API');
+      return balance;
     } catch (error) {
       console.error('❌ Balance update failed:', error);
     }
   }
 
-  async function updateTransactions() {
+  async function updateTransactions(useCache = false) {
     const transactionsContainer = content.querySelector(
       '#transactions-container'
     );
 
-    try {
-      const transactions = await fetchTransactions();
-
+    // Helper to render transactions
+    const renderTransactions = (transactions) => {
       if (transactions.length === 0) {
-        transactionsContainer.innerHTML =
-          '<div class="text-center py-4 text-gray-400">No transactions yet</div>';
-      } else {
-        // Sort transactions newest first (by time)
-        const sortedTransactions = transactions.sort(
-          (a, b) => b.info.time - a.info.time
-        );
+        return '<div class="text-center py-4 text-gray-400">No transactions yet</div>';
+      }
 
-        transactionsContainer.innerHTML = sortedTransactions
-          .map((tx) => {
-            const isReceive = tx.detail.amount.sats > 0;
-            const txType = getTransactionType(tx);
-            const txid =
-              typeof tx.info.txid === 'object'
-                ? tx.info.txid.value
-                : tx.info.txid;
-            const txidShort = `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
+      const sortedTransactions = transactions.sort(
+        (a, b) => b.info.time - a.info.time
+      );
 
-            return `
+      return sortedTransactions
+        .map((tx) => {
+          const isReceive = tx.detail.amount.sats > 0;
+          const txType = getTransactionType(tx);
+          const txid =
+            typeof tx.info.txid === 'object'
+              ? tx.info.txid.value
+              : tx.info.txid;
+          const txidShort = `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
+
+          return `
     <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 bg-${isReceive ? 'green' : 'red'}-500/20 rounded-full flex items-center justify-center">
@@ -188,11 +251,25 @@ export async function WalletComponent(container) {
       </div>
     </div>
           `;
-          })
-          .join('');
+        })
+        .join('');
+    };
+
+    try {
+      // Use cached data if requested
+      if (useCache && cached && cached.transactions) {
+        transactionsContainer.innerHTML = renderTransactions(
+          cached.transactions
+        );
+        console.log('✅ Transactions loaded from cache');
+        return;
       }
 
-      console.log('✅ Transactions updated:', transactions.length);
+      // Fetch fresh data
+      const transactions = await fetchTransactions();
+      transactionsContainer.innerHTML = renderTransactions(transactions);
+      console.log('✅ Transactions updated from API:', transactions.length);
+      return transactions;
     } catch (error) {
       console.error('❌ Transactions update failed:', error);
       transactionsContainer.innerHTML =
@@ -200,24 +277,23 @@ export async function WalletComponent(container) {
     }
   }
 
-  async function updateUtxos() {
+  async function updateUtxos(useCache = false) {
     const utxoTableBody = content.querySelector('#utxo-table-body');
 
-    try {
-      const utxos = await fetchUtxos();
-
+    // Helper to render UTXOs
+    const renderUtxos = (utxos) => {
       if (utxos.length === 0) {
-        utxoTableBody.innerHTML =
-          '<tr><td colspan="4" class="text-center py-4 text-gray-400">No UTXOs found</td></tr>';
-      } else {
-        utxoTableBody.innerHTML = utxos
-          .map((utxoData) => {
-            const utxo = utxoData.utxo;
-            const spendInfo = utxoData.spendInfo;
-            const txidShort = truncateTxid(utxo.txid);
-            const color = getUtxoTypeColor(spendInfo.spendType);
+        return '<tr><td colspan="4" class="text-center py-4 text-gray-400">No UTXOs found</td></tr>';
+      }
 
-            return `
+      return utxos
+        .map((utxoData) => {
+          const utxo = utxoData.utxo;
+          const spendInfo = utxoData.spendInfo;
+          const txidShort = truncateTxid(utxo.txid);
+          const color = getUtxoTypeColor(spendInfo.spendType);
+
+          return `
             <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
               <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
                   onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid}')">${txidShort}:${utxo.vout}</td>
@@ -226,22 +302,33 @@ export async function WalletComponent(container) {
               <td class="py-3 px-4 text-${color}-400">${spendInfo.spendType}</td>
             </tr>
           `;
-          })
-          .join('');
+        })
+        .join('');
+    };
+
+    try {
+      // Use cached data if requested
+      if (useCache && cached && cached.utxos) {
+        utxoTableBody.innerHTML = renderUtxos(cached.utxos);
+        console.log('✅ UTXOs loaded from cache');
+        return;
       }
 
-      console.log('✅ UTXOs updated:', utxos.length);
+      // Fetch fresh data
+      const utxos = await fetchUtxos();
+      utxoTableBody.innerHTML = renderUtxos(utxos);
+      console.log('✅ UTXOs updated from API:', utxos.length);
+      return utxos;
     } catch (error) {
-      // Keep original hardcoded UTXOs as fallback
+      console.error('❌ UTXO update failed:', error);
       utxoTableBody.innerHTML = `
         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors">No UTXOs</td>
+          <td class="py-3 px-4 font-mono text-sm text-gray-300">No UTXOs</td>
           <td class="py-3 px-4 text-gray-400 font-mono">--</td>
           <td class="py-3 px-4 text-gray-400">--</td>
           <td class="py-3 px-4 text-gray-400">--</td>
         </tr>
       `;
-      console.error('❌ UTXO update failed, showing fallback:', error);
     }
   }
 
@@ -253,7 +340,22 @@ export async function WalletComponent(container) {
     refreshBtn.disabled = true;
 
     try {
-      await Promise.all([updateBalance(), updateTransactions(), updateUtxos()]);
+      // ✅ FORCE FRESH FETCH
+      const [balance, transactions, utxos] = await Promise.all([
+        fetchBalance(),
+        fetchTransactions(),
+        fetchUtxos(),
+      ]);
+
+      // Save to cache
+      saveWalletToCache(balance, transactions, utxos);
+
+      // Update UI
+      await Promise.all([
+        updateBalance(false),
+        updateTransactions(false),
+        updateUtxos(false),
+      ]);
 
       refreshBtn.textContent = 'Refreshed!';
       setTimeout(() => {
@@ -407,4 +509,28 @@ export async function WalletComponent(container) {
   updateBalance();
   updateTransactions();
   updateUtxos();
+
+  // ✅ SMART INITIALIZATION
+  if (shouldFetchFresh) {
+    console.log('🔄 Fetching fresh data...');
+    // Fetch fresh data
+    const [balance, transactions, utxos] = await Promise.all([
+      updateBalance(false),
+      updateTransactions(false),
+      updateUtxos(false),
+    ]);
+
+    // Save to cache
+    if (balance && transactions && utxos) {
+      saveWalletToCache(balance, transactions, utxos);
+    }
+  } else {
+    console.log('⚡ Using cached data (still fresh)');
+    // Just use cache
+    await Promise.all([
+      updateBalance(true),
+      updateTransactions(true),
+      updateUtxos(true),
+    ]);
+  }
 }
