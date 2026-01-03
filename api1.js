@@ -103,151 +103,163 @@ async function initNAPI() {
 function registerTakerHandlers() {
   // Initialize taker
   ipcMain.handle('taker:initialize', async (event, config) => {
-  try {
-    console.log('🔧 Taker initialization requested');
+    try {
+      console.log('🔧 Taker initialization requested');
 
-    // ✅ EXTRACT CONFIG VALUES ONCE
-    const walletName = config.wallet?.name || config.wallet?.fileName || api1State.DEFAULT_WALLET_NAME;
-    const protocol = config.protocol || 'v1';
-    const network = config.network || 'signet';
-    const walletPath = path.join(api1State.DATA_DIR, 'wallets', walletName);
+      // ✅ EXTRACT CONFIG VALUES ONCE
+      const walletName =
+        config.wallet?.name ||
+        config.wallet?.fileName ||
+        api1State.DEFAULT_WALLET_NAME;
+      const protocol = config.protocol || 'v1';
+      const network = config.network || 'signet';
+      const walletPath = path.join(api1State.DATA_DIR, 'wallets', walletName);
 
-    // ✅ CHECK IF WE CAN REUSE EXISTING INSTANCE (simplified)
-    const canReuse = api1State.takerInstance &&
-      api1State.protocolVersion === protocol &&
-      api1State.currentWalletName === walletName;
+      // ✅ CHECK IF WE CAN REUSE EXISTING INSTANCE (simplified)
+      const canReuse =
+        api1State.takerInstance &&
+        api1State.protocolVersion === protocol &&
+        api1State.currentWalletName === walletName;
 
-    console.log('🔍 Reuse check:', {
-      hasInstance: !!api1State.takerInstance,
-      protocolMatch: api1State.protocolVersion === protocol,
-      walletMatch: api1State.currentWalletName === walletName,
-      canReuse,
-    });
+      console.log('🔍 Reuse check:', {
+        hasInstance: !!api1State.takerInstance,
+        protocolMatch: api1State.protocolVersion === protocol,
+        walletMatch: api1State.currentWalletName === walletName,
+        canReuse,
+      });
 
-    if (canReuse) {
-      console.log('✅ Reusing existing Taker instance');
+      if (canReuse) {
+        console.log('✅ Reusing existing Taker instance');
+        const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
+        return {
+          success: true,
+          message: `Reusing existing ${protocolName} Taker instance`,
+          protocol,
+          walletName,
+          reused: true,
+        };
+      }
+
+      // ✅ SHUTDOWN OLD INSTANCE IF EXISTS
+      if (api1State.takerInstance) {
+        console.log('🔄 Shutting down old taker instance...');
+        try {
+          stopPeriodicSync();
+          if (api1State.walletSyncInterval) {
+            clearInterval(api1State.walletSyncInterval);
+            api1State.walletSyncInterval = null;
+          }
+          api1State.takerInstance.shutdown();
+        } catch (err) {
+          console.error('⚠️ Shutdown error:', err);
+        }
+        api1State.takerInstance = null;
+      }
+
+      console.log('🔧 Creating NEW Taker instance...');
+
       const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
+      console.log(`📦 Initializing ${protocolName} taker...`);
+
+      if (!api1State.coinswapNapi) {
+        await initNAPI();
+        if (!api1State.coinswapNapi) {
+          return { success: false, error: 'Failed to load coinswap-napi' };
+        }
+      }
+
+      // ✅ PREPARE CONSTRUCTOR PARAMS
+      const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
+      const rpcConfig = {
+        url: `${config.rpc?.host || '127.0.0.1'}:${config.rpc?.port || 38332}`,
+        username: config.rpc?.username || 'user',
+        password: config.rpc?.password || 'password',
+        walletName,
+      };
+      const finalPassword = config.wallet?.password?.trim() || '';
+      const torAuthPassword = config.taker?.tor_auth_password;
+      const controlPort = config.taker?.control_port || 9051;
+
+      // ✅ SELECT TAKER CLASS
+      const TakerClass =
+        protocol === 'v2'
+          ? api1State.coinswapNapi.TaprootTaker
+          : api1State.coinswapNapi.Taker;
+
+      if (!TakerClass) {
+        return {
+          success: false,
+          error: `${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Rebuild coinswap-napi.`,
+        };
+      }
+
+      // ✅ SETUP LOGGING
+      try {
+        TakerClass.setupLogging?.(api1State.DATA_DIR);
+      } catch (err) {
+        console.warn('⚠️ Logging setup failed:', err.message);
+      }
+
+      // ✅ CREATE INSTANCE
+      api1State.takerInstance = new TakerClass(
+        api1State.DATA_DIR,
+        walletName,
+        rpcConfig,
+        controlPort,
+        torAuthPassword,
+        zmqAddr,
+        finalPassword
+      );
+
+      // ✅ SAVE STATE
+      api1State.protocolVersion = protocol;
+      api1State.currentWalletName = walletName;
+      api1State.currentWalletPassword = finalPassword;
+      api1State.storedTakerConfig = {
+        dataDir: api1State.DATA_DIR,
+        rpcConfig,
+        zmqAddr,
+        controlPort,
+        torAuthPassword,
+        password: finalPassword,
+        protocol,
+      };
+
+      console.log(`✅ ${protocolName} Taker initialized`);
+
+      // ✅ START BACKGROUND SERVICES
+      setTimeout(async () => {
+        console.log('🔄 Starting background services...');
+        await startOfferbookSync('auto');
+        startPeriodicSync();
+        startPeriodicWalletSync();
+        console.log('✅ Background services started');
+      }, 2000);
+
       return {
         success: true,
-        message: `Reusing existing ${protocolName} Taker instance`,
+        message: `${protocolName} Taker initialized`,
         protocol,
         walletName,
-        reused: true,
+        reused: false,
       };
-    }
+    } catch (error) {
+      console.error('❌ Initialization failed:', error);
 
-    // ✅ SHUTDOWN OLD INSTANCE IF EXISTS
-    if (api1State.takerInstance) {
-      console.log('🔄 Shutting down old taker instance...');
-      try {
-        stopPeriodicSync();
-        if (api1State.walletSyncInterval) {
-          clearInterval(api1State.walletSyncInterval);
-          api1State.walletSyncInterval = null;
-        }
-        api1State.takerInstance.shutdown();
-      } catch (err) {
-        console.error('⚠️ Shutdown error:', err);
+      if (
+        error.message.includes('decrypt') ||
+        error.message.includes('passphrase')
+      ) {
+        return {
+          success: false,
+          error: 'Incorrect password',
+          wrongPassword: true,
+        };
       }
-      api1State.takerInstance = null;
+
+      return { success: false, error: error.message };
     }
-
-    console.log('🔧 Creating NEW Taker instance...');
-    
-    const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
-    console.log(`📦 Initializing ${protocolName} taker...`);
-
-    if (!api1State.coinswapNapi) {
-      await initNAPI();
-      if (!api1State.coinswapNapi) {
-        return { success: false, error: 'Failed to load coinswap-napi' };
-      }
-    }
-
-    // ✅ PREPARE CONSTRUCTOR PARAMS
-    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
-    const rpcConfig = {
-      url: `${config.rpc?.host || '127.0.0.1'}:${config.rpc?.port || 38332}`,
-      username: config.rpc?.username || 'user',
-      password: config.rpc?.password || 'password',
-      walletName,
-    };
-    const finalPassword = config.wallet?.password?.trim() || '';
-    const torAuthPassword = config.taker?.tor_auth_password;
-    const controlPort = config.taker?.control_port || 9051;
-
-    // ✅ SELECT TAKER CLASS
-    const TakerClass = protocol === 'v2' 
-      ? api1State.coinswapNapi.TaprootTaker 
-      : api1State.coinswapNapi.Taker;
-
-    if (!TakerClass) {
-      return {
-        success: false,
-        error: `${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Rebuild coinswap-napi.`,
-      };
-    }
-
-    // ✅ SETUP LOGGING
-    try {
-      TakerClass.setupLogging?.(api1State.DATA_DIR);
-    } catch (err) {
-      console.warn('⚠️ Logging setup failed:', err.message);
-    }
-
-    // ✅ CREATE INSTANCE
-    api1State.takerInstance = new TakerClass(
-      api1State.DATA_DIR,
-      walletName,
-      rpcConfig,
-      controlPort,
-      torAuthPassword,
-      zmqAddr,
-      finalPassword
-    );
-
-    // ✅ SAVE STATE
-    api1State.protocolVersion = protocol;
-    api1State.currentWalletName = walletName;
-    api1State.currentWalletPassword = finalPassword;
-    api1State.storedTakerConfig = {
-      dataDir: api1State.DATA_DIR,
-      rpcConfig,
-      zmqAddr,
-      controlPort,
-      torAuthPassword,
-      password: finalPassword,
-      protocol,
-    };
-
-    console.log(`✅ ${protocolName} Taker initialized`);
-
-    // ✅ START BACKGROUND SERVICES
-    setTimeout(async () => {
-      console.log('🔄 Starting background services...');
-      await startOfferbookSync('auto');
-      startPeriodicSync();
-      startPeriodicWalletSync();
-      console.log('✅ Background services started');
-    }, 2000);
-
-    return {
-      success: true,
-      message: `${protocolName} Taker initialized`,
-      protocol,
-      walletName,
-      reused: false,
-    };
-  } catch (error) {
-    console.error('❌ Initialization failed:', error);
-
-    if (error.message.includes('decrypt') || error.message.includes('passphrase')) {
-      return { success: false, error: 'Incorrect password', wrongPassword: true };
-    }
-
-    return { success: false, error: error.message };
-  }
-});
+  });
 
   ipcMain.handle('taker:shutdown', async () => {
     try {
@@ -281,15 +293,18 @@ function registerTakerHandlers() {
 
   async function startOfferbookSync(source = 'manual') {
     try {
-      if (!api1State.takerInstance || !api1State.storedTakerConfig) {
+      console.log(`🚀 startOfferbookSync called with source: ${source}`);
+
+      if (!api1State.takerInstance) {
+        console.log('❌ No taker instance!');
         return { success: false, error: 'Taker not initialized' };
       }
 
-      // 🛡️ CHECK: If sync is already running
+      console.log('✅ Taker instance exists');
+
+      // Check if sync already running
       if (api1State.syncState.isRunning) {
-        console.log(
-          `⏭️ Sync already running (${source}), joining existing sync`
-        );
+        console.log(`⏭️ Sync already running (${source}), skipping`);
         return {
           success: false,
           duplicate: true,
@@ -298,86 +313,77 @@ function registerTakerHandlers() {
       }
 
       const syncId = `${source}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      console.log(`🔄 [${syncId}] Starting offerbook sync (${source})...`);
+      console.log(
+        `🔄 [${syncId}] Triggering manual offerbook sync (${source})...`
+      );
 
-      // ✅ SET FLAGS
+      // Set flags
       api1State.syncState.isRunning = true;
       api1State.syncState.currentSyncId = syncId;
 
-      // Delete old offerbook
+      // ✅ FIX: Delete old offerbook and create fresh empty one
       const offerbookPath = path.join(
         api1State.storedTakerConfig.dataDir,
         'offerbook.json'
       );
+
       if (fs.existsSync(offerbookPath)) {
+        console.log('🗑️ Deleting old offerbook.json...');
         fs.unlinkSync(offerbookPath);
       }
 
-      const config = {
-        ...api1State.storedTakerConfig,
-        walletName: api1State.currentWalletName,
-        password: api1State.currentWalletPassword,
-        protocol: api1State.protocolVersion || 'v1',
-      };
-
-      const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
-        workerData: { config },
-      });
+      console.log('📝 Creating fresh empty offerbook.json...');
+      fs.writeFileSync(offerbookPath, '[]', 'utf8');
 
       api1State.activeSyncs.set(syncId, {
-        status: 'starting',
+        status: 'syncing',
         startedAt: Date.now(),
         source: source,
       });
 
-      worker.on('message', (msg) => {
-        if (msg.type === 'complete') {
-          console.log(`✅ Offerbook sync completed (${source})`);
-          api1State.activeSyncs.set(syncId, {
-            ...api1State.activeSyncs.get(syncId),
-            status: 'completed',
-            completedAt: Date.now(),
-          });
+      // ✅ Trigger manual sync
+      api1State.takerInstance.runOfferSyncNow();
 
-          // ✅ CLEAR FLAGS
+      // Monitor until complete
+      const checkInterval = setInterval(() => {
+        try {
+          const isSyncing = api1State.takerInstance.isOfferbookSyncing();
+
+          if (!isSyncing) {
+            clearInterval(checkInterval);
+
+            console.log(`✅ Offerbook sync completed (${source})`);
+            api1State.activeSyncs.set(syncId, {
+              ...api1State.activeSyncs.get(syncId),
+              status: 'completed',
+              completedAt: Date.now(),
+            });
+
+            // Clear flags
+            api1State.syncState.isRunning = false;
+            api1State.syncState.currentSyncId = null;
+            api1State.syncState.lastSyncTime = Date.now();
+          }
+        } catch (err) {
+          clearInterval(checkInterval);
+          console.error(`❌ Sync check failed:`, err);
+
           api1State.syncState.isRunning = false;
           api1State.syncState.currentSyncId = null;
-          api1State.syncState.lastSyncTime = Date.now();
-        } else if (msg.type === 'error') {
-          console.error(`❌ Offerbook sync failed (${source}):`, msg.error);
+
           api1State.activeSyncs.set(syncId, {
             ...api1State.activeSyncs.get(syncId),
             status: 'failed',
-            error: msg.error,
-          });
-
-          // ✅ CLEAR FLAGS
-          api1State.syncState.isRunning = false;
-          api1State.syncState.currentSyncId = null;
-        } else if (msg.type === 'status') {
-          api1State.activeSyncs.set(syncId, {
-            ...api1State.activeSyncs.get(syncId),
-            status: msg.status,
+            error: err.message,
           });
         }
-      });
-
-      worker.on('error', (err) => {
-        console.error(`❌ [${syncId}] Worker error (${source}):`, err);
-
-        // ✅ CLEAR FLAGS
-        api1State.syncState.isRunning = false;
-        api1State.syncState.currentSyncId = null;
-      });
+      }, 1000);
 
       return { success: true, syncId, source };
     } catch (error) {
       console.error('❌ Sync offerbook failed:', error);
-
-      // ✅ CLEAR FLAGS
       api1State.syncState.isRunning = false;
       api1State.syncState.currentSyncId = null;
-
       return { success: false, error: error.message };
     }
   }
