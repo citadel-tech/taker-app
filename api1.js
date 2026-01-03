@@ -1082,24 +1082,35 @@ function registerCoinswapHandlers() {
           status: 'starting',
           amount,
           makerCount,
+          protocol: protocol,
+          isTaproot: protocol === 'v2',
+          protocolVersion: protocol === 'v2' ? 2 : 1,
           startedAt: Date.now(),
         });
 
         worker.on('message', (msg) => {
           if (msg.type === 'complete') {
+            const existingSwap = api1State.activeSwaps.get(swapId);
             const swapData = {
-              ...api1State.activeSwaps.get(swapId),
+              ...existingSwap,
               status: 'completed',
               report: msg.report,
+              protocol: msg.protocol || protocol,
+              isTaproot: msg.isTaproot || protocol === 'v2',
+              protocolVersion: protocol === 'v2' ? 2 : 1,
               completedAt: Date.now(),
             };
             api1State.activeSwaps.set(swapId, swapData);
             saveSwapReport(swapId, swapData);
           } else if (msg.type === 'error') {
+            const existingSwap = api1State.activeSwaps.get(swapId);
             const swapData = {
-              ...api1State.activeSwaps.get(swapId),
+              ...existingSwap,
               status: 'failed',
               error: msg.error,
+              protocol: protocol,
+              isTaproot: protocol === 'v2',
+              protocolVersion: protocol === 'v2' ? 2 : 1,
               failedAt: Date.now(),
             };
             api1State.activeSwaps.set(swapId, swapData);

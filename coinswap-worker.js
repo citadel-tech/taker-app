@@ -17,12 +17,13 @@ const { parentPort, workerData } = require('worker_threads');
     console.log(`🔧 Coinswap worker starting with ${protocolName} protocol`);
 
     // Select the appropriate Taker class based on protocol
-    const TakerClass = protocol === 'v2'
-      ? coinswapNapi.TaprootTaker
-      : coinswapNapi.Taker;
+    const TakerClass =
+      protocol === 'v2' ? coinswapNapi.TaprootTaker : coinswapNapi.Taker;
 
     if (!TakerClass) {
-      throw new Error(`${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Please rebuild coinswap-napi.`);
+      throw new Error(
+        `${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Please rebuild coinswap-napi.`
+      );
     }
 
     // Setup logging if available
@@ -48,7 +49,12 @@ const { parentPort, workerData } = require('worker_threads');
     );
 
     // Notify that we're in progress
-    parentPort.postMessage({ type: 'status', status: 'in_progress', protocol });
+    parentPort.postMessage({
+      type: 'status',
+      status: 'in_progress',
+      protocol: config.protocol,
+      isTaproot: protocol === 'v2',
+    });
 
     // Run the coinswap
     const swapParams = {
@@ -61,7 +67,12 @@ const { parentPort, workerData } = require('worker_threads');
     const report = taker.doCoinswap(swapParams);
 
     // Send success message
-    parentPort.postMessage({ type: 'complete', report, protocol });
+    parentPort.postMessage({
+      type: 'complete',
+      report,
+      protocol: config.protocol || 'v1',
+      isTaproot: (config.protocol || 'v1') === 'v2',
+    });
   } catch (error) {
     // Send error message
     parentPort.postMessage({ type: 'error', error: error.message });

@@ -23,11 +23,14 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   let currentStep = savedProgress ? savedProgress.currentStep || 0 : 0;
-  let startTime = savedProgress
-    ? savedProgress.startTime
-    : actualSwapConfig.startTime || Date.now();
+  let startTime =
+    savedProgress?.startTime || actualSwapConfig?.startTime || Date.now();
   let logMessages = savedProgress ? savedProgress.logMessages || [] : [];
   let currentHop = 0;
+
+  const isV2 =
+    actualSwapConfig.protocolVersion === 2 ||
+    actualSwapConfig.isTaproot === true;
 
   const swapData = {
     amount: actualSwapConfig.amount,
@@ -37,17 +40,37 @@ export async function CoinswapComponent(container, swapConfig) {
   };
 
   if (swapData.transactions.length === 0) {
-    for (let i = 0; i < swapData.hops; i++) {
-      swapData.transactions.push({
-        id: `tx${i}`,
-        txid: '',
-        status: 'pending',
-        confirmations: 0,
-        timestamp: null,
-        fee: 0,
-        maker: null,
-        size: 0,
-      });
+    if (isV2) {
+      swapData.transactions = [
+        {
+          id: 'tx-outgoing',
+          txid: '',
+          status: 'pending',
+          label: 'Locking Funds',
+        },
+        {
+          id: 'tx-incoming',
+          txid: '',
+          status: 'pending',
+          label: 'Receiving Funds',
+        },
+      ];
+    } else {
+      // Existing V1 behavior
+      if (swapData.transactions.length === 0) {
+        for (let i = 0; i < swapData.hops; i++) {
+          swapData.transactions.push({
+            id: `tx${i}`,
+            txid: '',
+            status: 'pending',
+            confirmations: 0,
+            timestamp: null,
+            fee: 0,
+            maker: null,
+            size: 0,
+          });
+        }
+      }
     }
   }
 
@@ -117,7 +140,13 @@ export async function CoinswapComponent(container, swapConfig) {
               : color === 'blue'
                 ? 'text-blue-400'
                 : 'text-gray-400';
-      hopStatus.className = `hop-status text-xs ${colorClass} font-bold`;
+
+      // ✅ FIX: Use setAttribute for SVG elements
+      hopStatus.setAttribute(
+        'class',
+        `hop-status text-xs ${colorClass} font-bold`
+      );
+
       if (color === 'yellow' || color === 'orange') {
         hopStatus.classList.add('animate-pulse');
       }
@@ -213,7 +242,6 @@ export async function CoinswapComponent(container, swapConfig) {
       updateHopStatus(0, 'Initializing...', 'yellow');
     }
     // V1: "Broadcasted Funding tx" / "Waiting for funding transaction confirmation"
-    // V2: "Registered watcher for taker's outgoing contract"
     else if (
       message.includes('Broadcasted Funding tx') ||
       message.includes('Waiting for funding transaction confirmation. Txids')
@@ -233,11 +261,10 @@ export async function CoinswapComponent(container, swapConfig) {
     ) {
       const txMatch = message.match(/([a-f0-9]{64}):(\d+)/i);
       if (txMatch) {
-        const emptySlot = swapData.transactions.findIndex((tx) => !tx.txid);
-        if (emptySlot !== -1) {
-          setTransactionTxid(emptySlot, txMatch[1]);
-          updateHopStatus(emptySlot, 'Broadcasting...', 'orange');
-        }
+        // This is hop 0 - taker's outgoing contract
+        setTransactionTxid(0, txMatch[1]);
+        updateHopStatus(0, 'Broadcasting...', 'orange');
+        updateMakerVisibility(0, true); // Light up first maker
       }
     }
     // V2: "Persisted outgoing swapcoin to wallet store"
@@ -254,15 +281,18 @@ export async function CoinswapComponent(container, swapConfig) {
         if (slot !== -1) {
           setTransactionConfirmed(slot);
           updateHopStatus(slot, '✓ Confirmed', 'green');
-          // Light up next maker, or all makers if this is the last hop
-          if (slot < swapData.hops - 1) {
-            updateMakerVisibility(slot + 1, true);
-          } else {
-            // Last hop confirmed - ensure all makers are visible
-            for (let i = 0; i < swapData.makers; i++) {
-              updateMakerVisibility(i, true);
-            }
+
+          const confirmedHops = swapData.transactions.filter(
+            (tx) => tx.status === 'confirmed'
+          ).length;
+
+          for (let i = 0; i < Math.min(confirmedHops, swapData.makers); i++) {
+            updateMakerVisibility(i, true);
           }
+
+          console.log(
+            `✅ Hop ${slot + 1} confirmed. Lighting up ${Math.min(confirmedHops, swapData.makers)} makers`
+          );
         }
       }
     }
@@ -276,8 +306,20 @@ export async function CoinswapComponent(container, swapConfig) {
         if (slot !== -1) {
           setTransactionConfirmed(slot);
           updateHopStatus(slot, '✓ Confirmed', 'green');
-          if (slot < swapData.hops - 1) {
-            updateMakerVisibility(slot + 1, true);
+
+          // ✅ When outgoing is confirmed, light up ALL makers and mark intermediate hops as "Processing"
+          if (slot === 0) {
+            // Light up all makers
+            for (let i = 0; i < swapData.makers; i++) {
+              updateMakerVisibility(i, true);
+            }
+            // Mark intermediate hops as processing (hops 1 to N-1)
+            for (let i = 1; i < swapData.hops - 1; i++) {
+              updateHopStatus(i, '🔄 Processing...', 'blue');
+            }
+            console.log(
+              `✅ Outgoing contract confirmed. All ${swapData.makers} makers now active`
+            );
           }
         }
       }
@@ -296,31 +338,43 @@ export async function CoinswapComponent(container, swapConfig) {
     }
     // V2: Negotiating with makers
     else if (message.includes('Received AckResponse from maker')) {
+      // Mark first few hops as negotiating
       updateHopStatus(0, 'Negotiating...', 'yellow');
     }
     // V2: "All makers have responded with their outgoing keys"
     else if (
       message.includes('All makers have responded with their outgoing keys')
     ) {
-      updateHopStatus(0, 'Keys received', 'green');
+      // Mark all intermediate hops as "Keys received"
+      for (let i = 1; i < swapData.hops - 1; i++) {
+        updateHopStatus(i, '🔑 Keys received', 'green');
+      }
+    }
+    // V2: "Registered watcher for taker's incoming contract"
+    else if (
+      message.includes("Registered watcher for taker's incoming contract")
+    ) {
+      const txMatch = message.match(/([a-f0-9]{64}):(\d+)/i);
+      if (txMatch) {
+        // This is the final hop - mark it
+        const lastHop = swapData.hops - 1;
+        updateHopStatus(lastHop, '📥 Receiving...', 'blue');
+      }
     }
     // V2: "Sweeping taker's incoming contract"
     else if (message.includes("Sweeping taker's incoming contract")) {
-      updateHopStatus(0, 'Sweeping...', 'yellow');
+      const lastHop = swapData.hops - 1;
+      updateHopStatus(lastHop, 'Sweeping...', 'yellow');
     }
     // V2: "Broadcast taker sweep transaction"
     else if (message.includes('Broadcast taker sweep transaction')) {
       const txMatch = message.match(/([a-f0-9]{64})/i);
       if (txMatch) {
-        // Update the transaction with sweep txid
-        const slot = swapData.transactions.findIndex((tx) => tx.txid);
-        if (slot !== -1) {
-          setTransactionConfirmed(slot);
-          updateHopStatus(slot, '✓ Swept', 'green');
-        }
+        const lastHop = swapData.hops - 1;
+        updateHopStatus(lastHop, '✓ Swept', 'green');
       }
     }
-    // V1: "Swaps settled successfully" | V2: "Swaps settled successfully"
+    // V1: "Swaps settled successfully"
     else if (message.includes('Swaps settled successfully')) {
       for (let i = 0; i < swapData.hops; i++) {
         updateHopStatus(i, '✓ Complete', 'green');
@@ -331,12 +385,20 @@ export async function CoinswapComponent(container, swapConfig) {
       for (let i = 0; i < swapData.hops; i++) {
         updateHopStatus(i, '✓ Complete', 'green');
       }
+      // Make sure all makers are visible
+      for (let i = 0; i < swapData.makers; i++) {
+        updateMakerVisibility(i, true);
+      }
       updateYouReceive(true);
     }
     // V2: "Successfully Completed Taproot Coinswap"
     else if (message.includes('Successfully Completed Taproot Coinswap')) {
       for (let i = 0; i < swapData.hops; i++) {
         updateHopStatus(i, '✓ Complete', 'green');
+      }
+      // Make sure all makers are visible
+      for (let i = 0; i < swapData.makers; i++) {
+        updateMakerVisibility(i, true);
       }
       updateYouReceive(true);
     }
@@ -350,7 +412,10 @@ export async function CoinswapComponent(container, swapConfig) {
     }
     // V2: "Starting forward-flow private key handover"
     else if (message.includes('Starting forward-flow private key handover')) {
-      updateHopStatus(0, 'Key exchange...', 'yellow');
+      // Mark intermediate hops as doing key exchange
+      for (let i = 1; i < swapData.hops - 1; i++) {
+        updateHopStatus(i, '🔐 Key exchange...', 'yellow');
+      }
     }
     // V2: "Downloading offer from taproot maker"
     else if (message.includes('Downloading offer from taproot maker')) {
@@ -378,6 +443,20 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Successfully recovered outgoing contract via timelock')
     ) {
       addLog('Recovered via timelock', 'success');
+    } else if (
+      message.includes("Registered watcher for taker's outgoing contract")
+    ) {
+      const txMatch = message.match(/([a-f0-9]{64})/);
+      if (txMatch && isV2) {
+        setTransactionTxid(0, txMatch[1]); // slot 0 = outgoing
+        updateHopStatus(0, 'Locked', 'orange'); // but we won't show per-hop status anymore
+      }
+    } else if (message.includes('Broadcast taker sweep transaction')) {
+      const txMatch = message.match(/([a-f0-9]{64})/i);
+      if (txMatch && isV2) {
+        setTransactionTxid(1, txMatch[1]);
+        updateYouReceive(true);
+      }
     }
   }
 
@@ -484,6 +563,10 @@ export async function CoinswapComponent(container, swapConfig) {
             error: swap.error,
           });
 
+          // Show failure modal
+          showFailureModal(swap.error);
+
+          // Trigger recovery
           triggerRecovery();
         }
       } catch (error) {
@@ -492,9 +575,70 @@ export async function CoinswapComponent(container, swapConfig) {
     }, 2000);
   }
 
+  function showFailureModal(errorMessage) {
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.className =
+      'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+    modal.innerHTML = `
+    <div class="bg-[#1a2332] rounded-lg p-6 max-w-md mx-4 border border-red-500/30">
+      <div class="flex items-center mb-4">
+        <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mr-4">
+          <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </div>
+        <h3 class="text-xl font-bold text-red-400">Swap Failed</h3>
+      </div>
+      
+      <div class="mb-6">
+        <p class="text-gray-300 mb-3">The coinswap could not be completed. Your funds are safe and recovery has been initiated.</p>
+        
+        <div class="bg-[#0f1419] rounded p-3 mb-3">
+          <p class="text-xs text-gray-400 mb-1">Error Details:</p>
+          <p class="text-sm text-red-300 font-mono break-words">${errorMessage || 'Unknown error'}</p>
+        </div>
+        
+        <div class="bg-blue-500/10 border border-blue-500/30 rounded p-3 text-xs text-blue-300">
+          <p class="font-semibold mb-1">🔒 Your funds are protected</p>
+          <p>Recovery process has started automatically. Check your wallet for returned funds.</p>
+        </div>
+      </div>
+      
+      <button id="modal-to-swap" class="w-full bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
+        Back to Swap Page
+      </button>
+    </div>
+  `;
+
+    document.body.appendChild(modal);
+
+    // Add event listener
+    modal.querySelector('#modal-to-swap').addEventListener('click', () => {
+      modal.remove();
+      if (pollInterval) clearInterval(pollInterval);
+      if (logPollInterval) clearInterval(logPollInterval);
+
+      // Navigate back to Swap page
+      import('./Swap.js').then((module) => {
+        container.innerHTML = '';
+        module.SwapComponent(container);
+      });
+    });
+  }
+
   function completeSwapWithReport(report) {
     if (content.dataset.completed === 'true') return;
     content.dataset.completed = 'true';
+
+    // ✅ ADD THESE DEBUG LOGS
+    console.log('🔍 actualSwapConfig:', actualSwapConfig);
+    console.log('🔍 Backend report:', report);
+    console.log(
+      '🔍 isV2 check:',
+      actualSwapConfig.protocolVersion,
+      actualSwapConfig.isTaproot
+    );
 
     addLog('Generating swap report...', 'success');
 
@@ -504,6 +648,14 @@ export async function CoinswapComponent(container, swapConfig) {
     content.querySelector('#complete-button').classList.remove('hidden');
 
     const transformedReport = transformSwapReport(report);
+    transformedReport.protocol =
+      actualSwapConfig.protocol ||
+      (actualSwapConfig.protocolVersion === 2 ? 'v2' : 'v1');
+    transformedReport.isTaproot =
+      actualSwapConfig.isTaproot || actualSwapConfig.protocolVersion === 2;
+    transformedReport.protocolVersion =
+      actualSwapConfig.protocolVersion || (actualSwapConfig.isTaproot ? 2 : 1);
+
     actualSwapConfig.swapReport = transformedReport;
 
     SwapStateManager.saveSwapProgress({
@@ -598,6 +750,17 @@ export async function CoinswapComponent(container, swapConfig) {
       const feeTotal = baseFee + amountRelativeFee + timeRelativeFee;
       totalMakerFees += feeTotal;
 
+      const outgoingContracts = getArrayValue(
+        'outgoing_contracts',
+        'outgoingContracts',
+        []
+      );
+      const incomingContracts = getArrayValue(
+        'incoming_contracts',
+        'incomingContracts',
+        []
+      );
+
       return {
         makerIndex: idx,
         makerAddress: makerAddresses[idx] || `maker${idx + 1}`,
@@ -684,9 +847,13 @@ export async function CoinswapComponent(container, swapConfig) {
   function updateArrowLink(hopIndex, txid) {
     const arrow = content.querySelector(`#arrow-link-${hopIndex}`);
     if (arrow && txid) {
-      // Use mempool.space for mainnet, or localhost for regtest
-      const baseUrl = 'https://mempool.space/tx/'; // Change to 'http://localhost:8080/tx/' for regtest
-      arrow.href = `${baseUrl}${txid}`;
+      const baseUrl = 'https://mempool.space/signet/tx/';
+      // ✅ FIX: Use setAttributeNS for SVG href
+      arrow.setAttributeNS(
+        'http://www.w3.org/1999/xlink',
+        'href',
+        `${baseUrl}${txid}`
+      );
     }
   }
 
@@ -694,11 +861,37 @@ export async function CoinswapComponent(container, swapConfig) {
     const txList = content.querySelector('#transaction-list');
     if (!txList) return;
 
-    const txHtml = swapData.transactions
-      .map((tx, index) => {
-        const hasData = tx.txid || tx.status !== 'pending';
-        if (!hasData) {
-          return `
+    if (isV2) {
+      const [outgoing, incoming] = swapData.transactions;
+      txList.innerHTML = `
+      <div class="space-y-3">
+        <div class="bg-[#0f1419] rounded p-3">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-gray-300 font-medium">Locking Funds</span>
+            <span class="${outgoing.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
+              ${outgoing.status === 'confirmed' ? '✓ Confirmed' : outgoing.txid ? 'Broadcasted' : 'Pending'}
+            </span>
+          </div>
+          ${outgoing.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${outgoing.txid}</div>` : '<div class="text-gray-500 text-xs">Waiting for broadcast...</div>'}
+        </div>
+
+        <div class="bg-[#0f1419] rounded p-3 opacity-${incoming.status === 'pending' ? '50' : '100'}">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-gray-300 font-medium">Receiving Funds</span>
+            <span class="${incoming.status === 'confirmed' ? 'text-green-400' : 'text-gray-500'}">
+              ${incoming.status === 'confirmed' ? '✓ Received' : 'Waiting...'}
+            </span>
+          </div>
+          ${incoming.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${incoming.txid}</div>` : '<div class="text-gray-500 text-xs">Sweep pending</div>'}
+        </div>
+      </div>
+    `;
+    } else {
+      const txHtml = swapData.transactions
+        .map((tx, index) => {
+          const hasData = tx.txid || tx.status !== 'pending';
+          if (!hasData) {
+            return `
           <div class="bg-[#0f1419] rounded p-2 text-xs opacity-50">
             <div class="flex justify-between mb-1">
               <span class="text-gray-400">Hop ${index + 1}</span>
@@ -707,9 +900,9 @@ export async function CoinswapComponent(container, swapConfig) {
             <div class="font-mono text-gray-500">Waiting...</div>
           </div>
         `;
-        }
+          }
 
-        return `
+          return `
         <div class="bg-[#0f1419] rounded p-2 text-xs">
           <div class="flex justify-between mb-1">
             <span class="text-gray-400">Hop ${index + 1}</span>
@@ -724,14 +917,64 @@ export async function CoinswapComponent(container, swapConfig) {
           </div>
         </div>
       `;
-      })
-      .join('');
+        })
+        .join('');
 
-    txList.innerHTML = txHtml;
+      txList.innerHTML = txHtml;
+    }
   }
 
   function buildFlowDiagram() {
     const actualMakers = swapData.makers; // Number of actual makers (e.g., 2)
+
+    if (isV2) {
+      // Simplified V2 diagram: You → Makers (as one group) → You
+      return `
+    <div class="flex items-center justify-center" style="min-height: 450px;">
+      <svg width="450" height="450" viewBox="0 0 400 400" class="mx-auto">
+        <defs>
+          <marker id="arrow-out" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#FF6B35" />
+          </marker>
+          <marker id="arrow-in" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+            <polygon points="0 0, 8 3, 0 6" fill="#10B981" />
+          </marker>
+        </defs>
+
+        <!-- You Send -->
+        <g id="you-send">
+          <circle cx="100" cy="200" r="50" fill="#FF6B35" />
+          <text x="100" y="195" text-anchor="middle" fill="white" font-size="20" font-weight="bold">You</text>
+          <text x="100" y="215" text-anchor="middle" fill="#FFD4B9" font-size="12">Send</text>
+        </g>
+
+        <!-- Arrow to Makers -->
+        <a id="arrow-link-0">
+          <line x1="150" y1="200" x2="250" y2="200" stroke="#FF6B35" stroke-width="3" marker-end="url(#arrow-out)" />
+        </a>
+
+        <!-- Makers Group -->
+        <g id="makers-group">
+          <rect x="220" y="150" width="110" height="100" rx="20" fill="#3B82F6" opacity="0.9"/>
+          <text x="275" y="190" text-anchor="middle" fill="white" font-size="24" font-weight="bold">Makers</text>
+          <text x="275" y="215" text-anchor="middle" fill="#BFDBFE" font-size="12">${actualMakers} Liquidity Providers</text>
+        </g>
+
+        <!-- Arrow back to You -->
+        <a id="arrow-link-1">
+          <path d="M250 200 Q 200 100, 150 200" stroke="#10B981" stroke-width="3" fill="none" marker-end="url(#arrow-in)" />
+        </a>
+
+        <!-- You Receive -->
+        <g id="you-receive" style="opacity: 0.3">
+          <circle cx="100" cy="200" r="50" fill="#10B981" />
+          <text x="100" y="195" text-anchor="middle" fill="white" font-size="20" font-weight="bold">You</text>
+          <text x="100" y="215" text-anchor="middle" fill="#A7F3D0" font-size="12">Receive ✓</text>
+        </g>
+      </svg>
+    </div>
+    `;
+    }
     const radius = 140; // Radius of the circle
     const centerX = 200;
     const centerY = 200;
@@ -931,7 +1174,7 @@ export async function CoinswapComponent(container, swapConfig) {
       ${buildFlowDiagram()}
     </div>
 
-    <div class="grid grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 ${isV2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4 mb-6">
       <div class="bg-[#1a2332] rounded-lg p-4">
         <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Progress</h3>
         <div class="space-y-2 text-sm">
@@ -939,10 +1182,21 @@ export async function CoinswapComponent(container, swapConfig) {
             <span class="text-gray-400">Amount</span>
             <span class="font-mono text-white">${(swapData.amount / 100000000).toFixed(8)} BTC</span>
           </div>
+         ${
+           !isV2
+             ? `
           <div class="flex justify-between">
             <span class="text-gray-400">Hops</span>
             <span class="text-cyan-400">${swapData.hops}</span>
           </div>
+          `
+             : `
+          <div class="flex justify-between">
+            <span class="text-gray-400">Protocol</span>
+            <span class="text-cyan-400">Taproot V2</span>
+          </div>
+          `
+         }
           <div class="flex justify-between">
             <span class="text-gray-400">Time</span>
             <span id="elapsed-time" class="text-yellow-400">0:00</span>
@@ -950,10 +1204,16 @@ export async function CoinswapComponent(container, swapConfig) {
         </div>
       </div>
 
+      ${
+        !isV2
+          ? `
       <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Transactions</h3>
+        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Hop Transactions</h3>
         <div id="transaction-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
       </div>
+      `
+          : ''
+      }
 
       <div class="bg-[#1a2332] rounded-lg p-4">
         <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Status</h3>

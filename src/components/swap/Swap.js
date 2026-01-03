@@ -124,6 +124,12 @@ export async function SwapComponent(container) {
     availableUtxos = cached.utxos || [];
     availableMakers = cached.makers || [];
     totalBalance = cached.balance || 0;
+
+    // Update makers count immediately since we have the data
+    const makersCountEl = content.querySelector('#available-makers-count');
+    if (makersCountEl) {
+      makersCountEl.textContent = availableMakers.length;
+    }
   }
 
   // Fetch real UTXOs from API
@@ -168,12 +174,6 @@ export async function SwapComponent(container) {
     if (useCache && cached && cached.makers) {
       availableMakers = cached.makers;
       console.log('✅ Loaded', availableMakers.length, 'makers from cache');
-
-      // Update UI count
-      const makersCountEl = content.querySelector('#available-makers-count');
-      if (makersCountEl) {
-        makersCountEl.textContent = availableMakers.length;
-      }
       return availableMakers;
     }
 
@@ -222,15 +222,9 @@ export async function SwapComponent(container) {
       totalBalance = cached.balance;
       console.log('✅ Loaded balance from cache:', totalBalance);
 
-      // Update UI
-      const balanceEl = content.querySelector('#available-balance-sats');
-      const balanceBtcEl = content.querySelector('#available-balance-btc');
-      if (balanceEl) {
-        balanceEl.textContent = totalBalance.toLocaleString() + ' sats';
-      }
-      if (balanceBtcEl) {
-        balanceBtcEl.textContent =
-          (totalBalance / 100000000).toFixed(8) + ' BTC';
+      // Update UI if function exists
+      if (typeof updateBalanceUI === 'function') {
+        updateBalanceUI();
       }
       return totalBalance;
     }
@@ -242,15 +236,9 @@ export async function SwapComponent(container) {
         totalBalance = data.balance.spendable;
         console.log('✅ Loaded balance from API:', totalBalance);
 
-        // Update UI
-        const balanceEl = content.querySelector('#available-balance-sats');
-        const balanceBtcEl = content.querySelector('#available-balance-btc');
-        if (balanceEl) {
-          balanceEl.textContent = totalBalance.toLocaleString() + ' sats';
-        }
-        if (balanceBtcEl) {
-          balanceBtcEl.textContent =
-            (totalBalance / 100000000).toFixed(8) + ' BTC';
+        // Update UI if function exists
+        if (typeof updateBalanceUI === 'function') {
+          updateBalanceUI();
         }
         return totalBalance;
       }
@@ -511,6 +499,15 @@ export async function SwapComponent(container) {
         swapAmount = Math.floor(value * 100000000);
       } else if (amountUnit === 'usd') {
         swapAmount = Math.floor((value / btcPrice) * 100000000);
+      }
+
+      const inputConversions = content.querySelector(
+        '#amount-input-conversions'
+      );
+      if (inputConversions && selectionMode === 'auto') {
+        const btcAmount = (swapAmount / 100000000).toFixed(8);
+        const usdAmount = ((swapAmount / 100000000) * btcPrice).toFixed(2);
+        inputConversions.textContent = `≈ ${btcAmount} BTC • $${usdAmount} USD`;
       }
     }
 
@@ -867,7 +864,7 @@ export async function SwapComponent(container) {
                 Max
               </button>
             </div>
-            <p class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
+<p id="amount-input-conversions" class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
           </div>
 
           <!-- UTXO Selection (Only in Manual mode) -->
@@ -899,7 +896,7 @@ export async function SwapComponent(container) {
           <div class="mb-6">
             <div class="flex justify-between items-center mb-2">
               <label class="block text-sm text-gray-400">Number of Hops</label>
-              <span class="text-xs text-gray-500">Available makers: <span id="available-makers-count">0</span></span>
+              <span class="text-xs text-gray-500">Available makers: <span id="available-makers-count">${availableMakers.length}</span></span>
             </div>
             <div class="grid grid-cols-4 gap-2">
               <button id="hop-3" class="hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
@@ -1045,6 +1042,20 @@ export async function SwapComponent(container) {
 
   container.appendChild(content);
 
+  function updateBalanceUI() {
+    const balanceEl = content.querySelector('#available-balance-sats');
+    const balanceBtcEl = content.querySelector('#available-balance-btc');
+    if (balanceEl) {
+      balanceEl.textContent = totalBalance.toLocaleString() + ' sats';
+    }
+    if (balanceBtcEl) {
+      balanceBtcEl.textContent = (totalBalance / 100000000).toFixed(8) + ' BTC';
+    }
+  }
+
+  if (cached && !cached.isStale && totalBalance > 0) {
+    updateBalanceUI();
+  }
   // EVENT LISTENERS
 
   content
@@ -1132,9 +1143,14 @@ export async function SwapComponent(container) {
       }
 
       // ✅ ADD THIS PROTOCOL CHECK
+      let protocol = 'v1';
+let protocolName = 'Legacy';
+
+
+
       try {
         const protocolResult = await window.api.taker.getProtocol();
-        const protocol = protocolResult.protocol;
+        const protocol = protocolResult.protocol || 'v1';
         const protocolName = protocolResult.protocolName;
 
         // Check if we have compatible makers
@@ -1183,6 +1199,9 @@ export async function SwapComponent(container) {
         customHopCount: customHopCount,
         networkFeeRate: networkFeeRate,
         startTime: Date.now(),
+        protocol: protocol,
+        isTaproot: protocol === 'v2',
+        protocolVersion: protocol === 'v2' ? 2 : 1,
       };
 
       console.log('💾 Saving swap configuration:', swapConfig);
@@ -1276,6 +1295,12 @@ export async function SwapComponent(container) {
       // Save to cache
       saveSwapDataToCache(utxos, makers, balance);
 
+      updateBalanceUI();
+
+      const makersCountEl = content.querySelector('#available-makers-count');
+      if (makersCountEl) {
+        makersCountEl.textContent = makers.length;
+      }
       renderUtxoList();
       await renderRecentSwaps();
 
