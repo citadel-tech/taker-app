@@ -309,7 +309,7 @@ export function Market(container) {
 
       // ✅ Sync is done - wait 2 more seconds for file write
       console.log('✅ Offerbook synced - waiting for file write...');
-      await new Promise((resolve) => setTimeout(resolve, 10000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
 
       // ✅ NOW fetch makers
       console.log('✅ Now fetching makers...');
@@ -432,7 +432,7 @@ export function Market(container) {
 
     // ✅ CHANGE THIS: Wait 10 seconds (same as handleRefresh)
     console.log('✅ Offerbook sync completed - waiting for file write...');
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // ✅ NOW fetch makers
     console.log('✅ Now fetching makers...');
