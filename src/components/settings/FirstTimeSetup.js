@@ -35,9 +35,9 @@ export function FirstTimeSetupModal(container, onComplete) {
 
           <!-- Protocol Selection -->
 <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-  <h4 class="text-white font-semibold text-lg mb-3">Select Swap Protocol Type</h4>
+  <h4 class="text-white font-semibold text-lg mb-3">Select Swap Type</h4>
   <p class="text-sm text-gray-400 mb-4">
-    This determines which type of coinswaps you'll perform. You can only use one protocol type at a time.
+    This determines which type of swap you can perform. Either Taproot or Legacy(P2WSH) swaps.
   </p>
   
   <div class="grid grid-cols-2 gap-4">
@@ -83,9 +83,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   <!-- Important Notice -->
   <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mt-4">
     <p class="text-xs text-yellow-400 leading-relaxed">
-      <strong>⚠️ Important:</strong> You can only perform one protocol type at a time (Taproot OR Legacy swaps). 
-      However, your wallet can handle both Taproot and Legacy transactions for regular operations. 
-      To serve both protocols as a maker, run two separate maker instances (they can share the same Bitcoin Core node).
+      <strong>⚠️ Important:</strong>You can only perform one type of swap with a taker (Taproot OR Legacy swaps). You cannot do both. However, your wallet can handle both Taproot and Legacy transactions for regular operations of send and receive.
     </p>
   </div>
 </div>
