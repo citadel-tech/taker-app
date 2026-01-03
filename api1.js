@@ -16,7 +16,7 @@ const api1State = {
   DEFAULT_WALLET_NAME: 'taker-wallet',
   currentWalletName: 'taker-wallet',
   currentWalletPassword: '',
-  protocolVersion: 'v2', // 'v1' (P2WSH/Taker) or 'v2' (Taproot/TaprootTaker)
+  protocolVersion: 'v1', // 'v1' (P2WSH/Taker) or 'v2' (Taproot/TaprootTaker)
   walletSyncInterval: null,
 
   syncState: {
@@ -103,125 +103,178 @@ async function initNAPI() {
 function registerTakerHandlers() {
   // Initialize taker
   ipcMain.handle('taker:initialize', async (event, config) => {
-    try {
-      // Determine protocol version
-      const protocol = config.protocol || 'v1';
-      api1State.protocolVersion = protocol;
+  try {
+    console.log('🔧 Taker initialization requested');
+
+    // ✅ EXTRACT CONFIG VALUES ONCE
+    const walletName = config.wallet?.name || config.wallet?.fileName || api1State.DEFAULT_WALLET_NAME;
+    const protocol = config.protocol || 'v1';
+    const network = config.network || 'signet';
+    const walletPath = path.join(api1State.DATA_DIR, 'wallets', walletName);
+
+    // ✅ CHECK IF WE CAN REUSE EXISTING INSTANCE (simplified)
+    const canReuse = api1State.takerInstance &&
+      api1State.protocolVersion === protocol &&
+      api1State.currentWalletName === walletName;
+
+    console.log('🔍 Reuse check:', {
+      hasInstance: !!api1State.takerInstance,
+      protocolMatch: api1State.protocolVersion === protocol,
+      walletMatch: api1State.currentWalletName === walletName,
+      canReuse,
+    });
+
+    if (canReuse) {
+      console.log('✅ Reusing existing Taker instance');
       const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
-      console.log(
-        `📦 [API] Initializing taker with ${protocolName} protocol...`
-      );
-
-      if (!api1State.coinswapNapi) {
-        await initNAPI();
-        if (!api1State.coinswapNapi) {
-          return { success: false, error: 'Failed to load coinswap-napi' };
-        }
-      }
-
-      const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
-      const walletName =
-        config.wallet?.name ||
-        config.wallet?.fileName ||
-        api1State.DEFAULT_WALLET_NAME;
-      api1State.currentWalletName = walletName;
-
-      const rpcConfig = {
-        url: `${config.rpc?.host || '127.0.0.1'}:${config.rpc?.port || 38332}`,
-        username: config.rpc?.username || 'user',
-        password: config.rpc?.password || 'password',
-        walletName: walletName,
-      };
-
-      console.log('🔧 Initializing Taker with:', {
-        walletName,
-        zmqAddr,
-        protocol,
-      });
-
-      // Select the appropriate Taker class based on protocol
-      const TakerClass =
-        protocol === 'v2'
-          ? api1State.coinswapNapi.TaprootTaker
-          : api1State.coinswapNapi.Taker;
-
-      if (!TakerClass) {
-        const missing = protocol === 'v2' ? 'TaprootTaker' : 'Taker';
-        return {
-          success: false,
-          error: `${missing} class not found in coinswap-napi. Please rebuild the native module.`,
-        };
-      }
-
-      // Setup logging
-      try {
-        if (TakerClass.setupLogging) {
-          TakerClass.setupLogging(api1State.DATA_DIR);
-        }
-      } catch (logError) {
-        console.warn('⚠️ Could not setup logging:', logError.message);
-      }
-
-      const walletPassword = config.wallet?.password;
-      const finalPassword =
-        walletPassword && walletPassword.trim() !== '' ? walletPassword : '';
-      api1State.currentWalletPassword = finalPassword || '';
-
-      const torAuthPassword = config.taker?.tor_auth_password || undefined;
-
-      api1State.takerInstance = new TakerClass(
-        api1State.DATA_DIR,
-        walletName,
-        rpcConfig,
-        config.taker?.control_port || 9051,
-        torAuthPassword,
-        zmqAddr,
-        finalPassword
-      );
-
-      api1State.storedTakerConfig = {
-        dataDir: api1State.DATA_DIR,
-        rpcConfig,
-        zmqAddr,
-        controlPort: config.taker?.control_port || 9051,
-        torAuthPassword: torAuthPassword,
-        password: finalPassword || '',
-        protocol: protocol,
-      };
-
-      console.log(
-        `✅ ${protocolName} Taker initialized with wallet:`,
-        walletName
-      );
-
-      // Background offerbook sync
-      setTimeout(async () => {
-        await startOfferbookSync('auto');
-
-        // Start periodic syncs (every 5 minutes)
-        startPeriodicSync();
-        startPeriodicWalletSync();
-      }, 2000);
-
       return {
         success: true,
-        message: `${protocolName} Taker initialized and ready`,
+        message: `Reusing existing ${protocolName} Taker instance`,
         protocol,
+        walletName,
+        reused: true,
       };
-    } catch (error) {
-      console.error('❌ Initialization failed:', error);
+    }
 
-      if (
-        error.message.includes('decrypting wallet') ||
-        error.message.includes('wrong passphrase')
-      ) {
-        return {
-          success: false,
-          error: 'Incorrect password',
-          wrongPassword: true,
-        };
+    // ✅ SHUTDOWN OLD INSTANCE IF EXISTS
+    if (api1State.takerInstance) {
+      console.log('🔄 Shutting down old taker instance...');
+      try {
+        stopPeriodicSync();
+        if (api1State.walletSyncInterval) {
+          clearInterval(api1State.walletSyncInterval);
+          api1State.walletSyncInterval = null;
+        }
+        api1State.takerInstance.shutdown();
+      } catch (err) {
+        console.error('⚠️ Shutdown error:', err);
+      }
+      api1State.takerInstance = null;
+    }
+
+    console.log('🔧 Creating NEW Taker instance...');
+    
+    const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
+    console.log(`📦 Initializing ${protocolName} taker...`);
+
+    if (!api1State.coinswapNapi) {
+      await initNAPI();
+      if (!api1State.coinswapNapi) {
+        return { success: false, error: 'Failed to load coinswap-napi' };
+      }
+    }
+
+    // ✅ PREPARE CONSTRUCTOR PARAMS
+    const zmqAddr = config.zmq?.address || 'tcp://127.0.0.1:28332';
+    const rpcConfig = {
+      url: `${config.rpc?.host || '127.0.0.1'}:${config.rpc?.port || 38332}`,
+      username: config.rpc?.username || 'user',
+      password: config.rpc?.password || 'password',
+      walletName,
+    };
+    const finalPassword = config.wallet?.password?.trim() || '';
+    const torAuthPassword = config.taker?.tor_auth_password;
+    const controlPort = config.taker?.control_port || 9051;
+
+    // ✅ SELECT TAKER CLASS
+    const TakerClass = protocol === 'v2' 
+      ? api1State.coinswapNapi.TaprootTaker 
+      : api1State.coinswapNapi.Taker;
+
+    if (!TakerClass) {
+      return {
+        success: false,
+        error: `${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Rebuild coinswap-napi.`,
+      };
+    }
+
+    // ✅ SETUP LOGGING
+    try {
+      TakerClass.setupLogging?.(api1State.DATA_DIR);
+    } catch (err) {
+      console.warn('⚠️ Logging setup failed:', err.message);
+    }
+
+    // ✅ CREATE INSTANCE
+    api1State.takerInstance = new TakerClass(
+      api1State.DATA_DIR,
+      walletName,
+      rpcConfig,
+      controlPort,
+      torAuthPassword,
+      zmqAddr,
+      finalPassword
+    );
+
+    // ✅ SAVE STATE
+    api1State.protocolVersion = protocol;
+    api1State.currentWalletName = walletName;
+    api1State.currentWalletPassword = finalPassword;
+    api1State.storedTakerConfig = {
+      dataDir: api1State.DATA_DIR,
+      rpcConfig,
+      zmqAddr,
+      controlPort,
+      torAuthPassword,
+      password: finalPassword,
+      protocol,
+    };
+
+    console.log(`✅ ${protocolName} Taker initialized`);
+
+    // ✅ START BACKGROUND SERVICES
+    setTimeout(async () => {
+      console.log('🔄 Starting background services...');
+      await startOfferbookSync('auto');
+      startPeriodicSync();
+      startPeriodicWalletSync();
+      console.log('✅ Background services started');
+    }, 2000);
+
+    return {
+      success: true,
+      message: `${protocolName} Taker initialized`,
+      protocol,
+      walletName,
+      reused: false,
+    };
+  } catch (error) {
+    console.error('❌ Initialization failed:', error);
+
+    if (error.message.includes('decrypt') || error.message.includes('passphrase')) {
+      return { success: false, error: 'Incorrect password', wrongPassword: true };
+    }
+
+    return { success: false, error: error.message };
+  }
+});
+
+  ipcMain.handle('taker:shutdown', async () => {
+    try {
+      console.log('🛑 Shutting down taker...');
+      console.trace('Shutdown called from:'); // ← ADD THIS to see who called it
+
+      // Stop periodic syncs
+      stopPeriodicSync();
+
+      // Stop wallet sync
+      if (api1State.walletSyncInterval) {
+        clearInterval(api1State.walletSyncInterval);
+        api1State.walletSyncInterval = null;
       }
 
+      // Shutdown taker instance
+      if (api1State.takerInstance) {
+        api1State.takerInstance.shutdown();
+        api1State.takerInstance = null;
+        api1State.protocolVersion = null;
+        api1State.currentWalletName = null;
+        console.log('✅ Taker shutdown complete');
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Taker shutdown error:', error);
       return { success: false, error: error.message };
     }
   });
@@ -894,6 +947,7 @@ function registerCoinswapHandlers() {
         if (!api1State.takerInstance) {
           return { success: false, error: 'Taker not initialized' };
         }
+        const offerbookPath = path.join(api1State.DATA_DIR, 'offerbook.json');
 
         if (!amount || amount <= 0) {
           return { success: false, error: 'Invalid amount' };
