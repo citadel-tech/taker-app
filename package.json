@@ -84,7 +84,7 @@
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.14",
-    "tailwindcss": "^4.1.14",
-    "coinswap-napi": "file:./node_modules/coinswap-napi"
+    "electron-store": "^8.2.0",
+    "tailwindcss": "^4.1.14"
   }
 }

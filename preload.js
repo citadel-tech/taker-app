@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('tor:testConnection', config),
     getProtocol: () => ipcRenderer.invoke('taker:getProtocol'),
     isOfferbookSyncing: () => ipcRenderer.invoke('taker:isOfferbookSyncing'),
+    setupLogging: (dataDir, level) => 
+      ipcRenderer.invoke('taker:setupLogging', { dataDir, level }),
+
   },
 
   // Coinswap operations
@@ -58,6 +61,10 @@ contextBridge.exposeInMainWorld('api', {
   shell: {
     showItemInFolder: (path) =>
       ipcRenderer.invoke('shell:showItemInFolder', path),
+  },
+   preferences: {
+    get: (key) => ipcRenderer.invoke('preferences:get', key),
+    set: (key, value) => ipcRenderer.invoke('preferences:set', key, value),
   },
 
   // File dialogs - TOP LEVEL, NOT INSIDE TAKER!
