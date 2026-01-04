@@ -30,7 +30,7 @@ function createWindow() {
       enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    icon: path.join(__dirname, 'assets/icon.png'),
+    icon: path.join(__dirname, 'src', 'image', 'coinswap.png'),
   });
 
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
@@ -70,10 +70,10 @@ function createWindow() {
 
 app.whenReady().then(async () => {
   console.log('🚀 Electron app starting...');
-  
+
   // Register API v1 handlers
   registerAPI1();
-  
+
   createWindow();
 });
 
