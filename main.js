@@ -30,7 +30,7 @@ function createWindow() {
       enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    icon: path.join(__dirname, 'src', 'image', 'coinswap.png'),
+    icon: path.join(__dirname, 'coinswap.png'),
   });
 
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {

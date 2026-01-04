@@ -48,7 +48,7 @@
       ],
       "category": "Finance",
       "executableName": "coinswap-taker",
-      "icon": "src/image/coinswap.png"
+      "icon": "coinswap.png"
     },
     "snap": {
       "confinement": "classic",
