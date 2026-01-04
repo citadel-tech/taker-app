@@ -1,7 +1,9 @@
-const { ipcMain, dialog } = require('electron');
+const { ipcMain, dialog, app } = require('electron');
 const { Worker } = require('worker_threads');
 const path = require('path');
 const fs = require('fs');
+const Store = require('electron-store');
+const store = new Store();
 
 // ============================================================================
 // SHARED STATE - Exported for main.js to access if needed
@@ -101,6 +103,45 @@ async function initNAPI() {
 // ============================================================================
 
 function registerTakerHandlers() {
+  ipcMain.handle('preferences:get', async (event, key) => {
+    try {
+      return { success: true, value: store.get(key) };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('preferences:set', async (event, key, value) => {
+    try {
+      store.set(key, value);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Add setupLogging handler
+  ipcMain.handle('taker:setupLogging', async (event, { dataDir, level }) => {
+    try {
+      console.log(`🔧 Setting up logging: level=${level}, dataDir=${dataDir}`);
+
+      if (!TakerClass?.setupLogging) {
+        throw new Error('setupLogging method not available');
+      }
+
+      TakerClass.setupLogging(dataDir, level);
+
+      // Store the preference
+      store.set('logLevel', level);
+
+      console.log('✅ Logging initialized successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Logging setup failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Initialize taker
   ipcMain.handle('taker:initialize', async (event, config) => {
     try {
@@ -195,7 +236,13 @@ function registerTakerHandlers() {
 
       // ✅ SETUP LOGGING
       try {
-        TakerClass.setupLogging?.(api1State.DATA_DIR);
+        // Get log level from store, environment, or default to 'info'
+        const logLevel =
+          store.get('logLevel') || process.env.LOG_LEVEL || 'info';
+
+        console.log(`🔧 Setting up logging with level: ${logLevel}`);
+        TakerClass.setupLogging?.(api1State.DATA_DIR, logLevel);
+        console.log('✅ Logging initialized');
       } catch (err) {
         console.warn('⚠️ Logging setup failed:', err.message);
       }

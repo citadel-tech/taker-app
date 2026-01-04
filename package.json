@@ -10,7 +10,59 @@
     "build:css": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css",
     "test": "echo \"Error: no test specified\" && exit 1",
     "setup:coinswap": "node setup-coinswap.js",
-    "prepare": "npm run setup:coinswap && npm run build:css"
+    "prepare": "npm run setup:coinswap && npm run build:css",
+    "build": "npm run build:css",
+    "prebuild:electron": "node prepare-dist.js",
+    "build:electron": "electron-builder",
+    "postbuild:electron": "node postbuild-dist.js",
+    "dist": "node prepare-dist.js && npm run build && npm run build:electron && node postbuild-dist.js"
+  },
+  "build": {
+    "appId": "com.citadel.taker-app",
+    "productName": "TakerApp",
+    "asar": false,
+    "files": [
+      "**/*",
+      "!**/node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
+      "!**/node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
+      "!**/node_modules/*.d.ts",
+      "!**/node_modules/.bin",
+      "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
+      "!.editorconfig",
+      "!**/._*",
+      "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
+      "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
+      "!**/{appveyor.yml,.travis.yml,circle.yml}",
+      "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+      "!coinswap-ffi",
+      "!dist",
+      "!**/*.map"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "snap"
+      ],
+      "category": "Finance",
+      "executableName": "taker-app"
+    },
+    "snap": {
+      "confinement": "classic",
+      "grade": "stable",
+      "summary": "Private Bitcoin swaps using the Coinswap Protocol",
+      "description": "A desktop application for performing private Bitcoin swaps. The Taker app acts as a Bitcoin wallet with coinswap capabilities.",
+      "plugs": [
+        "home",
+        "network",
+        "network-bind",
+        "desktop",
+        "desktop-legacy",
+        "x11"
+      ]
+    }
   },
   "repository": {
     "type": "git",
@@ -25,12 +77,14 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "electron": "^27.0.0",
+    "electron-builder": "^26.0.12",
     "electron-reloader": "^1.2.3",
     "prettier": "^3.6.2",
     "prettier-plugin-embed": "^0.5.0"
   },
   "dependencies": {
     "@tailwindcss/cli": "^4.1.14",
+    "electron-store": "^8.2.0",
     "tailwindcss": "^4.1.14"
   }
 }
