@@ -234,9 +234,7 @@ export async function WalletComponent(container) {
         <div>
           <div class="flex items-center gap-2">
             <p class="text-white font-mono text-sm">${isReceive ? 'Received' : 'Sent'}</p>
-            <span class="text-xs px-2 py-0.5 rounded ${txType === 'swap' ? 'bg-blue-500/20 text-blue-400' : 'bg-green-500/20 text-green-400'}">
-              ${txType === 'swap' ? 'Swap' : 'Regular'}
-            </span>
+         
           </div>
           <p class="text-gray-400 text-xs cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
              onclick="openTxOnMempool('${txid}')"

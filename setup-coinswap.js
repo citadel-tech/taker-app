@@ -4,16 +4,11 @@ const fs = require('fs');
 const path = require('path');
 
 const FFI_DIR = path.join(__dirname, 'coinswap-ffi');
-const NAPI_DIR = path.join(FFI_DIR, 'coinswap-js'); // CHANGED FROM coinswap-napi
-const NODE_MODULES_TARGET = path.join(
-  __dirname,
-  'node_modules',
-  'coinswap-napi'
-); // Keep same target name
+const NAPI_SOURCE = path.join(FFI_DIR, 'coinswap-js');
+const NODE_MODULES_TARGET = path.join(__dirname, 'node_modules', 'coinswap-napi');
 
 console.log('\n=== Coinswap Native Module Auto Setup ===\n');
 
-// Helper to run commands with proper shell
 function runCommand(cmd, options = {}) {
   return execSync(cmd, {
     stdio: 'inherit',
@@ -30,27 +25,64 @@ if (!fs.existsSync(FFI_DIR)) {
 } else {
   console.log('➡️  Updating coinswap-ffi...');
   runCommand('git pull', { cwd: FFI_DIR });
-  console.log('✓ coinswap-ffi updated with upstream\n');
+  console.log('✓ coinswap-ffi updated\n');
 }
 
 // STEP 2 — Install deps & build coinswap-js
 console.log('➡️  Installing dependencies for coinswap-js...');
-runCommand('npm install', { cwd: NAPI_DIR });
+runCommand('npm install', { cwd: NAPI_SOURCE });
 
 console.log('➡️  Building coinswap-js...');
-runCommand('npm run build', { cwd: NAPI_DIR });
+runCommand('npm run build', { cwd: NAPI_SOURCE });
 
-// STEP 3 — Copy coinswap-js into node_modules as coinswap-napi
-console.log('➡️  Linking coinswap-js into node_modules...');
+// STEP 3 — Create symlink in node_modules
+console.log('➡️  Setting up coinswap-napi in node_modules...');
 
-// remove old version if exists
+// Ensure node_modules exists
+const nodeModulesDir = path.join(__dirname, 'node_modules');
+if (!fs.existsSync(nodeModulesDir)) {
+  fs.mkdirSync(nodeModulesDir, { recursive: true });
+}
+
+// Remove old link/directory if exists
 if (fs.existsSync(NODE_MODULES_TARGET)) {
   fs.rmSync(NODE_MODULES_TARGET, { recursive: true, force: true });
 }
 
-// Use fs.cpSync instead of exec cp
-fs.cpSync(NAPI_DIR, NODE_MODULES_TARGET, { recursive: true });
+// Create symlink (works on Linux/Mac, falls back to copy on Windows)
+try {
+  fs.symlinkSync(NAPI_SOURCE, NODE_MODULES_TARGET, 'dir');
+  console.log('✓ Symlinked coinswap-js → node_modules/coinswap-napi\n');
+} catch (err) {
+  console.log('⚠️  Symlink failed, copying instead...');
+  fs.cpSync(NAPI_SOURCE, NODE_MODULES_TARGET, { recursive: true });
+  console.log('✓ Copied coinswap-js → node_modules/coinswap-napi\n');
+}
 
-console.log('✓ coinswap-js copied into node_modules as coinswap-napi\n');
+// STEP 4 — Verify
+console.log('➡️  Verifying module...');
+const indexPath = path.join(NODE_MODULES_TARGET, 'index.js');
 
+if (!fs.existsSync(indexPath)) {
+  console.error('❌ Error: index.js not found!');
+  process.exit(1);
+}
+
+// Find the actual .node file
+console.log('➡️  Searching for native binary...');
+try {
+  const result = execSync(`find ${NODE_MODULES_TARGET} -name "*.node"`, { 
+    encoding: 'utf-8' 
+  }).trim();
+  
+  if (result) {
+    console.log('✓ Found native binary at:', result);
+  } else {
+    console.warn('⚠️  Warning: No .node file found, module may not work');
+  }
+} catch (err) {
+  console.warn('⚠️  Warning: Could not search for .node file');
+}
+
+console.log('\n✓ Module structure verified');
 console.log('🎉 Setup complete! Coinswap-NAPI is ready.\n');
