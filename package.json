@@ -1,5 +1,5 @@
 {
-  "name": "taker-app",
+  "name": "coinswap-taker",
   "version": "1.0.0",
   "description": "Staging area for the demo taker-app",
   "main": "main.js",
@@ -18,8 +18,8 @@
     "dist": "node prepare-dist.js && npm run build && npm run build:electron && node postbuild-dist.js"
   },
   "build": {
-    "appId": "com.citadel.taker-app",
-    "productName": "TakerApp",
+    "appId": "com.citadel.coinswap-taker",
+    "productName": "CoinswapTaker",
     "asar": false,
     "files": [
       "**/*",
@@ -47,7 +47,8 @@
         "snap"
       ],
       "category": "Finance",
-      "executableName": "taker-app"
+      "executableName": "coinswap-taker",
+      "icon": "coinswap.png"
     },
     "snap": {
       "confinement": "classic",
