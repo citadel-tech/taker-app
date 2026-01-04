@@ -55,14 +55,14 @@ export function SwapReportComponent(container, swapReport) {
       swapReport.taker_sweep_txid ||
       swapReport.takerSweepTxid ||
       null,
+    protocol: swapReport.protocol || 'v1',
+    isTaproot: swapReport.isTaproot || false,
+    protocolVersion: swapReport.protocolVersion || 1,
   };
 
   console.log('📊 Normalized report:', report);
 
-  const isV2Swap =
-    report.protocolVersion === 2 ||
-    report.isTaproot === true ||
-    (report.fundingTxidsByHop && report.fundingTxidsByHop.length === 1);
+  const isV2Swap = report.isTaproot || false;
 
   // Helper functions
   function satsToBtc(sats) {
@@ -238,15 +238,20 @@ export function SwapReportComponent(container, swapReport) {
     }
 
     if (isV2Swap) {
-  // Extract transaction IDs
-  const outgoingTxids = report.outgoingContracts || []; // Add this to report
-  const incomingTxids = report.incomingContracts || []; // Add this to report
-  const takerOutgoing = Array.isArray(report.fundingTxidsByHop[0]) 
-    ? report.fundingTxidsByHop[0][0] 
-    : report.fundingTxidsByHop[0];
-  const takerIncoming = report.sweepTxid;
+      // Extract txids from fundingTxidsByHop
+      const allTxids = report.fundingTxidsByHop.map((arr) =>
+        Array.isArray(arr) ? arr[0] : arr
+      );
 
-  return `
+      // Outgoing: Taker is [0], Makers are [1], [2], [3]
+      const takerOutgoing = allTxids[0];
+      const makersOutgoing = allTxids.slice(1); // [1, 2, 3]
+
+      // Incoming: Makers receive [0], [1], [2], Taker receives [3]
+      const makersIncoming = allTxids.slice(0, -1); // [0, 1, 2]
+      const takerIncoming = allTxids[allTxids.length - 1]; // [3]
+
+      return `
     <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
       <p class="text-sm text-blue-300 mb-2">
         <strong>Taproot Coinswap (V2 Protocol)</strong>
@@ -282,11 +287,12 @@ export function SwapReportComponent(container, swapReport) {
       </div>
 
       <!-- Makers' Outgoing Contracts -->
-      ${report.makerAddresses.map((addr, idx) => {
-        const color = makerColors[idx % makerColors.length];
-        const txid = outgoingTxids[idx] || 'N/A'; // Get from report
-        
-        return `
+      ${report.makerAddresses
+        .map((addr, idx) => {
+          const color = makerColors[idx % makerColors.length];
+          const txid = makersOutgoing[idx] || 'N/A';
+
+          return `
           <div class="bg-[#0f1419] rounded-lg p-4 mb-3 border-l-4" style="border-color: ${color}">
             <p class="text-sm font-semibold mb-2" style="color: ${color}">
               Maker ${idx + 1}
@@ -304,7 +310,8 @@ export function SwapReportComponent(container, swapReport) {
             </div>
           </div>
         `;
-      }).join('')}
+        })
+        .join('')}
     </div>
 
     <!-- Incoming Contracts Section -->
@@ -314,13 +321,14 @@ export function SwapReportComponent(container, swapReport) {
       </h4>
       
       <!-- Makers' Incoming Contracts -->
-      ${report.makerAddresses.map((addr, idx) => {
-        const color = makerColors[idx % makerColors.length];
-        const txid = incomingTxids[idx] || 'N/A'; // Get from report
-        
-        return `
+      ${report.makerAddresses
+        .map((addr, idx) => {
+          const color = makerColors[idx % makerColors.length];
+          const txid = makersIncoming[idx] || 'N/A';
+
+          return `
           <div class="bg-[#0f1419] rounded-lg p-4 mb-3 border-l-4" style="border-color: ${color}">
-            <p class="text-sm font-semibold mb-2" style="color: ${color}">
+            <p class="text-sm font-semibold mb-2" style="c olor: ${color}">
               Maker ${idx + 1}
             </p>
             <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
@@ -336,7 +344,8 @@ export function SwapReportComponent(container, swapReport) {
             </div>
           </div>
         `;
-      }).join('')}
+        })
+        .join('')}
 
       <!-- Taker's Incoming (Sweep) -->
       <div class="bg-[#0f1419] rounded-lg p-4 border-l-4 border-[#10B981]">
@@ -357,7 +366,7 @@ export function SwapReportComponent(container, swapReport) {
       </div>
     </div>
   `;
-}
+    }
 
     // ✅ V1 PROTOCOL: Show all funding transactions
 

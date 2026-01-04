@@ -1144,14 +1144,12 @@ export async function SwapComponent(container) {
 
       // ✅ ADD THIS PROTOCOL CHECK
       let protocol = 'v1';
-let protocolName = 'Legacy';
-
-
+      let protocolName = 'Legacy';
 
       try {
         const protocolResult = await window.api.taker.getProtocol();
-        const protocol = protocolResult.protocol || 'v1';
-        const protocolName = protocolResult.protocolName;
+        protocol = protocolResult.protocol || 'v1';
+        protocolName = protocolResult.protocolName;
 
         // Check if we have compatible makers
         const data = await window.api.taker.getOffers();

@@ -28,9 +28,7 @@ export async function CoinswapComponent(container, swapConfig) {
   let logMessages = savedProgress ? savedProgress.logMessages || [] : [];
   let currentHop = 0;
 
-  const isV2 =
-    actualSwapConfig.protocolVersion === 2 ||
-    actualSwapConfig.isTaproot === true;
+  const isV2 = actualSwapConfig.isTaproot || false;
 
   const swapData = {
     amount: actualSwapConfig.amount,
@@ -533,9 +531,12 @@ export async function CoinswapComponent(container, swapConfig) {
           clearInterval(pollInterval);
           clearInterval(logPollInterval);
 
+          console.log('🎯 Swap completed! Report data:', swap.report);
+
           if (swap.report) {
             completeSwapWithReport(swap.report);
           } else {
+            console.warn('⚠️ No report from backend, using default');
             completeSwap();
           }
         } else if (swap.status === 'failed') {
@@ -631,14 +632,10 @@ export async function CoinswapComponent(container, swapConfig) {
     if (content.dataset.completed === 'true') return;
     content.dataset.completed = 'true';
 
-    // ✅ ADD THESE DEBUG LOGS
-    console.log('🔍 actualSwapConfig:', actualSwapConfig);
-    console.log('🔍 Backend report:', report);
-    console.log(
-      '🔍 isV2 check:',
-      actualSwapConfig.protocolVersion,
-      actualSwapConfig.isTaproot
-    );
+    console.log('🎯 completeSwapWithReport called with:', report);
+
+    console.log('🔍 actualSwapConfig:', actualSwapConfig); // ← ADD THIS
+    console.log('🔍 isTaproot value:', actualSwapConfig?.isTaproot); // ← ADD THIS
 
     addLog('Generating swap report...', 'success');
 
@@ -648,13 +645,9 @@ export async function CoinswapComponent(container, swapConfig) {
     content.querySelector('#complete-button').classList.remove('hidden');
 
     const transformedReport = transformSwapReport(report);
-    transformedReport.protocol =
-      actualSwapConfig.protocol ||
-      (actualSwapConfig.protocolVersion === 2 ? 'v2' : 'v1');
-    transformedReport.isTaproot =
-      actualSwapConfig.isTaproot || actualSwapConfig.protocolVersion === 2;
-    transformedReport.protocolVersion =
-      actualSwapConfig.protocolVersion || (actualSwapConfig.isTaproot ? 2 : 1);
+    transformedReport.protocol = actualSwapConfig.protocol || 'v1';
+    transformedReport.isTaproot = actualSwapConfig.isTaproot || false;
+    transformedReport.protocolVersion = actualSwapConfig.isTaproot ? 2 : 1;
 
     actualSwapConfig.swapReport = transformedReport;
 
@@ -674,6 +667,11 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function transformSwapReport(backendReport) {
+    console.log(
+      '🔍 Full backend report:',
+      JSON.stringify(backendReport, null, 2)
+    ); // ← ADD THIS
+
     if (!backendReport) return getDefaultReport();
 
     const getValue = (snakeCase, camelCase, defaultVal = 0) => {
@@ -740,6 +738,17 @@ export async function CoinswapComponent(container, swapConfig) {
     );
     const makerFeeInfoRaw = getArrayValue('maker_fee_info', 'makerFeeInfo', []);
 
+    const outgoingContracts = getArrayValue(
+      'outgoing_contracts',
+      'outgoingContracts',
+      []
+    );
+    const incomingContracts = getArrayValue(
+      'incoming_contracts',
+      'incomingContracts',
+      []
+    );
+
     let totalMakerFees = 0;
     const makerFeeInfo = makerFeeInfoRaw.map((info, idx) => {
       const baseFee = info.base_fee ?? info.baseFee ?? 0;
@@ -749,17 +758,6 @@ export async function CoinswapComponent(container, swapConfig) {
         info.time_relative_fee ?? info.timeRelativeFee ?? 0;
       const feeTotal = baseFee + amountRelativeFee + timeRelativeFee;
       totalMakerFees += feeTotal;
-
-      const outgoingContracts = getArrayValue(
-        'outgoing_contracts',
-        'outgoingContracts',
-        []
-      );
-      const incomingContracts = getArrayValue(
-        'incoming_contracts',
-        'incomingContracts',
-        []
-      );
 
       return {
         makerIndex: idx,
@@ -793,6 +791,8 @@ export async function CoinswapComponent(container, swapConfig) {
       inputUtxos,
       outputRegularUtxos,
       outputSwapUtxos,
+      outgoingContracts,
+      incomingContracts,
     };
   }
 
@@ -875,7 +875,7 @@ export async function CoinswapComponent(container, swapConfig) {
           ${outgoing.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${outgoing.txid}</div>` : '<div class="text-gray-500 text-xs">Waiting for broadcast...</div>'}
         </div>
 
-        <div class="bg-[#0f1419] rounded p-3 opacity-${incoming.status === 'pending' ? '50' : '100'}">
+        <div class="bg-[#0f1419] rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Receiving Funds</span>
             <span class="${incoming.status === 'confirmed' ? 'text-green-400' : 'text-gray-500'}">
@@ -927,53 +927,116 @@ export async function CoinswapComponent(container, swapConfig) {
   function buildFlowDiagram() {
     const actualMakers = swapData.makers; // Number of actual makers (e.g., 2)
 
-    if (isV2) {
-      // Simplified V2 diagram: You → Makers (as one group) → You
+    function buildFlowDiagram() {
+      const actualMakers = swapData.makers;
+      const radius = 140;
+      const centerX = 200;
+      const centerY = 200;
+
+      // Same circular layout for BOTH V1 and V2
+      const totalNodes = actualMakers + 1;
+      const angleStep = (2 * Math.PI) / totalNodes;
+
+      const positions = [];
+      for (let i = 0; i < totalNodes; i++) {
+        const angle = angleStep * i - Math.PI / 2;
+        const x = centerX + radius * Math.cos(angle);
+        const y = centerY + radius * Math.sin(angle);
+        positions.push({ x, y });
+      }
+
       return `
     <div class="flex items-center justify-center" style="min-height: 450px;">
       <svg width="450" height="450" viewBox="0 0 400 400" class="mx-auto">
         <defs>
-          <marker id="arrow-out" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#FF6B35" />
-          </marker>
-          <marker id="arrow-in" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-            <polygon points="0 0, 8 3, 0 6" fill="#10B981" />
-          </marker>
+          ${Array.from({ length: actualMakers + 1 }, (_, i) => {
+            const color =
+              i < actualMakers
+                ? makerColors[i % makerColors.length]
+                : '#10B981';
+            return `
+              <marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="${color}" />
+              </marker>
+            `;
+          }).join('')}
         </defs>
+        
+        <!-- Arrows -->
+        ${positions
+          .map((pos, i) => {
+            const nextPos = positions[(i + 1) % positions.length];
+            const color =
+              i < actualMakers
+                ? makerColors[i % makerColors.length]
+                : '#10B981';
 
-        <!-- You Send -->
-        <g id="you-send">
-          <circle cx="100" cy="200" r="50" fill="#FF6B35" />
-          <text x="100" y="195" text-anchor="middle" fill="white" font-size="20" font-weight="bold">You</text>
-          <text x="100" y="215" text-anchor="middle" fill="#FFD4B9" font-size="12">Send</text>
+            const dx = nextPos.x - pos.x;
+            const dy = nextPos.y - pos.y;
+            const length = Math.sqrt(dx * dx + dy * dy);
+            const offsetStart = i === 0 ? 40 : 35;
+            const offsetEnd = (i + 1) % positions.length === 0 ? 40 : 35;
+
+            const startX = pos.x + (dx / length) * offsetStart;
+            const startY = pos.y + (dy / length) * offsetStart;
+            const endX = nextPos.x - (dx / length) * offsetEnd;
+            const endY = nextPos.y - (dy / length) * offsetEnd;
+
+            return `
+            <line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" 
+                  stroke="${color}" stroke-width="2.5" marker-end="url(#arrow-${i})" opacity="0.6"/>
+          `;
+          })
+          .join('')}
+        
+        <!-- You Node -->
+        <g id="you-node" style="transition: all 0.3s;">
+          <rect x="${positions[0].x - 38}" y="${positions[0].y - 38}" width="76" height="76" rx="14" 
+                fill="#FF6B35" id="you-rect" style="transition: fill 0.5s;"/>
+          <text x="${positions[0].x}" y="${positions[0].y}" text-anchor="middle" fill="white" font-size="22" font-weight="bold">You</text>
+          <text id="you-state-text" x="${positions[0].x}" y="${positions[0].y + 50}" text-anchor="middle" fill="#D1D5DB" font-size="10">Send</text>
         </g>
-
-        <!-- Arrow to Makers -->
-        <a id="arrow-link-0">
-          <line x1="150" y1="200" x2="250" y2="200" stroke="#FF6B35" stroke-width="3" marker-end="url(#arrow-out)" />
-        </a>
-
-        <!-- Makers Group -->
-        <g id="makers-group">
-          <rect x="220" y="150" width="110" height="100" rx="20" fill="#3B82F6" opacity="0.9"/>
-          <text x="275" y="190" text-anchor="middle" fill="white" font-size="24" font-weight="bold">Makers</text>
-          <text x="275" y="215" text-anchor="middle" fill="#BFDBFE" font-size="12">${actualMakers} Liquidity Providers</text>
-        </g>
-
-        <!-- Arrow back to You -->
-        <a id="arrow-link-1">
-          <path d="M250 200 Q 200 100, 150 200" stroke="#10B981" stroke-width="3" fill="none" marker-end="url(#arrow-in)" />
-        </a>
-
-        <!-- You Receive -->
-        <g id="you-receive" style="opacity: 0.3">
-          <circle cx="100" cy="200" r="50" fill="#10B981" />
-          <text x="100" y="195" text-anchor="middle" fill="white" font-size="20" font-weight="bold">You</text>
-          <text x="100" y="215" text-anchor="middle" fill="#A7F3D0" font-size="12">Receive ✓</text>
-        </g>
+        
+        <!-- Makers -->
+        ${Array.from({ length: actualMakers }, (_, i) => {
+          const pos = positions[i + 1];
+          const color = makerColors[i % makerColors.length];
+          return `
+            <g id="maker-${i}" style="opacity: 0.3; filter: blur(3px); transition: all 0.3s;">
+              <rect x="${pos.x - 32}" y="${pos.y - 32}" width="64" height="64" rx="10" fill="${color}"/>
+              <text x="${pos.x}" y="${pos.y + 3}" text-anchor="middle" fill="white" font-size="20" font-weight="bold">M${i + 1}</text>
+              
+              ${
+                !isV2
+                  ? `
+                <g id="hop-${i}">
+                  <rect x="${pos.x - 52}" y="${pos.y - 58}" width="104" height="22" rx="5" 
+                        fill="#0f1419" stroke="#374151" stroke-width="1"/>
+                  <text class="hop-status" x="${pos.x}" y="${pos.y - 42}" text-anchor="middle" 
+                        fill="#9CA3AF" font-size="10" font-weight="bold">Pending</text>
+                </g>
+              `
+                  : `
+                <text class="hop-status" x="${pos.x}" y="${pos.y - 45}" text-anchor="middle" 
+                      fill="#6B7280" font-size="10">Off-chain</text>
+              `
+              }
+            </g>
+          `;
+        }).join('')}
+        
+        ${
+          isV2
+            ? `
+          <!-- V2 Center Label -->
+          <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">Taproot V2</text>
+          <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
+        `
+            : ''
+        }
       </svg>
     </div>
-    `;
+  `;
     }
     const radius = 140; // Radius of the circle
     const centerX = 200;
