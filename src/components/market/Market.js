@@ -4,7 +4,6 @@ export function Market(container) {
 
   // STATE
   let makers = [];
-  let selectedMakers = [];
   let isLoading = true;
   let syncProgress = null;
   let currentMakerStatus = 'good'; // 'good', 'bad', or 'unresponsive'
@@ -610,122 +609,6 @@ export function Market(container) {
     document.body.appendChild(modal);
   };
 
-  function toggleMakerSelection(index) {
-    const makerIndex = selectedMakers.indexOf(index);
-    if (makerIndex > -1) {
-      selectedMakers.splice(makerIndex, 1);
-    } else {
-      selectedMakers.push(index);
-    }
-    updateSelectionUI();
-  }
-
-  function updateSelectionUI() {
-    const displayedMakers = makers.filter(
-      (m) => m.status === currentMakerStatus
-    );
-
-    displayedMakers.forEach((maker) => {
-      const checkbox = content.querySelector(`#maker-${maker.index}`);
-      if (checkbox) {
-        checkbox.checked = selectedMakers.includes(maker.index);
-      }
-    });
-
-    const selectAllCheckbox = content.querySelector('#select-all-makers');
-    if (selectAllCheckbox) {
-      const displayedIndices = displayedMakers.map((m) => m.index);
-      const selectedDisplayed = selectedMakers.filter((i) =>
-        displayedIndices.includes(i)
-      );
-
-      if (selectedDisplayed.length === 0) {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = false;
-      } else if (selectedDisplayed.length === displayedMakers.length) {
-        selectAllCheckbox.checked = true;
-        selectAllCheckbox.indeterminate = false;
-      } else {
-        selectAllCheckbox.checked = false;
-        selectAllCheckbox.indeterminate = true;
-      }
-    }
-
-    const actionButtons = content.querySelector('#maker-actions');
-    const selectedCount = content.querySelector('#selected-makers-count');
-
-    if (selectedMakers.length > 0) {
-      actionButtons.classList.remove('hidden');
-      selectedCount.textContent = selectedMakers.length;
-    } else {
-      actionButtons.classList.add('hidden');
-    }
-  }
-
-  function selectAllMakers() {
-    const selectAllCheckbox = content.querySelector('#select-all-makers');
-    const displayedMakers = makers.filter(
-      (m) => m.status === currentMakerStatus
-    );
-
-    if (selectAllCheckbox.checked) {
-      displayedMakers.forEach((maker) => {
-        if (!selectedMakers.includes(maker.index)) {
-          selectedMakers.push(maker.index);
-        }
-      });
-    } else {
-      const displayedIndices = displayedMakers.map((m) => m.index);
-      selectedMakers = selectedMakers.filter(
-        (i) => !displayedIndices.includes(i)
-      );
-    }
-    updateSelectionUI();
-  }
-
-  async function swapWithSelectedMakers() {
-    if (selectedMakers.length === 0) {
-      alert('Please select at least one maker');
-      return;
-    }
-
-    const selectedMakerData = selectedMakers.map((index) =>
-      makers.find((m) => m.index === index)
-    );
-
-    // Get protocol
-    const protocolResult = await window.api.taker.getProtocol();
-    const protocol = protocolResult.protocol;
-    const protocolName = protocolResult.protocolName;
-
-    // Validate all makers match protocol
-    const incompatibleMakers = selectedMakerData.filter((maker) => {
-      if (protocol === 'v2') {
-        return maker.protocol !== 'Taproot';
-      } else {
-        return maker.protocol !== 'Legacy P2WSH';
-      }
-    });
-
-    if (incompatibleMakers.length > 0) {
-      showError(
-        `❌ Protocol Mismatch: You selected ${incompatibleMakers.length} ${protocol === 'v2' ? 'Legacy' : 'Taproot'} maker(s), but your wallet is configured for ${protocolName} swaps. Please only select ${protocolName} makers.`
-      );
-      return;
-    }
-
-    console.log(
-      '🔄 Starting swap with',
-      selectedMakerData.length,
-      'makers:',
-      selectedMakerData
-    );
-
-    import('./Swap.js').then((module) => {
-      container.innerHTML = '';
-      module.SwapComponent(container, null, selectedMakerData);
-    });
-  }
 
   function updateUI() {
     const stats = calculateStats();
@@ -884,9 +767,7 @@ export function Market(container) {
             .map(
               (maker) => `
           <div class="grid grid-cols-9 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
-            <div class="flex items-center">
-              <input type="checkbox" id="maker-${maker.index}" class="w-4 h-4 accent-[#FF6B35]" />
-            </div>
+            
             <div class="text-sm">
               <span class="px-2 py-1 ${
                 maker.protocol === 'Taproot'
@@ -901,7 +782,7 @@ export function Market(container) {
             <div class="text-blue-400">${maker.volumeFee}%</div>
             <div class="text-cyan-400">${maker.timeFee}%</div>
             <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
-            <div class="text-yellow-400">${(maker.maxSize / 1000000).toFixed(1)}M</div>
+<div class="text-yellow-400">${maker.maxSize < 1000000 ? maker.maxSize.toLocaleString() : (maker.maxSize / 1000000).toFixed(1) + 'M'}</div>
             <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
               ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
             </div>
@@ -910,14 +791,7 @@ export function Market(container) {
             )
             .join('');
 
-          displayedMakers.forEach((maker) => {
-            const checkbox = content.querySelector(`#maker-${maker.index}`);
-            if (checkbox) {
-              checkbox.addEventListener('change', () =>
-                toggleMakerSelection(maker.index)
-              );
-            }
-          });
+          
         }
       }
     }
@@ -936,7 +810,6 @@ export function Market(container) {
       footer.innerHTML = `Showing ${displayedCount} ${currentMakerStatus} offers • ${timeStr}`;
     }
 
-    updateSelectionUI();
   }
 
   content.innerHTML = `
@@ -1014,20 +887,9 @@ export function Market(container) {
   </button>
 </div>
 
-      <div id="maker-actions" class="hidden bg-[#FF6B35] p-4 flex justify-between items-center">
-        <span class="text-white font-semibold text-lg">
-          <span id="selected-makers-count">0</span> makers selected
-        </span>
-        <button id="swap-with-makers" class="bg-white text-[#FF6B35] px-6 py-2 rounded-lg font-semibold text-lg hover:bg-gray-100 transition-colors">
-          Swap with Selected →
-        </button>
-      </div>
+      
 
       <div class="grid grid-cols-9 gap-4 bg-[#FF6B35] p-4">
-        <div class="flex items-center">
-          <input type="checkbox" id="select-all-makers" class="w-4 h-4 accent-[#FF6B35] mr-2" />
-          <span class="font-semibold text-lg text-sm">Select</span>
-        </div>
         <div class="font-semibold text-lg">Protocol</div>
         <div class="font-semibold text-lg">Maker Address</div>
         <div class="font-semibold text-lg">Base Fee</div>
@@ -1057,13 +919,6 @@ export function Market(container) {
   content
     .querySelector('#refresh-market-btn')
     .addEventListener('click', handleRefresh);
-  content
-    .querySelector('#select-all-makers')
-    .addEventListener('change', selectAllMakers);
-  content
-    .querySelector('#swap-with-makers')
-    .addEventListener('click', swapWithSelectedMakers);
-
   // Tab switching
   function switchTab(status) {
     currentMakerStatus = status;

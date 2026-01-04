@@ -291,17 +291,21 @@ export async function WalletComponent(container) {
           const utxo = utxoData.utxo;
           const spendInfo = utxoData.spendInfo;
           const txidShort = truncateTxid(utxo.txid);
-          const color = getUtxoTypeColor(spendInfo.spendType);
+          const typeColor = getUtxoTypeColor(spendInfo.spendType);
 
           return `
-            <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-              <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
-                  onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid}')">${txidShort}:${utxo.vout}</td>
-              <td class="py-3 px-4 text-${color}-400 font-mono">${satsToBtc(utxo.amount)}</td>
-              <td class="py-3 px-4 text-gray-300">${utxo.confirmations}</td>
-              <td class="py-3 px-4 text-${color}-400">${spendInfo.spendType}</td>
-            </tr>
-          `;
+        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+              onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid}')">${txidShort}:${utxo.vout}</td>
+          <td class="py-3 px-4 text-green-400 font-mono">${satsToBtc(utxo.amount)}</td>
+          <td class="py-3 px-4 ${utxo.confirmations === 0 ? 'text-yellow-400' : 'text-gray-300'}">${utxo.confirmations}</td>
+          <td class="py-3 px-4">
+            <span class="px-2 py-1 rounded text-xs font-semibold bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
+              ${spendInfo.spendType}
+            </span>
+          </td>
+        </tr>
+      `;
         })
         .join('');
     };

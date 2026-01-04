@@ -70,10 +70,19 @@ export async function SwapHistoryComponent(container) {
   async function viewSwapReport(swapId) {
     try {
       const result = await window.api.swapReports.get(swapId);
+      console.log('📋 Raw result from API:', result); // ← ADD THIS
+      console.log('📋 Report from result:', result.report.report); // ← ADD THIS
+
       if (result.success && result.report) {
         import('./SwapReport.js').then((module) => {
           container.innerHTML = '';
-          module.SwapReportComponent(container, result.report.report);
+          const fullReport = {
+            ...result.report.report,
+            protocol: result.report.protocol ?? 'v1',
+            isTaproot: result.report.isTaproot ?? false,
+            protocolVersion: result.report.protocolVersion ?? 1,
+          };
+          module.SwapReportComponent(container, fullReport);
         });
       } else {
         console.error('Swap report not found for ID:', swapId);
