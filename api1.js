@@ -828,6 +828,14 @@ function registerTakerHandlers() {
           return false;
         }
 
+        if (!api1State.coinswapNapi) {
+          await initNAPI();
+          if (!api1State.coinswapNapi) {
+            console.error('coinswap-napi not loaded for isWalletEncrypted check');
+            return false;
+          }
+        }
+
         const isEncrypted =
           api1State.coinswapNapi.Taker.isWalletEncrypted(walletPath);
         return isEncrypted;

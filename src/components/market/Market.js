@@ -590,7 +590,7 @@ export function Market(container) {
           <div class="bg-[#0f1419] p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
             <button 
-              onclick="window.open('https://mempool.space/signet/tx/${maker.bondTxid}', '_blank')"
+              onclick="window.open('https://mutinynet.com/tx/${maker.bondTxid}', '_blank')"
               class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold text-lg transition-colors">
               View on Block Explorer →
             </button>
