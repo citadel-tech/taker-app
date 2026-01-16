@@ -467,7 +467,7 @@ export async function WalletComponent(container) {
 
   // Global function for opening transactions on mempool.space
   window.openTxOnMempool = (txid) => {
-    const url = `https://mempool.space/signet/tx/${txid}`;
+    const url = `https://mutinynet.com/tx/${txid}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');

@@ -955,7 +955,7 @@ export function SwapReportComponent(container, swapReport) {
   content.querySelectorAll('.view-txid-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const txid = btn.dataset.txid;
-      window.open(`https://mempool.space/signet/tx/${txid}`, '_blank');
+      window.open(`https://mutinynet.com/tx/${txid}`, '_blank');
     });
   });
 

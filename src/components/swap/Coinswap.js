@@ -847,7 +847,7 @@ export async function CoinswapComponent(container, swapConfig) {
   function updateArrowLink(hopIndex, txid) {
     const arrow = content.querySelector(`#arrow-link-${hopIndex}`);
     if (arrow && txid) {
-      const baseUrl = 'https://mempool.space/signet/tx/';
+      const baseUrl = 'https://mutinynet.com/tx/';
       // ✅ FIX: Use setAttributeNS for SVG href
       arrow.setAttributeNS(
         'http://www.w3.org/1999/xlink',

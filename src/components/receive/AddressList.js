@@ -304,7 +304,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                       <tr class="border-b border-gray-800 hover:bg-[#242d3d] transition-colors address-row" data-address="${addr.address}">
                         <td class="py-3 px-4">
                           <div class="flex items-center gap-2">
-                            <a href="https://mempool.space/signet/address/${addr.address}" 
+                            <a href="https://mutinynet.com/address/${addr.address}" 
                                target="_blank" 
                                class="font-mono text-sm text-blue-400 hover:text-blue-300 underline truncate max-w-[200px]" 
                                title="${addr.address}">
