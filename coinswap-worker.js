@@ -29,9 +29,9 @@ const { parentPort, workerData } = require('worker_threads');
     // Setup logging if available
     try {
       if (TakerClass.setupLogging) {
-        TakerClass.setupLogging(config.dataDir);
+        TakerClass.setupLogging(config.dataDir, config.logLevel || 'debug');
       } else if (coinswapNapi.setupLogging) {
-        coinswapNapi.setupLogging(config.dataDir);
+        coinswapNapi.setupLogging(config.dataDir, config.logLevel || 'debug');
       }
     } catch (logError) {
       console.warn('⚠️ Worker could not setup logging:', logError.message);
