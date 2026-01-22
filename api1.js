@@ -125,6 +125,13 @@ function registerTakerHandlers() {
     try {
       console.log(`🔧 Setting up logging: level=${level}, dataDir=${dataDir}`);
 
+      if (!api1State.coinswapNapi) {
+        await initNAPI();
+      }
+
+      // Default to Taker class for logging setup (shared mechanism)
+      const TakerClass = api1State.coinswapNapi?.Taker;
+
       if (!TakerClass?.setupLogging) {
         throw new Error('setupLogging method not available');
       }
@@ -238,7 +245,7 @@ function registerTakerHandlers() {
       try {
         // Get log level from store, environment, or default to 'info'
         const logLevel =
-          store.get('logLevel') || process.env.LOG_LEVEL || 'info';
+          store.get('logLevel') || process.env.LOG_LEVEL || 'debug';
 
         console.log(`🔧 Setting up logging with level: ${logLevel}`);
         TakerClass.setupLogging?.(api1State.DATA_DIR, logLevel);
@@ -935,16 +942,16 @@ function registerTakerHandlers() {
           protocol: m.protocol,
           offer: m.offer
             ? {
-                baseFee: m.offer.base_fee,
-                amountRelativeFeePct: m.offer.amount_relative_fee_pct,
-                timeRelativeFeePct: m.offer.time_relative_fee_pct,
-                requiredConfirms: m.offer.required_confirms,
-                minimumLocktime: m.offer.minimum_locktime,
-                maxSize: m.offer.max_size,
-                minSize: m.offer.min_size,
-                tweakablePoint: m.offer.tweakable_point,
-                fidelity: m.offer.fidelity,
-              }
+              baseFee: m.offer.base_fee,
+              amountRelativeFeePct: m.offer.amount_relative_fee_pct,
+              timeRelativeFeePct: m.offer.time_relative_fee_pct,
+              requiredConfirms: m.offer.required_confirms,
+              minimumLocktime: m.offer.minimum_locktime,
+              maxSize: m.offer.max_size,
+              minSize: m.offer.min_size,
+              tweakablePoint: m.offer.tweakable_point,
+              fidelity: m.offer.fidelity,
+            }
             : null,
         });
 
@@ -1127,6 +1134,7 @@ function registerCoinswapHandlers() {
             api1State.storedTakerConfig?.zmqAddr || 'tcp://127.0.0.1:28332',
           password: password || '',
           protocol: protocol,
+          logLevel: store.get('logLevel') || process.env.LOG_LEVEL || 'debug',
         };
 
         const worker = new Worker(path.join(__dirname, 'coinswap-worker.js'), {
