@@ -168,16 +168,18 @@ export async function WalletComponent(container) {
   async function updateBalance(useCache = false) {
     try {
       // Use cached data if requested
-      if (useCache && cached && cached.balance) {
-        content.querySelector('#regular-balance').textContent =
-          satsToBtc(cached.balance.regular) + ' BTC';
-        content.querySelector('#swap-balance').textContent =
-          satsToBtc(cached.balance.swap) + ' BTC';
-        content.querySelector('#contract-balance').textContent =
-          satsToBtc(cached.balance.contract) + ' BTC';
-        content.querySelector('#spendable-balance').textContent =
-          satsToBtc(cached.balance.spendable) + ' BTC';
-        console.log('✅ Balance loaded from cache');
+      if (useCache) {
+        if (cached && cached.balance) {
+          content.querySelector('#regular-balance').textContent =
+            satsToBtc(cached.balance.regular) + ' BTC';
+          content.querySelector('#swap-balance').textContent =
+            satsToBtc(cached.balance.swap) + ' BTC';
+          content.querySelector('#contract-balance').textContent =
+            satsToBtc(cached.balance.contract) + ' BTC';
+          content.querySelector('#spendable-balance').textContent =
+            satsToBtc(cached.balance.spendable) + ' BTC';
+          console.log('✅ Balance loaded from cache');
+        }
         return;
       }
 
@@ -255,11 +257,13 @@ export async function WalletComponent(container) {
 
     try {
       // Use cached data if requested
-      if (useCache && cached && cached.transactions) {
-        transactionsContainer.innerHTML = renderTransactions(
-          cached.transactions
-        );
-        console.log('✅ Transactions loaded from cache');
+      if (useCache) {
+        if (cached && cached.transactions) {
+          transactionsContainer.innerHTML = renderTransactions(
+            cached.transactions
+          );
+          console.log('✅ Transactions loaded from cache');
+        }
         return;
       }
 
@@ -310,9 +314,11 @@ export async function WalletComponent(container) {
 
     try {
       // Use cached data if requested
-      if (useCache && cached && cached.utxos) {
-        utxoTableBody.innerHTML = renderUtxos(cached.utxos);
-        console.log('✅ UTXOs loaded from cache');
+      if (useCache) {
+        if (cached && cached.utxos) {
+          utxoTableBody.innerHTML = renderUtxos(cached.utxos);
+          console.log('✅ UTXOs loaded from cache');
+        }
         return;
       }
 
@@ -507,32 +513,15 @@ export async function WalletComponent(container) {
     });
   }
 
-  // Initialize data
-  updateBalance();
-  updateTransactions();
-  updateUtxos();
-
-  // ✅ SMART INITIALIZATION
-  if (shouldFetchFresh) {
-    console.log('🔄 Fetching fresh data...');
-    // Fetch fresh data
-    const [balance, transactions, utxos] = await Promise.all([
-      updateBalance(false),
-      updateTransactions(false),
-      updateUtxos(false),
-    ]);
-
-    // Save to cache
-    if (balance && transactions && utxos) {
-      saveWalletToCache(balance, transactions, utxos);
-    }
+  // ✅ LOAD CACHED DATA ONLY (No Auto-Fetch)
+  if (cached) {
+    console.log('⚡ Loading cached data');
+    updateBalance(true);
+    updateTransactions(true);
+    updateUtxos(true);
   } else {
-    console.log('⚡ Using cached data (still fresh)');
-    // Just use cache
-    await Promise.all([
-      updateBalance(true),
-      updateTransactions(true),
-      updateUtxos(true),
-    ]);
+    // If no cache, we show empty state (already default in HTML or could be set here)
+    // User must click "Refresh" to get data.
+    console.log('Waiting for user to refresh...');
   }
 }
