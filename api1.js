@@ -489,7 +489,8 @@ function registerTakerHandlers() {
         return { success: false, error: 'Taker not initialized' };
       }
 
-      api1State.takerInstance.syncAndSave();
+      // Sync removed to prevent UI blocking on page load - relies on background sync
+      // api1State.takerInstance.syncAndSave();
       const balance = api1State.takerInstance.getBalances();
 
       return {
@@ -935,16 +936,16 @@ function registerTakerHandlers() {
           protocol: m.protocol,
           offer: m.offer
             ? {
-                baseFee: m.offer.base_fee,
-                amountRelativeFeePct: m.offer.amount_relative_fee_pct,
-                timeRelativeFeePct: m.offer.time_relative_fee_pct,
-                requiredConfirms: m.offer.required_confirms,
-                minimumLocktime: m.offer.minimum_locktime,
-                maxSize: m.offer.max_size,
-                minSize: m.offer.min_size,
-                tweakablePoint: m.offer.tweakable_point,
-                fidelity: m.offer.fidelity,
-              }
+              baseFee: m.offer.base_fee,
+              amountRelativeFeePct: m.offer.amount_relative_fee_pct,
+              timeRelativeFeePct: m.offer.time_relative_fee_pct,
+              requiredConfirms: m.offer.required_confirms,
+              minimumLocktime: m.offer.minimum_locktime,
+              maxSize: m.offer.max_size,
+              minSize: m.offer.min_size,
+              tweakablePoint: m.offer.tweakable_point,
+              fidelity: m.offer.fidelity,
+            }
             : null,
         });
 
