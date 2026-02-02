@@ -1,5 +1,5 @@
 const WALLET_CACHE_KEY = 'wallet_data_cache';
-const CACHE_DURATION = 90 * 1000; // 90 seconds
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 function loadWalletFromCache() {
   try {

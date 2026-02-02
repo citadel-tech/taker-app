@@ -528,7 +528,7 @@ function registerTakerHandlers() {
           }
         }
       },
-      5 * 60 * 1000 // 5 minutes
+      15 * 60 * 1000 // 15 minutes
     );
   }
 
