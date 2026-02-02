@@ -2,7 +2,7 @@ import { SwapStateManager, formatRelativeTime } from './SwapStateManager.js';
 
 // ✅ ADD CACHE CONSTANTS
 const SWAP_DATA_CACHE_KEY = 'swap_data_cache';
-const CACHE_DURATION = 300 * 1000; // 5 mins
+const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
 
 // ✅ ADD CACHE FUNCTIONS
 function loadSwapDataFromCache() {
@@ -67,7 +67,7 @@ export async function SwapComponent(container) {
   // If there's an active swap in progress, redirect to coinswap progress
   if (activeSwap && activeSwap.status === 'configured') {
     const age = Date.now() - activeSwap.createdAt;
-    if (age > 5 * 60 * 1000) {
+    if (age > 15 * 60 * 1000) {
       console.log('🧹 Clearing stale configured swap');
       await SwapStateManager.clearSwapData();
     } else {
