@@ -375,13 +375,22 @@ function registerTakerHandlers() {
       );
 
       if (fs.existsSync(offerbookPath)) {
-        console.log('🗑️ Deleting old offerbook.json...');
-        fs.unlinkSync(offerbookPath);
+        try {
+          const content = fs.readFileSync(offerbookPath, 'utf8');
+          JSON.parse(content); // Test if valid
+          console.log('✅ Existing offerbook is valid');
+        } catch (parseError) {
+          console.log('⚠️ Corrupted offerbook detected, recreating...');
+          fs.writeFileSync(
+            offerbookPath,
+            JSON.stringify({ makers: [] }),
+            'utf8'
+          );
+        }
+      } else {
+        console.log('📝 Creating initial offerbook.json...');
+        fs.writeFileSync(offerbookPath, JSON.stringify({ makers: [] }), 'utf8');
       }
-
-      console.log('📝 Creating fresh empty offerbook.json...');
-      fs.writeFileSync(offerbookPath, '[]', 'utf8');
-
       api1State.activeSyncs.set(syncId, {
         status: 'syncing',
         startedAt: Date.now(),
@@ -831,7 +840,9 @@ function registerTakerHandlers() {
         if (!api1State.coinswapNapi) {
           await initNAPI();
           if (!api1State.coinswapNapi) {
-            console.error('coinswap-napi not loaded for isWalletEncrypted check');
+            console.error(
+              'coinswap-napi not loaded for isWalletEncrypted check'
+            );
             return false;
           }
         }
