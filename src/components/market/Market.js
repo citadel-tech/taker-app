@@ -277,8 +277,12 @@ export function Market(container) {
     refreshBtn.disabled = true;
     refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
 
-    // ✅ SHOW LOADER IMMEDIATELY
-    isLoading = true;
+    // ✅ Show sync progress bar ONLY
+    syncProgress = {
+      percent: 50,
+      status: 'syncing',
+      message: 'Syncing market data...',
+    };
     updateUI();
 
     try {
@@ -292,10 +296,10 @@ export function Market(container) {
       console.log('📡 Sync started:', syncId);
       localStorage.setItem('active_sync_id', syncId);
 
-      // ✅ SIMPLE: Just poll isOfferbookSyncing() until it's false
+      // Poll until sync completes
       let isSyncing = true;
       while (isSyncing) {
-        await new Promise((resolve) => setTimeout(resolve, 1000)); // Check every second
+        await new Promise((resolve) => setTimeout(resolve, 1000));
 
         const statusResult = await window.api.taker.isOfferbookSyncing();
         if (statusResult.success) {
@@ -306,14 +310,17 @@ export function Market(container) {
         }
       }
 
-      // ✅ Sync is done - wait 2 more seconds for file write
+      // Sync is done - wait for file write
       console.log('✅ Offerbook synced - waiting for file write...');
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
-      // ✅ NOW fetch makers
-      console.log('✅ Now fetching makers...');
+      // Clear sync progress
+      syncProgress = null;
+
+      // NOW fetch fresh makers
+      console.log('✅ Now fetching fresh makers...');
       localStorage.removeItem('active_sync_id');
-      await fetchMakers(); // This sets isLoading = false
+      await fetchMakers(); // This sets isLoading = false and updates UI
 
       refreshBtn.innerHTML = '✅ Synced!';
       setTimeout(() => {
@@ -321,7 +328,7 @@ export function Market(container) {
         refreshBtn.innerHTML = originalText;
       }, 2000);
     } catch (error) {
-      isLoading = false;
+      syncProgress = null; 
       updateUI();
       refreshBtn.innerHTML = '❌ Failed';
       showError(error.message);
@@ -331,6 +338,7 @@ export function Market(container) {
       }, 3000);
     }
   }
+
   async function initialize() {
     // Get protocol version
     const protocolResult = await window.api.taker.getProtocol();
@@ -609,7 +617,6 @@ export function Market(container) {
     document.body.appendChild(modal);
   };
 
-
   function updateUI() {
     const stats = calculateStats();
     const tableBody = content.querySelector('#maker-table-body');
@@ -790,8 +797,6 @@ export function Market(container) {
         `
             )
             .join('');
-
-          
         }
       }
     }
@@ -809,7 +814,6 @@ export function Market(container) {
       ).length;
       footer.innerHTML = `Showing ${displayedCount} ${currentMakerStatus} offers • ${timeStr}`;
     }
-
   }
 
   content.innerHTML = `

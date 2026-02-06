@@ -45,7 +45,7 @@ export const SwapStateManager = {
     // Check if configured swap is stale (older than 5 minutes)
     if (activeSwap.status === 'configured') {
       const age = Date.now() - activeSwap.createdAt;
-      if (age > 5 * 60 * 1000) {
+      if (age > 15 * 60 * 1000) {
         console.log(
           '🧹 Clearing stale configured swap from hasActiveSwap check'
         );
