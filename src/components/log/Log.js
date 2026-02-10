@@ -112,6 +112,7 @@ export function LogComponent(container) {
       info: logs.filter((l) => l.type === 'info').length,
       warn: logs.filter((l) => l.type === 'warn').length,
       error: logs.filter((l) => l.type === 'error').length,
+      debug: logs.filter((l) => l.type === 'debug').length,
     };
     const total = Object.values(stats).reduce((a, b) => a + b, 0) || 1;
 
@@ -119,12 +120,15 @@ export function LogComponent(container) {
     if (el('#info-count')) el('#info-count').textContent = stats.info;
     if (el('#warn-count')) el('#warn-count').textContent = stats.warn;
     if (el('#error-count')) el('#error-count').textContent = stats.error;
+    if (el('#debug-count')) el('#debug-count').textContent = stats.debug;
     if (el('#info-bar'))
       el('#info-bar').style.width = `${(stats.info / total) * 100}%`;
     if (el('#warn-bar'))
       el('#warn-bar').style.width = `${(stats.warn / total) * 100}%`;
     if (el('#error-bar'))
       el('#error-bar').style.width = `${(stats.error / total) * 100}%`;
+    if (el('#debug-bar'))
+      el('#debug-bar').style.width = `${(stats.debug / total) * 100}%`;
   }
 
   function setFilter(filter) {
@@ -163,6 +167,7 @@ export function LogComponent(container) {
               <button id="filter-info" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Info</button>
               <button id="filter-warn" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Warning</button>
               <button id="filter-error" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Error</button>
+              <button id="filter-debug" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Debug</button>
             </div>
             <div class="flex gap-2">
               <button id="refresh-logs" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded text-sm transition-colors">
@@ -206,6 +211,15 @@ export function LogComponent(container) {
               </div>
               <div class="w-full bg-[#0f1419] rounded-full h-2">
                 <div id="error-bar" class="bg-red-400 h-2 rounded-full" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between items-center mb-1">
+                <span class="text-sm text-gray-400">Debug</span>
+                <span id="debug-count" class="text-blue-400 font-semibold">0</span>
+              </div>
+              <div class="w-full bg-[#0f1419] rounded-full h-2">
+                <div id="debug-bar" class="bg-blue-400 h-2 rounded-full" style="width:0%"></div>
               </div>
             </div>
           </div>
@@ -253,6 +267,9 @@ export function LogComponent(container) {
   content
     .querySelector('#filter-error')
     .addEventListener('click', () => setFilter('error'));
+  content
+    .querySelector('#filter-debug')
+    .addEventListener('click', () => setFilter('debug'));
   content.querySelector('#refresh-logs').addEventListener('click', fetchLogs);
   content
     .querySelector('#open-log-file')
