@@ -184,10 +184,6 @@ cd ../..
 npm run setup:coinswap
 ```
 
-**Build takes a long time**
-
-The first build compiles Rust code which can take 2-3 minutes. This is normal. Subsequent builds will be faster as most dependencies are cached.
-
 ## Contributing
 
 Contributions are welcome! To contribute:
