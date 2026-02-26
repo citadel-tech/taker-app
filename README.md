@@ -13,6 +13,26 @@ In the Coinswap protocol, a **Taker** is a Bitcoin user who initiates atomic swa
 
 Unlike traditional Bitcoin transactions that create an on-chain trail, coinswaps mix your coins through multiple makers, making it significantly harder to trace the origin and destination of funds.
 
+## Screenshots
+
+### Wallet
+
+![Wallet Screenshot](/screenshot/wallet.png)
+
+### Swap Page
+
+![Swap Screenshot](/screenshot/swap.png)
+
+### Ongoing Swap
+
+![Ongoing Swap Screenshot](/screenshot/swap1.png)
+
+### Swap Report
+
+![Swap Report Screenshot](/screenshot/report1.png)
+
+
+
 ## Prerequisites
 
 ### Required
