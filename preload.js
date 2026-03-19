@@ -72,4 +72,5 @@ contextBridge.exposeInMainWorld('api', {
   saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),
   restoreWallet: (data) => ipcRenderer.invoke('taker:restore', data),
   backupWallet: (data) => ipcRenderer.invoke('taker:backup', data),
+  testTcpPort: (config) => ipcRenderer.invoke('network:testTcpPort', config),
 });

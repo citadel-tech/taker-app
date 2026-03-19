@@ -1344,6 +1344,64 @@ function registerDialogHandlers() {
 function registerTorHandlers() {
   const net = require('net');
 
+  ipcMain.handle('network:testTcpPort', async (event, config) => {
+    const host = config?.host || '127.0.0.1';
+    const port = config?.port;
+    const timeout = config?.timeout || 3000;
+
+    return new Promise((resolve) => {
+      if (!port) {
+        resolve({
+          success: false,
+          host,
+          port,
+          error: 'Port is required',
+        });
+        return;
+      }
+
+      const socket = new net.Socket();
+      let settled = false;
+
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        resolve(result);
+      };
+
+      socket.setTimeout(timeout);
+
+      socket.on('connect', () => {
+        finish({
+          success: true,
+          host,
+          port,
+        });
+      });
+
+      socket.on('error', () => {
+        finish({
+          success: false,
+          host,
+          port,
+          error: `Cannot connect to ${host}:${port}`,
+        });
+      });
+
+      socket.on('timeout', () => {
+        finish({
+          success: false,
+          host,
+          port,
+          error: `Connection timeout to ${host}:${port}`,
+        });
+      });
+
+      socket.connect(port, host);
+    });
+  });
+
   ipcMain.handle('tor:testConnection', async (event, config) => {
     const socksPort = config?.socksPort || 9050;
     const controlPort = config?.controlPort || 9051;
