@@ -25,7 +25,7 @@ export function Market(container) {
           if (refreshBtn) {
             refreshBtn.disabled = true;
             refreshBtn.innerHTML =
-              '<span class="animate-pulse">⏳ Syncing...</span>';
+              '<span class="animate-pulse">Refreshing...</span>';
           }
 
           // Monitor the current sync
@@ -36,7 +36,7 @@ export function Market(container) {
           // No sync running - enable button
           if (refreshBtn && refreshBtn.disabled) {
             refreshBtn.disabled = false;
-            refreshBtn.innerHTML = '🔄 Sync Market Data';
+            refreshBtn.innerHTML = 'Refresh';
           }
         }
       }
@@ -264,7 +264,7 @@ export function Market(container) {
 
     const originalText = refreshBtn.innerHTML;
     refreshBtn.disabled = true;
-    refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
+    refreshBtn.innerHTML = '<span class="animate-pulse">Refreshing...</span>';
 
     syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
     updateUI();
@@ -290,7 +290,7 @@ export function Market(container) {
       syncProgress = null;
       await fetchMakers();
 
-      refreshBtn.innerHTML = '✅ Synced!';
+      refreshBtn.innerHTML = 'Refreshed!';
       setTimeout(() => {
         refreshBtn.disabled = false;
         refreshBtn.innerHTML = originalText;
@@ -298,7 +298,7 @@ export function Market(container) {
     } catch (error) {
       syncProgress = null;
       updateUI();
-      refreshBtn.innerHTML = '❌ Failed';
+      refreshBtn.innerHTML = 'Refresh Failed';
       showError(error.message);
       setTimeout(() => {
         refreshBtn.disabled = false;
@@ -358,7 +358,7 @@ export function Market(container) {
           if (refreshBtn) {
             refreshBtn.disabled = true;
             refreshBtn.innerHTML =
-              '<span class="animate-pulse">⏳ Syncing...</span>';
+              '<span class="animate-pulse">Refreshing...</span>';
           }
 
           isLoading = true;
@@ -741,7 +741,7 @@ export function Market(container) {
         <div class="col-span-9 text-center py-12">
           <p class="text-gray-400 mb-4">No makers found</p>
           <button onclick="document.querySelector('#refresh-market-btn').click()" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg">
-            Sync Market Data
+            Refresh
           </button>
         </div>
       `;
@@ -810,7 +810,7 @@ export function Market(container) {
         <p class="text-gray-400">Live view of the current coinswap market</p>
       </div>
       <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
-        🔄 Sync Market Data
+        Refresh
       </button>
     </div>
 

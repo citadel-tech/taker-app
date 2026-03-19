@@ -397,7 +397,7 @@ export async function WalletComponent(container) {
                 <p class="text-gray-400 font-mono text-sm">${walletInfo.walletPath}</p>
             </div>
             <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
-                Refresh All Data
+                Refresh
             </button>
         </div>
 

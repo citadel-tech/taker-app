@@ -202,7 +202,7 @@ const result = await window.api.taker.getTransactions(200, 0);
               📥 Export CSV
             </button>
             <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-              🔄 Refresh
+              Refresh
             </button>
           </div>
         </div>
@@ -429,7 +429,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     const refreshButton = container.querySelector('#refresh-addresses');
     if (refreshButton) {
       refreshButton.addEventListener('click', async () => {
-        refreshButton.innerHTML = '⏳ Loading...';
+        refreshButton.innerHTML = 'Refreshing...';
         refreshButton.disabled = true;
         allAddresses = await fetchAddresses();
         render();
