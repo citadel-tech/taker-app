@@ -3,6 +3,27 @@ export function AddressListComponent(container) {
   let sortBy = 'newest';
   let allAddresses = [];
 
+  function getSpendTypeDisplay(spendType = '') {
+    const normalized = String(spendType || '').toLowerCase();
+    if (normalized.includes('swap')) return 'Swap';
+    if (normalized.includes('contract')) return 'Contract';
+    if (normalized.includes('seed') || normalized.includes('regular')) return 'Regular';
+    return 'Regular';
+  }
+
+  function extractSpendType(tx) {
+    const candidates = [
+      tx?.detail?.address?.spendType,
+      tx?.detail?.address?.spendInfo?.spendType,
+      tx?.detail?.spendType,
+      tx?.detail?.spendInfo?.spendType,
+      tx?.detail?.label,
+    ];
+
+    const match = candidates.find((value) => typeof value === 'string' && value.trim());
+    return getSpendTypeDisplay(match);
+  }
+
   // Fetch addresses from transactions
   async function fetchAddresses() {
     try {
@@ -27,7 +48,8 @@ const result = await window.api.taker.getTransactions(200, 0);
                 used: 0,
                 received: 0,
                 createdAt: (tx.info.blocktime || tx.info.time) * 1000,
-                type: detectAddressType(addr),
+                type: detectAddressType(addr, extractSpendType(tx)),
+                spendType: extractSpendType(tx),
                 lastUsed: (tx.info.blocktime || tx.info.time) * 1000
               });
             }
@@ -47,22 +69,29 @@ const result = await window.api.taker.getTransactions(200, 0);
     }
   }
 
-  function detectAddressType(address) {
-    if (address.startsWith('bc1q')) return 'P2WPKH';
-    if (address.startsWith('bc1p')) return 'P2TR';
+  function detectAddressType(address, fallbackSpendType = '') {
+    if (address.startsWith('bc1q') || address.startsWith('tb1q') || address.startsWith('bcrt1q')) {
+      return address.length > 50 ? 'P2WSH' : 'P2WPKH';
+    }
+    if (address.startsWith('bc1p') || address.startsWith('tb1p') || address.startsWith('bcrt1p')) return 'P2TR';
     if (address.startsWith('3')) return 'P2SH';
     if (address.startsWith('1')) return 'P2PKH';
-    if (address.startsWith('tb1q')) return 'P2WPKH';
-    if (address.startsWith('bcrt1q')) return 'P2WPKH';
-    return 'Unknown';
+    if (address.startsWith('2')) return 'P2SH';
+    if (address.startsWith('m') || address.startsWith('n')) return 'P2PKH';
+
+    const spendType = getSpendTypeDisplay(fallbackSpendType);
+    if (spendType === 'Contract' || spendType === 'Swap') return 'P2WSH';
+    return 'P2WPKH';
   }
 
   function getFilteredAddresses() {
     let addresses = [...allAddresses];
 
-    // Apply type filter
+    // Apply spend-type filter
     if (currentFilter !== 'all') {
-      addresses = addresses.filter((addr) => addr.type === currentFilter);
+      addresses = addresses.filter(
+        (addr) => addr.spendType.toLowerCase() === currentFilter
+      );
     }
 
     // Apply sorting
@@ -90,16 +119,6 @@ const result = await window.api.taker.getTransactions(200, 0);
     return colors[type] || 'gray';
   }
 
-  function getStatusInfo(addr) {
-    if (addr.used === 0) {
-      return { text: 'Unused', color: 'yellow' };
-    } else if (addr.used === 1) {
-      return { text: 'Used', color: 'green' };
-    } else {
-      return { text: `Reused (${addr.used}x)`, color: 'blue' };
-    }
-  }
-
   function formatLastUsed(timestamp) {
     if (!timestamp) return 'Never';
     const date = new Date(timestamp);
@@ -120,7 +139,6 @@ const result = await window.api.taker.getTransactions(200, 0);
     const totalReceived = allAddresses.reduce((sum, a) => sum + a.received, 0);
     
     return {
-      total: allAddresses.length,
       used,
       reused,
       totalReceived
@@ -162,10 +180,9 @@ const result = await window.api.taker.getTransactions(200, 0);
     }
 
     const csv = [
-      'Address,Type,Status,Times Used,Received (BTC),Created At,Last Used',
+      'Address,Type,Spend Type,Times Used,Received (BTC),Created At,Last Used',
       ...allAddresses.map((addr) => {
-        const statusInfo = getStatusInfo(addr);
-        return `"${addr.address}","${addr.type}","${statusInfo.text}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
+        return `"${addr.address}","${addr.type}","${addr.spendType}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
       }),
     ].join('\n');
 
@@ -183,9 +200,11 @@ const result = await window.api.taker.getTransactions(200, 0);
   function render() {
     const filteredAddresses = getFilteredAddresses();
     const stats = getStats();
-
-    // Get unique address types for filter buttons
-    const addressTypes = [...new Set(allAddresses.map((a) => a.type))];
+    const spendTypeFilters = [
+      { value: 'regular', label: 'Regular' },
+      { value: 'contract', label: 'Contract' },
+      { value: 'swap', label: 'Swap' },
+    ];
 
     container.innerHTML = `
       <div id="address-list-content">
@@ -202,17 +221,13 @@ const result = await window.api.taker.getTransactions(200, 0);
               📥 Export CSV
             </button>
             <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-              🔄 Refresh
+              Refresh
             </button>
           </div>
         </div>
 
         <!-- Address Stats -->
-        <div class="grid grid-cols-4 gap-4 mb-6">
-          <div class="bg-[#1a2332] rounded-lg p-6">
-            <p class="text-sm text-gray-400 mb-2">Total Addresses</p>
-            <p class="text-2xl font-mono text-[#FF6B35]">${stats.total}</p>
-          </div>
+        <div class="grid grid-cols-3 gap-4 mb-6">
           <div class="bg-[#1a2332] rounded-lg p-6">
             <p class="text-sm text-gray-400 mb-2">Used Addresses</p>
             <p class="text-2xl font-mono text-green-400">${stats.used}</p>
@@ -236,15 +251,20 @@ const result = await window.api.taker.getTransactions(200, 0);
               <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] text-gray-400 border border-gray-700 hover:bg-[#242d3d]'} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
                 All (${allAddresses.length})
               </button>
-              ${addressTypes
+              ${spendTypeFilters
                 .map((type) => {
                   const count = allAddresses.filter(
-                    (a) => a.type === type
+                    (a) => a.spendType === type.label
                   ).length;
-                  const color = getTypeColor(type);
+                  const color =
+                    type.value === 'regular'
+                      ? 'green'
+                      : type.value === 'contract'
+                        ? 'yellow'
+                        : 'blue';
                   return `
-                  <button data-filter="${type}" class="filter-btn ${currentFilter === type ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
-                    ${type} (${count})
+                  <button data-filter="${type.value}" class="filter-btn ${currentFilter === type.value ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    ${type.label} (${count})
                   </button>
                 `;
                 })
@@ -273,7 +293,7 @@ const result = await window.api.taker.getTransactions(200, 0);
               ? `
             <div class="text-center py-12">
               <div class="text-4xl mb-4">📭</div>
-              <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `of type ${currentFilter}` : 'found in transaction history'}</p>
+              <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `for ${currentFilter} spend type` : 'found in transaction history'}</p>
               <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-2 rounded-lg transition-colors">
                 Generate New Address
               </button>
@@ -286,7 +306,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                   <tr class="border-b border-gray-700">
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Address</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Type</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Status</th>
+                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Spend Type</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Times Used</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Received</th>
                     <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Created</th>
@@ -297,7 +317,12 @@ const result = await window.api.taker.getTransactions(200, 0);
                   ${filteredAddresses
                     .map((addr) => {
                       const typeColor = getTypeColor(addr.type);
-                      const statusInfo = getStatusInfo(addr);
+                      const spendTypeColor =
+                        addr.spendType === 'Regular'
+                          ? 'green'
+                          : addr.spendType === 'Contract'
+                            ? 'yellow'
+                            : 'blue';
                       const createdDate = new Date(addr.createdAt);
 
                       return `
@@ -321,8 +346,8 @@ const result = await window.api.taker.getTransactions(200, 0);
                           </span>
                         </td>
                         <td class="py-3 px-4">
-                          <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${statusInfo.color}-500/20 text-${statusInfo.color}-400">
-                            ${statusInfo.text}
+                          <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${spendTypeColor}-500/20 text-${spendTypeColor}-400 border border-${spendTypeColor}-500/30">
+                            ${addr.spendType}
                           </span>
                         </td>
                         <td class="py-3 px-4 text-sm text-gray-300 font-mono">${addr.used}</td>
@@ -348,15 +373,6 @@ const result = await window.api.taker.getTransactions(200, 0);
             </div>
           `
           }
-        </div>
-
-        <!-- Privacy Info -->
-        <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <h4 class="text-sm font-semibold text-lg text-blue-400 mb-2">💡 Privacy Tip</h4>
-          <p class="text-xs text-blue-300">
-            For best privacy, generate a new address for each transaction. Address reuse can link your transactions together and reduce your anonymity.
-            Addresses marked as "Reused" have received multiple transactions and may have reduced privacy.
-          </p>
         </div>
       </div>
     `;
@@ -429,7 +445,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     const refreshButton = container.querySelector('#refresh-addresses');
     if (refreshButton) {
       refreshButton.addEventListener('click', async () => {
-        refreshButton.innerHTML = '⏳ Loading...';
+        refreshButton.innerHTML = 'Refreshing...';
         refreshButton.disabled = true;
         allAddresses = await fetchAddresses();
         render();

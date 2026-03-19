@@ -18,16 +18,19 @@ function runCommand(cmd, options = {}) {
 }
 
 // STEP 1 — Clone coinswap-ffi if missing
-if (!fs.existsSync(FFI_DIR)) {
-  console.log('➡️  Cloning coinswap-ffi...');
-  runCommand('git clone https://github.com/citadel-tech/coinswap-ffi.git');
-  console.log('✓ Cloned coinswap-ffi\n');
-} else {
-  console.log('➡️  Updating coinswap-ffi...');
-  runCommand('git pull', { cwd: FFI_DIR });
-  console.log('✓ coinswap-ffi updated\n');
-}
+const BRANCH = 'offerbook-fix';
+const REPO_URL = 'https://github.com/citadel-tech/coinswap-ffi.git';
 
+if (!fs.existsSync(FFI_DIR)) {
+  console.log(`➡️  Cloning coinswap-ffi (branch ${BRANCH})...`);
+  runCommand(`git clone -b ${BRANCH} ${REPO_URL}`);
+} else {
+  console.log(`➡️  Updating coinswap-ffi to branch ${BRANCH}...`);
+  // Fetch all branches and checkout the desired one
+  runCommand('git fetch --all', { cwd: FFI_DIR });
+  runCommand(`git checkout ${BRANCH}`, { cwd: FFI_DIR });
+  runCommand('git pull', { cwd: FFI_DIR });
+}
 // STEP 2 — Install deps & build coinswap-js
 console.log('➡️  Installing dependencies for coinswap-js...');
 runCommand('npm install', { cwd: NAPI_SOURCE });

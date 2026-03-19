@@ -1,6 +1,7 @@
 export function TransactionsListComponent(container) {
   // State
   let currentFilter = 'all';
+  let currentSort = 'newest';
   let allTransactions = [];
   let currentPage = 0;
   const transactionsPerPage = 20;
@@ -93,19 +94,24 @@ export function TransactionsListComponent(container) {
   }
 
   function getFilteredTransactions() {
-    // First sort all transactions
-    const sorted = sortTransactionsByTime(allTransactions);
+    let filtered = [...allTransactions];
 
-    if (currentFilter === 'all') {
-      return sorted;
-    } else if (currentFilter === 'received') {
-      return sorted.filter((tx) => getTransactionType(tx) === 'received');
+    if (currentFilter === 'received') {
+      filtered = filtered.filter((tx) => getTransactionType(tx) === 'received');
     } else if (currentFilter === 'sent') {
-      return sorted.filter((tx) => getTransactionType(tx) === 'sent');
+      filtered = filtered.filter((tx) => getTransactionType(tx) === 'sent');
     } else if (currentFilter === 'swaps') {
-      return sorted.filter((tx) => getTransactionType(tx) === 'swap');
+      filtered = filtered.filter((tx) => getTransactionType(tx) === 'swap');
     }
-    return sorted;
+
+    if (currentSort === 'amount') {
+      return filtered.sort(
+        (a, b) =>
+          Math.abs(b.detail.amount.sats || 0) - Math.abs(a.detail.amount.sats || 0)
+      );
+    }
+
+    return sortTransactionsByTime(filtered);
   }
 
   function updateFilterButtons() {
@@ -125,6 +131,26 @@ export function TransactionsListComponent(container) {
   function setFilter(filter) {
     currentFilter = filter;
     updateFilterButtons();
+    renderTransactions();
+  }
+
+  function updateSortButtons() {
+    const buttons = content.querySelectorAll('.sort-btn');
+    buttons.forEach((btn) => {
+      const sort = btn.dataset.sort;
+      if (sort === currentSort) {
+        btn.className =
+          'sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+      } else {
+        btn.className =
+          'sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+      }
+    });
+  }
+
+  function setSort(sort) {
+    currentSort = sort;
+    updateSortButtons();
     renderTransactions();
   }
 
@@ -252,21 +278,22 @@ export function TransactionsListComponent(container) {
 
   function calculateTotals() {
     const totalReceived = allTransactions
-      .filter((tx) => tx.detail.amount.sats > 0)
+      .filter((tx) => getTransactionType(tx) === 'received')
       .reduce((sum, tx) => sum + tx.detail.amount.sats, 0);
 
     const totalSent = Math.abs(
       allTransactions
-        .filter((tx) => tx.detail.amount.sats < 0)
+        .filter((tx) => getTransactionType(tx) === 'sent')
         .reduce((sum, tx) => sum + tx.detail.amount.sats, 0)
     );
-
-    const netBalance = totalReceived - totalSent;
+    const totalSwaps = allTransactions.filter(
+      (tx) => getTransactionType(tx) === 'swap'
+    ).length;
 
     return {
       totalReceived: satsToBtc(totalReceived),
       totalSent: satsToBtc(totalSent),
-      netBalance: satsToBtc(netBalance),
+      totalSwaps,
     };
   }
 
@@ -291,20 +318,6 @@ export function TransactionsListComponent(container) {
 
     try {
       allTransactions = await fetchTransactions(100); // Load more transactions
-
-      // Debug: log transaction types to help identify swap detection
-      console.log('📊 Transaction breakdown:');
-      allTransactions.forEach((tx, i) => {
-        const type = getTransactionType(tx);
-        const label = tx.detail.label || 'no label';
-        const category = tx.detail.category;
-        if (i < 10) {
-          // Log first 10 for debugging
-          console.log(
-            `  ${i}: type=${type}, category=${category}, label=${label}`
-          );
-        }
-      });
 
       updateStats();
       renderTransactions();
@@ -346,16 +359,11 @@ export function TransactionsListComponent(container) {
     content.querySelector('#filter-swaps-count').textContent = stats.swaps;
 
     // Update stats cards
-    content.querySelector('#total-transactions').textContent = stats.all;
     content.querySelector('#total-received').textContent =
       totals.totalReceived + ' BTC';
     content.querySelector('#total-sent').textContent =
       totals.totalSent + ' BTC';
-
-    const netEl = content.querySelector('#net-balance');
-    const netValue = parseFloat(totals.netBalance);
-    netEl.textContent = (netValue >= 0 ? '+' : '') + totals.netBalance + ' BTC';
-    netEl.className = `text-2xl font-mono ${netValue >= 0 ? 'text-green-400' : 'text-red-400'}`;
+    content.querySelector('#total-swaps').textContent = totals.totalSwaps;
   }
 
   // Create content
@@ -369,7 +377,7 @@ export function TransactionsListComponent(container) {
                     <span>←</span> Back to Wallet
                 </button>
                 <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Transactions</h2>
-                <p class="text-gray-400">Complete transaction history (newest first)</p>
+                <p class="text-gray-400">Complete transaction history with filtering and sorting</p>
             </div>
             <button id="refresh-transactions-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors">
                 Refresh
@@ -377,11 +385,7 @@ export function TransactionsListComponent(container) {
         </div>
 
         <!-- Transaction Stats -->
-        <div class="grid grid-cols-4 gap-4 mb-6">
-            <div class="bg-[#1a2332] rounded-lg p-6">
-                <p class="text-sm text-gray-400 mb-2">Total Transactions</p>
-                <p id="total-transactions" class="text-2xl font-mono text-[#FF6B35]">--</p>
-            </div>
+        <div class="grid grid-cols-3 gap-4 mb-6">
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Received</p>
                 <p id="total-received" class="text-2xl font-mono text-green-400">-- BTC</p>
@@ -391,8 +395,8 @@ export function TransactionsListComponent(container) {
                 <p id="total-sent" class="text-2xl font-mono text-red-400">-- BTC</p>
             </div>
             <div class="bg-[#1a2332] rounded-lg p-6">
-                <p class="text-sm text-gray-400 mb-2">Net Balance</p>
-                <p id="net-balance" class="text-2xl font-mono text-green-400">-- BTC</p>
+                <p class="text-sm text-gray-400 mb-2">Total Swaps</p>
+                <p id="total-swaps" class="text-2xl font-mono text-[#FF6B35]">--</p>
             </div>
         </div>
 
@@ -400,8 +404,7 @@ export function TransactionsListComponent(container) {
         <div class="bg-[#1a2332] rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300">Transaction History</h3>
-                <!-- Filter buttons -->
-                <div class="flex gap-2">
+                <div class="flex gap-2 items-center flex-wrap">
                     <button data-filter="all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         All (<span id="filter-all-count">--</span>)
                     </button>
@@ -413,6 +416,12 @@ export function TransactionsListComponent(container) {
                     </button>
                     <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         🔄 Swaps (<span id="filter-swaps-count">--</span>)
+                    </button>
+                    <button data-sort="newest" id="sort-newest" class="sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Newest
+                    </button>
+                    <button data-sort="amount" id="sort-amount" class="sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Amount
                     </button>
                 </div>
             </div>
@@ -428,11 +437,6 @@ export function TransactionsListComponent(container) {
                     Load More Transactions
                 </button>
             </div>
-        </div>
-        
-        <!-- Debug Info (can be removed in production) -->
-        <div class="mt-4 p-4 bg-[#0f1419] rounded-lg text-xs text-gray-500">
-            <p>💡 Tip: Check browser console for transaction type breakdown to debug swap detection</p>
         </div>
     `;
 
@@ -494,6 +498,14 @@ export function TransactionsListComponent(container) {
     });
   });
 
+  const sortButtons = content.querySelectorAll('.sort-btn');
+  sortButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const sort = button.dataset.sort;
+      setSort(sort);
+    });
+  });
+
   // Add back button handler
   const backButton = content.querySelector('#back-to-wallet');
   backButton.addEventListener('click', () => {
@@ -504,5 +516,6 @@ export function TransactionsListComponent(container) {
   });
 
   // Initialize data
+  updateSortButtons();
   loadTransactions();
 }

@@ -14,73 +14,68 @@ export function RecoveryComponent(container) {
     }
 
     content.innerHTML = `
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Recovery</h2>
-        <p class="text-gray-400 mb-8">Recover funds from failed or stuck coinswaps</p>
+        <div class="flex flex-col gap-4 mb-8 md:flex-row md:items-start md:justify-between">
+            <div>
+                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Recovery</h2>
+                <p class="text-gray-400">Recover funds from failed or stuck coinswaps</p>
+            </div>
+            <button
+                id="manual-recovery-btn"
+                class="shrink-0 bg-[#ff6b35] hover:bg-[#ff7f50] text-white font-bold px-5 py-3 rounded-xl transition-all border border-[#ff6b35] shadow-lg shadow-black/30 hover:shadow-xl hover:scale-[1.02]"
+            >
+                Trigger Recovery
+            </button>
+        </div>
 
-        <div class="grid grid-cols-2 gap-6">
-            <!-- Left: Recovery Status -->
-              <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Manual Recovery</h3>
-                    <p class="text-sm text-gray-400 mb-4">If automatic recovery fails, you can manually recover funds</p>
-                   <button id="manual-recovery-btn" 
-    class="w-full bg-[#ff6b35] hover:bg-[#ff7f50] text-white font-bold py-4 text-lg rounded-xl transition-all border border-[#ff6b35] shadow-lg shadow-black/30 hover:shadow-xl hover:scale-[1.02]">
-    🔧 Manually Trigger Recovery
-</button>
-                    <div id="recovery-status" class="hidden mt-3 p-3 rounded-lg text-sm"></div>
-                </div>
-
-            <!-- Right: Recovery Info -->
-            <div class="col-span-1 space-y-6">
-                <!-- How Recovery Works -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">How Recovery Works</h3>
-                    <div class="space-y-3 text-sm text-gray-400">
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">1.</span>
-                            <p>System detects failed swap or timeout</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">2.</span>
-                            <p>Broadcast contract transactions to blockchain</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">3.</span>
-                            <p>Wait for timelock or claim via hashlock</p>
-                        </div>
-                        <div class="flex gap-3">
-                            <span class="text-[#FF6B35] font-bold">4.</span>
-                            <p>Funds returned to your wallet</p>
-                        </div>
+        <div class="space-y-6">
+            <div class="bg-[#1a2332] rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-300 mb-4">How Recovery Works</h3>
+                <div class="space-y-4 text-sm text-gray-400">
+                    <div class="flex gap-3 items-start">
+                        <span class="text-[#FF6B35] font-bold">1.</span>
+                        <p>The Recovery routine detects failed swaps, waits for HTLC timelock expiry then creates and broadcasts a refund transaction back to wallet.</p>
                     </div>
-
-                    <div class="mt-6 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-                        <p class="text-xs text-blue-400">
-                            ℹ Recovery is automatic but may take several hours due to timelock periods
-                        </p>
+                    <div class="flex gap-3 items-start">
+                        <span class="text-[#FF6B35] font-bold">2.</span>
+                        <p>It might take several hours for timelock to expire.</p>
+                    </div>
+                    <div class="flex gap-3 items-start">
+                        <span class="text-[#FF6B35] font-bold">3.</span>
+                        <p>Recovery is automatically triggered for any unspent swap contract transactions at wallet startup. If you still see pending recoveries here, use the Trigger Recovery button to manually trigger a recovery.</p>
+                    </div>
+                    <div class="flex gap-3 items-start">
+                        <span class="text-[#FF6B35] font-bold">4.</span>
+                        <p>While waiting for recovery the app can be safely closed. Recovery will resume in next restart.</p>
+                    </div>
+                    <div class="flex gap-3 items-start">
+                        <span class="text-[#FF6B35] font-bold">5.</span>
+                        <p>Always ensure to not have very old pending recoveries. That can put your funds at risk.</p>
                     </div>
                 </div>
+            </div>
 
-                <!-- Recovery Stats -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Recovery Stats</h3>
-                    <div class="space-y-4">
-                        <div>
-                            <p class="text-sm text-gray-400 mb-1">Total Recovered</p>
-                            <p id="total-recovered" class="text-xl font-mono text-green-400">0.00000000 BTC</p>
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-400 mb-1">Recovery Rate</p>
-                            <p id="recovery-rate" class="text-xl font-mono text-blue-400">100%</p>
-                        </div>
-                        <div>
-                            <p class="text-sm text-gray-400 mb-1">Pending</p>
-                            <p id="pending-count" class="text-xl font-mono text-yellow-400">0</p>
-                        </div>
+            <div class="bg-[#1a2332] rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-300 mb-4">Recovery Stats</h3>
+                <div class="grid gap-4 sm:grid-cols-3">
+                    <div class="rounded-lg bg-[#111827]/40 p-4">
+                        <p class="text-sm text-gray-400 mb-1">Total Recovered</p>
+                        <p id="total-recovered" class="text-xl font-mono text-green-400">0.00000000 BTC</p>
+                    </div>
+                    <div class="rounded-lg bg-[#111827]/40 p-4">
+                        <p class="text-sm text-gray-400 mb-1">Recovery Rate</p>
+                        <p id="recovery-rate" class="text-xl font-mono text-blue-400">100%</p>
+                    </div>
+                    <div class="rounded-lg bg-[#111827]/40 p-4">
+                        <p class="text-sm text-gray-400 mb-1">Pending</p>
+                        <p id="pending-count" class="text-xl font-mono text-yellow-400">0</p>
                     </div>
                 </div>
+            </div>
 
-                <!-- Manual Recovery -->
-              
+            <div class="bg-[#1a2332] rounded-lg p-6">
+                <h3 class="text-lg font-semibold text-gray-300 mb-4">Manual Recovery</h3>
+                <p class="text-sm text-gray-400">If automatic recovery fails, you can manually recover funds.</p>
+                <div id="recovery-status" class="hidden mt-4 p-3 rounded-lg text-sm"></div>
             </div>
         </div>
     `;
@@ -115,7 +110,7 @@ export function RecoveryComponent(container) {
         }
 
         setTimeout(() => {
-            btn.textContent = '🔧 Manually Trigger Recovery';
+            btn.textContent = 'Trigger Recovery';
             btn.disabled = false;
             btn.classList.remove('opacity-50', 'cursor-not-allowed');
         }, 3000);
