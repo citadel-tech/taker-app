@@ -404,50 +404,36 @@ function registerTakerHandlers() {
         source: source,
       });
 
-      // ✅ Trigger manual sync
-      api1State.takerInstance.runOfferSyncNow();
+      // Trigger sync and wait for completion in the native layer.
+      api1State.takerInstance.syncOfferbookAndWait();
 
-      // Monitor until complete
-      const checkInterval = setInterval(() => {
-        try {
-          const isSyncing = api1State.takerInstance.isOfferbookSyncing();
+      const completedAt = Date.now();
+      console.log(`✅ Offerbook sync completed (${source})`);
+      api1State.activeSyncs.set(syncId, {
+        ...api1State.activeSyncs.get(syncId),
+        status: 'completed',
+        completedAt,
+      });
 
-          if (!isSyncing) {
-            clearInterval(checkInterval);
-
-            console.log(`✅ Offerbook sync completed (${source})`);
-            api1State.activeSyncs.set(syncId, {
-              ...api1State.activeSyncs.get(syncId),
-              status: 'completed',
-              completedAt: Date.now(),
-            });
-
-            // Clear flags
-            api1State.syncState.isRunning = false;
-            api1State.syncState.currentSyncId = null;
-            api1State.syncState.lastSyncTime = Date.now();
-          }
-        } catch (err) {
-          clearInterval(checkInterval);
-          console.error(`❌ Sync check failed:`, err);
-
-          api1State.syncState.isRunning = false;
-          api1State.syncState.currentSyncId = null;
-
-          api1State.activeSyncs.set(syncId, {
-            ...api1State.activeSyncs.get(syncId),
-            status: 'failed',
-            error: err.message,
-          });
-        }
-      }, 1000);
-
+      api1State.syncState.lastSyncTime = completedAt;
       return { success: true, syncId, source };
     } catch (error) {
       console.error('❌ Sync offerbook failed:', error);
+
+      if (api1State.syncState.currentSyncId) {
+        const failedSyncId = api1State.syncState.currentSyncId;
+        api1State.activeSyncs.set(failedSyncId, {
+          ...api1State.activeSyncs.get(failedSyncId),
+          status: 'failed',
+          error: error.message,
+          completedAt: Date.now(),
+        });
+      }
+
+      return { success: false, error: error.message };
+    } finally {
       api1State.syncState.isRunning = false;
       api1State.syncState.currentSyncId = null;
-      return { success: false, error: error.message };
     }
   }
 
@@ -654,25 +640,6 @@ function registerTakerHandlers() {
     }
   });
 
-  // Check if offerbook is syncing
-  ipcMain.handle('taker:isOfferbookSyncing', async () => {
-    try {
-      if (!api1State.takerInstance) {
-        return { success: false, error: 'Taker not initialized' };
-      }
-
-      const isSyncing = api1State.takerInstance.isOfferbookSyncing();
-
-      return {
-        success: true,
-        isSyncing: isSyncing,
-      };
-    } catch (error) {
-      console.error('Failed to check offerbook sync status:', error);
-      return { success: false, error: error.message, isSyncing: false };
-    }
-  });
-
   // Get UTXOs
   ipcMain.handle('taker:getUtxos', async () => {
     try {
@@ -865,8 +832,8 @@ function registerTakerHandlers() {
     }
   );
 
-  // Sync offerbook
-  ipcMain.handle('taker:syncOfferbook', async () => {
+  // Sync offerbook and wait for completion
+  ipcMain.handle('taker:syncOfferbookAndWait', async () => {
     return await startOfferbookSync('manual');
   });
 
@@ -1047,8 +1014,8 @@ function registerCoinswapHandlers() {
 
         while (retries < maxRetries) {
           try {
-            // Check if sync is still running
-            const isSyncing = api1State.takerInstance.isOfferbookSyncing();
+            // Check if app-level sync is still running.
+            const isSyncing = api1State.syncState.isRunning;
 
             if (!isSyncing) {
               // Sync complete - now check if we have enough makers
