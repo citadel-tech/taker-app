@@ -152,7 +152,7 @@ export function Market(container) {
     }
   }
 
-  async function syncOfferbook() {
+  async function syncOfferbookAndWait() {
     try {
       // Check if sync is already running
       const activeSyncId = localStorage.getItem('active_sync_id');
@@ -169,7 +169,7 @@ export function Market(container) {
 
       console.log('🔄 Starting offerbook sync...');
 
-      const result = await window.api.taker.syncOfferbook();
+      const result = await window.api.taker.syncOfferbookAndWait();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to start sync');
@@ -286,7 +286,7 @@ export function Market(container) {
     updateUI();
 
     try {
-      const result = await window.api.taker.syncOfferbook();
+      const result = await window.api.taker.syncOfferbookAndWait();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to start sync');
@@ -295,20 +295,6 @@ export function Market(container) {
       const syncId = result.syncId;
       console.log('📡 Sync started:', syncId);
       localStorage.setItem('active_sync_id', syncId);
-
-      // Poll until sync completes
-      let isSyncing = true;
-      while (isSyncing) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        const statusResult = await window.api.taker.isOfferbookSyncing();
-        if (statusResult.success) {
-          isSyncing = statusResult.isSyncing;
-          if (isSyncing) {
-            console.log('⏳ Still syncing...');
-          }
-        }
-      }
 
       // Sync is done - wait for file write
       console.log('✅ Offerbook synced - waiting for file write...');
@@ -361,11 +347,11 @@ export function Market(container) {
     }
     banner.classList.remove('hidden');
 
-    // ✅ CHECK: Is offerbook currently syncing?
+    // Check if app-level sync is currently running.
     try {
-      const syncingResult = await window.api.taker.isOfferbookSyncing();
+      const syncingResult = await window.api.taker.getCurrentSyncState();
 
-      if (syncingResult.success && syncingResult.isSyncing) {
+      if (syncingResult.success && syncingResult.isRunning) {
         console.log('⏳ Background sync in progress, waiting...');
         isLoading = true;
         updateUI();
@@ -418,15 +404,15 @@ export function Market(container) {
     isLoading = true;
     updateUI();
 
-    // ✅ SIMPLE: Just poll until sync is done
+    // Poll app sync state until sync is done.
     let isSyncing = true;
     while (isSyncing) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       try {
-        const result = await window.api.taker.isOfferbookSyncing();
+        const result = await window.api.taker.getCurrentSyncState();
         if (result.success) {
-          isSyncing = result.isSyncing;
+          isSyncing = result.isRunning;
           if (isSyncing) {
             console.log('⏳ Still syncing...');
           }
