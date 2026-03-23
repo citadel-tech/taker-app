@@ -12,7 +12,8 @@ contextBridge.exposeInMainWorld('api', {
     getBalance: () => ipcRenderer.invoke('taker:getBalance'),
     getNextAddress: () => ipcRenderer.invoke('taker:getNextAddress'),
     sync: () => ipcRenderer.invoke('taker:sync'),
-    syncOfferbook: () => ipcRenderer.invoke('taker:syncOfferbook'),
+    syncOfferbookAndWait: () =>
+      ipcRenderer.invoke('taker:syncOfferbookAndWait'),
     getSyncStatus: (syncId) =>
       ipcRenderer.invoke('taker:getSyncStatus', syncId),
     getOffers: () => ipcRenderer.invoke('taker:getOffers'),
@@ -30,7 +31,6 @@ contextBridge.exposeInMainWorld('api', {
     testTorConnection: (config) =>
       ipcRenderer.invoke('tor:testConnection', config),
     getProtocol: () => ipcRenderer.invoke('taker:getProtocol'),
-    isOfferbookSyncing: () => ipcRenderer.invoke('taker:isOfferbookSyncing'),
     setupLogging: (dataDir, level) => 
       ipcRenderer.invoke('taker:setupLogging', { dataDir, level }),
 

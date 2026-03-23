@@ -8,6 +8,7 @@ export function Market(container) {
   let syncProgress = null;
   let currentMakerStatus = 'good'; // 'good', 'bad', or 'unresponsive'
   let syncCheckInterval = null;
+  let periodicRefreshInterval = null;
 
   // Check sync state every second
   function startSyncStateMonitor() {
@@ -152,7 +153,7 @@ export function Market(container) {
     }
   }
 
-  async function syncOfferbook() {
+  async function syncOfferbookAndWait() {
     try {
       // Check if sync is already running
       const activeSyncId = localStorage.getItem('active_sync_id');
@@ -169,7 +170,7 @@ export function Market(container) {
 
       console.log('🔄 Starting offerbook sync...');
 
-      const result = await window.api.taker.syncOfferbook();
+      const result = await window.api.taker.syncOfferbookAndWait();
 
       if (!result.success) {
         throw new Error(result.error || 'Failed to start sync');
@@ -254,73 +255,40 @@ export function Market(container) {
   async function handleRefresh() {
     const refreshBtn = content.querySelector('#refresh-market-btn');
 
-    // Check if sync is already running
-    const activeSyncId = localStorage.getItem('active_sync_id');
-    if (activeSyncId) {
-      try {
-        const status = await window.api.taker.getSyncStatus(activeSyncId);
-        if (
-          status.success &&
-          (status.sync.status === 'syncing' ||
-            status.sync.status === 'starting')
-        ) {
-          showError('Sync already in progress');
-          return;
-        }
-      } catch (err) {
-        localStorage.removeItem('active_sync_id');
-      }
+    // Guard against double-click if sync already running
+    const stateCheck = await window.api.taker.getCurrentSyncState();
+    if (stateCheck.success && stateCheck.isRunning) {
+      showError('Sync already in progress');
+      return;
     }
 
     const originalText = refreshBtn.innerHTML;
-
     refreshBtn.disabled = true;
     refreshBtn.innerHTML = '<span class="animate-pulse">Syncing...</span>';
 
-    // ✅ Show sync progress bar ONLY
-    syncProgress = {
-      percent: 50,
-      status: 'syncing',
-      message: 'Syncing market data...',
-    };
+    syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
     updateUI();
 
     try {
-      const result = await window.api.taker.syncOfferbook();
-
+      const result = await window.api.taker.syncOfferbookAndWait();
       if (!result.success) {
         throw new Error(result.error || 'Failed to start sync');
       }
 
       const syncId = result.syncId;
-      console.log('📡 Sync started:', syncId);
-      localStorage.setItem('active_sync_id', syncId);
+      await new Promise((resolve, reject) => {
+        const poll = setInterval(async () => {
+          try {
+            const status = await window.api.taker.getSyncStatus(syncId);
+            if (!status.success) { clearInterval(poll); reject(new Error('Failed to get sync status')); return; }
+            if (status.sync.status === 'completed') { clearInterval(poll); resolve(); }
+            else if (status.sync.status === 'failed') { clearInterval(poll); reject(new Error(status.sync.error || 'Sync failed')); }
+          } catch (err) { clearInterval(poll); reject(err); }
+        }, 1000);
+      });
 
-      // Poll until sync completes
-      let isSyncing = true;
-      while (isSyncing) {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        const statusResult = await window.api.taker.isOfferbookSyncing();
-        if (statusResult.success) {
-          isSyncing = statusResult.isSyncing;
-          if (isSyncing) {
-            console.log('⏳ Still syncing...');
-          }
-        }
-      }
-
-      // Sync is done - wait for file write
-      console.log('✅ Offerbook synced - waiting for file write...');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      // Clear sync progress
       syncProgress = null;
-
-      // NOW fetch fresh makers
-      console.log('✅ Now fetching fresh makers...');
-      localStorage.removeItem('active_sync_id');
-      await fetchMakers(); // This sets isLoading = false and updates UI
+      await fetchMakers();
 
       refreshBtn.innerHTML = '✅ Synced!';
       setTimeout(() => {
@@ -328,7 +296,7 @@ export function Market(container) {
         refreshBtn.innerHTML = originalText;
       }, 2000);
     } catch (error) {
-      syncProgress = null; 
+      syncProgress = null;
       updateUI();
       refreshBtn.innerHTML = '❌ Failed';
       showError(error.message);
@@ -361,11 +329,11 @@ export function Market(container) {
     }
     banner.classList.remove('hidden');
 
-    // ✅ CHECK: Is offerbook currently syncing?
+    // Check if app-level sync is currently running.
     try {
-      const syncingResult = await window.api.taker.isOfferbookSyncing();
+      const syncingResult = await window.api.taker.getCurrentSyncState();
 
-      if (syncingResult.success && syncingResult.isSyncing) {
+      if (syncingResult.success && syncingResult.isRunning) {
         console.log('⏳ Background sync in progress, waiting...');
         isLoading = true;
         updateUI();
@@ -409,6 +377,25 @@ export function Market(container) {
     await fetchMakers();
     isLoading = false;
     updateUI();
+
+    // Refresh offerbook data every 15 minutes. The Rust backend keeps
+    // offerbook.json up to date; this just re-reads the file for the UI.
+    periodicRefreshInterval = setInterval(async () => {
+      const syncState = await window.api.taker.getCurrentSyncState();
+      if (!syncState.isRunning) {
+        await fetchMakers();
+      }
+    }, 15 * 60 * 1000);
+
+    // Clean up the interval when this component is removed from the DOM
+    const observer = new MutationObserver(() => {
+      if (!document.body.contains(content)) {
+        clearInterval(periodicRefreshInterval);
+        periodicRefreshInterval = null;
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
   }
 
   async function monitorExistingSync() {
@@ -418,15 +405,15 @@ export function Market(container) {
     isLoading = true;
     updateUI();
 
-    // ✅ SIMPLE: Just poll until sync is done
+    // Poll app sync state until sync is done.
     let isSyncing = true;
     while (isSyncing) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
       try {
-        const result = await window.api.taker.isOfferbookSyncing();
+        const result = await window.api.taker.getCurrentSyncState();
         if (result.success) {
-          isSyncing = result.isSyncing;
+          isSyncing = result.isRunning;
           if (isSyncing) {
             console.log('⏳ Still syncing...');
           }

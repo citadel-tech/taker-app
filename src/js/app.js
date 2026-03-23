@@ -184,7 +184,7 @@ async function checkTakerInitialization(config) {
 
       if (result.success) {
         console.log('✅ Taker initialized');
-        startMainApp();
+        await performLaunchSync(startMainApp);
       } else {
         console.error('❌ Taker initialization failed:', result.error);
         alert('Failed to initialize: ' + result.error);
@@ -283,7 +283,7 @@ async function showPasswordPrompt(config) {
         if (result.success) {
           modal.remove();
           resolve(true);
-          startMainApp();
+          await performLaunchSync(startMainApp);
         } else if (result.wrongPassword) {
           errorDiv.classList.remove('hidden');
           errorDiv.querySelector('p').textContent =
@@ -315,6 +315,50 @@ async function showPasswordPrompt(config) {
       resolve(false);
     });
   });
+}
+
+/**
+ * Show an offerbook sync overlay, wait for sync to complete, then call onComplete.
+ * Used on launch so the user sees makers as soon as the app opens.
+ */
+async function performLaunchSync(onComplete) {
+  const overlay = document.createElement('div');
+  overlay.id = 'launch-sync-overlay';
+  overlay.className = 'fixed inset-0 bg-[#0f1419] flex items-center justify-center z-50';
+  overlay.innerHTML = `
+    <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-8 text-center">
+      <div class="w-16 h-16 bg-[#FF6B35]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span class="text-3xl animate-spin inline-block">⏳</span>
+      </div>
+      <h2 class="text-xl font-bold text-white mb-2">Syncing Market Data</h2>
+      <p class="text-gray-400 text-sm mb-4">Discovering available makers via Tor. This may take a minute...</p>
+      <div class="bg-gray-700 rounded-full h-2">
+        <div class="bg-[#FF6B35] h-2 rounded-full animate-pulse" style="width: 60%"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  try {
+    const syncResult = await window.api.taker.syncOfferbookAndWait();
+    if (syncResult.success) {
+      const syncId = syncResult.syncId;
+      await new Promise((resolve) => {
+        const poll = setInterval(async () => {
+          try {
+            const status = await window.api.taker.getSyncStatus(syncId);
+            const done = !status.success || status.sync.status === 'completed' || status.sync.status === 'failed';
+            if (done) { clearInterval(poll); resolve(); }
+          } catch { clearInterval(poll); resolve(); }
+        }, 1000);
+      });
+    }
+  } catch (err) {
+    console.warn('⚠️ Launch offerbook sync error:', err.message);
+  }
+
+  overlay.remove();
+  onComplete();
 }
 
 // Start the main app after bitcoind connection is established
