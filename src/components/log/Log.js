@@ -243,11 +243,6 @@ export function LogComponent(container) {
           </div>
         </div>
         
-        <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-          <p class="text-xs text-blue-400">
-            <strong>💡 Tip:</strong> The logs shown here are real-time. For detailed debugging or historical logs, open the complete log file.
-          </p>
-        </div>
       </div>
     </div>
   `;

@@ -1,4 +1,9 @@
 import { SwapStateManager, formatRelativeTime } from './SwapStateManager.js';
+import {
+  buildSwapHistoryMarkup,
+  loadSwapHistory,
+  summarizeSwapHistory,
+} from './SwapHistory.js';
 
 // ✅ ADD CACHE CONSTANTS
 const SWAP_DATA_CACHE_KEY = 'swap_data_cache';
@@ -94,6 +99,25 @@ export async function SwapComponent(container) {
   let useCustomHops = false;
   let customHopCount = 6;
   let networkFeeRate = 2;
+  let currentProtocol = 'v1';
+  let currentNetwork = 'signet';
+  let walletBalances = {
+    spendable: 0,
+    regular: 0,
+    swap: 0,
+    contract: 0,
+    fidelity: 0,
+  };
+  let maxSwappableAmount = 0;
+  let balanceLoadPromise = null;
+  let balancesLoaded = false;
+
+  try {
+    const config = JSON.parse(localStorage.getItem('coinswap_config') || '{}');
+    currentNetwork = config.network || currentNetwork;
+  } catch (error) {
+    console.error('Failed to load swap config context:', error);
+  }
 
   // Restore user selections from saved state if available
   const savedSelections = await SwapStateManager.getUserSelections();
@@ -118,18 +142,37 @@ export async function SwapComponent(container) {
   let totalBalance = 0;
   const btcPrice = 50000;
 
-  // ✅ LOAD FROM CACHE IMMEDIATELY IF AVAILABLE
-  if (cached && !cached.isStale) {
-    console.log('⚡ Using cached swap data (still fresh)');
-    availableUtxos = cached.utxos || [];
-    availableMakers = cached.makers || [];
-    totalBalance = cached.balance || 0;
+  function filterMakersByProtocol(makers) {
+    return makers.filter((maker) =>
+      currentProtocol === 'v2'
+        ? maker.protocol === 'Taproot'
+        : maker.protocol !== 'Taproot'
+    );
+  }
 
-    // Update makers count immediately since we have the data
+  function updateAvailableMakersCount() {
     const makersCountEl = content.querySelector('#available-makers-count');
     if (makersCountEl) {
       makersCountEl.textContent = availableMakers.length;
     }
+  }
+
+  try {
+    const protocolResult = await window.api.taker.getProtocol();
+    currentProtocol = protocolResult.protocol || currentProtocol;
+  } catch (error) {
+    console.error('Failed to get authoritative protocol:', error);
+  }
+
+  // ✅ LOAD FROM CACHE IMMEDIATELY IF AVAILABLE
+  if (cached && !cached.isStale) {
+    console.log('⚡ Using cached swap data (still fresh)');
+    availableUtxos = cached.utxos || [];
+    availableMakers = filterMakersByProtocol(cached.makers || []);
+    totalBalance = cached.balance || 0;
+
+    // Update makers count immediately since we have the data
+    updateAvailableMakersCount();
   }
 
   // Fetch real UTXOs from API
@@ -172,8 +215,9 @@ export async function SwapComponent(container) {
   async function fetchMakers(useCache = false) {
     // ✅ USE CACHE IF REQUESTED
     if (useCache && cached && cached.makers) {
-      availableMakers = cached.makers;
+      availableMakers = filterMakersByProtocol(cached.makers);
       console.log('✅ Loaded', availableMakers.length, 'makers from cache');
+      updateAvailableMakersCount();
       return availableMakers;
     }
 
@@ -183,17 +227,27 @@ export async function SwapComponent(container) {
       if (data.success && data.offerbook) {
         const goodMakers = data.offerbook.goodMakers || [];
 
-        availableMakers = goodMakers
-          .filter((item) => item.offer !== null)
-          .map((item, index) => {
-            const offer = item.offer;
-            return {
-              minSize: offer.minSize || 0,
-              maxSize: offer.maxSize || 0,
-              fee: (offer.amountRelativeFeePct || 0).toFixed(1),
-              index: index,
-            };
-          });
+        availableMakers = filterMakersByProtocol(
+          goodMakers
+            .filter((item) => item.offer !== null)
+            .map((item, index) => {
+              const offer = item.offer;
+              const addressObj = item.address || {};
+              const onionAddr = addressObj.onion_addr || '';
+              const port = addressObj.port || '6102';
+              const makerAddress = `${onionAddr}:${port}`;
+              return {
+                address: makerAddress,
+                minSize: offer.minSize || 0,
+                maxSize: offer.maxSize || 0,
+                baseFee: offer.baseFee || 0,
+                volumeFeePct: offer.amountRelativeFeePct || 0,
+                timeFeePct: offer.timeRelativeFeePct || 0,
+                protocol: item.protocol || 'Legacy',
+                index: index,
+              };
+            })
+        );
 
         console.log(
           '✅ Loaded',
@@ -202,10 +256,7 @@ export async function SwapComponent(container) {
         );
 
         // Update UI count
-        const makersCountEl = content.querySelector('#available-makers-count');
-        if (makersCountEl) {
-          makersCountEl.textContent = availableMakers.length;
-        }
+        updateAvailableMakersCount();
         return availableMakers;
       }
     } catch (error) {
@@ -220,6 +271,7 @@ export async function SwapComponent(container) {
     // ✅ USE CACHE IF REQUESTED
     if (useCache && cached && cached.balance) {
       totalBalance = cached.balance;
+      balancesLoaded = true;
       console.log('✅ Loaded balance from cache:', totalBalance);
 
       // Update UI if function exists
@@ -233,7 +285,15 @@ export async function SwapComponent(container) {
       const data = await window.api.taker.getBalance();
 
       if (data.success) {
-        totalBalance = data.balance.spendable;
+        walletBalances = {
+          spendable: data.balance.spendable || 0,
+          regular: data.balance.regular || 0,
+          swap: data.balance.swap || 0,
+          contract: data.balance.contract || 0,
+          fidelity: data.balance.fidelity || 0,
+        };
+        totalBalance = walletBalances.spendable;
+        balancesLoaded = true;
         console.log('✅ Loaded balance from API:', totalBalance);
 
         // Update UI if function exists
@@ -244,8 +304,46 @@ export async function SwapComponent(container) {
       }
     } catch (error) {
       console.error('Failed to fetch balance:', error);
+      balancesLoaded = true;
     }
     return 0;
+  }
+
+  async function ensureBalancesLoaded() {
+    if (!balanceLoadPromise) {
+      balanceLoadPromise = fetchBalance(false).finally(() => {
+        balanceLoadPromise = null;
+      });
+    }
+
+    await balanceLoadPromise;
+    return walletBalances;
+  }
+
+  async function fetchSwapLiquidity() {
+    try {
+      const data = await window.api.taker.checkSwapLiquidity();
+      if (data.success && data.liquidity) {
+        maxSwappableAmount = data.liquidity.maxSwappable ?? 0;
+        walletBalances = {
+          ...walletBalances,
+          spendable: data.liquidity.spendable ?? walletBalances.spendable,
+          regular: data.liquidity.regular ?? walletBalances.regular,
+          swap: data.liquidity.swap ?? walletBalances.swap,
+        };
+        return maxSwappableAmount;
+      }
+    } catch (error) {
+      console.error('Failed to fetch swap liquidity:', error);
+    }
+
+    await ensureBalancesLoaded();
+
+    maxSwappableAmount = Math.max(
+      0,
+      Math.max(walletBalances.regular || 0, walletBalances.swap || 0) - 3000
+    );
+    return maxSwappableAmount;
   }
 
   // Render UTXO list dynamically
@@ -304,75 +402,59 @@ export async function SwapComponent(container) {
     });
   }
 
-  // Render Recent Swaps section
-  // Render Recent Swaps section
-  async function renderRecentSwaps() {
-    const recentSwapsContainer = content.querySelector(
-      '#recent-swaps-container'
-    );
-    if (!recentSwapsContainer) return;
+  async function renderSwapHistorySection() {
+    const swapHistoryContainer = content.querySelector('#swap-history-container');
+    const swapHistoryStats = content.querySelector('#swap-history-stats');
+    if (!swapHistoryContainer || !swapHistoryStats) return;
 
-    let recentSwaps = [];
+    let swapHistory = [];
     try {
-      const result = await window.api.swapReports.getAll();
-      if (result.success && result.reports) {
-        recentSwaps = result.reports
-          .filter((report) => report.status === 'completed')
-          .slice(0, 5)
-          .map((report) => ({
-            id: report.swapId || `swap_${Date.now()}`,
-            completedAt: report.completedAt || Date.now(),
-            amount: report.amount || 0,
-            hops: (report.report?.makersCount || 0) + 1,
-          }));
-      }
+      swapHistory = await loadSwapHistory();
     } catch (error) {
-      console.error('Failed to load recent swaps:', error);
-    }
-
-    if (recentSwaps.length === 0) {
-      recentSwapsContainer.innerHTML = `
-      <div class="text-center py-8 text-gray-500">
-        <p class="text-4xl mb-2">🔄</p>
-        <p>No swaps yet</p>
-        <p class="text-xs mt-1">Your completed swaps will appear here</p>
-      </div>
-    `;
-      return;
-    }
-
-    recentSwapsContainer.innerHTML = recentSwaps
-      .map((swap) => {
-        const btcAmount = (swap.amount / 100000000).toFixed(8);
-        const timeAgo = formatRelativeTime(swap.completedAt);
-
-        return `
-        <div class="swap-history-item flex items-center gap-4 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-4 cursor-pointer transition-colors" data-swap-id="${swap.id}">
-          <div class="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-            <span class="text-green-400">✓</span>
-          </div>
-          <div class="flex-1">
-            <div class="flex justify-between items-center">
-              <span class="text-white font-medium">Coinswap</span>
-              <span class="text-green-400 font-mono">${btcAmount} BTC</span>
-            </div>
-            <div class="flex justify-between items-center mt-1">
-              <span class="text-xs text-gray-500">${timeAgo}</span>
-              <span class="text-xs text-cyan-400">${swap.hops} hops</span>
-            </div>
-          </div>
+      swapHistoryStats.innerHTML = '';
+      swapHistoryContainer.innerHTML = `
+        <div class="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p class="text-red-400 font-semibold mb-2">Unable to load swap history</p>
+          <p class="text-sm text-gray-400">${error.message || 'Please try again.'}</p>
         </div>
       `;
-      })
-      .join('');
+      return;
+    }
+    const stats = summarizeSwapHistory(swapHistory);
 
-    // Add click handlers for swap history items
-    content.querySelectorAll('.swap-history-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        const swapId = item.dataset.swapId;
-        viewSwapReport(swapId);
+    swapHistoryStats.innerHTML =
+      stats.totalSwaps > 0
+        ? `
+      <div class="bg-[#0f1419] rounded-lg p-4">
+        <p class="text-sm text-gray-400 mb-1">Total Swaps</p>
+        <p class="text-2xl font-bold text-[#FF6B35]">${stats.totalSwaps}</p>
+      </div>
+      <div class="bg-[#0f1419] rounded-lg p-4">
+        <p class="text-sm text-gray-400 mb-1">Total Amount</p>
+        <p class="text-2xl font-bold text-green-400">${(
+          stats.totalAmount / 100000000
+        ).toFixed(8)} BTC</p>
+      </div>
+      <div class="bg-[#0f1419] rounded-lg p-4">
+        <p class="text-sm text-gray-400 mb-1">Total Fees Paid</p>
+        <p class="text-2xl font-bold text-yellow-400">${stats.totalFees.toLocaleString()} sats</p>
+      </div>
+      <div class="bg-[#0f1419] rounded-lg p-4">
+        <p class="text-sm text-gray-400 mb-1">Avg Fee Paid</p>
+        <p class="text-2xl font-bold text-cyan-400">${stats.avgFeePaid.toLocaleString()} sats</p>
+      </div>
+    `
+        : '';
+
+    swapHistoryContainer.innerHTML = buildSwapHistoryMarkup(swapHistory);
+    swapHistoryContainer
+      .querySelectorAll('.swap-history-row')
+      .forEach((row) => {
+        row.addEventListener('click', () => {
+          const swapId = row.dataset.swapId;
+          viewSwapReport(swapId);
+        });
       });
-    });
   }
 
   // View swap report from history
@@ -382,7 +464,13 @@ export async function SwapComponent(container) {
       if (result.success && result.report) {
         import('./SwapReport.js').then((module) => {
           container.innerHTML = '';
-          module.SwapReportComponent(container, result.report.report);
+          module.SwapReportComponent(container, {
+            ...result.report,
+            ...result.report.report,
+            protocol: result.report.protocol ?? 'v1',
+            isTaproot: result.report.isTaproot ?? false,
+            protocolVersion: result.report.protocolVersion ?? 1,
+          });
         });
       } else {
         console.error('Swap report not found for ID:', swapId);
@@ -426,53 +514,68 @@ export async function SwapComponent(container) {
     }, 0);
   }
 
-  // Calculate fees based on hops/makers
+  function getTopCandidateMakers() {
+    return availableMakers.slice(0, getNumberOfMakers());
+  }
+
+  function getBlockIntervalSeconds() {
+    if (currentNetwork === 'mainnet' || currentNetwork === 'bitcoin') return 600;
+    if (currentNetwork === 'regtest') return 0;
+    return 30;
+  }
+
+  function formatEstimatedTime(seconds) {
+    if (seconds <= 0) return 'Instant';
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    if (mins === 0) return `${secs}s`;
+    if (secs === 0) return `${mins}m`;
+    return `${mins}m ${secs}s`;
+  }
+
+  // Estimate fees from the top candidate makers shown in the UI.
   function calculateFees(amount) {
     const hops = getNumberOfHops();
-    const makers = getNumberOfMakers();
-
-    const baseFeePercent = 0.1;
-
-    // Network fees: estimate ~250 vBytes per hop
-    const txSize = 250;
-    const networkFee = networkFeeRate * txSize * hops;
-
-    const makerFeePercent = baseFeePercent * makers;
-    const makerFee = (amount * makerFeePercent) / 100;
+    const topCandidateMakers = getTopCandidateMakers();
+    const avgFundingTxSize = 300;
+    const fundingTxs = hops;
+    const networkFee = fundingTxs * avgFundingTxSize * networkFeeRate;
+    const makerFee = topCandidateMakers.reduce((sum, maker, index) => {
+      const refundLocktime = 20 * (index + 1);
+      const volumeFee = amount * ((maker.volumeFeePct || 0) / 100);
+      const timeFee =
+        refundLocktime * amount * ((maker.timeFeePct || 0) / 100);
+      return sum + (maker.baseFee || 0) + volumeFee + timeFee;
+    }, 0);
     const totalFee = makerFee + networkFee;
 
     return {
       makerFeeSats: Math.floor(makerFee),
       networkFeeSats: Math.floor(networkFee),
       totalFeeSats: Math.floor(totalFee),
-      makerFeePercent: makerFeePercent.toFixed(2),
+      makerFeePercent:
+        amount > 0 ? ((makerFee / amount) * 100).toFixed(2) : '0.00',
+      fundingTxs,
+      avgFundingTxSize,
     };
   }
 
   function calculateSwapDetails() {
     const hops = getNumberOfHops();
     const makers = getNumberOfMakers();
-
-    const baseTime = 10;
-    const baseFeePercent = 0.1;
-
-    // Network fees: estimate ~250 vBytes per hop
-    const txSize = 250;
-    const networkFee = networkFeeRate * txSize * hops;
-
-    const estimatedTime = hops * baseTime;
-    const makerFeePercent = baseFeePercent * makers;
-    const makerFee = (swapAmount * makerFeePercent) / 100;
-    const totalFee = makerFee + networkFee;
+    const feeDetails = calculateFees(swapAmount);
+    const estimatedTime = getBlockIntervalSeconds() * hops;
 
     return {
-      hops: hops,
-      makers: makers,
-      time: estimatedTime,
-      makerFeePercent: makerFeePercent.toFixed(2),
-      makerFeeSats: Math.floor(makerFee),
-      networkFeeSats: Math.floor(networkFee),
-      totalFeeSats: Math.floor(totalFee),
+      hops,
+      makers,
+      timeSeconds: estimatedTime,
+      makerFeePercent: feeDetails.makerFeePercent,
+      makerFeeSats: feeDetails.makerFeeSats,
+      networkFeeSats: feeDetails.networkFeeSats,
+      totalFeeSats: feeDetails.totalFeeSats,
+      fundingTxs: feeDetails.fundingTxs,
+      avgFundingTxSize: feeDetails.avgFundingTxSize,
     };
   }
 
@@ -542,17 +645,30 @@ export async function SwapComponent(container) {
     content.querySelector('#num-hops-display').textContent =
       details.hops + ' hop' + (details.hops !== 1 ? 's' : '');
     content.querySelector('#estimated-time').textContent =
-      details.time + ' min';
+      formatEstimatedTime(details.timeSeconds);
+    content.querySelector('#selected-makers-display').textContent =
+      getTopCandidateMakers()
+        .map((maker) => maker.address)
+        .join(', ') || 'None selected';
     content.querySelector('#maker-fee-percent').textContent =
       details.makerFeePercent + '%';
     content.querySelector('#maker-fee-sats').textContent =
-      '~' + details.makerFeeSats.toLocaleString() + ' sats';
+      details.makerFeeSats.toLocaleString() + ' sats';
     content.querySelector('#network-fee-sats').textContent =
-      '~' + details.networkFeeSats.toLocaleString() + ' sats';
+      details.networkFeeSats.toLocaleString() + ' sats';
     content.querySelector('#network-fee-rate').textContent =
       networkFeeRate + ' sat/vB';
+    content.querySelector('#funding-txs-count').textContent =
+      details.fundingTxs.toString();
+    content.querySelector('#avg-funding-tx-size').textContent =
+      `${details.avgFundingTxSize} vB`;
     content.querySelector('#total-fee-sats').textContent =
-      '~' + details.totalFeeSats.toLocaleString() + ' sats';
+      details.totalFeeSats.toLocaleString() + ' sats';
+
+    const maxSwapEl = content.querySelector('#max-swappable-amount');
+    if (maxSwapEl) {
+      maxSwapEl.textContent = `${maxSwappableAmount.toLocaleString()} sats`;
+    }
 
     // Total = Amount - Fees (what user receives)
     content.querySelector('#total-amount').textContent =
@@ -594,11 +710,15 @@ export async function SwapComponent(container) {
       }
 
       // Check if amount exceeds balance
-      if (swapAmount > totalBalance && totalBalance > 0) {
+      if (balancesLoaded && swapAmount > maxSwappableAmount) {
         warnings.push(
-          `Swap amount (${swapAmount.toLocaleString()} sats) exceeds available balance`
+          `Swap amount (${swapAmount.toLocaleString()} sats) exceeds swappable balance`
         );
       }
+    }
+
+    if (!balancesLoaded) {
+      warnings.push('Loading wallet balances...');
     }
 
     // Check if enough makers available
@@ -764,10 +884,7 @@ export async function SwapComponent(container) {
       return; // In manual mode, amount is from UTXOs
     }
 
-    const details = calculateSwapDetails();
-    const estimatedFees = details.totalFeeSats || 1500;
-
-    swapAmount = Math.max(0, totalBalance - estimatedFees - 500);
+    swapAmount = Math.max(0, maxSwappableAmount);
 
     // Also check maker max size
     if (availableMakers.length > 0) {
@@ -808,15 +925,14 @@ export async function SwapComponent(container) {
     <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap</h2>
     <p class="text-gray-400 mb-8">Perform private Bitcoin swaps through multiple makers</p>
 
-      <div id="protocol-banner" class="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-lg p-4 mb-6 hidden">
-    <div class="flex items-center gap-3">
-      <span class="text-3xl">⚠️</span>
-      <div>
-        <h3 class="text-lg font-bold text-yellow-400 mb-1" id="protocol-warning-title"></h3>
-        <p class="text-sm text-gray-300" id="protocol-warning-text"></p>
+    <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
+      <div class="flex items-start gap-3">
+        <span class="text-2xl text-yellow-400">⚠</span>
+        <p class="text-sm text-yellow-300">
+          Warning: If swap with only one maker, the maker can deanonymize you. Recommended minimum hop = 2.
+        </p>
       </div>
     </div>
-  </div>
 
     <div class="grid grid-cols-3 gap-6">
       <div class="col-span-2 space-y-6">
@@ -824,9 +940,9 @@ export async function SwapComponent(container) {
         <div class="bg-[#1a2332] rounded-lg p-6">
           <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Initiate Swap</h3>
 
-          <!-- Selection Mode -->
+          <!-- Select UTXOs -->
           <div class="mb-6">
-            <label class="block text-sm text-gray-400 mb-2">Selection Mode</label>
+            <label class="block text-sm text-gray-400 mb-2">Select UTXOs</label>
             <div class="flex gap-2">
               <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
                 Auto Select UTXOs
@@ -865,6 +981,7 @@ export async function SwapComponent(container) {
               </button>
             </div>
 <p id="amount-input-conversions" class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
+            <p class="text-xs text-gray-500 mt-1">Max swappable: <span id="max-swappable-amount" class="text-[#FF6B35] font-semibold">0 sats</span></p>
           </div>
 
           <!-- UTXO Selection (Only in Manual mode) -->
@@ -885,18 +1002,13 @@ export async function SwapComponent(container) {
               <p class="text-gray-400 text-center py-4">Loading UTXOs...</p>
             </div>
 
-            <div class="mt-3 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-              <p class="text-xs text-blue-400">
-                💡 Swap amount will be calculated from selected UTXOs minus fees.
-              </p>
-            </div>
           </div>
 
           <!-- Number of Hops -->
           <div class="mb-6">
             <div class="flex justify-between items-center mb-2">
               <label class="block text-sm text-gray-400">Number of Hops</label>
-              <span class="text-xs text-gray-500">Available makers: <span id="available-makers-count">${availableMakers.length}</span></span>
+              <span class="text-xs text-white font-bold text-2xl">Available Makers: <span id="available-makers-count" class="text-[#FF6B35]">${availableMakers.length}</span></span>
             </div>
             <div class="grid grid-cols-4 gap-2">
               <button id="hop-3" class="hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
@@ -953,7 +1065,7 @@ export async function SwapComponent(container) {
           
           <div class="space-y-4">
             <div>
-              <p class="text-sm text-gray-400 mb-1">Available Balance</p>
+              <p class="text-sm text-gray-400 mb-1">Swappable Balance</p>
               <p id="available-balance-sats" class="text-xl font-mono text-green-400">0 sats</p>
               <p id="available-balance-btc" class="text-xs text-gray-500">0.00000000 BTC</p>
             </div>
@@ -974,6 +1086,10 @@ export async function SwapComponent(container) {
                 <span class="text-sm text-gray-400">Makers</span>
                 <span id="num-makers-display" class="text-sm text-white">2 makers</span>
               </div>
+              <div class="flex justify-between mb-2 gap-3">
+                <span class="text-sm text-gray-400">Top Maker Candidates</span>
+                <span id="selected-makers-display" class="text-sm text-cyan-400 text-right break-all">None selected</span>
+              </div>
               <div class="flex justify-between mb-2">
                 <span class="text-sm text-gray-400">Hops</span>
                 <span id="num-hops-display" class="text-sm text-cyan-400">3 hops</span>
@@ -983,22 +1099,30 @@ export async function SwapComponent(container) {
                 <span id="estimated-time" class="text-sm text-cyan-400">15 min</span>
               </div>
               <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Maker Fee</span>
+                <span class="text-sm text-gray-400">Estimated Maker Fee</span>
                 <div class="text-right">
                   <div id="maker-fee-percent" class="text-sm text-yellow-400">0.20%</div>
                   <div id="maker-fee-sats" class="text-xs text-gray-500">~0 sats</div>
                 </div>
               </div>
               <div class="flex justify-between mb-2">
+                <span class="text-sm text-gray-400">Funding Txs</span>
+                <span id="funding-txs-count" class="text-sm text-white">3</span>
+              </div>
+              <div class="flex justify-between mb-2">
+                <span class="text-sm text-gray-400">Avg Funding Tx Size</span>
+                <span id="avg-funding-tx-size" class="text-sm text-white">300 vB</span>
+              </div>
+              <div class="flex justify-between mb-2">
                 <span class="text-sm text-gray-400">Network Fee</span>
                 <div class="text-right">
-                  <div id="network-fee-sats" class="text-sm text-yellow-400">~0 sats</div>
+                  <div id="network-fee-sats" class="text-sm text-yellow-400">0 sats</div>
                   <div id="network-fee-rate" class="text-xs text-gray-500">2 sat/vB</div>
                 </div>
               </div>
               <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Total Fee</span>
-                <span id="total-fee-sats" class="text-sm font-mono text-yellow-400">~0 sats</span>
+                <span class="text-sm text-gray-400">Estimated Total Fee</span>
+                <span id="total-fee-sats" class="text-sm font-mono text-yellow-400">0 sats</span>
               </div>
               <div class="flex justify-between pt-2 border-t border-gray-700">
                 <span class="text-sm font-semibold text-lg text-gray-300">You Receive</span>
@@ -1008,34 +1132,17 @@ export async function SwapComponent(container) {
                 </div>
               </div>
             </div>
-
-            <div class="border-t border-gray-700 pt-4">
-              <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-3">
-                <p class="text-xs text-purple-400 mb-2">
-                  <strong>Privacy Benefits:</strong>
-                </p>
-                <ul class="text-xs text-purple-400 space-y-1">
-                  <li>• Breaks transaction links</li>
-                  <li>• Multiple mixing hops</li>
-                  <li>• Enhanced anonymity</li>
-                </ul>
-              </div>
-            </div>
           </div>
         </div>
 
-        <!-- Recent Swaps Section -->
-        <div class="bg-[#1a2332] rounded-lg p-6 mt-6">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xl font-semibold text-lg text-gray-300">Recent Swaps</h3>
-            <button id="view-all-swaps" class="text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
-              View All Swaps →
-            </button>
-          </div>
-          <div id="recent-swaps-container" class="space-y-3">
-            <p class="text-gray-400 text-center py-4">Loading swap history...</p>
-          </div>
-        </div>
+      </div>
+    </div>
+
+    <div class="bg-[#1a2332] rounded-lg p-6 mt-6">
+      <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Swap History</h3>
+      <div id="swap-history-stats" class="grid grid-cols-4 gap-4 mb-4"></div>
+      <div id="swap-history-container" class="space-y-3">
+        <p class="text-gray-400 text-center py-4">Loading swap history...</p>
       </div>
     </div>
   `;
@@ -1046,10 +1153,14 @@ export async function SwapComponent(container) {
     const balanceEl = content.querySelector('#available-balance-sats');
     const balanceBtcEl = content.querySelector('#available-balance-btc');
     if (balanceEl) {
-      balanceEl.textContent = totalBalance.toLocaleString() + ' sats';
+      balanceEl.textContent = maxSwappableAmount.toLocaleString() + ' sats';
     }
     if (balanceBtcEl) {
-      balanceBtcEl.textContent = (totalBalance / 100000000).toFixed(8) + ' BTC';
+      balanceBtcEl.textContent = (maxSwappableAmount / 100000000).toFixed(8) + ' BTC';
+    }
+    const input = content.querySelector('#swap-amount-input');
+    if (input) {
+      input.max = String(maxSwappableAmount);
     }
   }
 
@@ -1116,14 +1227,6 @@ export async function SwapComponent(container) {
   content.querySelector('#mode-manual').addEventListener('click', () => {
     toggleSelectionMode('manual');
     saveCurrentSelections();
-  });
-
-  // View All Swaps button
-  content.querySelector('#view-all-swaps').addEventListener('click', () => {
-    import('./SwapHistory.js').then((module) => {
-      container.innerHTML = '';
-      module.SwapHistoryComponent(container);
-    });
   });
 
   content
@@ -1290,17 +1393,16 @@ export async function SwapComponent(container) {
       fetchMakers(false),
       fetchBalance(false),
     ]).then(async ([utxos, makers, balance]) => {
+      await fetchSwapLiquidity();
+
       // Save to cache
       saveSwapDataToCache(utxos, makers, balance);
 
       updateBalanceUI();
 
-      const makersCountEl = content.querySelector('#available-makers-count');
-      if (makersCountEl) {
-        makersCountEl.textContent = makers.length;
-      }
+      updateAvailableMakersCount();
       renderUtxoList();
-      await renderRecentSwaps();
+      await renderSwapHistorySection();
 
       // Restore UTXO selections
       if (selectedUtxos.length > 0) {
@@ -1333,7 +1435,11 @@ export async function SwapComponent(container) {
     console.log('⚡ Using cached swap data (still fresh)');
     // Just use cache - render immediately
     renderUtxoList();
-    renderRecentSwaps();
+    ensureBalancesLoaded().then(() => fetchSwapLiquidity()).then(() => {
+      updateBalanceUI();
+      updateSummary();
+    });
+    renderSwapHistorySection();
 
     // Restore UTXO selections
     if (selectedUtxos.length > 0) {
@@ -1367,26 +1473,22 @@ export async function SwapComponent(container) {
   (async () => {
     try {
       const protocolResult = await window.api.taker.getProtocol();
-      const protocol = protocolResult.protocol;
-
-      const banner = content.querySelector('#protocol-banner');
-      const title = content.querySelector('#protocol-warning-title');
-      const text = content.querySelector('#protocol-warning-text');
-
-      if (banner && title && text) {
-        if (protocol === 'v2') {
-          title.textContent = '⚡ You Can Only Swap With Taproot Makers';
-          text.textContent =
-            'Your wallet is configured for Taproot swaps. Selecting Legacy makers will cause the swap to fail.';
-        } else {
-          title.textContent = '🔒 You Can Only Swap With Legacy Makers';
-          text.textContent =
-            'Your wallet is configured for Legacy swaps. Selecting Taproot makers will cause the swap to fail.';
-        }
-        banner.classList.remove('hidden');
+      const nextProtocol = protocolResult.protocol || 'v1';
+      if (nextProtocol !== currentProtocol) {
+        currentProtocol = nextProtocol;
+        await fetchMakers(false);
+        updateSummary();
       }
     } catch (error) {
       console.error('Failed to get protocol:', error);
+    }
+  })();
+
+  (async () => {
+    try {
+      await ensureBalancesLoaded();
+    } catch (error) {
+      console.error('Failed to prime wallet balances:', error);
     }
   })();
 }

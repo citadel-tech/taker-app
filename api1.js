@@ -464,6 +464,60 @@ function registerTakerHandlers() {
     }
   });
 
+  ipcMain.handle('taker:checkSwapLiquidity', async () => {
+    try {
+      if (!api1State.takerInstance) {
+        return { success: false, error: 'Taker not initialized' };
+      }
+
+      const balance = api1State.takerInstance.getBalances();
+      const regular = Number(balance?.regular || 0);
+      const swap = Number(balance?.swap || 0);
+      const spendable = Number(balance?.spendable || 0);
+
+      let maxSwappable = Math.max(regular, swap) - 3000;
+
+      if (
+        typeof api1State.takerInstance.checkSwapLiquidity === 'function'
+      ) {
+        try {
+          const nativeResult = api1State.takerInstance.checkSwapLiquidity();
+          if (typeof nativeResult === 'number') {
+            maxSwappable = nativeResult;
+          } else if (
+            nativeResult &&
+            typeof nativeResult.maxSwappable === 'number'
+          ) {
+            maxSwappable = nativeResult.maxSwappable;
+          } else if (
+            nativeResult &&
+            typeof nativeResult.max_swappable === 'number'
+          ) {
+            maxSwappable = nativeResult.max_swappable;
+          }
+        } catch (nativeError) {
+          console.warn(
+            '⚠️ checkSwapLiquidity native call failed, using balance fallback:',
+            nativeError.message
+          );
+        }
+      }
+
+      return {
+        success: true,
+        liquidity: {
+          spendable,
+          regular,
+          swap,
+          maxSwappable: Math.max(0, Math.floor(maxSwappable)),
+        },
+      };
+    } catch (error) {
+      console.error('❌ Failed to check swap liquidity:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Start periodic wallet sync (every 5 minutes)
   function startPeriodicWalletSync() {
     if (api1State.walletSyncInterval) {

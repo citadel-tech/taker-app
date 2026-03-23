@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
     getSyncStatus: (syncId) =>
       ipcRenderer.invoke('taker:getSyncStatus', syncId),
     getOffers: () => ipcRenderer.invoke('taker:getOffers'),
+    checkSwapLiquidity: () => ipcRenderer.invoke('taker:checkSwapLiquidity'),
     getGoodMakers: () => ipcRenderer.invoke('taker:getGoodMakers'),
     getTransactions: (count, skip) =>
       ipcRenderer.invoke('taker:getTransactions', { count, skip }),

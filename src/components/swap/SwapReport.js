@@ -11,12 +11,12 @@ export function SwapReportComponent(container, swapReport) {
     content.innerHTML = `
       <div class="text-center py-20">
         <p class="text-red-400 text-xl">Error: No swap report data available</p>
-        <button id="back-btn" class="mt-4 bg-[#FF6B35] text-white px-6 py-3 rounded-lg">Back to Wallet</button>
+        <button id="back-btn" class="mt-4 bg-[#FF6B35] text-white px-6 py-3 rounded-lg">Back to Swaps</button>
       </div>
     `;
     container.appendChild(content);
     content.querySelector('#back-btn')?.addEventListener('click', () => {
-      if (window.appManager) window.appManager.renderComponent('wallet');
+      if (window.appManager) window.appManager.renderComponent('swap');
     });
     return;
   }
@@ -252,16 +252,6 @@ export function SwapReportComponent(container, swapReport) {
       const takerIncoming = allTxids[allTxids.length - 1]; // [3]
 
       return `
-    <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
-      <p class="text-sm text-blue-300 mb-2">
-        <strong>Taproot Coinswap (V2 Protocol)</strong>
-      </p>
-      <p class="text-xs text-gray-300">
-        Uses <strong>MuSig2</strong> for cooperative signatures. Only <strong>2 on-chain transactions</strong> visible: 
-        your outgoing contract and the final sweep. All ${report.makersCount} makers coordinate off-chain.
-      </p>
-    </div>
-
     <!-- Outgoing Contracts Section -->
     <div class="mb-6">
       <h4 class="text-md font-semibold text-[#FF6B35] mb-3 flex items-center gap-2">
@@ -328,7 +318,7 @@ export function SwapReportComponent(container, swapReport) {
 
           return `
           <div class="bg-[#0f1419] rounded-lg p-4 mb-3 border-l-4" style="border-color: ${color}">
-            <p class="text-sm font-semibold mb-2" style="c olor: ${color}">
+            <p class="text-sm font-semibold mb-2" style="color: ${color}">
               Maker ${idx + 1}
             </p>
             <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
@@ -434,155 +424,69 @@ export function SwapReportComponent(container, swapReport) {
       .join('');
   }
 
-  // Build circular flow visualization - true circle layout
+  function getProtocolInfoLines() {
+    return `
+      <div>
+        <p class="mb-1"><strong>Save Money:</strong> Lesser Fees than V1 swaps.</p>
+        <p><strong>Efficient:</strong> Combined tapscript with Musig2 + HTLC leaves.</p>
+      </div>
+      <div>
+        <p class="mb-1"><strong>Anonymity Set — Legacy:</strong> All P2WSH UTXOs.</p>
+        <p><strong>Anonymity Set — Taproot:</strong> All Taproot Single Sig UTXOs.</p>
+      </div>
+    `;
+  }
+
+  // Build swap circuit visualization
   function buildCircularFlowHtml() {
-    const totalNodes = report.makersCount + 1; // You + makers (You appears once, at start/end position)
-    const size = 350;
-    const centerX = size / 2;
-    const centerY = size / 2;
-    const radius = 160;
+    const nodes = [
+      { label: 'You', sublabel: 'Outgoing', color: '#FF6B35' },
+      ...report.makerAddresses.map((addr, index) => ({
+        label: `Maker ${index + 1}`,
+        sublabel: truncateAddress(addr, 10, 6),
+        color: makerColors[index % makerColors.length],
+        makerIndex: index,
+      })),
+      { label: 'You', sublabel: 'Incoming', color: '#10B981' },
+    ];
+    const columns = Math.max(nodes.length * 2 - 1, 1);
+    const flowItems = nodes.flatMap((node, index) => {
+      const nodeHtml = `
+        <div class="min-w-[180px] rounded-xl border p-4 bg-[#0f1419] ${
+          node.makerIndex !== undefined ? 'maker-node cursor-pointer' : ''
+        }" style="border-color: ${node.color}55;" ${
+          node.makerIndex !== undefined
+            ? `data-maker-index="${node.makerIndex}"`
+            : ''
+        }>
+          <p class="text-sm font-bold" style="color: ${node.color};">${node.label}</p>
+          <p class="text-xs text-gray-400 mt-1">${node.sublabel}</p>
+        </div>
+      `;
 
-    // Calculate positions around a circle
-    // Start at top (You), go clockwise through makers, back to You
-    const allNodes = [];
-
-    // "You" at top (both start and end point)
-    allNodes.push({
-      type: 'you',
-      label: 'You',
-      angle: -Math.PI / 2, // Top
-      color: '#FF6B35',
-    });
-
-    // Makers distributed around the circle clockwise
-    for (let i = 0; i < report.makersCount; i++) {
-      // Distribute makers evenly around the circle (excluding the "You" position)
-      const angleStep = (2 * Math.PI) / (report.makersCount + 1);
-      const angle = -Math.PI / 2 + angleStep * (i + 1);
-
-      allNodes.push({
-        type: 'maker',
-        index: i,
-        label: `M${i + 1}`,
-        angle: angle,
-        color: makerColors[i % makerColors.length],
-      });
-    }
-
-    // Calculate x, y positions
-    const nodePositions = allNodes.map((node) => ({
-      ...node,
-      x: centerX + radius * Math.cos(node.angle),
-      y: centerY + radius * Math.sin(node.angle),
-    }));
-
-    // Build SVG arrows (curved paths around the circle)
-    let arrowsHtml = '';
-
-    for (let i = 0; i < nodePositions.length; i++) {
-      const from = nodePositions[i];
-      const toIndex = (i + 1) % nodePositions.length;
-      const to = nodePositions[toIndex];
-
-      const midAngle = (from.angle + to.angle) / 2;
-      let adjustedMidAngle = midAngle;
-      if (Math.abs(from.angle - to.angle) > Math.PI) {
-        adjustedMidAngle = midAngle + Math.PI;
+      if (index === nodes.length - 1) {
+        return [nodeHtml];
       }
 
-      const arcRadius = radius + 20;
-      const midX = centerX + arcRadius * Math.cos(adjustedMidAngle);
-      const midY = centerY + arcRadius * Math.sin(adjustedMidAngle);
-
-      const circleRadius = 40;
-
-      // Calculate start point offset along the arc from 'from' node
-      const startAngle = Math.atan2(midY - from.y, midX - from.x);
-      const startX = from.x + circleRadius * Math.cos(startAngle);
-      const startY = from.y + circleRadius * Math.sin(startAngle);
-
-      // Calculate end point offset along the arc to 'to' node
-      const arrowheadLength = -2; // Negative to pull it back
-      const endAngle = Math.atan2(midY - to.y, midX - to.x);
-      const endX = to.x + (circleRadius + arrowheadLength) * Math.cos(endAngle);
-      const endY = to.y + (circleRadius + arrowheadLength) * Math.sin(endAngle);
-
-      const color = from.color;
-
-      arrowsHtml += `
-        <defs>
-          <linearGradient id="gradient-${i}" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style="stop-color:${color};stop-opacity:0.6" />
-            <stop offset="100%" style="stop-color:${color};stop-opacity:1" />
-          </linearGradient>
-          <filter id="glow-${i}">
-            <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
-            <feMerge>
-              <feMergeNode in="coloredBlur"/>
-              <feMergeNode in="SourceGraphic"/>
-            </feMerge>
-          </filter>
-          <marker id="arrowhead-${i}" markerWidth="12" markerHeight="10" refX="10" refY="5" orient="auto">
-            <polygon points="0 0, 12 5, 0 10" fill="${color}" />
-          </marker>
-        </defs>
-        <path d="M ${startX} ${startY} Q ${midX} ${midY} ${endX} ${endY}"
-              stroke="url(#gradient-${i})" 
-              stroke-width="2.5" 
-              fill="none" 
-              filter="url(#glow-${i})"
-              marker-end="url(#arrowhead-${i})" 
-              opacity="0.9"/>
-      `;
-    }
-
-    // Build node elements
-    let nodesHtml = nodePositions
-      .map((node, idx) => {
-        const isYou = node.type === 'you';
-
-        return `
-      <div class="absolute transform -translate-x-1/2 -translate-y-1/2 
-                  ${!isYou ? 'maker-node cursor-pointer' : ''} 
-                  transition-all duration-300 z-10"
-           style="left: ${node.x}px; top: ${node.y}px;"
-           ${!isYou ? `data-maker-index="${node.index}"` : ''}>
-        <div class="flex flex-col items-center gap-2">
-<div class="w-24 h-24 rounded-full flex items-center justify-center shadow-2xl border-4 backdrop-blur-sm relative"
-               style="background: ${isYou ? 'linear-gradient(135deg, ' + node.color + ' 0%, ' + node.color + '99 100%)' : 'linear-gradient(135deg, ' + node.color + '40 0%, ' + node.color + '20 100%)'}; 
-                      border-color: ${node.color};
-                      box-shadow: 0 0 30px ${node.color}50;">
-            ${
-              isYou
-                ? '<span class="text-3xl">👤</span>'
-                : `<span class="font-bold text-2xl" style="color: ${node.color};">${node.label}</span>`
-            }
+      return [
+        nodeHtml,
+        `
+          <div class="flex items-center justify-center text-[#FF6B35]">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h12m0 0-4-4m4 4-4 4"></path>
+            </svg>
           </div>
-          <div class="text-center bg-[#0f1419]/90 px-3 py-1 rounded-lg backdrop-blur-sm border border-gray-700">
-            <p class="text-sm text-white font-bold">${isYou ? 'You' : `Maker ${node.index + 1}`}</p>
-            ${!isYou ? `<p class="text-xs text-gray-400 font-mono">${truncateAddress(report.makerAddresses[node.index] || '', 8, 4)}</p>` : '<p class="text-xs text-gray-400">Start/End</p>'}
-          </div>
+        `,
+      ];
+    });
+
+    return `
+      <div class="overflow-x-auto">
+        <div class="grid items-center gap-4 min-w-max" style="grid-template-columns: repeat(${columns}, minmax(0, auto));">
+          ${flowItems.join('')}
         </div>
       </div>
     `;
-      })
-      .join('');
-
-    return `
-   <div class="relative mx-auto bg-gradient-to-br from-[#0a0f16] to-[#1a2332] rounded-2xl p-8" style="width: ${size}px; height: ${size}px;">
-      <svg class="absolute inset-0" width="${size}" height="${size}">
-        ${arrowsHtml}
-      </svg>
-      ${nodesHtml}
-      
-      <!-- Center info -->
-      <div class="absolute transform -translate-x-1/2 -translate-y-1/2 text-center bg-[#1a2332]/80 backdrop-blur-sm rounded-xl px-6 py-4 border-2 border-[#FF6B35]/30 shadow-xl"
-           style="left: ${centerX}px; top: ${centerY}px;">
-        <p class="text-4xl font-black text-[#FF6B35] mb-1">${report.makersCount + 1}</p>
-        <p class="text-xs text-gray-400 font-semibold text-lg uppercase tracking-wider">Total Hops</p>
-      </div>
-    </div>
-  `;
   }
 
   // UI
@@ -674,11 +578,11 @@ export function SwapReportComponent(container, swapReport) {
               <h2 class="text-4xl font-bold text-[#FF6B35]">
                 Coinswap Report
               </h2>
-              <p class="text-gray-400 text-sm mt-1">Privacy-Enhanced Bitcoin Transaction</p>
+              <p class="text-gray-400 text-sm mt-1">View Detailed Swap Data.</p>
             </div>
           </div>
           <button id="back-to-wallet" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-6 py-3 rounded-lg transition-all hover:scale-105">
-            ← Back to Wallet
+            ← Back to Swaps
           </button>
         </div>
         
@@ -697,10 +601,16 @@ export function SwapReportComponent(container, swapReport) {
       <div class="mb-8 animate-fade-in-up stagger-1">
         <div class="bg-gradient-to-br from-[#1a2332] to-[#0f1419] rounded-xl p-8 border border-[#FF6B35]/20 shadow-2xl">
           <h3 class="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-            <span>🔗</span> Transaction Flow
+            <svg class="w-7 h-7 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="6" cy="6" r="2" stroke-width="2"></circle>
+              <circle cx="18" cy="6" r="2" stroke-width="2"></circle>
+              <circle cx="12" cy="18" r="2" stroke-width="2"></circle>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h8M7 7.5l4 8M17 7.5l-4 8"></path>
+            </svg>
+            Swap Circuit
             <span class="text-sm font-normal text-gray-400">(Click on makers for details)</span>
           </h3>
-          <p class="text-xs text-gray-500 mb-6">Your coins flow through multiple makers and return to you with broken transaction links</p>
+          <p class="text-xs text-gray-500 mb-6">Your coins move across the swap circuit and come back with broken transaction links.</p>
           
           <!-- Circular Flow -->
           <div class="flex justify-center">
@@ -710,34 +620,12 @@ export function SwapReportComponent(container, swapReport) {
         
           
           <!-- Technical Explanation Box -->
-<div class="mt-6 p-4 ${isV2Swap ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-blue-500/10 border border-blue-500/30'} rounded-lg">
-  <h4 class="text-sm font-bold ${isV2Swap ? 'text-purple-300' : 'text-blue-300'} mb-2 flex items-center gap-2">
-    <span>ℹ️</span> ${isV2Swap ? 'Taproot Protocol (V2)' : 'P2WSH Protocol (V1)'}
+<div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+  <h4 class="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
+    <span>ℹ️</span> Protocol Details
   </h4>
-  <div class="text-xs text-gray-300 grid grid-cols-2 gap-4">
-    ${
-      isV2Swap
-        ? `
-      <div>
-        <p class="mb-1"><strong>⚡ MuSig2:</strong> Cooperative signatures between makers</p>
-        <p><strong>🔗 One TX:</strong> Only 1 on-chain funding transaction</p>
-      </div>
-      <div>
-        <p class="mb-1"><strong>🔓 Privacy:</strong> Same link-breaking as V1</p>
-        <p><strong>💰 Efficient:</strong> Lower on-chain footprint</p>
-      </div>
-    `
-        : `
-      <div>
-        <p class="mb-1"><strong>🔄 Circular Path:</strong> Coins flow You → Makers → You</p>
-        <p><strong>⚛️ Atomic Swaps:</strong> HTLCs ensure safe exchanges</p>
-      </div>
-      <div>
-        <p class="mb-1"><strong>🔓 Link Breaking:</strong> Each hop uses different UTXOs</p>
-        <p><strong>👁️ Result:</strong> Observers cannot trace the path</p>
-      </div>
-    `
-    }
+  <div class="text-xs text-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4">
+    ${getProtocolInfoLines()}
   </div>
 </div>
         </div>
@@ -769,10 +657,10 @@ export function SwapReportComponent(container, swapReport) {
             <span class="text-2xl">🔗</span>
           </div>
          <p class="text-2xl font-bold text-purple-400">
-  ${isV2Swap ? '2' : report.makersCount + 1}
+  ${report.totalFundingTxs}
 </p>
 <p class="text-xs text-gray-400 mt-1">
-  ${isV2Swap ? 'On-chain TXs (V2)' : `${report.makersCount} makers used`}
+  ${isV2Swap ? 'Funding transactions observed' : `${report.makersCount} makers used`}
 </p>
         </div>
 
@@ -842,68 +730,18 @@ export function SwapReportComponent(container, swapReport) {
             </div>
           </div>
 
-          <!-- Privacy Impact -->
-          <div class="bg-purple-500/20 border border-purple-500/30 rounded-lg p-6 animate-fade-in-up stagger-3">
-            <h3 class="text-lg font-semibold text-lg text-purple-300 mb-3 flex items-center gap-2">
-              <span>🔒</span> Privacy Achieved
-            </h3>
-            <ul class="space-y-2 text-sm">
-              <li class="flex items-start gap-2 text-purple-200">
-                <span class="text-green-400 mt-0.5">✓</span>
-                <span><span class="font-bold">${report.makersCount + 1}</span> transaction hops completed</span>
-              </li>
-              <li class="flex items-start gap-2 text-purple-200">
-                <span class="text-green-400 mt-0.5">✓</span>
-                <span>Links broken at each hop</span>
-              </li>
-              <li class="flex items-start gap-2 text-purple-200">
-                <span class="text-green-400 mt-0.5">✓</span>
-                <span>No common input ownership</span>
-              </li>
-              <li class="flex items-start gap-2 text-purple-200">
-                <span class="text-green-400 mt-0.5">✓</span>
-                <span>Enhanced anonymity set</span>
-              </li>
-            </ul>
-          </div>
-
           <!-- UTXO Summary with Tooltip -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-4">
             <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
               <span>📦</span> UTXO Summary
-              <span class="tooltip-trigger">
-                <span class="text-gray-500 text-sm cursor-help">ⓘ</span>
-                <span class="tooltip-content text-xs text-gray-300">
-                  UTXOs (Unspent Transaction Outputs) used in the swap process
-                </span>
-              </span>
             </h3>
             <div class="space-y-3 text-sm">
-              <div class="flex justify-between items-center tooltip-trigger">
-                <span class="text-gray-400 flex items-center gap-1">
-                  Inputs
-                  <span class="tooltip-content text-xs text-gray-300">
-                    Your UTXOs that were spent to initiate the swap
-                  </span>
-                </span>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-400">Outgoing Regular/Swap UTXOs</span>
                 <span class="font-mono text-white">${report.inputUtxos.length}</span>
               </div>
-              <div class="flex justify-between items-center tooltip-trigger">
-                <span class="text-gray-400 flex items-center gap-1">
-                  Regular Outputs
-                  <span class="tooltip-content text-xs text-gray-300">
-                    Standard outputs returned to your wallet
-                  </span>
-                </span>
-                <span class="font-mono text-green-400">${report.outputRegularUtxos.length}</span>
-              </div>
-              <div class="flex justify-between items-center tooltip-trigger">
-                <span class="text-gray-400 flex items-center gap-1">
-                  Swap Coins
-                  <span class="tooltip-content text-xs text-gray-300">
-                    Privacy-enhanced coins from the swap (different history)
-                  </span>
-                </span>
+              <div class="flex justify-between items-center">
+                <span class="text-gray-400">Incoming Swap UTXOs</span>
                 <span class="font-mono text-blue-400">${report.outputSwapUtxos.length}</span>
               </div>
             </div>
@@ -918,7 +756,7 @@ export function SwapReportComponent(container, swapReport) {
           📥 Export Report
         </button>
         <button id="done-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
-          ✅ Done - Return to Wallet
+          Back to Swaps
         </button>
       </div>
     </div>
@@ -975,14 +813,14 @@ export function SwapReportComponent(container, swapReport) {
   // Back to wallet
   content.querySelector('#back-to-wallet').addEventListener('click', () => {
     if (window.appManager) {
-      window.appManager.renderComponent('wallet');
+      window.appManager.renderComponent('swap');
     }
   });
 
   // Done button
   content.querySelector('#done-btn').addEventListener('click', () => {
     if (window.appManager) {
-      window.appManager.renderComponent('wallet');
+      window.appManager.renderComponent('swap');
     }
   });
 }
