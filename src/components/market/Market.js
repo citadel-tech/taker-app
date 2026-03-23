@@ -9,6 +9,7 @@ export function Market(container) {
   let currentMakerStatus = 'good'; // 'good', 'bad', or 'unresponsive'
   let syncCheckInterval = null;
   let periodicRefreshInterval = null;
+  let relayCount = null;
 
   // Check sync state every second
   function startSyncStateMonitor() {
@@ -116,6 +117,11 @@ export function Market(container) {
         const goodMakers = data.offerbook.goodMakers || [];
         const badMakers = data.offerbook.badMakers || [];
         const unresponsiveMakers = data.offerbook.unresponsiveMakers || [];
+        relayCount = Array.isArray(data.relays)
+          ? data.relays.length
+          : typeof data.relayCount === 'number'
+            ? data.relayCount
+            : relayCount;
 
         makers = [
           ...goodMakers.map((item, index) => ({
@@ -308,26 +314,8 @@ export function Market(container) {
   }
 
   async function initialize() {
-    // Get protocol version
-    const protocolResult = await window.api.taker.getProtocol();
-    const protocol = protocolResult.protocol;
-    const protocolName = protocolResult.protocolName;
-
-    // Show protocol warning banner
-    const banner = content.querySelector('#protocol-banner');
-    const title = content.querySelector('#protocol-warning-title');
-    const text = content.querySelector('#protocol-warning-text');
-
-    if (protocol === 'v2') {
-      title.textContent = '⚡ You Can Only Swap With Taproot Makers';
-      text.textContent =
-        'Your wallet is configured for Taproot swaps. Legacy makers will be filtered out.';
-    } else {
-      title.textContent = '🔒 You Can Only Swap With Legacy Makers';
-      text.textContent =
-        'Your wallet is configured for Legacy swaps. Taproot makers will be filtered out.';
-    }
-    banner.classList.remove('hidden');
+    // Keep protocol fetch to preserve existing initialization flow.
+    await window.api.taker.getProtocol();
 
     // Check if app-level sync is currently running.
     try {
@@ -459,16 +447,12 @@ export function Market(container) {
       (sum, m) => sum + m.maxSize,
       0
     );
-    const avgFee =
-      displayedMakers.length > 0
-        ? displayedMakers.reduce((sum, m) => sum + parseFloat(m.volumeFee), 0) /
-          displayedMakers.length
-        : 0;
+    const totalFidelity = displayedMakers.reduce((sum, m) => sum + m.bond, 0);
 
     return {
       totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
-      avgFee: avgFee.toFixed(1),
-      onlineMakers: displayedMakers.length,
+      totalFidelity: totalFidelity.toLocaleString(),
+      nostrRelays: relayCount ?? 0,
     };
   }
 
@@ -490,12 +474,8 @@ export function Market(container) {
       ? Math.floor(maker.bondLocktime / 144)
       : 0;
 
-    const certExpiryDays = maker.bondCertExpiry
-      ? Math.floor((maker.bondCertExpiry * 2016) / 144)
-      : null;
-
     modal.innerHTML = `
-      <div class="bg-[#1a2332] rounded-lg p-6 max-w-3xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="bg-[#1a2332] rounded-lg p-6 max-w-2xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
         <div class="flex justify-between items-start mb-6">
           <h3 class="text-2xl font-bold text-[#FF6B35]">Fidelity Bond Details</h3>
           <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
@@ -503,93 +483,48 @@ export function Market(container) {
         
         <div class="space-y-4">
           <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Maker Address</p>
+            <p class="text-sm text-gray-400 mb-1">Tor Address</p>
             <p class="text-white font-mono text-sm break-all">${maker.address}</p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div class="bg-[#0f1419] p-4 rounded-lg">
-              <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
-              <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
-              <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
-            </div>
-
-            <div class="bg-[#0f1419] p-4 rounded-lg">
-              <p class="text-sm text-gray-400 mb-1">Bond Status</p>
-              <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
-                ${maker.bondIsSpent ? '❌ Spent' : '✅ Active'}
-              </p>
-            </div>
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
+            <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
+            <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
           </div>
 
           <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Bond Outpoint (UTXO)</p>
-            <p class="text-white font-mono text-sm break-all">${maker.bondOutpoint}</p>
-            <div class="flex gap-2 mt-2 text-xs">
-              <span class="text-gray-400">Txid: <span class="text-cyan-400">${maker.bondTxid}</span></span>
-              <span class="text-gray-400">Vout: <span class="text-cyan-400">${maker.bondVout}</span></span>
-            </div>
+            <p class="text-sm text-gray-400 mb-1">Bond Status</p>
+            <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
+              ${maker.bondIsSpent ? 'Spent' : 'Active'}
+            </p>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div class="bg-[#0f1419] p-4 rounded-lg">
-              <p class="text-sm text-gray-400 mb-1">Bond Locktime</p>
-              <p class="text-lg font-mono text-yellow-400">${maker.bondLocktime.toLocaleString()} blocks</p>
-              <p class="text-xs text-gray-500 mt-1">~${locktimeDays} days</p>
-            </div>
-
-            <div class="bg-[#0f1419] p-4 rounded-lg">
-              <p class="text-sm text-gray-400 mb-1">Confirmation Height</p>
-              <p class="text-lg font-mono text-blue-400">
-                ${maker.bondConfHeight !== null ? maker.bondConfHeight.toLocaleString() : 'N/A'}
-              </p>
-            </div>
+          <div class="bg-[#0f1419] p-4 rounded-lg">
+            <p class="text-sm text-gray-400 mb-1">Expires In</p>
+            <p class="text-2xl font-mono text-yellow-400">~${locktimeDays} days</p>
+            ${
+              maker.bondLocktime
+                ? `<p class="text-xs text-gray-500 mt-1">${maker.bondLocktime.toLocaleString()} blocks</p>`
+                : ''
+            }
           </div>
 
           ${
-            maker.bondCertExpiry !== null
+            maker.bondTxid
               ? `
           <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Certificate Expiry</p>
-            <p class="text-lg font-mono text-orange-400">${maker.bondCertExpiry} difficulty periods</p>
-            <p class="text-xs text-gray-500 mt-1">${maker.bondCertExpiry * 2016} blocks (~${certExpiryDays} days)</p>
-          </div>
-          `
-              : ''
-          }
-
-          ${
-            maker.bondPubkey
-              ? `
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Bond Public Key</p>
-            <p class="text-white font-mono text-xs break-all">${maker.bondPubkey}</p>
-          </div>
-          `
-              : ''
-          }
-
-          <div class="grid grid-cols-2 gap-4">
-            <div class="bg-[#0f1419] p-4 rounded-lg">
-              <p class="text-sm text-gray-400 mb-1">Required Confirmations</p>
-              <p class="text-lg font-mono text-blue-400">${maker.requiredConfirms}</p>
-            </div>
-
-            <div class="bg-[#0f1419] p-4 rounded-lg">
-              <p class="text-sm text-gray-400 mb-1">Minimum Locktime</p>
-              <p class="text-lg font-mono text-yellow-400">${maker.minimumLocktime} blocks</p>
-              <p class="text-xs text-gray-500 mt-1">~${Math.floor(maker.minimumLocktime / 144)} days</p>
-            </div>
-          </div>
-
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-2">Transaction Details</p>
-            <button 
-              onclick="window.open('https://mutinynet.com/tx/${maker.bondTxid}', '_blank')"
-              class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg font-semibold text-lg transition-colors">
-              View on Block Explorer →
+            <p class="text-sm text-gray-400 mb-1">Bond Txid</p>
+            <button
+              onclick="window.open('https://mempool.space/tx/${maker.bondTxid}', '_blank')"
+              class="text-cyan-400 hover:text-cyan-300 underline font-mono text-sm break-all text-left w-full"
+            >
+              ${maker.bondTxid}
             </button>
           </div>
+          `
+              : ''
+          }
         </div>
 
         <div class="mt-6 flex justify-end">
@@ -697,13 +632,13 @@ export function Market(container) {
         <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
       </div>
       <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Average Fee</p>
-        <p class="text-2xl font-mono text-green-400">${stats.avgFee}%</p>
+        <p class="text-sm text-gray-400 mb-2">Total Fidelity Locked</p>
+        <p class="text-2xl font-mono text-purple-400">${stats.totalFidelity} sats</p>
       </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Online Makers</p>
-        <p class="text-2xl font-mono text-blue-400">${stats.onlineMakers}</p>
-      </div>
+      <!-- <div class="bg-[#1a2332] rounded-lg p-6">
+        <p class="text-sm text-gray-400 mb-2">Nostr Relays</p>
+        <p class="text-2xl font-mono text-cyan-400">${stats.nostrRelays}</p>
+      </div> -->
     `;
     }
 
@@ -725,7 +660,7 @@ export function Market(container) {
       if (isLoading) {
         // ✅ SHOW BIG LOADING SPINNER IN TABLE
         tableBody.innerHTML = `
-        <div class="col-span-9 text-center py-16">
+        <div class="col-span-8 text-center py-16">
           <div class="inline-block">
             <svg class="animate-spin h-16 w-16 text-[#FF6B35] mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -738,7 +673,7 @@ export function Market(container) {
       `;
       } else if (makers.length === 0) {
         tableBody.innerHTML = `
-        <div class="col-span-9 text-center py-12">
+        <div class="col-span-8 text-center py-12">
           <p class="text-gray-400 mb-4">No makers found</p>
           <button onclick="document.querySelector('#refresh-market-btn').click()" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg">
             Refresh
@@ -752,7 +687,7 @@ export function Market(container) {
 
         if (displayedMakers.length === 0) {
           tableBody.innerHTML = `
-          <div class="col-span-9 text-center py-12">
+          <div class="col-span-8 text-center py-12">
             <p class="text-gray-400">No ${currentMakerStatus} makers found</p>
           </div>
         `;
@@ -760,7 +695,7 @@ export function Market(container) {
           tableBody.innerHTML = displayedMakers
             .map(
               (maker) => `
-          <div class="grid grid-cols-9 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
+          <div class="grid grid-cols-8 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
             
             <div class="text-sm">
               <span class="px-2 py-1 ${
@@ -814,17 +749,6 @@ export function Market(container) {
       </button>
     </div>
 
-     <div id="protocol-banner" class="bg-yellow-500/10 border-2 border-yellow-500/50 rounded-lg p-4 mb-6 hidden">
-      <div class="flex items-center gap-3">
-        <span class="text-3xl">⚠️</span>
-        <div>
-          <h3 class="text-lg font-bold text-yellow-400 mb-1" id="protocol-warning-title"></h3>
-          <p class="text-sm text-gray-300" id="protocol-warning-text"></p>
-        </div>
-      </div>
-    </div>
-
-
     <!-- Sync Status Display -->
     <div class="bg-[#1a2332] rounded-lg p-4 mb-4">
       <div id="sync-status"></div>
@@ -840,27 +764,27 @@ export function Market(container) {
           <h3 class="text-lg font-semibold text-lg text-[#FF6B35] mb-2">Fee Calculation</h3>
           <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
           <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
-            Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Lock Time × Swap Amount × % Time Rate)
+            Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Locktime × Swap Amount × % Time Rate)
           </code>
-          <p class="text-gray-400 text-sm mt-2">
-            Lower fees mean cheaper swaps, but may indicate lower liquidity or reputation.
+          <p class="text-gray-400 text-sm mt-3">
+            Refund Locktime depends on the position of a maker in swap circuit. Calculated as 20*(n+1), where n = index position of the maker in the swap circuit.
           </p>
         </div>
       </div>
     </div>
 
-    <div id="market-stats" class="grid grid-cols-3 gap-4 mb-6">
+    <div id="market-stats" class="grid grid-cols-2 gap-4 mb-6">
       <div class="bg-[#1a2332] rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
         <p class="text-2xl font-mono text-[#FF6B35]">0.00 BTC</p>
       </div>
       <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Average Fee</p>
-        <p class="text-2xl font-mono text-green-400">0.0%</p>
+        <p class="text-sm text-gray-400 mb-2">Total Fidelity Locked</p>
+        <p class="text-2xl font-mono text-purple-400">0 sats</p>
       </div>
       <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Online Makers</p>
-        <p class="text-2xl font-mono text-blue-400">0</p>
+        <p class="text-sm text-gray-400 mb-2">Nostr Relays</p>
+        <p class="text-2xl font-mono text-cyan-400">0</p>
       </div>
     </div>
 
@@ -880,19 +804,19 @@ export function Market(container) {
 
       
 
-      <div class="grid grid-cols-9 gap-4 bg-[#FF6B35] p-4">
-        <div class="font-semibold text-lg">Protocol</div>
-        <div class="font-semibold text-lg">Maker Address</div>
-        <div class="font-semibold text-lg">Base Fee</div>
-        <div class="font-semibold text-lg">% Fee Rate</div>
-        <div class="font-semibold text-lg">% Time Rate</div>
-        <div class="font-semibold text-lg">Min Swap Size</div>
-        <div class="font-semibold text-lg">Max Swap Size</div>
-        <div class="font-semibold text-lg">Fidelity Bond</div>
+      <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4 text-xs">
+        <div class="font-semibold">Protocol</div>
+        <div class="font-semibold">Tor Address</div>
+        <div class="font-semibold">Base Fee</div>
+        <div class="font-semibold">% Fee Rate</div>
+        <div class="font-semibold">% Time Rate</div>
+        <div class="font-semibold">Min Swap Size</div>
+        <div class="font-semibold">Max Swap Size</div>
+        <div class="font-semibold">Fidelity Bond</div>
       </div>
 
       <div id="maker-table-body" class="divide-y divide-gray-700">
-        <div class="col-span-9 text-center py-12">
+        <div class="col-span-8 text-center py-12">
           <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
           <p class="text-gray-400">Loading makers...</p>
         </div>
