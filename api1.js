@@ -284,8 +284,8 @@ function registerTakerHandlers() {
       // ✅ START BACKGROUND SERVICES
       setTimeout(async () => {
         console.log('🔄 Starting background services...');
-        await startOfferbookSync('auto');
-        startPeriodicSync();
+        // Offerbook sync is triggered explicitly on launch and manually by the user.
+        // The Rust backend keeps offerbook.json up to date internally.
         startPeriodicWalletSync();
         console.log('✅ Background services started');
       }, 2000);
@@ -320,9 +320,6 @@ function registerTakerHandlers() {
       console.log('🛑 Shutting down taker...');
       console.trace('Shutdown called from:'); // ← ADD THIS to see who called it
 
-      // Stop periodic syncs
-      stopPeriodicSync();
-
       // Stop wallet sync
       if (api1State.walletSyncInterval) {
         clearInterval(api1State.walletSyncInterval);
@@ -345,124 +342,80 @@ function registerTakerHandlers() {
     }
   });
 
-  async function startOfferbookSync(source = 'manual') {
-    try {
-      console.log(`🚀 startOfferbookSync called with source: ${source}`);
+  /**
+   * Spawn a worker thread to run syncOfferbookAndWait().
+   *
+   * The sync MUST run off the main thread — calling it on the main thread
+   * blocks Electron's entire event loop and triggers the OS "not responding"
+   * dialog. The worker creates its own Taker instance. At launch this matches
+   * the main Taker (both cold). Mid-session the worker's Tor circuits warm up
+   * quickly because the Tor daemon reuses circuits it already established for
+   * the main Taker.
+   *
+   * Returns { success, syncId } immediately. Caller polls getSyncStatus(syncId).
+   */
+  function startSyncWorker(source = 'manual') {
+    if (!api1State.takerInstance || !api1State.storedTakerConfig) {
+      return { success: false, error: 'Taker not initialized' };
+    }
 
-      if (!api1State.takerInstance) {
-        console.log('❌ No taker instance!');
-        return { success: false, error: 'Taker not initialized' };
-      }
+    if (api1State.syncState.isRunning) {
+      console.log(`⏭️ Sync already running (${source}), skipping`);
+      return { success: false, duplicate: true };
+    }
 
-      console.log('✅ Taker instance exists');
+    const syncId = `${source}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+    api1State.syncState.isRunning = true;
+    api1State.syncState.currentSyncId = syncId;
+    api1State.activeSyncs.set(syncId, {
+      status: 'syncing',
+      startedAt: Date.now(),
+      source,
+    });
 
-      // Check if sync already running
-      if (api1State.syncState.isRunning) {
-        console.log(`⏭️ Sync already running (${source}), skipping`);
-        return {
-          success: false,
-          duplicate: true,
-          existingSyncId: api1State.syncState.currentSyncId,
-        };
-      }
+    const workerConfig = {
+      dataDir: api1State.DATA_DIR,
+      walletName: api1State.currentWalletName || api1State.DEFAULT_WALLET_NAME,
+      rpcConfig: api1State.storedTakerConfig.rpcConfig,
+      zmqAddr: api1State.storedTakerConfig.zmqAddr,
+      controlPort: api1State.storedTakerConfig.controlPort || 9051,
+      torAuthPassword: api1State.storedTakerConfig.torAuthPassword,
+      password: api1State.storedTakerConfig.password || '',
+      protocol: api1State.protocolVersion || 'v1',
+    };
 
-      const syncId = `${source}_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-      console.log(
-        `🔄 [${syncId}] Triggering manual offerbook sync (${source})...`
-      );
+    const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
+      workerData: { config: workerConfig },
+    });
 
-      // Set flags
-      api1State.syncState.isRunning = true;
-      api1State.syncState.currentSyncId = syncId;
-
-      // ✅ FIX: Delete old offerbook and create fresh empty one
-      const offerbookPath = path.join(
-        api1State.storedTakerConfig.dataDir,
-        'offerbook.json'
-      );
-
-      if (fs.existsSync(offerbookPath)) {
-        try {
-          const content = fs.readFileSync(offerbookPath, 'utf8');
-          JSON.parse(content); // Test if valid
-          console.log('✅ Existing offerbook is valid');
-        } catch (parseError) {
-          console.log('⚠️ Corrupted offerbook detected, recreating...');
-          fs.writeFileSync(
-            offerbookPath,
-            JSON.stringify({ makers: [] }),
-            'utf8'
-          );
-        }
-      } else {
-        console.log('📝 Creating initial offerbook.json...');
-        fs.writeFileSync(offerbookPath, JSON.stringify({ makers: [] }), 'utf8');
-      }
-      api1State.activeSyncs.set(syncId, {
-        status: 'syncing',
-        startedAt: Date.now(),
-        source: source,
-      });
-
-      // Trigger sync and wait for completion in the native layer.
-      api1State.takerInstance.syncOfferbookAndWait();
-
-      const completedAt = Date.now();
-      console.log(`✅ Offerbook sync completed (${source})`);
+    const finish = (status, extra = {}) => {
       api1State.activeSyncs.set(syncId, {
         ...api1State.activeSyncs.get(syncId),
-        status: 'completed',
-        completedAt,
+        ...extra,
+        status,
+        completedAt: Date.now(),
       });
-
-      api1State.syncState.lastSyncTime = completedAt;
-      return { success: true, syncId, source };
-    } catch (error) {
-      console.error('❌ Sync offerbook failed:', error);
-
-      if (api1State.syncState.currentSyncId) {
-        const failedSyncId = api1State.syncState.currentSyncId;
-        api1State.activeSyncs.set(failedSyncId, {
-          ...api1State.activeSyncs.get(failedSyncId),
-          status: 'failed',
-          error: error.message,
-          completedAt: Date.now(),
-        });
-      }
-
-      return { success: false, error: error.message };
-    } finally {
+      if (status === 'completed') api1State.syncState.lastSyncTime = Date.now();
       api1State.syncState.isRunning = false;
       api1State.syncState.currentSyncId = null;
-    }
-  }
+    };
 
-  function startPeriodicSync() {
-    // Clear any existing interval
-    if (api1State.syncState.periodicInterval) {
-      clearInterval(api1State.syncState.periodicInterval);
-    }
+    worker.on('message', (msg) => {
+      if (msg.type === 'completed') {
+        console.log(`✅ [${syncId}] Offerbook sync completed`);
+        finish('completed');
+      } else if (msg.type === 'error') {
+        console.error(`❌ [${syncId}] Offerbook sync failed:`, msg.error);
+        finish('failed', { error: msg.error });
+      }
+    });
 
-    console.log('⏰ Starting periodic sync scheduler (every 15 minutes)');
+    worker.on('error', (err) => {
+      console.error(`❌ [${syncId}] Offerbook worker error:`, err.message);
+      finish('failed', { error: err.message });
+    });
 
-    api1State.syncState.periodicInterval = setInterval(
-      async () => {
-        console.log('⏰ Periodic sync triggered');
-        await startOfferbookSync('periodic');
-      },
-      15 * 60 * 1000
-    ); // 15 minutes
-  }
-
-  /**
-   * Stop periodic offerbook syncs
-   */
-  function stopPeriodicSync() {
-    if (api1State.syncState.periodicInterval) {
-      clearInterval(api1State.syncState.periodicInterval);
-      api1State.syncState.periodicInterval = null;
-      console.log('⏰ Periodic sync scheduler stopped');
-    }
+    return { success: true, syncId };
   }
 
   // Get wallet info
@@ -832,9 +785,8 @@ function registerTakerHandlers() {
     }
   );
 
-  // Sync offerbook and wait for completion
-  ipcMain.handle('taker:syncOfferbookAndWait', async () => {
-    return await startOfferbookSync('manual');
+  ipcMain.handle('taker:syncOfferbookAndWait', () => {
+    return startSyncWorker('manual');
   });
 
   // Get sync status
