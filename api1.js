@@ -33,6 +33,28 @@ const api1State = {
 // HELPER FUNCTIONS
 // ============================================================================
 
+/**
+ * Returns true if a maker from the offerbook is usable for a swap.
+ * Mirrors the categorization logic in the offerbook handler.
+ */
+function isUsableMaker(maker) {
+  const state = maker.state;
+  const normalizedState =
+    typeof state === 'string'
+      ? state.toLowerCase()
+      : state && typeof state === 'object'
+        ? Object.keys(state)[0]?.toLowerCase()
+        : null;
+  if (normalizedState === 'unresponsive' || normalizedState === 'bad') {
+    return false;
+  }
+  if (normalizedState === 'good') {
+    return true;
+  }
+  // Fallback for older payloads without an explicit state.
+  return maker.offer != null;
+}
+
 function getCurrentWalletName() {
   try {
     const configPath = path.join(api1State.DATA_DIR, 'config.toml');
@@ -908,16 +930,23 @@ function registerTakerHandlers() {
 
         makers.forEach((maker) => {
           const state = maker.state;
+          const normalizedState =
+            typeof state === 'string'
+              ? state.toLowerCase()
+              : state && typeof state === 'object'
+                ? Object.keys(state)[0]?.toLowerCase()
+                : null;
 
-          if (state && state.Unresponsive) {
+          if (normalizedState === 'unresponsive') {
             unresponsiveMakers.push(maker);
-          } else if (state && state.Bad) {
+          } else if (normalizedState === 'bad') {
             badMakers.push(maker);
-          } else if (maker.offer !== null) {
-            // Good makers have offers
+          } else if (normalizedState === 'good') {
+            goodMakers.push(maker);
+          } else if (maker.offer != null) {
+            // Fallback for older payloads without an explicit state.
             goodMakers.push(maker);
           } else {
-            // Fallback: makers without offers go to unresponsive
             unresponsiveMakers.push(maker);
           }
         });
@@ -1034,11 +1063,7 @@ function registerCoinswapHandlers() {
                 const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
                 const offerbook = JSON.parse(offerbookData);
                 const makers = offerbook.makers || [];
-                const goodMakersCount = makers.filter(
-                  (m) =>
-                    m.offer !== null &&
-                    !(m.state && (m.state.Unresponsive || m.state.Bad))
-                ).length;
+                const goodMakersCount = makers.filter(isUsableMaker).length;
 
                 if (goodMakersCount >= makerCount) {
                   console.log(
@@ -1069,11 +1094,7 @@ function registerCoinswapHandlers() {
             const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
             const offerbook = JSON.parse(offerbookData);
             const makers = offerbook.makers || [];
-            const goodMakersCount = makers.filter(
-              (m) =>
-                m.offer !== null &&
-                !(m.state && (m.state.Unresponsive || m.state.Bad))
-            ).length;
+            const goodMakersCount = makers.filter(isUsableMaker).length;
 
             if (goodMakersCount < makerCount) {
               console.error(

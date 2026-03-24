@@ -151,6 +151,24 @@ export const SwapStateManager = {
     console.log('Swap marked as completed and cleared from active state');
   },
 
+  async getSwapHistory() {
+    try {
+      const state = await this.loadState();
+      return state[STORAGE_KEYS.SWAP_HISTORY] || [];
+    } catch (error) {
+      console.error('Error getting swap history:', error);
+      return [];
+    }
+  },
+
+  async clearSwapHistory() {
+    const state = await this.loadState();
+    delete state[STORAGE_KEYS.SWAP_HISTORY];
+    await this.saveState(state);
+
+    console.log('Swap history cleared');
+  },
+
   // Clear all swap data
   async clearSwapData() {
     const state = await this.loadState();

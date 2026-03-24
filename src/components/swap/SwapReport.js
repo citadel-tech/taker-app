@@ -21,6 +21,36 @@ export function SwapReportComponent(container, swapReport) {
     return;
   }
 
+  const toNumber = (value, fallback = 0) => {
+    const normalized = Number(value);
+    return Number.isFinite(normalized) ? normalized : fallback;
+  };
+
+  const rawTotalMakerFees = toNumber(
+    swapReport.totalMakerFees ?? swapReport.total_maker_fees,
+    0
+  );
+  const rawMiningFee = toNumber(
+    swapReport.miningFee ?? swapReport.mining_fee,
+    0
+  );
+  const rawFeePaidOrEarned = toNumber(
+    swapReport.fee_paid_or_earned ?? swapReport.feePaidOrEarned,
+    NaN
+  );
+  const providedTotalFee = toNumber(
+    swapReport.totalFee ?? swapReport.total_fee,
+    NaN
+  );
+  const derivedTotalFee = Number.isFinite(rawFeePaidOrEarned)
+    ? Math.abs(rawFeePaidOrEarned)
+    : rawTotalMakerFees + rawMiningFee;
+  const rawTotalFee =
+    Number.isFinite(providedTotalFee) &&
+    (providedTotalFee > 0 || derivedTotalFee <= 0)
+      ? providedTotalFee
+      : derivedTotalFee;
+
   // Extract values with safe defaults
   const report = {
     swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
@@ -38,11 +68,17 @@ export function SwapReportComponent(container, swapReport) {
       swapReport.totalFundingTxs || swapReport.total_funding_txs || 0,
     fundingTxidsByHop:
       swapReport.fundingTxidsByHop || swapReport.funding_txids_by_hop || [],
-    totalFee: swapReport.totalFee || swapReport.total_fee || 0,
-    totalMakerFees:
-      swapReport.totalMakerFees || swapReport.total_maker_fees || 0,
-    miningFee: swapReport.miningFee || swapReport.mining_fee || 0,
-    feePercentage: swapReport.feePercentage || swapReport.fee_percentage || 0,
+    totalFee: rawTotalFee,
+    totalMakerFees: rawTotalMakerFees,
+    miningFee: rawMiningFee,
+    feePercentage:
+      swapReport.feePercentage ||
+      swapReport.fee_percentage ||
+      ((swapReport.targetAmount ?? swapReport.target_amount ?? 0) > 0
+        ? (rawTotalFee /
+            (swapReport.targetAmount ?? swapReport.target_amount ?? 0)) *
+          100
+        : 0),
     makerFeeInfo: swapReport.makerFeeInfo || swapReport.maker_fee_info || [],
     inputUtxos: swapReport.inputUtxos || swapReport.input_utxos || [],
     outputRegularUtxos:
