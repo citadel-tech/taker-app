@@ -3,7 +3,8 @@ export function UtxoListComponent(container) {
   let selectedUtxos = [];
   let allUtxos = [];
   let filteredUtxos = [];
-  let activeTypeFilter = 'all'; // 'all', 'p2wpkh', 'p2wsh', 'p2tr'
+  let activeTypeFilter = 'all'; // 'all', 'regular', 'contract', 'swap', 'spendable'
+  let currentSort = 'newest'; // 'newest', 'amount'
 
   // API Functions
   async function fetchUtxos() {
@@ -34,7 +35,7 @@ export function UtxoListComponent(container) {
     return `${txid.substring(0, 12)}...${txid.substring(txid.length - 4)}`;
   }
 
-  function getUtxoTypeColor(spendType) {
+  function getUtxoTypeColor(spendType = '') {
     const type = spendType.toLowerCase();
     if (type.includes('seed') || type.includes('regular')) return 'green';
     if (type.includes('swap')) return 'blue';
@@ -42,6 +43,14 @@ export function UtxoListComponent(container) {
     if (type.includes('fidelity')) return 'purple';
     if (type.includes('swept')) return 'cyan';
     return 'gray';
+  }
+
+  function getSpendTypeDisplay(spendType = '') {
+    const type = spendType.toLowerCase();
+    if (type.includes('seed') || type.includes('regular')) return 'Regular';
+    if (type.includes('swap')) return 'Swap';
+    if (type.includes('contract')) return 'Contract';
+    return spendType || 'Unknown';
   }
 
   // Determine script type from UTXO data
@@ -130,15 +139,17 @@ export function UtxoListComponent(container) {
     ).length;
     const unconfirmed = totalUtxos - confirmed;
 
-    // Count by script type (from all UTXOs, not filtered)
-    const p2wpkhCount = allUtxos.filter(
-      (u) => getScriptType(u) === 'p2wpkh'
+    const regularCount = allUtxos.filter(
+      (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Regular'
     ).length;
-    const p2wshCount = allUtxos.filter(
-      (u) => getScriptType(u) === 'p2wsh'
+    const contractCount = allUtxos.filter(
+      (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Contract'
     ).length;
-    const p2trCount = allUtxos.filter(
-      (u) => getScriptType(u) === 'p2tr'
+    const swapCount = allUtxos.filter(
+      (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Swap'
+    ).length;
+    const spendableCount = allUtxos.filter((u) =>
+      ['Regular', 'Swap'].includes(getSpendTypeDisplay(u.spendInfo?.spendType))
     ).length;
 
     return {
@@ -146,9 +157,10 @@ export function UtxoListComponent(container) {
       totalValue,
       confirmed,
       unconfirmed,
-      p2wpkhCount,
-      p2wshCount,
-      p2trCount,
+      regularCount,
+      contractCount,
+      swapCount,
+      spendableCount,
     };
   }
 
@@ -157,11 +169,26 @@ export function UtxoListComponent(container) {
 
     if (filterType === 'all') {
       filteredUtxos = [...allUtxos];
+    } else if (filterType === 'spendable') {
+      filteredUtxos = allUtxos.filter((utxo) =>
+        ['Regular', 'Swap'].includes(
+          getSpendTypeDisplay(utxo.spendInfo?.spendType)
+        )
+      );
     } else {
       filteredUtxos = allUtxos.filter(
-        (utxo) => getScriptType(utxo) === filterType
+        (utxo) =>
+          getSpendTypeDisplay(utxo.spendInfo?.spendType).toLowerCase() ===
+          filterType
       );
     }
+
+    filteredUtxos.sort((a, b) => {
+      if (currentSort === 'amount') {
+        return b.utxo.amount - a.utxo.amount;
+      }
+      return (a.utxo.confirmations || 0) - (b.utxo.confirmations || 0);
+    });
 
     // Clear selections when filter changes
     selectedUtxos = [];
@@ -173,7 +200,7 @@ export function UtxoListComponent(container) {
   }
 
   function updateFilterButtons() {
-    const filters = ['all', 'p2wpkh', 'p2wsh', 'p2tr'];
+    const filters = ['all', 'regular', 'contract', 'swap', 'spendable'];
     filters.forEach((filter) => {
       const btn = content.querySelector(`#filter-${filter}`);
       if (btn) {
@@ -186,6 +213,28 @@ export function UtxoListComponent(container) {
         }
       }
     });
+  }
+
+  function updateSortButtons() {
+    const sorts = ['newest', 'amount'];
+    sorts.forEach((sort) => {
+      const btn = content.querySelector(`#sort-${sort}`);
+      if (btn) {
+        if (sort === currentSort) {
+          btn.className =
+            'sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+        } else {
+          btn.className =
+            'sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+        }
+      }
+    });
+  }
+
+  function setSort(sortType) {
+    currentSort = sortType;
+    applyFilter(activeTypeFilter);
+    updateSortButtons();
   }
 
   function toggleUtxoSelection(index) {
@@ -318,21 +367,26 @@ export function UtxoListComponent(container) {
     content.querySelector('#unconfirmed-count').textContent = stats.unconfirmed;
 
     // Update filter button counts
-    const p2wpkhBtn = content.querySelector('#filter-p2wpkh');
-    const p2wshBtn = content.querySelector('#filter-p2wsh');
-    const p2trBtn = content.querySelector('#filter-p2tr');
+    const regularBtn = content.querySelector('#filter-regular');
+    const contractBtn = content.querySelector('#filter-contract');
+    const swapBtn = content.querySelector('#filter-swap');
+    const spendableBtn = content.querySelector('#filter-spendable');
 
-    if (p2wpkhBtn) {
-      p2wpkhBtn.querySelector('.filter-count').textContent =
-        `(${stats.p2wpkhCount})`;
+    if (regularBtn) {
+      regularBtn.querySelector('.filter-count').textContent =
+        `(${stats.regularCount})`;
     }
-    if (p2wshBtn) {
-      p2wshBtn.querySelector('.filter-count').textContent =
-        `(${stats.p2wshCount})`;
+    if (contractBtn) {
+      contractBtn.querySelector('.filter-count').textContent =
+        `(${stats.contractCount})`;
     }
-    if (p2trBtn) {
-      p2trBtn.querySelector('.filter-count').textContent =
-        `(${stats.p2trCount})`;
+    if (swapBtn) {
+      swapBtn.querySelector('.filter-count').textContent =
+        `(${stats.swapCount})`;
+    }
+    if (spendableBtn) {
+      spendableBtn.querySelector('.filter-count').textContent =
+        `(${stats.spendableCount})`;
     }
   }
 
@@ -343,7 +397,7 @@ export function UtxoListComponent(container) {
       const message =
         activeTypeFilter === 'all'
           ? 'No UTXOs found'
-          : `No ${getScriptTypeDisplay(activeTypeFilter)} UTXOs found`;
+          : `No ${activeTypeFilter} UTXOs found`;
       tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400">${message}</td></tr>`;
       return;
     }
@@ -357,6 +411,7 @@ export function UtxoListComponent(container) {
         const txid = typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
         const scriptType = getScriptType(utxoData);
         const scriptColor = getScriptTypeColor(scriptType);
+        const spendTypeDisplay = getSpendTypeDisplay(spendInfo.spendType);
 
         return `
         <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
@@ -372,7 +427,7 @@ export function UtxoListComponent(container) {
               ${getScriptTypeDisplay(scriptType)}
             </span>
           </td>
-          <td class="py-3 px-4 text-${typeColor}-400">${spendInfo.spendType}</td>
+          <td class="py-3 px-4 text-${typeColor}-400">${spendTypeDisplay}</td>
           <td class="py-3 px-4 font-mono text-sm text-gray-300">${utxo.address ? utxo.address.substring(0, 8) + '...' + utxo.address.substring(utxo.address.length - 4) : '--'}</td>
         </tr>
       `;
@@ -399,7 +454,7 @@ export function UtxoListComponent(container) {
                     ← Back to Wallet
                 </button>
                 <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All UTXOs</h2>
-                <p class="text-gray-400">Complete list of unspent transaction outputs</p>
+                <p class="text-gray-400">Complete list of unspent transaction outputs with filtering and sorting</p>
             </div>
             <button id="refresh-utxos-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
                 Refresh UTXOs
@@ -426,28 +481,33 @@ export function UtxoListComponent(container) {
             </div>
         </div>
 
-        <!-- Script Type Filter -->
+        <!-- UTXO Filters -->
         <div class="bg-[#1a2332] rounded-lg p-4 mb-6">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-400 mr-2">Filter by Script Type:</span>
+            <div class="flex items-center justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-2 flex-wrap">
                     <button id="filter-all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         All
                     </button>
-                    <button id="filter-p2wpkh" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-                        P2WPKH <span class="filter-count text-xs opacity-70">(0)</span>
+                    <button id="filter-regular" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Regular UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
-                    <button id="filter-p2wsh" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-                        P2WSH <span class="filter-count text-xs opacity-70">(0)</span>
+                    <button id="filter-contract" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Contract UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
-                    <button id="filter-p2tr" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-                        P2TR <span class="filter-count text-xs opacity-70">(0)</span>
+                    <button id="filter-swap" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Swap UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
+                    </button>
+                    <button id="filter-spendable" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Spendable UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
                 </div>
-                <div class="text-xs text-gray-500">
-                    <span class="text-green-400">P2WPKH</span> = SegWit Pubkey | 
-                    <span class="text-blue-400">P2WSH</span> = SegWit Script | 
-                    <span class="text-purple-400">P2TR</span> = Taproot
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button id="sort-newest" class="sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Newest
+                    </button>
+                    <button id="sort-amount" class="sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                        Amount
+                    </button>
                 </div>
             </div>
         </div>
@@ -481,7 +541,7 @@ export function UtxoListComponent(container) {
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Amount</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Confirmations</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Script Type</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Spend Type</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Type</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Address</th>
                         </tr>
                     </thead>
@@ -520,14 +580,23 @@ export function UtxoListComponent(container) {
     .querySelector('#filter-all')
     .addEventListener('click', () => applyFilter('all'));
   content
-    .querySelector('#filter-p2wpkh')
-    .addEventListener('click', () => applyFilter('p2wpkh'));
+    .querySelector('#filter-regular')
+    .addEventListener('click', () => applyFilter('regular'));
   content
-    .querySelector('#filter-p2wsh')
-    .addEventListener('click', () => applyFilter('p2wsh'));
+    .querySelector('#filter-contract')
+    .addEventListener('click', () => applyFilter('contract'));
   content
-    .querySelector('#filter-p2tr')
-    .addEventListener('click', () => applyFilter('p2tr'));
+    .querySelector('#filter-swap')
+    .addEventListener('click', () => applyFilter('swap'));
+  content
+    .querySelector('#filter-spendable')
+    .addEventListener('click', () => applyFilter('spendable'));
+  content
+    .querySelector('#sort-newest')
+    .addEventListener('click', () => setSort('newest'));
+  content
+    .querySelector('#sort-amount')
+    .addEventListener('click', () => setSort('amount'));
 
   // Add select all handler
   const selectAllCheckbox = content.querySelector('#select-all-utxos');
@@ -557,5 +626,6 @@ export function UtxoListComponent(container) {
   });
 
   // Initialize data
+  updateSortButtons();
   loadUtxos();
 }

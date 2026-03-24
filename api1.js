@@ -464,6 +464,60 @@ function registerTakerHandlers() {
     }
   });
 
+  ipcMain.handle('taker:checkSwapLiquidity', async () => {
+    try {
+      if (!api1State.takerInstance) {
+        return { success: false, error: 'Taker not initialized' };
+      }
+
+      const balance = api1State.takerInstance.getBalances();
+      const regular = Number(balance?.regular || 0);
+      const swap = Number(balance?.swap || 0);
+      const spendable = Number(balance?.spendable || 0);
+
+      let maxSwappable = Math.max(regular, swap) - 3000;
+
+      if (
+        typeof api1State.takerInstance.checkSwapLiquidity === 'function'
+      ) {
+        try {
+          const nativeResult = api1State.takerInstance.checkSwapLiquidity();
+          if (typeof nativeResult === 'number') {
+            maxSwappable = nativeResult;
+          } else if (
+            nativeResult &&
+            typeof nativeResult.maxSwappable === 'number'
+          ) {
+            maxSwappable = nativeResult.maxSwappable;
+          } else if (
+            nativeResult &&
+            typeof nativeResult.max_swappable === 'number'
+          ) {
+            maxSwappable = nativeResult.max_swappable;
+          }
+        } catch (nativeError) {
+          console.warn(
+            '⚠️ checkSwapLiquidity native call failed, using balance fallback:',
+            nativeError.message
+          );
+        }
+      }
+
+      return {
+        success: true,
+        liquidity: {
+          spendable,
+          regular,
+          swap,
+          maxSwappable: Math.max(0, Math.floor(maxSwappable)),
+        },
+      };
+    } catch (error) {
+      console.error('❌ Failed to check swap liquidity:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Start periodic wallet sync (every 5 minutes)
   function startPeriodicWalletSync() {
     if (api1State.walletSyncInterval) {
@@ -1343,6 +1397,64 @@ function registerDialogHandlers() {
 // Add this function
 function registerTorHandlers() {
   const net = require('net');
+
+  ipcMain.handle('network:testTcpPort', async (event, config) => {
+    const host = config?.host || '127.0.0.1';
+    const port = config?.port;
+    const timeout = config?.timeout || 3000;
+
+    return new Promise((resolve) => {
+      if (!port) {
+        resolve({
+          success: false,
+          host,
+          port,
+          error: 'Port is required',
+        });
+        return;
+      }
+
+      const socket = new net.Socket();
+      let settled = false;
+
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        resolve(result);
+      };
+
+      socket.setTimeout(timeout);
+
+      socket.on('connect', () => {
+        finish({
+          success: true,
+          host,
+          port,
+        });
+      });
+
+      socket.on('error', () => {
+        finish({
+          success: false,
+          host,
+          port,
+          error: `Cannot connect to ${host}:${port}`,
+        });
+      });
+
+      socket.on('timeout', () => {
+        finish({
+          success: false,
+          host,
+          port,
+          error: `Connection timeout to ${host}:${port}`,
+        });
+      });
+
+      socket.connect(port, host);
+    });
+  });
 
   ipcMain.handle('tor:testConnection', async (event, config) => {
     const socksPort = config?.socksPort || 9050;

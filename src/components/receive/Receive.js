@@ -142,17 +142,28 @@ export function ReceiveComponent(container) {
   }
 
   // Detect address type from address string
-  function detectAddressType(address) {
-    if (address.startsWith('bc1q')) return 'P2WPKH';
-    if (address.startsWith('bc1p')) return 'P2TR';
+  function detectAddressType(address, fallbackSpendType = '') {
+    if (
+      address.startsWith('bc1q') ||
+      address.startsWith('tb1q') ||
+      address.startsWith('bcrt1q')
+    ) {
+      return address.length > 50 ? 'P2WSH' : 'P2WPKH';
+    }
+    if (
+      address.startsWith('bc1p') ||
+      address.startsWith('bcrt1p') ||
+      address.startsWith('tb1p')
+    )
+      return 'P2TR';
     if (address.startsWith('3')) return 'P2SH';
     if (address.startsWith('1')) return 'P2PKH';
-    if (address.startsWith('tb1q')) return 'P2WPKH'; // testnet
-    if (address.startsWith('bcrt1q')) return 'P2WPKH'; // regtest
-    if (address.startsWith('bcrt1p')) return 'P2TR';
-    if (address.startsWith('tb1q')) return 'P2WPKH';
-    if (address.startsWith('tb1p')) return 'P2TR';
-    return 'Unknown';
+    if (address.startsWith('2')) return 'P2SH';
+    if (address.startsWith('m') || address.startsWith('n')) return 'P2PKH';
+
+    const spendType = String(fallbackSpendType || '').toLowerCase();
+    if (spendType.includes('contract') || spendType.includes('swap')) return 'P2WSH';
+    return 'P2WPKH';
   }
 
   // Get addresses from transaction history
