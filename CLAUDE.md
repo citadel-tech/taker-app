@@ -226,3 +226,61 @@ When reviewing code, pay special attention to:
 ---
 
 **For Reviewers**: This is a privacy-focused Bitcoin application. Security and correctness are paramount. When in doubt about Bitcoin/Lightning/swap mechanics, ask for clarification rather than making assumptions.
+
+
+## Orchestration Protocol
+
+When given a task, always follow this pipeline. Do not skip steps.
+
+### Step 1 — Plan first, code never first
+
+Before touching any file, produce a planning doc in this format:
+```
+## Task: <one line summary>
+
+### Affected files
+- `src/api/makers.rs` — reason
+- `frontend/app/routes/makers.tsx` — reason
+
+### Agent assignments
+- Agent 1: [file list] — [what it does]
+- Agent 2: [file list] — [what it does]
+
+### Complexity: small | medium | large
+### Agent count: 1 | 2 | 5
+```
+
+Rules for agent count:
+- **1 agent** — single file, or changes are tightly coupled across files
+- **2 agents** — 2-4 files, clearly separable (e.g. backend + frontend split)
+- **5 agents** — 5+ files, each agent owns a distinct module/domain
+
+### Step 2 — Spawn agents via Task tool
+
+Each Task agent receives:
+- Its assigned files only (no awareness of other agents' files)
+- The specific goal for its slice
+- The relevant architecture context from this CLAUDE.md
+
+**Hard rule: no two agents may touch the same file. If a file needs changes from two concerns, one agent owns it and handles both.**
+
+### Step 3 — Review
+
+After all agents complete, spawn 1-2 review Tasks that:
+- Read all changed files together
+- Check for: type mismatches across the API boundary, broken imports, inconsistent naming, logic errors
+- If issues found: report back to planner, re-assign fixes to the relevant agent
+- If clean: proceed
+
+### Step 4 — Cleanup
+
+Run the appropriate formatters based on what changed:
+- Any `.rs` files touched → `cargo fmt`
+- Any `.ts` / `.tsx` files touched → `cd frontend && npx prettier --write <changed files>`
+- If both → run both
+
+### Step 5 — Verify
+
+- If `.rs` changed → `cargo build` (not release, just check it compiles)
+- If `.ts`/`.tsx` changed → `cd frontend && npm run build`
+- Report any errors back to planner for a fix cycle

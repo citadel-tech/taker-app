@@ -723,7 +723,12 @@ export async function CoinswapComponent(container, swapConfig) {
       'fundingTxidsByHop',
       []
     );
-    const totalFee = getValue('total_fee', 'totalFee', 0);
+    const feePaidOrEarned = getValue(
+      'fee_paid_or_earned',
+      'feePaidOrEarned',
+      NaN
+    );
+    const totalFee = getValue('total_fee', 'totalFee', NaN);
     const miningFee = getValue('mining_fee', 'miningFee', 0);
     const inputUtxos = getArrayValue('input_utxos', 'inputUtxos', []);
     const outputRegularUtxos = getArrayValue(
@@ -769,9 +774,17 @@ export async function CoinswapComponent(container, swapConfig) {
       };
     });
 
-    const calculatedMiningFee = miningFee || totalFee - totalMakerFees;
+    const derivedTotalFee = Number.isFinite(feePaidOrEarned)
+      ? Math.abs(feePaidOrEarned)
+      : totalMakerFees + miningFee;
+    const normalizedTotalFee =
+      Number.isFinite(totalFee) && (totalFee > 0 || derivedTotalFee <= 0)
+        ? totalFee
+        : derivedTotalFee;
+    const calculatedMiningFee =
+      miningFee || normalizedTotalFee - totalMakerFees;
     const feePercentage =
-      targetAmount > 0 ? (totalFee / targetAmount) * 100 : 0;
+      targetAmount > 0 ? (normalizedTotalFee / targetAmount) * 100 : 0;
 
     return {
       swapId,
@@ -783,7 +796,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerAddresses,
       totalFundingTxs,
       fundingTxidsByHop,
-      totalFee,
+      totalFee: normalizedTotalFee,
       totalMakerFees,
       miningFee: calculatedMiningFee,
       feePercentage,
