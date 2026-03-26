@@ -248,7 +248,13 @@ function normalizeBalancePayload(rawBalance = {}, rawUtxos = []) {
   // Recover that provenance by matching active UTXOs against saved swap reports.
   if (historicalSwapBalance > normalized.swap) {
     normalized.swap = historicalSwapBalance;
-    normalized.regular = Math.max(0, normalized.spendable - normalized.swap);
+    normalized.regular = Math.max(
+      0,
+      normalized.spendable -
+        normalized.swap -
+        normalized.contract -
+        normalized.fidelity
+    );
   }
 
   return {

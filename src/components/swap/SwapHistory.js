@@ -86,9 +86,25 @@ function normalizeSwapReport(report) {
   return {
     id: report.swapId || nested.swapId || `swap_${Date.now()}`,
     completedAt,
-    amount: report.amount || nested.amount || nested.targetAmount || 0,
-    totalOutputAmount:
-      nested.totalOutputAmount || nested.total_output_amount || 0,
+    amount:
+      toNumber(
+        report.amount ??
+          nested.amount ??
+          nested.targetAmount ??
+          nested.target_amount ??
+          nested.incomingAmount ??
+          nested.incoming_amount,
+        0
+      ),
+    totalOutputAmount: toNumber(
+      nested.totalOutputAmount ??
+        nested.total_output_amount ??
+        nested.outgoingAmount ??
+        nested.outgoing_amount ??
+        report.totalOutputAmount ??
+        report.total_output_amount,
+      0
+    ),
     makersCount,
     hops: makersCount + 1,
     totalFee,
@@ -126,24 +142,36 @@ export async function loadSwapHistory() {
             report: normalized.report,
           };
         });
+    } else {
+      swapHistory = [];
+      throw new Error(result.error || 'Failed to load swap history');
     }
   } catch (error) {
+    swapHistory = [];
     console.error('Failed to load swap history:', error);
+    throw error;
   }
   return swapHistory;
 }
 
 export function summarizeSwapHistory(history) {
   const totalSwaps = history.length;
-  const totalAmount = history.reduce((sum, s) => sum + (s.amount || 0), 0);
-  const totalFees = history.reduce((sum, s) => sum + (s.totalFee || 0), 0);
+  const totalAmount = history.reduce(
+    (sum, s) => sum + (Number(s.amount) || 0),
+    0
+  );
+  const totalFees = history.reduce(
+    (sum, s) => sum + (Number(s.totalFee) || 0),
+    0
+  );
   const avgFeePaid = totalSwaps > 0 ? Math.round(totalFees / totalSwaps) : 0;
   return { totalSwaps, totalAmount, totalFees, avgFeePaid };
 }
 
 function satsToBtc(sats) {
-  if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
-  return (sats / 100000000).toFixed(8);
+  const normalized = Number(sats);
+  if (!Number.isFinite(normalized)) return '0.00000000';
+  return (normalized / 100000000).toFixed(8);
 }
 
 export function buildSwapHistoryMarkup(history) {
@@ -161,8 +189,12 @@ export function buildSwapHistoryMarkup(history) {
     <div class="space-y-4">
       ${history
         .map((swap) => {
-          const btcAmount = satsToBtc(swap.amount);
-          const outputBtc = satsToBtc(swap.totalOutputAmount);
+          const amount = Number(swap.amount) || 0;
+          const totalOutputAmount = Number(swap.totalOutputAmount) || 0;
+          const feePercentage = Number(swap.feePercentage) || 0;
+          const totalFee = Number(swap.totalFee) || 0;
+          const btcAmount = satsToBtc(amount);
+          const outputBtc = satsToBtc(totalOutputAmount);
           const timeAgo = formatRelativeTime(swap.completedAt);
           const dateStr = formatDate(swap.completedAt);
           const duration = formatDuration(swap.durationSeconds);
@@ -189,7 +221,7 @@ export function buildSwapHistoryMarkup(history) {
               </div>
               <div class="text-right flex-shrink-0">
                 <div class="text-lg font-mono text-green-400">${btcAmount} BTC</div>
-                <div class="text-xs text-gray-500">${swap.amount.toLocaleString()} sats</div>
+                <div class="text-xs text-gray-500">${amount.toLocaleString()} sats</div>
               </div>
               <div class="text-gray-600 flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -204,11 +236,11 @@ export function buildSwapHistoryMarkup(history) {
               </div>
               <div>
                 <span class="text-gray-500">Fee</span>
-                <p class="text-yellow-400 font-mono">${swap.feePercentage?.toFixed(2) || '0.00'}%</p>
+                <p class="text-yellow-400 font-mono">${feePercentage.toFixed(2)}%</p>
               </div>
               <div>
                 <span class="text-gray-500">Total Fee</span>
-                <p class="text-yellow-400 font-mono">${(swap.totalFee || 0).toLocaleString()} sats</p>
+                <p class="text-yellow-400 font-mono">${totalFee.toLocaleString()} sats</p>
               </div>
               <div>
                 <span class="text-gray-500">Output</span>

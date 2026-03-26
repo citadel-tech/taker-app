@@ -25,21 +25,35 @@ export function SwapReportComponent(container, swapReport) {
     const normalized = Number(value);
     return Number.isFinite(normalized) ? normalized : fallback;
   };
+  const nestedReport = swapReport.report || {};
 
   const rawTotalMakerFees = toNumber(
-    swapReport.totalMakerFees ?? swapReport.total_maker_fees,
+    swapReport.totalMakerFees ??
+      swapReport.total_maker_fees ??
+      nestedReport.totalMakerFees ??
+      nestedReport.total_maker_fees,
     0
   );
   const rawMiningFee = toNumber(
-    swapReport.miningFee ?? swapReport.mining_fee,
+    swapReport.miningFee ??
+      swapReport.mining_fee ??
+      nestedReport.miningFee ??
+      nestedReport.mining_fee,
     0
   );
   const rawFeePaidOrEarned = toNumber(
-    swapReport.fee_paid_or_earned ?? swapReport.feePaidOrEarned,
+    swapReport.fee_paid_or_earned ??
+      swapReport.feePaidOrEarned ??
+      nestedReport.fee_paid_or_earned ??
+      nestedReport.feePaidOrEarned ??
+      nestedReport.feePaidOrEarned,
     NaN
   );
   const providedTotalFee = toNumber(
-    swapReport.totalFee ?? swapReport.total_fee,
+    swapReport.totalFee ??
+      swapReport.total_fee ??
+      nestedReport.totalFee ??
+      nestedReport.total_fee,
     NaN
   );
   const derivedTotalFee = Number.isFinite(rawFeePaidOrEarned)
@@ -52,39 +66,115 @@ export function SwapReportComponent(container, swapReport) {
       : derivedTotalFee;
 
   // Extract values with safe defaults
+  const normalizedFundingTxids =
+    swapReport.fundingTxidsByHop ||
+    swapReport.funding_txids_by_hop ||
+    nestedReport.fundingTxidsByHop ||
+    nestedReport.funding_txids_by_hop ||
+    nestedReport.fundingTxids ||
+    nestedReport.funding_txids ||
+    [];
+  const normalizedTargetAmount = toNumber(
+    swapReport.targetAmount ??
+      swapReport.target_amount ??
+      nestedReport.targetAmount ??
+      nestedReport.target_amount ??
+      swapReport.amount ??
+      nestedReport.incomingAmount ??
+      nestedReport.incoming_amount ??
+      nestedReport.outgoingAmount ??
+      nestedReport.outgoing_amount,
+    0
+  );
+  const normalizedTotalFundingTxs = toNumber(
+    swapReport.totalFundingTxs ??
+      swapReport.total_funding_txs ??
+      nestedReport.totalFundingTxs ??
+      nestedReport.total_funding_txs,
+    Array.isArray(normalizedFundingTxids) ? normalizedFundingTxids.length : 0
+  );
+  const normalizedFeePercentage = toNumber(
+    swapReport.feePercentage ??
+      swapReport.fee_percentage ??
+      nestedReport.feePercentage ??
+      nestedReport.fee_percentage,
+    normalizedTargetAmount > 0 ? (rawTotalFee / normalizedTargetAmount) * 100 : 0
+  );
+
   const report = {
     swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
     swapDurationSeconds:
-      swapReport.swapDurationSeconds || swapReport.swap_duration_seconds || 0,
-    targetAmount: swapReport.targetAmount || swapReport.target_amount || 0,
+      toNumber(
+        swapReport.swapDurationSeconds ??
+          swapReport.swap_duration_seconds ??
+          nestedReport.swapDurationSeconds ??
+          nestedReport.swap_duration_seconds,
+        0
+      ),
+    targetAmount: normalizedTargetAmount,
     totalInputAmount:
-      swapReport.totalInputAmount || swapReport.total_input_amount || 0,
+      toNumber(
+        swapReport.totalInputAmount ??
+          swapReport.total_input_amount ??
+          nestedReport.totalInputAmount ??
+          nestedReport.total_input_amount,
+        normalizedTargetAmount
+      ),
     totalOutputAmount:
-      swapReport.totalOutputAmount || swapReport.total_output_amount || 0,
-    makersCount: swapReport.makersCount || swapReport.makers_count || 0,
+      toNumber(
+        swapReport.totalOutputAmount ??
+          swapReport.total_output_amount ??
+          nestedReport.totalOutputAmount ??
+          nestedReport.total_output_amount ??
+          nestedReport.outgoingAmount ??
+          nestedReport.outgoing_amount,
+        0
+      ),
+    makersCount: toNumber(
+      swapReport.makersCount ??
+        swapReport.makers_count ??
+        nestedReport.makersCount ??
+        nestedReport.makers_count,
+      0
+    ),
     makerAddresses:
-      swapReport.makerAddresses || swapReport.maker_addresses || [],
-    totalFundingTxs:
-      swapReport.totalFundingTxs || swapReport.total_funding_txs || 0,
-    fundingTxidsByHop:
-      swapReport.fundingTxidsByHop || swapReport.funding_txids_by_hop || [],
+      swapReport.makerAddresses ||
+      swapReport.maker_addresses ||
+      nestedReport.makerAddresses ||
+      nestedReport.maker_addresses ||
+      [],
+    totalFundingTxs: normalizedTotalFundingTxs,
+    fundingTxidsByHop: normalizedFundingTxids,
     totalFee: rawTotalFee,
     totalMakerFees: rawTotalMakerFees,
     miningFee: rawMiningFee,
-    feePercentage:
-      swapReport.feePercentage ||
-      swapReport.fee_percentage ||
-      ((swapReport.targetAmount ?? swapReport.target_amount ?? 0) > 0
-        ? (rawTotalFee /
-            (swapReport.targetAmount ?? swapReport.target_amount ?? 0)) *
-          100
-        : 0),
-    makerFeeInfo: swapReport.makerFeeInfo || swapReport.maker_fee_info || [],
-    inputUtxos: swapReport.inputUtxos || swapReport.input_utxos || [],
+    feePercentage: normalizedFeePercentage,
+    makerFeeInfo:
+      swapReport.makerFeeInfo ||
+      swapReport.maker_fee_info ||
+      nestedReport.makerFeeInfo ||
+      nestedReport.maker_fee_info ||
+      [],
+    inputUtxos:
+      swapReport.inputUtxos ||
+      swapReport.input_utxos ||
+      nestedReport.inputUtxos ||
+      nestedReport.input_utxos ||
+      [],
     outputRegularUtxos:
-      swapReport.outputRegularUtxos || swapReport.output_regular_utxos || [],
+      swapReport.outputRegularUtxos ||
+      swapReport.output_regular_utxos ||
+      nestedReport.outputRegularUtxos ||
+      nestedReport.output_regular_utxos ||
+      nestedReport.outputChangeUtxos ||
+      nestedReport.output_change_utxos ||
+      [],
     outputSwapUtxos:
-      swapReport.outputSwapUtxos || swapReport.output_swap_utxos || [],
+      swapReport.outputSwapUtxos ||
+      swapReport.output_swap_utxos ||
+      nestedReport.outputSwapUtxos ||
+      nestedReport.output_swap_utxos ||
+      [],
     sweepTxid:
       swapReport.sweep_txid ||
       swapReport.sweepTxid ||
@@ -475,7 +565,13 @@ export function SwapReportComponent(container, swapReport) {
 
   // Build swap circuit visualization (circular SVG)
   function buildCircularFlowHtml() {
-    const actualMakers = report.makersCount || report.makerAddresses.length;
+    const makersCount = Number(report.makersCount);
+    const actualMakers = Math.max(
+      0,
+      Number.isFinite(makersCount) && makersCount > 0
+        ? makersCount
+        : report.makerAddresses.length
+    );
     const totalNodes = actualMakers + 1; // +1 for You
 
     // Dynamic node sizing
@@ -738,9 +834,13 @@ export function SwapReportComponent(container, swapReport) {
   50% { opacity: 1; }
 }
 
+.maker-node {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 .maker-node:hover {
-  z-index: 20 !important;
-  transform: scale(1.15) !important;
+  filter: brightness(1.08);
 }
       
       .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
@@ -752,10 +852,6 @@ export function SwapReportComponent(container, swapReport) {
       
       .maker-card:hover {
         transform: scale(1.02);
-      }
-      
-      .maker-node:hover {
-        z-index: 10;
       }
       
       /* Tooltip styles */

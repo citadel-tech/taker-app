@@ -1143,7 +1143,7 @@ export async function CoinswapComponent(container, swapConfig) {
           const sy = pos.y + (dy / len) * (fromHalf + 4);
           const ex = nextPos.x - (dx / len) * (toHalf + 10);
           const ey = nextPos.y - (dy / len) * (toHalf + 10);
-          return `<a id="arrow-link-${i}" href="#" onclick="event.preventDefault();" title="View transaction">
+          return `<a id="arrow-link-${i}" href="#" target="_blank" rel="noopener noreferrer" title="View transaction">
             <line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
                   stroke="${color}" stroke-width="2" marker-end="url(#arrow-${i})" opacity="0.6" class="transition-opacity"/>
           </a>`;

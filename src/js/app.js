@@ -492,7 +492,11 @@ async function performLaunchSync(onComplete) {
               clearInterval(poll);
               resolve();
             }
-          } catch { clearInterval(poll); resolve(); }
+          } catch (err) {
+            console.error('Sync polling error:', err);
+            clearInterval(poll);
+            resolve();
+          }
         }, 1000);
       });
     } else {
