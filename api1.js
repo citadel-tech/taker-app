@@ -109,6 +109,169 @@ function saveSwapReport(swapId, swapData) {
   }
 }
 
+function toNumber(value, fallback = 0) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : fallback;
+}
+
+function getAllSwapReportPaths() {
+  const reportsRoot = path.join(api1State.DATA_DIR, 'swap_reports');
+  const reportPaths = [];
+
+  function walk(dirPath) {
+    if (!fs.existsSync(dirPath)) return;
+
+    for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+      const fullPath = path.join(dirPath, entry.name);
+      if (entry.isDirectory()) {
+        walk(fullPath);
+      } else if (entry.isFile() && entry.name.endsWith('.json')) {
+        reportPaths.push(fullPath);
+      }
+    }
+  }
+
+  walk(reportsRoot);
+  return reportPaths;
+}
+
+function getHistoricalSwapOutputMap() {
+  const swapOutputs = new Map();
+
+  for (const reportPath of getAllSwapReportPaths()) {
+    try {
+      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+      const outputSwapUtxos =
+        report.output_swap_utxos ||
+        report.outputSwapUtxos ||
+        report.report?.output_swap_utxos ||
+        report.report?.outputSwapUtxos ||
+        [];
+
+      outputSwapUtxos.forEach((entry) => {
+        if (!Array.isArray(entry) || entry.length < 2) return;
+        const [amount, address] = entry;
+        if (!address) return;
+        swapOutputs.set(address, toNumber(amount, 0));
+      });
+    } catch (error) {
+      console.warn('⚠️ Failed to parse swap report for balance derivation:', {
+        reportPath,
+        error: error.message,
+      });
+    }
+  }
+
+  return swapOutputs;
+}
+
+function deriveBalancesFromUtxos(rawUtxos = []) {
+  const derived = {
+    spendable: 0,
+    regular: 0,
+    swap: 0,
+    contract: 0,
+    fidelity: 0,
+  };
+
+  rawUtxos.forEach(([utxoEntry, spendInfo]) => {
+    const amount = toNumber(utxoEntry?.amount?.sats, 0);
+    const spendType = String(spendInfo?.spendType || '').toLowerCase();
+    const isSpendable = Boolean(utxoEntry?.spendable);
+
+    if (isSpendable) {
+      derived.spendable += amount;
+    }
+
+    if (spendType.includes('swap')) {
+      derived.swap += amount;
+      return;
+    }
+
+    if (spendType.includes('contract')) {
+      derived.contract += amount;
+      return;
+    }
+
+    if (spendType.includes('fidelity')) {
+      derived.fidelity += amount;
+      return;
+    }
+
+    if (spendType.includes('seed') || spendType.includes('regular')) {
+      derived.regular += amount;
+    }
+  });
+
+  return derived;
+}
+
+function normalizeBalancePayload(rawBalance = {}, rawUtxos = []) {
+  const derivedFromUtxos = deriveBalancesFromUtxos(rawUtxos);
+  const historicalSwapOutputs = getHistoricalSwapOutputMap();
+
+  const matchedHistoricalSwapUtxos = rawUtxos.filter(([utxoEntry]) =>
+    historicalSwapOutputs.has(utxoEntry?.address)
+  );
+  const historicalSwapBalance = matchedHistoricalSwapUtxos.reduce(
+    (sum, [utxoEntry]) => sum + toNumber(utxoEntry?.amount?.sats, 0),
+    0
+  );
+
+  const normalized = {
+    spendable: toNumber(
+      rawBalance.spendable ?? rawBalance.spendable_balance,
+      derivedFromUtxos.spendable
+    ),
+    regular: toNumber(
+      rawBalance.regular ?? rawBalance.regular_balance,
+      derivedFromUtxos.regular
+    ),
+    swap: toNumber(
+      rawBalance.swap ??
+        rawBalance.swap_balance ??
+        rawBalance.swapCoin ??
+        rawBalance.swapcoin,
+      derivedFromUtxos.swap
+    ),
+    contract: toNumber(
+      rawBalance.contract ?? rawBalance.contract_balance,
+      derivedFromUtxos.contract
+    ),
+    fidelity: toNumber(
+      rawBalance.fidelity ?? rawBalance.fidelity_balance,
+      derivedFromUtxos.fidelity
+    ),
+  };
+
+  // Completed swap outputs can show up as SeedCoin/regular in the current UTXO API.
+  // Recover that provenance by matching active UTXOs against saved swap reports.
+  if (historicalSwapBalance > normalized.swap) {
+    normalized.swap = historicalSwapBalance;
+    normalized.regular = Math.max(
+      0,
+      normalized.spendable -
+        normalized.swap -
+        normalized.contract -
+        normalized.fidelity
+    );
+  }
+
+  return {
+    normalized,
+    debug: {
+      rawBalance,
+      derivedFromUtxos,
+      historicalSwapBalance,
+      historicalSwapMatches: matchedHistoricalSwapUtxos.map(([utxoEntry, spendInfo]) => ({
+        address: utxoEntry?.address,
+        amount: toNumber(utxoEntry?.amount?.sats, 0),
+        spendType: spendInfo?.spendType,
+      })),
+    },
+  };
+}
+
 async function initNAPI() {
   try {
     api1State.coinswapNapi = require('coinswap-napi');
@@ -469,16 +632,16 @@ function registerTakerHandlers() {
       // Sync removed to prevent UI blocking on page load - relies on background sync
       // api1State.takerInstance.syncAndSave();
       const balance = api1State.takerInstance.getBalances();
+      const rawUtxos = api1State.takerInstance.listAllUtxoSpendInfo();
+      const { normalized, debug } = normalizeBalancePayload(balance, rawUtxos);
+
+      console.log('💰 Raw taker balance payload:', balance);
+      console.log('💰 Normalized taker balance payload:', normalized);
+      console.log('💰 Balance derivation details:', debug);
 
       return {
         success: true,
-        balance: {
-          spendable: balance.spendable,
-          regular: balance.regular,
-          swap: balance.swap,
-          contract: balance.contract,
-          fidelity: balance.fidelity,
-        },
+        balance: normalized,
       };
     } catch (error) {
       console.error('❌ Failed to get balance:', error);

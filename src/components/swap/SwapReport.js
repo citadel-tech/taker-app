@@ -25,21 +25,35 @@ export function SwapReportComponent(container, swapReport) {
     const normalized = Number(value);
     return Number.isFinite(normalized) ? normalized : fallback;
   };
+  const nestedReport = swapReport.report || {};
 
   const rawTotalMakerFees = toNumber(
-    swapReport.totalMakerFees ?? swapReport.total_maker_fees,
+    swapReport.totalMakerFees ??
+      swapReport.total_maker_fees ??
+      nestedReport.totalMakerFees ??
+      nestedReport.total_maker_fees,
     0
   );
   const rawMiningFee = toNumber(
-    swapReport.miningFee ?? swapReport.mining_fee,
+    swapReport.miningFee ??
+      swapReport.mining_fee ??
+      nestedReport.miningFee ??
+      nestedReport.mining_fee,
     0
   );
   const rawFeePaidOrEarned = toNumber(
-    swapReport.fee_paid_or_earned ?? swapReport.feePaidOrEarned,
+    swapReport.fee_paid_or_earned ??
+      swapReport.feePaidOrEarned ??
+      nestedReport.fee_paid_or_earned ??
+      nestedReport.feePaidOrEarned ??
+      nestedReport.feePaidOrEarned,
     NaN
   );
   const providedTotalFee = toNumber(
-    swapReport.totalFee ?? swapReport.total_fee,
+    swapReport.totalFee ??
+      swapReport.total_fee ??
+      nestedReport.totalFee ??
+      nestedReport.total_fee,
     NaN
   );
   const derivedTotalFee = Number.isFinite(rawFeePaidOrEarned)
@@ -52,39 +66,115 @@ export function SwapReportComponent(container, swapReport) {
       : derivedTotalFee;
 
   // Extract values with safe defaults
+  const normalizedFundingTxids =
+    swapReport.fundingTxidsByHop ||
+    swapReport.funding_txids_by_hop ||
+    nestedReport.fundingTxidsByHop ||
+    nestedReport.funding_txids_by_hop ||
+    nestedReport.fundingTxids ||
+    nestedReport.funding_txids ||
+    [];
+  const normalizedTargetAmount = toNumber(
+    swapReport.targetAmount ??
+      swapReport.target_amount ??
+      nestedReport.targetAmount ??
+      nestedReport.target_amount ??
+      swapReport.amount ??
+      nestedReport.incomingAmount ??
+      nestedReport.incoming_amount ??
+      nestedReport.outgoingAmount ??
+      nestedReport.outgoing_amount,
+    0
+  );
+  const normalizedTotalFundingTxs = toNumber(
+    swapReport.totalFundingTxs ??
+      swapReport.total_funding_txs ??
+      nestedReport.totalFundingTxs ??
+      nestedReport.total_funding_txs,
+    Array.isArray(normalizedFundingTxids) ? normalizedFundingTxids.length : 0
+  );
+  const normalizedFeePercentage = toNumber(
+    swapReport.feePercentage ??
+      swapReport.fee_percentage ??
+      nestedReport.feePercentage ??
+      nestedReport.fee_percentage,
+    normalizedTargetAmount > 0 ? (rawTotalFee / normalizedTargetAmount) * 100 : 0
+  );
+
   const report = {
     swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
     swapDurationSeconds:
-      swapReport.swapDurationSeconds || swapReport.swap_duration_seconds || 0,
-    targetAmount: swapReport.targetAmount || swapReport.target_amount || 0,
+      toNumber(
+        swapReport.swapDurationSeconds ??
+          swapReport.swap_duration_seconds ??
+          nestedReport.swapDurationSeconds ??
+          nestedReport.swap_duration_seconds,
+        0
+      ),
+    targetAmount: normalizedTargetAmount,
     totalInputAmount:
-      swapReport.totalInputAmount || swapReport.total_input_amount || 0,
+      toNumber(
+        swapReport.totalInputAmount ??
+          swapReport.total_input_amount ??
+          nestedReport.totalInputAmount ??
+          nestedReport.total_input_amount,
+        normalizedTargetAmount
+      ),
     totalOutputAmount:
-      swapReport.totalOutputAmount || swapReport.total_output_amount || 0,
-    makersCount: swapReport.makersCount || swapReport.makers_count || 0,
+      toNumber(
+        swapReport.totalOutputAmount ??
+          swapReport.total_output_amount ??
+          nestedReport.totalOutputAmount ??
+          nestedReport.total_output_amount ??
+          nestedReport.outgoingAmount ??
+          nestedReport.outgoing_amount,
+        0
+      ),
+    makersCount: toNumber(
+      swapReport.makersCount ??
+        swapReport.makers_count ??
+        nestedReport.makersCount ??
+        nestedReport.makers_count,
+      0
+    ),
     makerAddresses:
-      swapReport.makerAddresses || swapReport.maker_addresses || [],
-    totalFundingTxs:
-      swapReport.totalFundingTxs || swapReport.total_funding_txs || 0,
-    fundingTxidsByHop:
-      swapReport.fundingTxidsByHop || swapReport.funding_txids_by_hop || [],
+      swapReport.makerAddresses ||
+      swapReport.maker_addresses ||
+      nestedReport.makerAddresses ||
+      nestedReport.maker_addresses ||
+      [],
+    totalFundingTxs: normalizedTotalFundingTxs,
+    fundingTxidsByHop: normalizedFundingTxids,
     totalFee: rawTotalFee,
     totalMakerFees: rawTotalMakerFees,
     miningFee: rawMiningFee,
-    feePercentage:
-      swapReport.feePercentage ||
-      swapReport.fee_percentage ||
-      ((swapReport.targetAmount ?? swapReport.target_amount ?? 0) > 0
-        ? (rawTotalFee /
-            (swapReport.targetAmount ?? swapReport.target_amount ?? 0)) *
-          100
-        : 0),
-    makerFeeInfo: swapReport.makerFeeInfo || swapReport.maker_fee_info || [],
-    inputUtxos: swapReport.inputUtxos || swapReport.input_utxos || [],
+    feePercentage: normalizedFeePercentage,
+    makerFeeInfo:
+      swapReport.makerFeeInfo ||
+      swapReport.maker_fee_info ||
+      nestedReport.makerFeeInfo ||
+      nestedReport.maker_fee_info ||
+      [],
+    inputUtxos:
+      swapReport.inputUtxos ||
+      swapReport.input_utxos ||
+      nestedReport.inputUtxos ||
+      nestedReport.input_utxos ||
+      [],
     outputRegularUtxos:
-      swapReport.outputRegularUtxos || swapReport.output_regular_utxos || [],
+      swapReport.outputRegularUtxos ||
+      swapReport.output_regular_utxos ||
+      nestedReport.outputRegularUtxos ||
+      nestedReport.output_regular_utxos ||
+      nestedReport.outputChangeUtxos ||
+      nestedReport.output_change_utxos ||
+      [],
     outputSwapUtxos:
-      swapReport.outputSwapUtxos || swapReport.output_swap_utxos || [],
+      swapReport.outputSwapUtxos ||
+      swapReport.output_swap_utxos ||
+      nestedReport.outputSwapUtxos ||
+      nestedReport.output_swap_utxos ||
+      [],
     sweepTxid:
       swapReport.sweep_txid ||
       swapReport.sweepTxid ||
@@ -473,54 +563,255 @@ export function SwapReportComponent(container, swapReport) {
     `;
   }
 
-  // Build swap circuit visualization
+  // Build swap circuit visualization (circular SVG)
   function buildCircularFlowHtml() {
-    const nodes = [
-      { label: 'You', sublabel: 'Outgoing', color: '#FF6B35' },
-      ...report.makerAddresses.map((addr, index) => ({
-        label: `Maker ${index + 1}`,
-        sublabel: truncateAddress(addr, 10, 6),
-        color: makerColors[index % makerColors.length],
-        makerIndex: index,
-      })),
-      { label: 'You', sublabel: 'Incoming', color: '#10B981' },
-    ];
-    const columns = Math.max(nodes.length * 2 - 1, 1);
-    const flowItems = nodes.flatMap((node, index) => {
-      const nodeHtml = `
-        <div class="min-w-[180px] rounded-xl border p-4 bg-[#0f1419] ${
-          node.makerIndex !== undefined ? 'maker-node cursor-pointer' : ''
-        }" style="border-color: ${node.color}55;" ${
-          node.makerIndex !== undefined
-            ? `data-maker-index="${node.makerIndex}"`
-            : ''
-        }>
-          <p class="text-sm font-bold" style="color: ${node.color};">${node.label}</p>
-          <p class="text-xs text-gray-400 mt-1">${node.sublabel}</p>
-        </div>
-      `;
+    const makersCount = Number(report.makersCount);
+    const actualMakers = Math.max(
+      0,
+      Number.isFinite(makersCount) && makersCount > 0
+        ? makersCount
+        : report.makerAddresses.length
+    );
+    const totalNodes = actualMakers + 1; // +1 for You
 
-      if (index === nodes.length - 1) {
-        return [nodeHtml];
+    // Dynamic node sizing
+    const youHalf = actualMakers <= 5 ? 38 : actualMakers <= 10 ? 30 : 22;
+    const makerHalf = actualMakers <= 5 ? 32 : actualMakers <= 10 ? 25 : 18;
+    const youFont = actualMakers <= 5 ? 22 : actualMakers <= 10 ? 16 : 13;
+    const makerFont = actualMakers <= 5 ? 20 : actualMakers <= 10 ? 14 : 10;
+    const youRx = actualMakers <= 5 ? 14 : 10;
+    const makerRx = actualMakers <= 5 ? 10 : 7;
+    const maxNodeHalf = Math.max(youHalf, makerHalf);
+    const labelPad = youHalf + 62;
+
+    function getRectPoint(distance, width, height) {
+      const halfW = width / 2;
+      const halfH = height / 2;
+      const top = width / 2;
+      const right = height;
+      const bottom = width;
+      const left = height;
+      const perimeter = top + right + bottom + left + top;
+      let remaining = ((distance % perimeter) + perimeter) % perimeter;
+
+      const linePoint = (x1, y1, x2, y2, travelled, segmentLength) => {
+        const ratio = segmentLength === 0 ? 0 : travelled / segmentLength;
+        return {
+          x: x1 + (x2 - x1) * ratio,
+          y: y1 + (y2 - y1) * ratio,
+        };
+      };
+
+      const segments = [
+        {
+          length: top,
+          point: (travelled) =>
+            linePoint(0, -halfH, halfW, -halfH, travelled, top),
+        },
+        {
+          length: right,
+          point: (travelled) =>
+            linePoint(halfW, -halfH, halfW, halfH, travelled, right),
+        },
+        {
+          length: bottom,
+          point: (travelled) =>
+            linePoint(halfW, halfH, -halfW, halfH, travelled, bottom),
+        },
+        {
+          length: left,
+          point: (travelled) =>
+            linePoint(-halfW, halfH, -halfW, -halfH, travelled, left),
+        },
+        {
+          length: top,
+          point: (travelled) =>
+            linePoint(-halfW, -halfH, 0, -halfH, travelled, top),
+        },
+      ];
+
+      for (const segment of segments) {
+        if (remaining <= segment.length) {
+          return segment.point(remaining);
+        }
+        remaining -= segment.length;
       }
 
-      return [
-        nodeHtml,
-        `
-          <div class="flex items-center justify-center text-[#FF6B35]">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 12h12m0 0-4-4m4 4-4 4"></path>
-            </svg>
-          </div>
-        `,
-      ];
-    });
+      return { x: 0, y: -halfH };
+    }
+
+    function buildAdaptiveLayout() {
+      const gap = 14;
+
+      if (actualMakers <= 4) {
+        const minRadius =
+          (maxNodeHalf + gap) / Math.sin(Math.PI / totalNodes);
+        const radius = Math.max(minRadius, 140);
+        const svgSize = Math.round((radius + labelPad) * 2);
+        const centerX = svgSize / 2;
+        const centerY = svgSize / 2;
+        const angleStep = (2 * Math.PI) / totalNodes;
+        const positions = Array.from({ length: totalNodes }, (_, i) => {
+          const angle = angleStep * i - Math.PI / 2;
+          return {
+            x: centerX + radius * Math.cos(angle),
+            y: centerY + radius * Math.sin(angle),
+          };
+        });
+
+        return {
+          centerX,
+          centerY,
+          svgWidth: svgSize,
+          svgHeight: svgSize,
+          positions,
+          guideMarkup: `<circle cx="${centerX}" cy="${centerY}" r="${radius}"
+                  fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.6"/>`,
+        };
+      }
+
+      if (actualMakers <= 11) {
+        const safeSin = Math.max(Math.sin(Math.PI / totalNodes), 0.22);
+        const minRadius =
+          (maxNodeHalf + gap + Math.max(0, actualMakers - 5) * 2) / safeSin;
+        const rx = Math.max(minRadius * 1.15, 190 + actualMakers * 10);
+        const ry = Math.max(minRadius * 0.72, 120 + actualMakers * 5);
+        const svgWidth = Math.round(rx * 2 + labelPad * 2 + 30);
+        const svgHeight = Math.round(ry * 2 + labelPad * 2);
+        const centerX = svgWidth / 2;
+        const centerY = svgHeight / 2;
+        const angleStep = (2 * Math.PI) / totalNodes;
+        const positions = Array.from({ length: totalNodes }, (_, i) => {
+          const angle = angleStep * i - Math.PI / 2;
+          return {
+            x: centerX + rx * Math.cos(angle),
+            y: centerY + ry * Math.sin(angle),
+          };
+        });
+
+        return {
+          centerX,
+          centerY,
+          svgWidth,
+          svgHeight,
+          positions,
+          guideMarkup: `<ellipse cx="${centerX}" cy="${centerY}" rx="${rx}" ry="${ry}"
+                  fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>`,
+        };
+      }
+
+      const isSquareLayout = actualMakers <= 14;
+      const width = isSquareLayout
+        ? Math.max(420, 360 + actualMakers * 16)
+        : Math.max(640, 430 + actualMakers * 24);
+      const height = isSquareLayout
+        ? width
+        : Math.max(320, 250 + Math.min(actualMakers - 14, 8) * 18);
+      const halfW = width / 2;
+      const halfH = height / 2;
+      const perimeter = width * 2 + height * 2;
+      const svgWidth = Math.round(width + labelPad * 2);
+      const svgHeight = Math.round(height + labelPad * 2);
+      const centerX = svgWidth / 2;
+      const centerY = svgHeight / 2;
+      const step = perimeter / totalNodes;
+      const positions = Array.from({ length: totalNodes }, (_, i) => {
+        const point = getRectPoint(step * i, width, height);
+        return {
+          x: centerX + point.x,
+          y: centerY + point.y,
+        };
+      });
+
+      const x = centerX - halfW;
+      const y = centerY - halfH;
+      const guideMarkup = `<rect x="${x}" y="${y}" width="${width}" height="${height}"
+                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="7 7" opacity="0.6"/>`;
+
+      return {
+        centerX,
+        centerY,
+        svgWidth,
+        svgHeight,
+        positions,
+        guideMarkup,
+      };
+    }
+
+    const { centerX, centerY, svgWidth, svgHeight, positions, guideMarkup } =
+      buildAdaptiveLayout();
 
     return `
-      <div class="overflow-x-auto">
-        <div class="grid items-center gap-4 min-w-max" style="grid-template-columns: repeat(${columns}, minmax(0, auto));">
-          ${flowItems.join('')}
-        </div>
+      <div class="flex items-center justify-center overflow-auto">
+        <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" class="mx-auto max-w-full">
+          <defs>
+            ${Array.from({ length: totalNodes }, (_, i) => {
+              const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
+              return `<marker id="r-arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="${color}" opacity="0.9"/>
+              </marker>`;
+            }).join('')}
+            <filter id="r-glow-you" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="5" result="blur"/>
+              <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+
+          <!-- Guide path -->
+          ${guideMarkup}
+
+          <!-- Arrows -->
+          ${positions.map((pos, i) => {
+            const nextPos = positions[(i + 1) % positions.length];
+            const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
+            const fromHalf = i === 0 ? youHalf : makerHalf;
+            const toHalf = (i + 1) % positions.length === 0 ? youHalf : makerHalf;
+            const dx = nextPos.x - pos.x;
+            const dy = nextPos.y - pos.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const sx = pos.x + (dx / len) * (fromHalf + 4);
+            const sy = pos.y + (dy / len) * (fromHalf + 4);
+            const ex = nextPos.x - (dx / len) * (toHalf + 10);
+            const ey = nextPos.y - (dy / len) * (toHalf + 10);
+            return `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
+                          stroke="${color}" stroke-width="2" marker-end="url(#r-arrow-${i})" opacity="0.75"/>`;
+          }).join('')}
+
+          <!-- You node (completed — green) -->
+          <g>
+            <rect x="${(positions[0].x - youHalf).toFixed(1)}" y="${(positions[0].y - youHalf).toFixed(1)}"
+                  width="${youHalf * 2}" height="${youHalf * 2}" rx="${youRx}"
+                  fill="#10B981" filter="url(#r-glow-you)"/>
+            <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youFont * 0.38).toFixed(1)}"
+                  text-anchor="middle" fill="white" font-size="${youFont}" font-weight="bold">You</text>
+            <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 17).toFixed(1)}"
+                  text-anchor="middle" fill="#6EE7B7" font-size="${Math.max(8, youFont - 12)}">Completed ✓</text>
+          </g>
+
+          <!-- Maker nodes (clickable) -->
+          ${Array.from({ length: actualMakers }, (_, i) => {
+            const pos = positions[i + 1];
+            const color = makerColors[i % makerColors.length];
+            const addr = report.makerAddresses[i] || '';
+            const shortAddr = addr ? truncateAddress(addr, 6, 4) : '';
+            return `<g class="maker-node cursor-pointer" data-maker-index="${i}"
+                       style="transition: opacity 0.2s;">
+              <rect x="${(pos.x - makerHalf).toFixed(1)}" y="${(pos.y - makerHalf).toFixed(1)}"
+                    width="${makerHalf * 2}" height="${makerHalf * 2}" rx="${makerRx}" fill="${color}"/>
+              <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerFont * 0.38).toFixed(1)}"
+                    text-anchor="middle" fill="white" font-size="${makerFont}" font-weight="bold">M${i + 1}</text>
+              ${actualMakers <= 10 ? `
+              <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerHalf + 14).toFixed(1)}"
+                    text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(7, makerFont - 3)}">${shortAddr}</text>
+              ` : ''}
+            </g>`;
+          }).join('')}
+
+          ${isV2Swap ? `
+            <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">Taproot V2</text>
+            <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
+          ` : ''}
+        </svg>
       </div>
     `;
   }
@@ -543,9 +834,13 @@ export function SwapReportComponent(container, swapReport) {
   50% { opacity: 1; }
 }
 
+.maker-node {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
 .maker-node:hover {
-  z-index: 20 !important;
-  transform: scale(1.15) !important;
+  filter: brightness(1.08);
 }
       
       .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
@@ -557,10 +852,6 @@ export function SwapReportComponent(container, swapReport) {
       
       .maker-card:hover {
         transform: scale(1.02);
-      }
-      
-      .maker-node:hover {
-        z-index: 10;
       }
       
       /* Tooltip styles */

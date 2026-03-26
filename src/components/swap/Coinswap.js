@@ -939,273 +939,258 @@ export async function CoinswapComponent(container, swapConfig) {
 
   function buildFlowDiagram() {
     const actualMakers = swapData.makers; // Number of actual makers (e.g., 2)
+    const totalNodes = actualMakers + 1;
 
-    function buildFlowDiagram() {
-      const actualMakers = swapData.makers;
-      const radius = 140;
-      const centerX = 200;
-      const centerY = 200;
+    // Dynamic node sizing based on maker count
+    const youHalf = actualMakers <= 5 ? 38 : actualMakers <= 10 ? 30 : 22;
+    const makerHalf = actualMakers <= 5 ? 32 : actualMakers <= 10 ? 25 : 18;
+    const youFont = actualMakers <= 5 ? 22 : actualMakers <= 10 ? 16 : 13;
+    const makerFont = actualMakers <= 5 ? 20 : actualMakers <= 10 ? 14 : 10;
+    const youRx = actualMakers <= 5 ? 14 : 10;
+    const makerRx = actualMakers <= 5 ? 10 : 7;
+    const maxNodeHalf = Math.max(youHalf, makerHalf);
+    const labelPad = youHalf + 62;
 
-      // Same circular layout for BOTH V1 and V2
-      const totalNodes = actualMakers + 1;
-      const angleStep = (2 * Math.PI) / totalNodes;
+    function getRectPoint(distance, width, height) {
+      const halfW = width / 2;
+      const halfH = height / 2;
+      const top = width / 2;
+      const right = height;
+      const bottom = width;
+      const left = height;
+      const perimeter = top + right + bottom + left + top;
+      let remaining = ((distance % perimeter) + perimeter) % perimeter;
 
-      const positions = [];
-      for (let i = 0; i < totalNodes; i++) {
-        const angle = angleStep * i - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        positions.push({ x, y });
+      const linePoint = (x1, y1, x2, y2, travelled, segmentLength) => {
+        const ratio = segmentLength === 0 ? 0 : travelled / segmentLength;
+        return {
+          x: x1 + (x2 - x1) * ratio,
+          y: y1 + (y2 - y1) * ratio,
+        };
+      };
+
+      const segments = [
+        {
+          length: top,
+          point: (travelled) =>
+            linePoint(0, -halfH, halfW, -halfH, travelled, top),
+        },
+        {
+          length: right,
+          point: (travelled) =>
+            linePoint(halfW, -halfH, halfW, halfH, travelled, right),
+        },
+        {
+          length: bottom,
+          point: (travelled) =>
+            linePoint(halfW, halfH, -halfW, halfH, travelled, bottom),
+        },
+        {
+          length: left,
+          point: (travelled) =>
+            linePoint(-halfW, halfH, -halfW, -halfH, travelled, left),
+        },
+        {
+          length: top,
+          point: (travelled) =>
+            linePoint(-halfW, -halfH, 0, -halfH, travelled, top),
+        },
+      ];
+
+      for (const segment of segments) {
+        if (remaining <= segment.length) {
+          return segment.point(remaining);
+        }
+        remaining -= segment.length;
       }
 
-      return `
-    <div class="flex items-center justify-center" style="min-height: 450px;">
-      <svg width="450" height="450" viewBox="0 0 400 400" class="mx-auto">
+      return { x: 0, y: -halfH };
+    }
+
+    function buildAdaptiveLayout() {
+      const gap = 14;
+
+      if (actualMakers <= 4) {
+        const minRadius =
+          (maxNodeHalf + gap) / Math.sin(Math.PI / totalNodes);
+        const radius = Math.max(minRadius, 140);
+        const svgSize = Math.round((radius + labelPad) * 2);
+        const centerX = svgSize / 2;
+        const centerY = svgSize / 2;
+        const angleStep = (2 * Math.PI) / totalNodes;
+        const positions = Array.from({ length: totalNodes }, (_, i) => {
+          const angle = angleStep * i - Math.PI / 2;
+          return {
+            x: centerX + radius * Math.cos(angle),
+            y: centerY + radius * Math.sin(angle),
+          };
+        });
+
+        return {
+          centerX,
+          centerY,
+          svgWidth: svgSize,
+          svgHeight: svgSize,
+          positions,
+          guideMarkup: `<circle cx="${centerX}" cy="${centerY}" r="${radius}"
+                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.6"/>`,
+        };
+      }
+
+      if (actualMakers <= 11) {
+        const safeSin = Math.max(Math.sin(Math.PI / totalNodes), 0.22);
+        const minRadius =
+          (maxNodeHalf + gap + Math.max(0, actualMakers - 5) * 2) / safeSin;
+        const rx = Math.max(minRadius * 1.15, 190 + actualMakers * 10);
+        const ry = Math.max(minRadius * 0.72, 120 + actualMakers * 5);
+        const svgWidth = Math.round(rx * 2 + labelPad * 2 + 30);
+        const svgHeight = Math.round(ry * 2 + labelPad * 2);
+        const centerX = svgWidth / 2;
+        const centerY = svgHeight / 2;
+        const angleStep = (2 * Math.PI) / totalNodes;
+        const positions = Array.from({ length: totalNodes }, (_, i) => {
+          const angle = angleStep * i - Math.PI / 2;
+          return {
+            x: centerX + rx * Math.cos(angle),
+            y: centerY + ry * Math.sin(angle),
+          };
+        });
+
+        return {
+          centerX,
+          centerY,
+          svgWidth,
+          svgHeight,
+          positions,
+          guideMarkup: `<ellipse cx="${centerX}" cy="${centerY}" rx="${rx}" ry="${ry}"
+                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>`,
+        };
+      }
+
+      const isSquareLayout = actualMakers <= 14;
+      const width = isSquareLayout
+        ? Math.max(420, 360 + actualMakers * 16)
+        : Math.max(640, 430 + actualMakers * 24);
+      const height = isSquareLayout
+        ? width
+        : Math.max(320, 250 + Math.min(actualMakers - 14, 8) * 18);
+      const halfW = width / 2;
+      const halfH = height / 2;
+      const perimeter = width * 2 + height * 2;
+      const svgWidth = Math.round(width + labelPad * 2);
+      const svgHeight = Math.round(height + labelPad * 2);
+      const centerX = svgWidth / 2;
+      const centerY = svgHeight / 2;
+      const step = perimeter / totalNodes;
+      const positions = Array.from({ length: totalNodes }, (_, i) => {
+        const point = getRectPoint(step * i, width, height);
+        return {
+          x: centerX + point.x,
+          y: centerY + point.y,
+        };
+      });
+
+      const x = centerX - halfW;
+      const y = centerY - halfH;
+      const guideMarkup = `<rect x="${x}" y="${y}" width="${width}" height="${height}"
+              fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="7 7" opacity="0.6"/>`;
+
+      return {
+        centerX,
+        centerY,
+        svgWidth,
+        svgHeight,
+        positions,
+        guideMarkup,
+      };
+    }
+
+    const { centerX, centerY, svgWidth, svgHeight, positions, guideMarkup } =
+      buildAdaptiveLayout();
+
+    const statusW = Math.max(70, makerHalf * 3.5);
+    const statusHalfW = statusW / 2;
+
+    return `
+    <div class="flex items-center justify-center overflow-auto">
+      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" class="mx-auto max-w-full">
         <defs>
-          ${Array.from({ length: actualMakers + 1 }, (_, i) => {
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-            return `
-              <marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                <polygon points="0 0, 8 3, 0 6" fill="${color}" />
-              </marker>
-            `;
+          ${Array.from({ length: totalNodes }, (_, i) => {
+            const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
+            return `<marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+              <polygon points="0 0, 8 3, 0 6" fill="${color}" opacity="0.85"/>
+            </marker>`;
           }).join('')}
+          <filter id="glow-you" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
         </defs>
-        
+
+        <!-- Guide path -->
+        ${guideMarkup}
+
         <!-- Arrows -->
-        ${positions
-          .map((pos, i) => {
-            const nextPos = positions[(i + 1) % positions.length];
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
+        ${positions.map((pos, i) => {
+          const nextPos = positions[(i + 1) % positions.length];
+          const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
+          const fromHalf = i === 0 ? youHalf : makerHalf;
+          const toHalf = (i + 1) % positions.length === 0 ? youHalf : makerHalf;
+          const dx = nextPos.x - pos.x;
+          const dy = nextPos.y - pos.y;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          const sx = pos.x + (dx / len) * (fromHalf + 4);
+          const sy = pos.y + (dy / len) * (fromHalf + 4);
+          const ex = nextPos.x - (dx / len) * (toHalf + 10);
+          const ey = nextPos.y - (dy / len) * (toHalf + 10);
+          return `<a id="arrow-link-${i}" href="#" target="_blank" rel="noopener noreferrer" title="View transaction">
+            <line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
+                  stroke="${color}" stroke-width="2" marker-end="url(#arrow-${i})" opacity="0.6" class="transition-opacity"/>
+          </a>`;
+        }).join('')}
 
-            const dx = nextPos.x - pos.x;
-            const dy = nextPos.y - pos.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            const offsetStart = i === 0 ? 40 : 35;
-            const offsetEnd = (i + 1) % positions.length === 0 ? 40 : 35;
-
-            const startX = pos.x + (dx / length) * offsetStart;
-            const startY = pos.y + (dy / length) * offsetStart;
-            const endX = nextPos.x - (dx / length) * offsetEnd;
-            const endY = nextPos.y - (dy / length) * offsetEnd;
-
-            return `
-            <line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" 
-                  stroke="${color}" stroke-width="2.5" marker-end="url(#arrow-${i})" opacity="0.6"/>
-          `;
-          })
-          .join('')}
-        
-        <!-- You Node -->
+        <!-- You node -->
         <g id="you-node" style="transition: all 0.3s;">
-          <rect x="${positions[0].x - 38}" y="${positions[0].y - 38}" width="76" height="76" rx="14" 
-                fill="#FF6B35" id="you-rect" style="transition: fill 0.5s;"/>
-          <text x="${positions[0].x}" y="${positions[0].y}" text-anchor="middle" fill="white" font-size="22" font-weight="bold">You</text>
-          <text id="you-state-text" x="${positions[0].x}" y="${positions[0].y + 50}" text-anchor="middle" fill="#D1D5DB" font-size="10">Send</text>
+          <rect x="${(positions[0].x - youHalf).toFixed(1)}" y="${(positions[0].y - youHalf).toFixed(1)}"
+                width="${youHalf * 2}" height="${youHalf * 2}" rx="${youRx}"
+                fill="#FF6B35" id="you-rect" style="transition: fill 0.5s;" filter="url(#glow-you)"/>
+          <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youFont * 0.38).toFixed(1)}"
+                text-anchor="middle" fill="white" font-size="${youFont}" font-weight="bold">You</text>
+          <text id="you-state-text"
+                x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 17).toFixed(1)}"
+                text-anchor="middle" fill="#D1D5DB" font-size="${Math.max(8, youFont - 12)}">Send</text>
+          <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 30).toFixed(1)}"
+                text-anchor="middle" fill="white" font-size="${Math.max(7, youFont - 14)}"
+                font-family="monospace">${(swapData.amount / 100000000).toFixed(4)}</text>
         </g>
-        
+
         <!-- Makers -->
         ${Array.from({ length: actualMakers }, (_, i) => {
           const pos = positions[i + 1];
           const color = makerColors[i % makerColors.length];
-          return `
-            <g id="maker-${i}" style="opacity: 0.3; filter: blur(3px); transition: all 0.3s;">
-              <rect x="${pos.x - 32}" y="${pos.y - 32}" width="64" height="64" rx="10" fill="${color}"/>
-              <text x="${pos.x}" y="${pos.y + 3}" text-anchor="middle" fill="white" font-size="20" font-weight="bold">M${i + 1}</text>
-              
-              ${
-                !isV2
-                  ? `
-                <g id="hop-${i}">
-                  <rect x="${pos.x - 52}" y="${pos.y - 58}" width="104" height="22" rx="5" 
-                        fill="#0f1419" stroke="#374151" stroke-width="1"/>
-                  <text class="hop-status" x="${pos.x}" y="${pos.y - 42}" text-anchor="middle" 
-                        fill="#9CA3AF" font-size="10" font-weight="bold">Pending</text>
-                </g>
-              `
-                  : `
-                <text class="hop-status" x="${pos.x}" y="${pos.y - 45}" text-anchor="middle" 
-                      fill="#6B7280" font-size="10">Off-chain</text>
-              `
-              }
+          return `<g id="maker-${i}" style="opacity: ${i === 0 ? '1' : '0.3'}; filter: ${i === 0 ? 'none' : 'blur(2px)'}; transition: all 0.4s;">
+            <rect x="${(pos.x - makerHalf).toFixed(1)}" y="${(pos.y - makerHalf).toFixed(1)}"
+                  width="${makerHalf * 2}" height="${makerHalf * 2}" rx="${makerRx}" fill="${color}"/>
+            <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerFont * 0.38).toFixed(1)}"
+                  text-anchor="middle" fill="white" font-size="${makerFont}" font-weight="bold">M${i + 1}</text>
+            ${actualMakers <= 12 ? `
+            <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerHalf + 14).toFixed(1)}"
+                  text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(7, makerFont - 3)}">Maker ${i + 1}</text>
+            ` : ''}
+            <g id="hop-${i}">
+              <rect x="${(pos.x - statusHalfW).toFixed(1)}" y="${(pos.y - makerHalf - 26).toFixed(1)}"
+                    width="${statusW.toFixed(1)}" height="20" rx="4"
+                    fill="#0f1419" stroke="#374151" stroke-width="1"/>
+              <text class="hop-status" x="${pos.x.toFixed(1)}" y="${(pos.y - makerHalf - 13).toFixed(1)}"
+                    text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(8, makerFont - 1)}" font-weight="bold">Pending</text>
             </g>
-          `;
+          </g>`;
         }).join('')}
-        
-        ${
-          isV2
-            ? `
-          <!-- V2 Center Label -->
+
+        ${isV2 ? `
           <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">Taproot V2</text>
           <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
-        `
-            : ''
-        }
-      </svg>
-    </div>
-  `;
-    }
-    const radius = 140; // Radius of the circle
-    const centerX = 200;
-    const centerY = 200;
-
-    // Calculate positions for nodes in a circle
-    // Total nodes: You + Makers (no duplicate "You")
-    const totalNodes = actualMakers + 1; // +1 for single "You"
-    const angleStep = (2 * Math.PI) / totalNodes;
-
-    const positions = [];
-    for (let i = 0; i < totalNodes; i++) {
-      const angle = angleStep * i - Math.PI / 2; // Start from top
-      const x = centerX + radius * Math.cos(angle);
-      const y = centerY + radius * Math.sin(angle);
-      positions.push({ x, y });
-    }
-
-    return `
-    <div class="flex items-center justify-center" style="min-height: 450px;">
-      <svg width="450" height="450" viewBox="0 0 400 400" class="mx-auto">
-        <defs>
-          ${Array.from({ length: actualMakers + 1 }, (_, i) => {
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-            return `
-              <marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-                <polygon points="0 0, 8 3, 0 6" fill="${color}" />
-              </marker>
-            `;
-          }).join('')}
-        </defs>
-        
-        <!-- Draw arrows between nodes (including back to You) -->
-        ${positions
-          .map((pos, i) => {
-            const nextPos = positions[(i + 1) % positions.length]; // Wrap around to first node
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-
-            // Calculate arrow direction
-            const dx = nextPos.x - pos.x;
-            const dy = nextPos.y - pos.y;
-            const length = Math.sqrt(dx * dx + dy * dy);
-            const offsetStart = i === 0 ? 40 : 35; // Larger offset for "You" node
-            const offsetEnd = (i + 1) % positions.length === 0 ? 40 : 35;
-
-            const startX = pos.x + (dx / length) * offsetStart;
-            const startY = pos.y + (dy / length) * offsetStart;
-            const endX = nextPos.x - (dx / length) * offsetEnd;
-            const endY = nextPos.y - (dy / length) * offsetEnd;
-
-            return `
-            <a id="arrow-link-${i}" href="#" class="cursor-pointer hover:opacity-80" title="View transaction" onclick="event.preventDefault();">
-              <line 
-                x1="${startX}" y1="${startY}" 
-                x2="${endX}" y2="${endY}" 
-                stroke="${color}" 
-                stroke-width="2.5" 
-                marker-end="url(#arrow-${i})" 
-                opacity="0.6"
-                class="transition-opacity"
-              />
-            </a>
-          `;
-          })
-          .join('')}
-        
-        <!-- You (single node - transitions from Send to Receive) -->
-        <g id="you-node" style="transition: all 0.3s;">
-          <rect 
-            x="${positions[0].x - 38}" y="${positions[0].y - 38}" 
-            width="76" height="76" 
-            rx="14" 
-            fill="#FF6B35" 
-            class="shadow-lg"
-            id="you-rect"
-            style="transition: fill 0.5s;"
-          />
-          <text 
-            x="${positions[0].x}" y="${positions[0].y}" 
-            text-anchor="middle" 
-            fill="white" 
-            font-size="22" 
-            font-weight="bold"
-          >You</text>
-          <text 
-            id="you-state-text"
-            x="${positions[0].x}" y="${positions[0].y + 50}" 
-            text-anchor="middle" 
-            fill="#D1D5DB" 
-            font-size="10"
-          >Send</text>
-          <text 
-            x="${positions[0].x}" y="${positions[0].y + 65}" 
-            text-anchor="middle" 
-            fill="white" 
-            font-size="9" 
-            font-family="monospace"
-          >${(swapData.amount / 100000000).toFixed(4)}</text>
-        </g>
-        
-        <!-- Makers -->
-        ${Array.from({ length: actualMakers }, (_, i) => {
-          const pos = positions[i + 1]; // Offset by 1 because "You" is at position 0
-          const color = makerColors[i % makerColors.length];
-          return `
-            <g id="maker-${i}" style="opacity: ${i === 0 ? '1' : '0.3'}; filter: ${i === 0 ? 'blur(0)' : 'blur(3px)'}; transition: all 0.3s;">
-              <!-- Maker node -->
-              <rect 
-                x="${pos.x - 32}" y="${pos.y - 32}" 
-                width="64" height="64" 
-                rx="10" 
-                fill="${color}" 
-                class="shadow-lg"
-              />
-              <text 
-                x="${pos.x}" y="${pos.x === positions[1].x ? pos.y : pos.y + 3}" 
-                text-anchor="middle" 
-                fill="white" 
-                font-size="20" 
-                font-weight="bold"
-              >M${i + 1}</text>
-              <text 
-                x="${pos.x}" y="${pos.y + 48}" 
-                text-anchor="middle" 
-                fill="#D1D5DB" 
-                font-size="9"
-              >Maker ${i + 1}</text>
-              
-              <!-- Status indicator -->
-              <g id="hop-${i}">
-                <rect 
-                  x="${pos.x - 52}" y="${pos.y - 58}" 
-                  width="104" height="22" 
-                  rx="5" 
-                  fill="#0f1419" 
-                  stroke="#374151" 
-                  stroke-width="1"
-                />
-                <text 
-                  class="hop-status" 
-                  x="${pos.x}" y="${pos.y - 42}" 
-                  text-anchor="middle" 
-                  fill="#9CA3AF" 
-                  font-size="10" 
-                  font-weight="bold"
-                >Pending</text>
-              </g>
-            </g>
-          `;
-        }).join('')}
+        ` : ''}
       </svg>
     </div>
   `;
@@ -1240,76 +1225,67 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   content.innerHTML = `
-    <div class="mb-6">
-      <button id="back-to-swap" class="text-gray-400 hover:text-white mb-4">← Back</button>
-      <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap in Progress</h2>
-      <p id="swap-status-text" class="text-gray-400">Executing swap through ${swapData.makers} makers...</p>
+    <!-- Header -->
+    <div class="mb-4">
+      <button id="back-to-swap" class="text-gray-500 hover:text-gray-300 text-sm flex items-center gap-1 mb-3 transition-colors">← Back</button>
+      <div class="flex items-center gap-3 mb-1">
+        <h2 class="text-2xl font-bold text-[#FF6B35]">Coinswap in Progress</h2>
+        <span class="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
+          <span class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
+          <span class="text-xs text-orange-400 font-medium">Active</span>
+        </span>
+      </div>
+      <p id="swap-status-text" class="text-gray-500 text-sm">Executing swap through ${swapData.makers} makers...</p>
     </div>
 
-    <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+    <!-- Flow diagram -->
+    <div class="bg-[#1a2332] rounded-xl mb-4 overflow-hidden">
       ${buildFlowDiagram()}
     </div>
 
-<div class="grid grid-cols-1 ${isV2 ? 'md:grid-cols-2' : 'md:grid-cols-3'} gap-4 mb-6">
-      <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Progress</h3>
-        <div class="space-y-2 text-sm">
-          <div class="flex justify-between">
-            <span class="text-gray-400">Amount</span>
-            <span class="font-mono text-white">${(swapData.amount / 100000000).toFixed(8)} BTC</span>
-          </div>
-         ${
-           !isV2
-             ? `
-          <div class="flex justify-between">
-            <span class="text-gray-400">Hops</span>
-            <span class="text-cyan-400">${swapData.hops}</span>
-          </div>
-          `
-             : `
-          <div class="flex justify-between">
-            <span class="text-gray-400">Protocol</span>
-            <span class="text-cyan-400">Taproot V2</span>
-          </div>
-          `
-         }
-          <div class="flex justify-between">
-            <span class="text-gray-400">Time</span>
-            <span id="elapsed-time" class="text-yellow-400">0:00</span>
-          </div>
+    <!-- Stats row -->
+    <div class="grid grid-cols-${isV2 ? '2' : '3'} gap-3 mb-4">
+      <div class="bg-[#1a2332] rounded-xl p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Amount</p>
+        <p class="font-mono text-white font-semibold">${(swapData.amount / 100000000).toFixed(8)} BTC</p>
+        ${!isV2
+          ? `<p class="text-xs text-gray-500 mt-2">Hops: <span class="text-cyan-400">${swapData.hops}</span></p>`
+          : `<p class="text-xs text-cyan-400 mt-2">Taproot V2 (MuSig2)</p>`
+        }
+      </div>
+
+      ${!isV2 ? `
+      <div class="bg-[#1a2332] rounded-xl p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Hop Transactions</p>
+        <div id="transaction-list" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
+      </div>
+      ` : ''}
+
+      <div class="bg-[#1a2332] rounded-xl p-4">
+        <div class="flex items-center justify-between mb-3">
+          <p class="text-xs text-gray-500 uppercase tracking-wide">Elapsed</p>
+          <span id="elapsed-time" class="font-mono text-yellow-400 font-bold text-xl">0:00</span>
         </div>
-      </div>
-
-      ${
-        !isV2
-          ? `
-      <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Hop Transactions</h3>
-        <div id="transaction-list" class="space-y-2 max-h-48 overflow-y-auto"></div>
-      </div>
-      `
-          : ''
-      }
-
-      <div class="bg-[#1a2332] rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Status</h3>
         <div class="space-y-2">
-          <div class="p-2 bg-blue-500/10 border border-blue-500/30 rounded text-xs text-blue-400">
-            ℹ️ Do not close window
+          <div class="flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
+            <span class="text-blue-400">Do not close window</span>
           </div>
-          <div class="p-2 bg-purple-500/10 border border-purple-500/30 rounded text-xs text-purple-400">
-            🔒 Funds protected by HTLCs
+          <div class="flex items-center gap-2 text-xs">
+            <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
+            <span class="text-purple-400">Funds protected by HTLCs</span>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="bg-[#1a2332] rounded-lg p-4">
-      <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Activity Log</h3>
-      <div id="log-container" class="bg-[#0f1419] rounded p-3 h-40 overflow-y-auto font-mono text-xs"></div>
+    <!-- Activity log -->
+    <div class="bg-[#1a2332] rounded-xl p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Activity Log</p>
+      <div id="log-container" class="bg-[#0a0f16] rounded-lg p-3 h-36 overflow-y-auto font-mono text-xs"></div>
     </div>
 
-    <button id="complete-button" class="hidden w-full mt-6 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-lg">
+    <button id="complete-button" class="hidden w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-colors">
       View Swap Report →
     </button>
   `;
