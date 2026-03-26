@@ -53,6 +53,7 @@ export async function WalletComponent(container) {
   async function fetchBalance() {
     try {
       const data = await window.api.taker.getBalance();
+      console.log('💳 Wallet balance API response:', data);
 
       if (data.success) {
         return data.balance;
@@ -169,6 +170,7 @@ export async function WalletComponent(container) {
     try {
       // Use cached data if requested
       if (useCache && cached && cached.balance) {
+        console.log('💳 Wallet balance from cache:', cached.balance);
         content.querySelector('#regular-balance').textContent =
           satsToBtc(cached.balance.regular) + ' BTC';
         content.querySelector('#swap-balance').textContent =
@@ -183,6 +185,7 @@ export async function WalletComponent(container) {
 
       // Fetch fresh data
       const balance = await fetchBalance();
+      console.log('💳 Wallet balance used by UI:', balance);
 
       content.querySelector('#regular-balance').textContent =
         satsToBtc(balance.regular) + ' BTC';

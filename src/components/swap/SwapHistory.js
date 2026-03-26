@@ -130,6 +130,97 @@ export async function loadSwapHistory() {
   } catch (error) {
     console.error('Failed to load swap history:', error);
   }
+  return swapHistory;
+}
+
+export function summarizeSwapHistory(history) {
+  const totalSwaps = history.length;
+  const totalAmount = history.reduce((sum, s) => sum + (s.amount || 0), 0);
+  const totalFees = history.reduce((sum, s) => sum + (s.totalFee || 0), 0);
+  const avgFeePaid = totalSwaps > 0 ? Math.round(totalFees / totalSwaps) : 0;
+  return { totalSwaps, totalAmount, totalFees, avgFeePaid };
+}
+
+function satsToBtc(sats) {
+  if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
+  return (sats / 100000000).toFixed(8);
+}
+
+export function buildSwapHistoryMarkup(history) {
+  if (history.length === 0) {
+    return `
+      <div class="text-center py-16">
+        <div class="text-6xl mb-4">🔄</div>
+        <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
+        <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="space-y-4">
+      ${history
+        .map((swap) => {
+          const btcAmount = satsToBtc(swap.amount);
+          const outputBtc = satsToBtc(swap.totalOutputAmount);
+          const timeAgo = formatRelativeTime(swap.completedAt);
+          const dateStr = formatDate(swap.completedAt);
+          const duration = formatDuration(swap.durationSeconds);
+
+          return `
+          <div class="swap-history-row bg-[#1a2332] hover:bg-[#242d3d] rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-[#FF6B35]/30" data-swap-id="${swap.id}">
+            <div class="flex items-center gap-4">
+              <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                <span class="text-2xl">✓</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-3 mb-1">
+                  <span class="text-white font-semibold text-lg">Coinswap</span>
+                  <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">Completed</span>
+                  <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">${swap.hops} hops</span>
+                </div>
+                <div class="flex items-center gap-4 text-sm">
+                  <span class="text-gray-500">${timeAgo}</span>
+                  <span class="text-gray-600">•</span>
+                  <span class="text-gray-500">${dateStr}</span>
+                  <span class="text-gray-600">•</span>
+                  <span class="text-gray-500">${duration}</span>
+                </div>
+              </div>
+              <div class="text-right flex-shrink-0">
+                <div class="text-lg font-mono text-green-400">${btcAmount} BTC</div>
+                <div class="text-xs text-gray-500">${swap.amount.toLocaleString()} sats</div>
+              </div>
+              <div class="text-gray-600 flex-shrink-0">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+              </div>
+            </div>
+            <div class="mt-4 pt-4 border-t border-gray-800 grid grid-cols-4 gap-4 text-sm">
+              <div>
+                <span class="text-gray-500">Makers</span>
+                <p class="text-white font-mono">${swap.makersCount}</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Fee</span>
+                <p class="text-yellow-400 font-mono">${swap.feePercentage?.toFixed(2) || '0.00'}%</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Total Fee</span>
+                <p class="text-yellow-400 font-mono">${(swap.totalFee || 0).toLocaleString()} sats</p>
+              </div>
+              <div>
+                <span class="text-gray-500">Output</span>
+                <p class="text-green-400 font-mono">${outputBtc} BTC</p>
+              </div>
+            </div>
+          </div>
+        `;
+        })
+        .join('')}
+    </div>
+  `;
 }
 
 export async function SwapHistoryComponent(container) {
