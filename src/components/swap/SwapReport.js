@@ -41,6 +41,21 @@ export function SwapReportComponent(container, swapReport) {
     const normalized = Number(value);
     return Number.isFinite(normalized) ? normalized : fallback;
   };
+
+  const flattenTxidEntries = (value) => {
+    if (Array.isArray(value)) {
+      return value.flatMap((entry) => flattenTxidEntries(entry));
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+      return [value.trim()];
+    }
+
+    return [];
+  };
+
+  const dedupeTxids = (value) => [...new Set(flattenTxidEntries(value))];
+
   const nestedReport = swapReport.report || {};
 
   const rawTotalMakerFees = toNumber(
@@ -93,11 +108,14 @@ export function SwapReportComponent(container, swapReport) {
   const normalizedFundingTxids =
     swapReport.fundingTxidsByHop ||
     swapReport.funding_txids_by_hop ||
+    swapReport.fundingTxids ||
+    swapReport.funding_txids ||
     nestedReport.fundingTxidsByHop ||
     nestedReport.funding_txids_by_hop ||
     nestedReport.fundingTxids ||
     nestedReport.funding_txids ||
     [];
+  const flattenedFundingTxids = dedupeTxids(normalizedFundingTxids);
   const normalizedTargetAmount = toNumber(
     swapReport.targetAmount ??
       swapReport.target_amount ??
@@ -119,7 +137,7 @@ export function SwapReportComponent(container, swapReport) {
       swapReport.total_funding_txs ??
       nestedReport.totalFundingTxs ??
       nestedReport.total_funding_txs,
-    Array.isArray(normalizedFundingTxids) ? normalizedFundingTxids.length : 0
+    flattenedFundingTxids.length
   );
   const normalizedFeePercentage = toNumber(
     swapReport.feePercentage ??
@@ -133,6 +151,35 @@ export function SwapReportComponent(container, swapReport) {
     swapReport.protocol || nestedReport.protocol,
     swapReport.isTaproot || nestedReport.isTaproot || false
   );
+  const hasExplicitProtocolMetadata =
+    Boolean(swapReport.protocol || nestedReport.protocol) ||
+    typeof swapReport.isTaproot === 'boolean' ||
+    typeof nestedReport.isTaproot === 'boolean';
+  const outgoingContractTxid =
+    swapReport.outgoingContractTxid ||
+    swapReport.outgoing_contract_txid ||
+    nestedReport.outgoingContractTxid ||
+    nestedReport.outgoing_contract_txid ||
+    null;
+  const incomingContractTxid =
+    swapReport.incomingContractTxid ||
+    swapReport.incoming_contract_txid ||
+    nestedReport.incomingContractTxid ||
+    nestedReport.incoming_contract_txid ||
+    null;
+  const recoveryTxids = dedupeTxids(
+    swapReport.recoveryTxids ||
+      swapReport.recovery_txids ||
+      nestedReport.recoveryTxids ||
+      nestedReport.recovery_txids ||
+      []
+  );
+  const sweepTxid =
+    swapReport.sweep_txid ||
+    swapReport.sweepTxid ||
+    swapReport.taker_sweep_txid ||
+    swapReport.takerSweepTxid ||
+    null;
 
   const report = {
     swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
@@ -190,6 +237,7 @@ export function SwapReportComponent(container, swapReport) {
       [],
     totalFundingTxs: normalizedTotalFundingTxs,
     fundingTxidsByHop: normalizedFundingTxids,
+    fundingTxids: flattenedFundingTxids,
     totalFee: rawTotalFee,
     totalMakerFees: rawTotalMakerFees,
     miningFee: normalizedMiningFee,
@@ -220,13 +268,8 @@ export function SwapReportComponent(container, swapReport) {
       nestedReport.outputSwapUtxos ||
       nestedReport.output_swap_utxos ||
       [],
-    sweepTxid:
-      swapReport.sweep_txid ||
-      swapReport.sweepTxid ||
-      swapReport.taker_sweep_txid ||
-      swapReport.takerSweepTxid ||
-      null,
-    protocol,
+    sweepTxid,
+    protocol: hasExplicitProtocolMetadata ? protocol : null,
     isTaproot:
       protocol === 'Taproot' ||
       swapReport.isTaproot ||
@@ -235,11 +278,12 @@ export function SwapReportComponent(container, swapReport) {
     protocolVersion:
       swapReport.protocolVersion ||
       (protocol === 'Taproot' ? 2 : 1),
+    outgoingContractTxid,
+    incomingContractTxid,
+    recoveryTxids,
   };
 
   console.log('📊 Normalized report:', report);
-
-  const isV2Swap = report.protocol === 'Taproot';
 
   // Helper functions
   function satsToBtc(sats) {
@@ -407,167 +451,77 @@ export function SwapReportComponent(container, swapReport) {
   }
 
   const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const transactionArtifacts = [
+    {
+      label: 'Outgoing Contract',
+      txid: report.outgoingContractTxid,
+      accent: '#FF6B35',
+      description: 'Contract transaction recorded on the outgoing side.',
+    },
+    {
+      label: 'Incoming Contract',
+      txid: report.incomingContractTxid,
+      accent: '#10B981',
+      description: 'Contract transaction recorded on the incoming side.',
+    },
+    ...report.fundingTxids.map((txid, index) => ({
+      label: `Funding Transaction ${index + 1}`,
+      txid,
+      accent: makerColors[index % makerColors.length],
+      description: 'Funding transaction captured directly from the saved report.',
+    })),
+    ...report.recoveryTxids.map((txid, index) => ({
+      label: `Recovery Transaction ${index + 1}`,
+      txid,
+      accent: '#F59E0B',
+      description: 'Recovery-related transaction included by the backend.',
+    })),
+    ...(report.sweepTxid
+      ? [
+          {
+            label: 'Final Sweep',
+            txid: report.sweepTxid,
+            accent: '#06B6D4',
+            description: 'Final sweep transaction when present in the report.',
+          },
+        ]
+      : []),
+  ].filter((artifact) => artifact.txid);
+  report.transactionArtifacts = transactionArtifacts;
+  report.artifactsCount = transactionArtifacts.length;
 
-  // Build funding transactions HTML
-  function buildFundingTxsHtml() {
-    if (!report.fundingTxidsByHop || report.fundingTxidsByHop.length === 0) {
-      return '<p class="text-gray-500 text-sm">No transaction data available</p>';
-    }
-
-    if (isV2Swap) {
-      // Extract txids from fundingTxidsByHop
-      const allTxids = report.fundingTxidsByHop.map((arr) =>
-        Array.isArray(arr) ? arr[0] : arr
-      );
-
-      // Outgoing: Taker is [0], Makers are [1], [2], [3]
-      const takerOutgoing = allTxids[0];
-      const makersOutgoing = allTxids.slice(1); // [1, 2, 3]
-
-      // Incoming: Makers receive [0], [1], [2], Taker receives [3]
-      const makersIncoming = allTxids.slice(0, -1); // [0, 1, 2]
-      const takerIncoming = allTxids[allTxids.length - 1]; // [3]
-
+  function buildTransactionArtifactsHtml() {
+    if (!report.transactionArtifacts || report.transactionArtifacts.length === 0) {
       return `
-    <!-- Outgoing Contracts Section -->
-    <div class="mb-6">
-      <h4 class="text-md font-semibold text-[#FF6B35] mb-3 flex items-center gap-2">
-        <span>📤</span> Outgoing Contracts
-      </h4>
-      
-      <!-- Taker's Outgoing -->
-      <div class="bg-[#0f1419] rounded-lg p-4 mb-3 border-l-4 border-[#FF6B35]">
-        <p class="text-sm font-semibold mb-2 text-[#FF6B35]">
-          Taker (You)
-        </p>
-        <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
-          <p class="font-mono text-xs text-gray-300 flex-1">
-            ${takerOutgoing ? truncateTxid(takerOutgoing) : 'N/A'}
+        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800">
+          <p class="text-gray-400 text-sm">
+            No transaction IDs were embedded in this report file. The report still includes makers, fees, and UTXO outputs below.
           </p>
-          <div class="flex gap-2">
-            <button class="copy-txid-btn text-gray-400 hover:text-white text-sm" 
-                    data-txid="${takerOutgoing || ''}" ${!takerOutgoing ? 'disabled' : ''}>📋</button>
-            <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm" 
-                    data-txid="${takerOutgoing || ''}" ${!takerOutgoing ? 'disabled' : ''}>🔍</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Makers' Outgoing Contracts -->
-      ${report.makerAddresses
-        .map((addr, idx) => {
-          const color = makerColors[idx % makerColors.length];
-          const txid = makersOutgoing[idx] || 'N/A';
-
-          return `
-          <div class="bg-[#0f1419] rounded-lg p-4 mb-3 border-l-4" style="border-color: ${color}">
-            <p class="text-sm font-semibold mb-2" style="color: ${color}">
-              Maker ${idx + 1}
-            </p>
-            <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
-              <p class="font-mono text-xs text-gray-300 flex-1">
-                ${typeof txid === 'string' ? truncateTxid(txid) : 'N/A'}
-              </p>
-              <div class="flex gap-2">
-                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm" 
-                        data-txid="${txid}" ${txid === 'N/A' ? 'disabled' : ''}>📋</button>
-                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm" 
-                        data-txid="${txid}" ${txid === 'N/A' ? 'disabled' : ''}>🔍</button>
-              </div>
-            </div>
-          </div>
-        `;
-        })
-        .join('')}
-    </div>
-
-    <!-- Incoming Contracts Section -->
-    <div>
-      <h4 class="text-md font-semibold text-[#10B981] mb-3 flex items-center gap-2">
-        <span>📥</span> Incoming Contracts
-      </h4>
-      
-      <!-- Makers' Incoming Contracts -->
-      ${report.makerAddresses
-        .map((addr, idx) => {
-          const color = makerColors[idx % makerColors.length];
-          const txid = makersIncoming[idx] || 'N/A';
-
-          return `
-          <div class="bg-[#0f1419] rounded-lg p-4 mb-3 border-l-4" style="border-color: ${color}">
-            <p class="text-sm font-semibold mb-2" style="color: ${color}">
-              Maker ${idx + 1}
-            </p>
-            <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
-              <p class="font-mono text-xs text-gray-300 flex-1">
-                ${typeof txid === 'string' ? truncateTxid(txid) : 'N/A'}
-              </p>
-              <div class="flex gap-2">
-                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm" 
-                        data-txid="${txid}" ${txid === 'N/A' ? 'disabled' : ''}>📋</button>
-                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm" 
-                        data-txid="${txid}" ${txid === 'N/A' ? 'disabled' : ''}>🔍</button>
-              </div>
-            </div>
-          </div>
-        `;
-        })
-        .join('')}
-
-      <!-- Taker's Incoming (Sweep) -->
-      <div class="bg-[#0f1419] rounded-lg p-4 border-l-4 border-[#10B981]">
-        <p class="text-sm font-semibold mb-2 text-[#10B981]">
-          Taker (You) - Final Sweep
-        </p>
-        <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
-          <p class="font-mono text-xs text-gray-300 flex-1">
-            ${takerIncoming ? truncateTxid(takerIncoming) : 'N/A'}
-          </p>
-          <div class="flex gap-2">
-            <button class="copy-txid-btn text-gray-400 hover:text-white text-sm" 
-                    data-txid="${takerIncoming || ''}" ${!takerIncoming ? 'disabled' : ''}>📋</button>
-            <button class="view-txid-btn text-gray-400 hover:text-[#10B981] text-sm" 
-                    data-txid="${takerIncoming || ''}" ${!takerIncoming ? 'disabled' : ''}>🔍</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-    }
-
-    // ✅ V1 PROTOCOL: Show all funding transactions
-
-    return report.fundingTxidsByHop
-      .map((txids, hopIdx) => {
-        const txidArray = Array.isArray(txids) ? txids : [txids];
-        const color = makerColors[hopIdx % makerColors.length];
-
-        return `
-        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800 hover:border-[#FF6B35]/50 transition-colors">
-          <p class="text-sm font-semibold text-lg mb-2" style="color: ${color}">
-            <span class="inline-block w-6 h-6 rounded-full text-center leading-6 text-xs" 
-                  style="background: ${color}20; border: 2px solid ${color}">
-              ${hopIdx + 1}
-            </span>
-            Hop ${hopIdx + 1}
-          </p>
-          ${txidArray
-            .map(
-              (txid) => `
-            <div class="flex items-center justify-between hover:bg-[#1a2332] p-2 rounded transition-colors">
-              <p class="font-mono text-xs text-gray-300 flex-1">${truncateTxid(txid)}</p>
-              <div class="flex gap-2">
-                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors" 
-                        data-txid="${txid}" title="Copy">📋</button>
-                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors" 
-                        data-txid="${txid}" title="View on Explorer">🔍</button>
-              </div>
-            </div>
-          `
-            )
-            .join('')}
         </div>
       `;
+    }
+
+    return report.transactionArtifacts
+      .map((artifact) => {
+        return `
+          <div class="bg-[#0f1419] rounded-lg p-4 border-l-4" style="border-color: ${artifact.accent}">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold mb-1" style="color: ${artifact.accent}">
+                  ${artifact.label}
+                </p>
+                <p class="text-xs text-gray-500 mb-2">${artifact.description}</p>
+                <p class="font-mono text-xs text-gray-300 break-all">${artifact.txid}</p>
+              </div>
+              <div class="flex gap-2 shrink-0">
+                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors"
+                        data-txid="${artifact.txid}" title="Copy">📋</button>
+                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors"
+                        data-txid="${artifact.txid}" title="View on Explorer">🔍</button>
+              </div>
+            </div>
+          </div>
+        `;
       })
       .join('');
   }
@@ -601,41 +555,15 @@ export function SwapReportComponent(container, swapReport) {
       .join('');
   }
 
-  function getProtocolInfoLines() {
-    if (report.protocol === 'Unified') {
-      return `
-        <div>
-          <p class="mb-1"><strong>Compatibility:</strong> Treated as compatible with both app modes.</p>
-          <p><strong>Current backend behavior:</strong> Native Unified handling is still being validated.</p>
-        </div>
-        <div>
-          <p class="mb-1"><strong>Anonymity Set:</strong> Determined by the contracts actually used in the swap.</p>
-          <p><strong>Display note:</strong> Shown distinctly so mixed maker markets are easier to inspect.</p>
-        </div>
-      `;
-    }
-
-    if (!isV2Swap) {
-      return `
-        <div>
-          <p class="mb-1"><strong>Compatibility:</strong> Uses Legacy P2WSH swap contracts.</p>
-          <p><strong>Tradeoff:</strong> Wider legacy maker compatibility with higher on-chain footprint.</p>
-        </div>
-        <div>
-          <p class="mb-1"><strong>Anonymity Set:</strong> Legacy P2WSH swap outputs.</p>
-          <p><strong>Routing:</strong> Privacy comes from the maker hop circuit rather than direct links.</p>
-        </div>
-      `;
-    }
-
+  function getReportInfoLines() {
     return `
       <div>
-        <p class="mb-1"><strong>Save Money:</strong> Lesser Fees than V1 swaps.</p>
-        <p><strong>Efficient:</strong> Combined tapscript with Musig2 + HTLC leaves.</p>
+        <p class="mb-1"><strong>Rendering Mode:</strong> This report is built from whichever fields are actually present in the saved JSON.</p>
+        <p><strong>Artifacts:</strong> Contract, funding, recovery, and sweep transaction IDs are shown whenever the backend included them.</p>
       </div>
       <div>
-        <p class="mb-1"><strong>Anonymity Set — Legacy:</strong> All P2WSH UTXOs.</p>
-        <p><strong>Anonymity Set — Taproot:</strong> All Taproot Single Sig UTXOs.</p>
+        <p class="mb-1"><strong>Makers Recorded:</strong> ${report.makersCount || report.makerAddresses.length}</p>
+        <p><strong>Protocol Metadata:</strong> ${report.protocol || 'Not explicitly included in this report file.'}</p>
       </div>
     `;
   }
@@ -926,10 +854,8 @@ export function SwapReportComponent(container, swapReport) {
             </g>`;
           }).join('')}
 
-          ${isV2Swap ? `
-            <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">${report.protocol}</text>
-            <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
-          ` : ''}
+          <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">Private Route</text>
+          <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">${actualMakers} makers</text>
         </svg>
       </div>
     `;
@@ -1075,15 +1001,14 @@ export function SwapReportComponent(container, swapReport) {
           
         
           
-          <!-- Technical Explanation Box -->
-<div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-  <h4 class="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
-    <span>ℹ️</span> Protocol Details
-  </h4>
-  <div class="text-xs text-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4">
-    ${getProtocolInfoLines()}
-  </div>
-</div>
+          <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+            <h4 class="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
+              <span>ℹ️</span> Report Summary
+            </h4>
+            <div class="text-xs text-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${getReportInfoLines()}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1109,24 +1034,24 @@ export function SwapReportComponent(container, swapReport) {
 
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-3">
           <div class="flex items-center justify-between mb-2">
-<p class="text-sm text-white">${isV2Swap ? 'On-Chain TXs' : 'Privacy Hops'}</p>
+<p class="text-sm text-white">On-Chain Artifacts</p>
             <span class="text-2xl">🔗</span>
           </div>
          <p class="text-2xl font-bold text-purple-400">
-  ${report.totalFundingTxs}
+  ${report.artifactsCount}
 </p>
 <p class="text-xs text-gray-400 mt-1">
-  ${isV2Swap ? 'Funding transactions observed' : `${report.makersCount} makers used`}
+  Transaction IDs extracted from this report
 </p>
         </div>
 
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
           <div class="flex items-center justify-between mb-2">
-            <p class="text-sm text-white">Protocol</p>
-            <span class="text-2xl">${report.protocol === 'Taproot' ? '⚡' : report.protocol === 'Unified' ? '◈' : '🔒'}</span>
+            <p class="text-sm text-white">Swap Partners</p>
+            <span class="text-2xl">🤝</span>
           </div>
-          <p class="text-2xl font-bold text-yellow-400">${report.protocol}</p>
-          <p class="text-xs text-gray-400 mt-1">Rendered from normalized report data</p>
+          <p class="text-2xl font-bold text-yellow-400">${report.makersCount || report.makerAddresses.length}</p>
+          <p class="text-xs text-gray-400 mt-1">Makers recorded in the report</p>
         </div>
 
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
@@ -1145,13 +1070,13 @@ export function SwapReportComponent(container, swapReport) {
         <!-- Transactions & Makers -->
         <div class="col-span-2 space-y-6">
           
-          <!-- Funding Transactions -->
+          <!-- Transaction Artifacts -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
             <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              <span>📝</span> Funding Transactions
+              <span>📝</span> Transaction Artifacts
             </h3>
             <div class="space-y-3">
-              ${buildFundingTxsHtml()}
+              ${buildTransactionArtifactsHtml()}
             </div>
           </div>
 

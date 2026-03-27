@@ -44,11 +44,22 @@ const path = require('path');
     while (Date.now() < timeoutAt) {
       await new Promise((resolve) => setTimeout(resolve, 500));
 
-      if (!fs.existsSync(offerbookPath)) {
+      let stat;
+
+      try {
+        stat = fs.statSync(offerbookPath);
+      } catch (error) {
+        if (error.code === 'ENOENT') {
+          continue;
+        }
+
+        throw error;
+      }
+
+      if (!stat) {
         continue;
       }
 
-      const stat = fs.statSync(offerbookPath);
       if (stat.mtimeMs <= initialMtime) {
         continue;
       }

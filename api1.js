@@ -194,6 +194,60 @@ function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
+function normalizeSwapProtocol(value, fallbackIsTaproot = false) {
+  switch (value) {
+    case 'v2':
+    case 'Taproot':
+      return 'Taproot';
+    case 'Unified':
+      return 'Unified';
+    case 'v1':
+    case 'Legacy':
+    case 'Legacy P2WSH':
+      return 'Legacy';
+    default:
+      return fallbackIsTaproot ? 'Taproot' : 'Legacy';
+  }
+}
+
+function inferTaprootFromReport(rawReport = {}) {
+  const nestedReport = rawReport.report || rawReport;
+  const rawProtocol = rawReport.protocol || nestedReport.protocol || null;
+  const explicitIsTaproot =
+    rawReport.isTaproot ?? nestedReport.isTaproot ?? null;
+
+  if (explicitIsTaproot === true) return true;
+  if (explicitIsTaproot === false) return false;
+
+  const explicitProtocol = rawProtocol
+    ? normalizeSwapProtocol(rawProtocol, false)
+    : null;
+
+  if (explicitProtocol === 'Taproot') return true;
+  if (explicitProtocol === 'Legacy') return false;
+
+  const protocolVersion =
+    rawReport.protocolVersion ||
+    rawReport.protocol_version ||
+    nestedReport.protocolVersion ||
+    nestedReport.protocol_version ||
+    null;
+  if (Number(protocolVersion) === 2) return true;
+  if (Number(protocolVersion) === 1) return false;
+
+  const outputSwapUtxos =
+    rawReport.outputSwapUtxos ||
+    rawReport.output_swap_utxos ||
+    nestedReport.outputSwapUtxos ||
+    nestedReport.output_swap_utxos ||
+    [];
+
+  return outputSwapUtxos.some((entry) => {
+    const address = Array.isArray(entry) ? String(entry[1] || '') : '';
+    return /^(bc1p|tb1p|bcrt1p)/i.test(address);
+  });
+}
+
 function buildSwapReportRecord(filePath, rawReport) {
   const fileName = path.basename(filePath, '.json');
   const nativeSwapId =
@@ -216,9 +270,13 @@ function buildSwapReportRecord(filePath, rawReport) {
     null;
   const normalizedSwapId = appSwapId || nativeSwapId || fileName;
   const nestedReport = rawReport.report ? rawReport.report : rawReport;
-  const isCoreReport = !filePath.includes(
-    `${path.sep}swap_reports${path.sep}${getCurrentWalletName()}${path.sep}`
+  const normalizedFilePath = path.normalize(String(filePath || ''));
+  const escapedSep = path.sep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const walletScopedReportPattern = new RegExp(
+    `${escapedSep}swap_reports${escapedSep}[^${escapedSep}]+${escapedSep}`
   );
+  const isWalletScopedReport = walletScopedReportPattern.test(normalizedFilePath);
+  const isCoreReport = !isWalletScopedReport;
   const rawStatus =
     rawReport.status || rawReport.report?.status || (isCoreReport ? 'Success' : null);
   const normalizedStatus =
@@ -239,6 +297,17 @@ function buildSwapReportRecord(filePath, rawReport) {
     Number.isFinite(Number(rawCompletedAt)) && Number(rawCompletedAt) < 1e12
       ? Number(rawCompletedAt) * 1000
       : rawCompletedAt;
+  const isTaproot = inferTaprootFromReport(rawReport);
+  const protocol = normalizeSwapProtocol(
+    rawReport.protocol || nestedReport.protocol,
+    isTaproot
+  );
+  const protocolVersion =
+    rawReport.protocolVersion ||
+    rawReport.protocol_version ||
+    nestedReport.protocolVersion ||
+    nestedReport.protocol_version ||
+    (protocol === 'Taproot' ? 2 : 1);
 
   return {
     ...rawReport,
@@ -251,6 +320,9 @@ function buildSwapReportRecord(filePath, rawReport) {
     filePath,
     fileName,
     isCoreReport,
+    protocol,
+    isTaproot,
+    protocolVersion,
   };
 }
 
@@ -1495,35 +1567,39 @@ function registerCoinswapHandlers() {
         worker.on('message', (msg) => {
           if (msg.type === 'status') {
             const existingSwap = api1State.activeSwaps.get(swapId) || {};
+            const normalizedProtocol = normalizeSwapProtocol(
+              msg.protocol || existingSwap.protocol || protocol,
+              existingSwap.isTaproot || protocol === 'v2'
+            );
             api1State.activeSwaps.set(swapId, {
               ...existingSwap,
               status: msg.status || existingSwap.status,
               nativeSwapId: msg.nativeSwapId || existingSwap.nativeSwapId,
-              protocol: msg.protocol || existingSwap.protocol || protocol,
-              isTaproot:
-                (msg.protocol || existingSwap.protocol || protocol) === 'v2',
-              protocolVersion:
-                (msg.protocol || existingSwap.protocol || protocol) === 'v2'
-                  ? 2
-                  : 1,
+              protocol: normalizedProtocol,
+              isTaproot: normalizedProtocol === 'Taproot',
+              protocolVersion: normalizedProtocol === 'Taproot' ? 2 : 1,
             });
           } else if (msg.type === 'complete') {
             const existingSwap = api1State.activeSwaps.get(swapId);
+            const normalizedProtocol = normalizeSwapProtocol(
+              msg.protocol || msg.report?.protocol || existingSwap?.protocol || protocol,
+              existingSwap?.isTaproot || protocol === 'v2'
+            );
             const swapData = {
               ...existingSwap,
               status: 'completed',
               report: msg.report,
-              protocol: msg.protocol || protocol,
-              isTaproot: (msg.protocol || protocol) === 'v2',
-              protocolVersion: protocol === 'v2' ? 2 : 1,
-          nativeSwapId: msg.nativeSwapId || existingSwap?.nativeSwapId,
-          appSwapId: msg.appSwapId || swapId,
-          completedAt: Date.now(),
-        };
-        api1State.activeSwaps.set(swapId, swapData);
-      } else if (msg.type === 'error') {
-        const existingSwap = api1State.activeSwaps.get(swapId);
-        const swapData = {
+              protocol: normalizedProtocol,
+              isTaproot: normalizedProtocol === 'Taproot',
+              protocolVersion: normalizedProtocol === 'Taproot' ? 2 : 1,
+              nativeSwapId: msg.nativeSwapId || existingSwap?.nativeSwapId,
+              appSwapId: msg.appSwapId || swapId,
+              completedAt: Date.now(),
+            };
+            api1State.activeSwaps.set(swapId, swapData);
+          } else if (msg.type === 'error') {
+            const existingSwap = api1State.activeSwaps.get(swapId);
+            const swapData = {
               ...existingSwap,
               status: 'failed',
               error: msg.error,

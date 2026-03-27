@@ -151,9 +151,13 @@ export async function SwapComponent(container) {
   let totalBalance = 0;
   const btcPrice = 50000;
 
+  function getMakerProtocol(makerOrItem, offer = makerOrItem?.offer) {
+    return makerOrItem?.protocol || (offer?.tweakablePoint ? 'Taproot' : 'Legacy');
+  }
+
   function filterMakersByProtocol(makers) {
     return makers.filter((maker) => {
-      const makerProtocol = maker.protocol || 'Legacy';
+      const makerProtocol = getMakerProtocol(maker);
       // Unified treated as compatible but not yet a user-selectable mode.
       if (makerProtocol === 'Unified') return true;
       return currentProtocol === 'v2'
@@ -255,9 +259,7 @@ export async function SwapComponent(container) {
                 baseFee: offer.baseFee || 0,
                 volumeFeePct: offer.amountRelativeFeePct || 0,
                 timeFeePct: offer.timeRelativeFeePct || 0,
-                protocol:
-                  item.protocol ||
-                  (offer.tweakablePoint ? 'Taproot' : 'Legacy'),
+                protocol: getMakerProtocol(item, offer),
                 index: index,
               };
             })
@@ -1275,7 +1277,7 @@ export async function SwapComponent(container) {
 
           // Filter makers by protocol
           const compatibleMakers = goodMakers.filter((maker) => {
-            const makerProtocol = maker.protocol || 'Legacy';
+            const makerProtocol = getMakerProtocol(maker);
             // Unified treated as compatible but not yet a user-selectable mode.
             if (makerProtocol === 'Unified') return true;
             return protocol === 'v2'

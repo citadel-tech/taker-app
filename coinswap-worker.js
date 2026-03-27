@@ -12,7 +12,9 @@ const { parentPort, workerData } = require('worker_threads');
 
     const { amount, makerCount, outpoints, config } = workerData;
     const protocol = config.protocol || 'v1';
-    const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
+    const normalizedProtocol = protocol === 'v2' ? 'Taproot' : 'Legacy';
+    const protocolName =
+      normalizedProtocol === 'Taproot' ? 'Taproot (V2)' : 'P2WSH (V1)';
 
     console.log(`🔧 Coinswap worker starting with ${protocolName} protocol`);
 
@@ -48,11 +50,11 @@ const { parentPort, workerData } = require('worker_threads');
     parentPort.postMessage({
       type: 'status',
       status: 'in_progress',
-      protocol: config.protocol,
+      protocol: normalizedProtocol || config.protocol,
     });
 
     const swapParams = {
-      protocol: protocol === 'v2' ? 'Taproot' : 'Legacy',
+      protocol: normalizedProtocol,
       sendAmount: amount,
       makerCount: makerCount,
       manuallySelectedOutpoints: outpoints || undefined,
@@ -67,7 +69,7 @@ const { parentPort, workerData } = require('worker_threads');
     parentPort.postMessage({
       type: 'status',
       status: 'prepared',
-      protocol: config.protocol,
+      protocol: normalizedProtocol || config.protocol,
       nativeSwapId: swapId,
     });
 
@@ -81,9 +83,9 @@ const { parentPort, workerData } = require('worker_threads');
         ...report,
         nativeSwapId: swapId,
         appSwapId: config.appSwapId,
-        protocol: config.protocol,
+        protocol: swapParams.protocol || normalizedProtocol || config.protocol,
       },
-      protocol: config.protocol || 'v1',
+      protocol: normalizedProtocol || config.protocol,
       nativeSwapId: swapId,
       appSwapId: config.appSwapId,
     });
