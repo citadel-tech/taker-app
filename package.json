@@ -44,7 +44,10 @@
     "linux": {
       "target": [
         "AppImage",
-        "snap"
+        "snap",
+        "deb",
+        "rpm",
+        "tar.gz"
       ],
       "category": "Finance",
       "executableName": "coinswap-taker",
