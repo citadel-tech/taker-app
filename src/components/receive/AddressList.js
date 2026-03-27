@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function AddressListComponent(container) {
   let currentFilter = 'all';
   let sortBy = 'newest';
@@ -218,7 +220,7 @@ const result = await window.api.taker.getTransactions(200, 0);
           </div>
           <div class="flex gap-2">
             <button id="export-addresses" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-              📥 Export CSV
+              ${icons.arrowDownCircle(14, 'mr-1')} Export CSV
             </button>
             <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
               Refresh
@@ -292,7 +294,7 @@ const result = await window.api.taker.getTransactions(200, 0);
             filteredAddresses.length === 0
               ? `
             <div class="text-center py-12">
-              <div class="text-4xl mb-4">📭</div>
+              <div class="text-gray-500 mb-4 flex justify-center">${icons.inbox(48)}</div>
               <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `for ${currentFilter} spend type` : 'found in transaction history'}</p>
               <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-2 rounded-lg transition-colors">
                 Generate New Address
@@ -336,7 +338,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                                 ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
                             </a>
                             <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
-                                📋
+                                ${icons.clipboardCopy(14)}
                             </button>
                           </div>
                         </td>
@@ -430,7 +432,7 @@ const result = await window.api.taker.getTransactions(200, 0);
         await copyToClipboard(address);
         btn.textContent = '✓';
         setTimeout(() => {
-          btn.textContent = '📋';
+          btn.innerHTML = icons.clipboardCopy(14);
         }, 1500);
       });
     });

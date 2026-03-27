@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function LogComponent(container) {
   const content = document.createElement('div');
   content.id = 'log-content';
@@ -148,7 +150,7 @@ export function LogComponent(container) {
     
     <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
       <div class="flex items-start gap-3">
-        <span class="text-2xl">💡</span>
+        <span>${icons.lightbulb(24)}</span>
         <div class="flex-1">
           <p class="text-blue-400 text-sm">
             <strong>Limited view:</strong> Only the last ${MAX_LOGS} log lines are shown here for performance. 
@@ -171,10 +173,10 @@ export function LogComponent(container) {
             </div>
             <div class="flex gap-2">
               <button id="refresh-logs" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded text-sm transition-colors">
-                🔄 Refresh
+                ${icons.refreshCw(14, 'mr-1')} Refresh
               </button>
               <button id="open-log-file" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded text-sm font-semibold transition-colors">
-                📁 Open Log File
+                ${icons.folder(14, 'mr-1')} Open Log File
               </button>
             </div>
           </div>

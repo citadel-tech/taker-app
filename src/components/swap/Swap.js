@@ -1,3 +1,4 @@
+import { icons } from '../../js/icons.js';
 import { SwapStateManager, formatRelativeTime } from './SwapStateManager.js';
 import {
   buildSwapHistoryMarkup,
@@ -768,7 +769,7 @@ export async function SwapComponent(container) {
 
     if (warnings.length > 0) {
       warningEl.innerHTML = warnings
-        .map((w) => `<p class="text-xs text-yellow-400">⚠️ ${w}</p>`)
+        .map((w) => `<p class="text-xs text-yellow-400">${icons.alertTriangle(12, 'mr-1')} ${w}</p>`)
         .join('');
       warningEl.classList.remove('hidden');
       startBtn.disabled = true;

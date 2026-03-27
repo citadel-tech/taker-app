@@ -86,6 +86,7 @@
   "dependencies": {
     "@tailwindcss/cli": "^4.1.14",
     "electron-store": "^8.2.0",
+    "lucide": "^1.7.0",
     "tailwindcss": "^4.1.14"
   }
 }

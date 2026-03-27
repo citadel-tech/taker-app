@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function SendComponent(container, preSelectedUtxos = null) {
   const content = document.createElement('div');
   content.id = 'send-content';
@@ -122,13 +124,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
     if (!signBtn) return;
 
     if (errors.length === 0) {
-      signBtn.textContent = '🔏 Sign Transaction';
+      signBtn.innerHTML = icons.key(14, 'mr-1') + ' Sign Transaction';
       signBtn.title = '';
       return;
     }
 
     // Show first error as button text
-    signBtn.textContent = '⚠️ ' + errors[0];
+    signBtn.innerHTML = icons.alertTriangle(14, 'mr-1') + ' ' + errors[0];
     signBtn.title = errors.join('\n');
   }
 
@@ -659,7 +661,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       signedTx = { id: 'simulated-tx' };
       signedTxHex = '0200000001' + 'ff'.repeat(100);
       
-      alert('✅ Transaction signed successfully!\n\nReview the details and click "Broadcast" to send.');
+      alert('Transaction signed successfully!\n\nReview the details and click "Broadcast" to send.');
       
       const hexPanel = content.querySelector('#hex-panel');
       if (hexPanel) hexPanel.classList.remove('hidden');
@@ -671,7 +673,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       
     } catch (error) {
       console.error('Signing failed:', error);
-      alert(`❌ Failed to sign: ${error.message}`);
+      alert(`Failed to sign: ${error.message}`);
     } finally {
       signBtn.disabled = false;
       signBtn.textContent = originalText;
@@ -754,7 +756,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       
     } catch (error) {
       console.error('Broadcast failed:', error);
-      alert(`❌ Failed to broadcast: ${error.message}`);
+      alert(`Failed to broadcast: ${error.message}`);
     } finally {
       broadcastBtn.disabled = false;
       broadcastBtn.textContent = originalText;
@@ -768,7 +770,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     popup.innerHTML = `
       <div class="bg-[#1a2332] rounded-lg p-8 max-w-2xl w-full mx-4 border border-green-500/50">
         <div class="text-center mb-6">
-          <div class="text-6xl mb-4">✅</div>
+          <div class="flex justify-center mb-4">${icons.checkCircle(64, 'text-green-400')}</div>
           <h2 class="text-2xl font-bold text-green-400 mb-2">Transaction Broadcast Successfully!</h2>
           <p class="text-gray-400">Your transaction(s) have been sent to the Bitcoin network</p>
         </div>
@@ -812,7 +814,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     <!-- Warning Banner -->
     <div class="mb-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
       <p class="text-sm text-yellow-400 font-semibold text-lg">
-        ⚠️ Regular and Swap UTXOs cannot be selected together in a single transaction
+        ${icons.alertTriangle(16, 'mr-1')} Regular and Swap UTXOs cannot be selected together in a single transaction
       </p>
       <p class="text-xs text-yellow-400/80 mt-1">Mixing these UTXO types compromises privacy. Use one type per send.</p>
     </div>
@@ -893,7 +895,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             
             <div id="utxo-warning" class="hidden mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
               <p class="text-xs text-red-400 font-semibold text-lg">
-                ⚠️ PRIVACY WARNING: You've selected both Regular and Swap UTXOs!
+                ${icons.alertTriangle(16, 'mr-1')} PRIVACY WARNING: You've selected both Regular and Swap UTXOs!
               </p>
               <p class="text-xs text-red-400/80 mt-1">This compromises your privacy. Please use only one type.</p>
             </div>
@@ -917,10 +919,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
         <!-- Action Buttons -->
         <div class="grid grid-cols-2 gap-4">
           <button id="sign-tx-btn" class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg transition-colors text-lg">
-            🔏 Sign Transaction
+            ${icons.key(14, 'mr-1')} Sign Transaction
           </button>
           <button id="broadcast-tx-btn" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg transition-colors text-lg">
-            📡 Broadcast
+            ${icons.radio(14, 'mr-1')} Broadcast
           </button>
         </div>
       </div>
@@ -980,7 +982,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-400">RBF:</span>
-                  <span class="text-blue-400">✓ Enabled</span>
+                  <span class="text-blue-400">${icons.check(14, 'mr-1')} Enabled</span>
                 </div>
               </div>
             </div>

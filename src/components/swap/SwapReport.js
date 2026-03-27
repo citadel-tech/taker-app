@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function SwapReportComponent(container, swapReport) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
     switch (value) {
@@ -381,7 +383,7 @@ export function SwapReportComponent(container, swapReport) {
             <p class="text-xs text-gray-400 mb-1">Onion Address</p>
             <div class="flex items-center gap-2">
               <p class="font-mono text-sm text-white break-all flex-1">${makerAddr}</p>
-              <button class="copy-addr-btn text-gray-400 hover:text-[#FF6B35] transition-colors" title="Copy">📋</button>
+              <button class="copy-addr-btn text-gray-400 hover:text-[#FF6B35] transition-colors" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
             </div>
           </div>
           
@@ -415,14 +417,14 @@ export function SwapReportComponent(container, swapReport) {
           
           <!-- Privacy Contribution -->
           <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-            <p class="text-xs text-green-400 mb-1">🔒 Privacy Contribution</p>
+            <p class="text-xs text-green-400 mb-1">${icons.shieldCheck(16, 'mr-2')} Privacy Contribution</p>
             <p class="text-xs text-gray-300">This maker broke the transaction link between hop ${makerIndex} and hop ${makerIndex + 2}, making it impossible to trace the flow of funds.</p>
           </div>
         </div>
         
         <div class="mt-6 flex gap-3">
           <button class="copy-addr-btn flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white py-3 rounded-lg transition-colors">
-            📋 Copy Address
+            ${icons.clipboardCopy(14, 'mr-1')} Copy Address
           </button>
           <button class="close-popup flex-1 text-white py-3 rounded-lg transition-colors"
                   style="background: ${color};">
@@ -515,9 +517,9 @@ export function SwapReportComponent(container, swapReport) {
               </div>
               <div class="flex gap-2 shrink-0">
                 <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors"
-                        data-txid="${artifact.txid}" title="Copy">📋</button>
+                        data-txid="${artifact.txid}" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
                 <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors"
-                        data-txid="${artifact.txid}" title="View on Explorer">🔍</button>
+                        data-txid="${artifact.txid}" title="View on Explorer">${icons.externalLink(14, 'mr-1')}</button>
               </div>
             </div>
           </div>
@@ -832,7 +834,7 @@ export function SwapReportComponent(container, swapReport) {
             <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youFont * 0.38).toFixed(1)}"
                   text-anchor="middle" fill="white" font-size="${youFont}" font-weight="bold">You</text>
             <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 17).toFixed(1)}"
-                  text-anchor="middle" fill="#6EE7B7" font-size="${Math.max(8, youFont - 12)}">Completed ✓</text>
+                  text-anchor="middle" fill="#6EE7B7" font-size="${Math.max(8, youFont - 12)}">&#x2713; Completed</text>
           </g>
 
           <!-- Maker nodes (clickable) -->
@@ -944,7 +946,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-4">
             <div class="w-16 h-16 bg-[#FF6B35] rounded-xl flex items-center justify-center shadow-lg">
-              <span class="text-3xl">🪙</span>
+              <span>${icons.circleDollarSign(20, 'mr-2')}</span>
             </div>
             <div>
               <h2 class="text-4xl font-bold text-[#FF6B35]">
@@ -960,7 +962,7 @@ export function SwapReportComponent(container, swapReport) {
         
         <div class="flex items-center gap-4">
           <div class="px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg backdrop-blur-sm">
-            <span class="text-green-400 font-semibold text-lg">✅ SWAP COMPLETED SUCCESSFULLY</span>
+            <span class="text-green-400 font-semibold text-lg flex items-center">${icons.checkCircle(20, 'mr-2')} SWAP COMPLETED SUCCESSFULLY</span>
           </div>
           <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
             <span class="text-gray-400 text-sm">ID: </span>
@@ -1003,7 +1005,7 @@ export function SwapReportComponent(container, swapReport) {
           
           <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
             <h4 class="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
-              <span>ℹ️</span> Report Summary
+              ${icons.info(16, 'mr-2')} Report Summary
             </h4>
             <div class="text-xs text-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4">
               ${getReportInfoLines()}
@@ -1017,7 +1019,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-1">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Swap Amount</p>
-            <span class="text-2xl">💰</span>
+            <span>${icons.circleDollarSign(16, 'mr-2')}</span>
           </div>
           <p class="text-2xl font-bold text-[#FF6B35]">${satsToBtc(report.targetAmount)} BTC</p>
           <p class="text-xs text-gray-400 mt-1">${formatNumber(report.targetAmount)} sats</p>
@@ -1026,7 +1028,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-2">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Duration</p>
-            <span class="text-2xl">⏱️</span>
+            <span>${icons.timer(16, 'mr-2')}</span>
           </div>
           <p class="text-2xl font-bold text-cyan-400">${formatDuration(report.swapDurationSeconds)}</p>
           <p class="text-xs text-gray-400 mt-1">${report.swapDurationSeconds.toFixed(1)}s total</p>
@@ -1035,7 +1037,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-3">
           <div class="flex items-center justify-between mb-2">
 <p class="text-sm text-white">On-Chain Artifacts</p>
-            <span class="text-2xl">🔗</span>
+            <span>${icons.link(16, 'mr-2')}</span>
           </div>
          <p class="text-2xl font-bold text-purple-400">
   ${report.artifactsCount}
@@ -1048,7 +1050,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Swap Partners</p>
-            <span class="text-2xl">🤝</span>
+            <span>${icons.handshake(16, 'mr-2')}</span>
           </div>
           <p class="text-2xl font-bold text-yellow-400">${report.makersCount || report.makerAddresses.length}</p>
           <p class="text-xs text-gray-400 mt-1">Makers recorded in the report</p>
@@ -1057,7 +1059,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Total Fee</p>
-            <span class="text-2xl">💸</span>
+            <span>${icons.receipt(16, 'mr-2')}</span>
           </div>
           <p class="text-2xl font-bold text-yellow-400">${report.feePercentage.toFixed(2)}%</p>
           <p class="text-xs text-gray-400 mt-1">${formatNumber(report.totalFee)} sats</p>
@@ -1073,7 +1075,7 @@ export function SwapReportComponent(container, swapReport) {
           <!-- Transaction Artifacts -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
             <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              <span>📝</span> Transaction Artifacts
+              ${icons.fileText(16, 'mr-2')} Transaction Artifacts
             </h3>
             <div class="space-y-3">
               ${buildTransactionArtifactsHtml()}
@@ -1083,7 +1085,7 @@ export function SwapReportComponent(container, swapReport) {
           <!-- Swap Partners / Makers -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-3">
             <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              <span>🤝</span> Swap Partners
+              ${icons.handshake(16, 'mr-2')} Swap Partners
               <span class="text-xs text-gray-500 font-normal ml-2">(Click for details)</span>
             </h3>
             <div class="grid grid-cols-2 gap-3">
@@ -1099,7 +1101,7 @@ export function SwapReportComponent(container, swapReport) {
           <!-- Fee Breakdown -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
             <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              <span>💰</span> Fee Details
+              ${icons.circleDollarSign(16, 'mr-2')} Fee Details
             </h3>
             <div class="space-y-3">
               <div class="flex justify-between items-center pb-3 border-b border-gray-700">
@@ -1123,7 +1125,7 @@ export function SwapReportComponent(container, swapReport) {
           <!-- UTXO Summary with Tooltip -->
           <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-4">
             <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              <span>📦</span> UTXO Summary
+              ${icons.package(16, 'mr-2')} UTXO Summary
             </h3>
             <div class="space-y-3 text-sm">
               <div class="flex justify-between items-center">
@@ -1143,7 +1145,7 @@ export function SwapReportComponent(container, swapReport) {
       <!-- Action Buttons -->
       <div class="mt-8 flex gap-4 animate-fade-in-up stagger-4">
         <button id="export-report" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-4 rounded-lg transition-all hover:scale-105">
-          📥 Export Report
+          ${icons.arrowDownCircle(16, 'mr-1')} Export Report
         </button>
         <button id="done-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
           Back to Swaps

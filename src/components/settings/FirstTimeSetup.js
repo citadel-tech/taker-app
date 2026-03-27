@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function FirstTimeSetupModal(container, onComplete) {
   const defaultWalletName = `taker-wallet-${Math.floor(100000 + Math.random() * 900000)}`;
   const iconClass = 'w-5 h-5 flex-shrink-0';
@@ -163,21 +165,21 @@ export function FirstTimeSetupModal(container, onComplete) {
             <div class="grid grid-cols-3 gap-4">
               <!-- Create New Wallet -->
               <div id="choice-create" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
-                <div class="text-4xl mb-3">🆕</div>
+                <div class="text-gray-400 mb-3 flex justify-center">${icons.plusCircle(40)}</div>
                 <h4 class="text-white font-semibold text-lg mb-2">Create New</h4>
                 <p class="text-xs text-gray-400">Start fresh with a new wallet</p>
               </div>
 
               <!-- Load Existing Wallet -->
               <div id="choice-load" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
-                <div class="text-4xl mb-3">📂</div>
+                <div class="text-gray-400 mb-3 flex justify-center">${icons.folderOpen(40)}</div>
                 <h4 class="text-white font-semibold text-lg mb-2">Load Existing</h4>
                 <p class="text-xs text-gray-400">Load a wallet from file</p>
               </div>
 
               <!-- Restore Wallet -->
               <div id="choice-restore" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
-                <div class="text-4xl mb-3">♻️</div>
+                <div class="text-gray-400 mb-3 flex justify-center">${icons.recycle(40)}</div>
                 <h4 class="text-white font-semibold text-lg mb-2">Restore</h4>
                 <p class="text-xs text-gray-400">Restore from backup JSON</p>
               </div>
@@ -478,7 +480,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       </div>
 
       <button id="test-tor-setup" class="w-full bg-purple-500 hover:bg-purple-600 text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
-        🧅 Test Tor Connection
+        ${icons.globe(14, 'mr-1')} Test Tor Connection
       </button>
 
       <div id="tor-test-result" class="hidden"></div>
@@ -559,7 +561,7 @@ export function FirstTimeSetupModal(container, onComplete) {
             (result) => `
               <div class="flex items-start justify-between gap-3">
                 <span class="text-sm ${result.ok ? 'text-green-400' : 'text-red-400'}">
-                  ${result.ok ? '✅' : '❌'} ${result.label}
+                  ${result.ok ? icons.checkCircle(14, 'mr-1') : icons.xCircle(14, 'mr-1')} ${result.label}
                 </span>
                 <span class="text-xs text-gray-400 text-right">${result.message}</span>
               </div>
@@ -808,7 +810,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       } else {
         errorDiv.innerHTML = `
           <div class="flex items-center">
-            <span class="text-sm text-red-400">❌ ${message}</span>
+            <span class="text-sm text-red-400">${icons.xCircle(14, 'mr-1')} ${message}</span>
           </div>
         `;
       }
@@ -1015,7 +1017,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
       statusDiv.innerHTML = `
         <div class="flex items-center">
-          <span class="text-sm text-red-400">❌ Please select a backup file</span>
+          <span class="text-sm text-red-400">${icons.xCircle(14, 'mr-1')} Please select a backup file</span>
         </div>
       `;
       statusDiv.classList.remove('hidden');
@@ -1027,7 +1029,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         'bg-blue-500/10 border border-blue-500/30 rounded-lg p-3';
       statusDiv.innerHTML = `
         <div class="flex items-center">
-          <span class="text-sm text-blue-400">🔄 Restoring wallet from backup...</span>
+          <span class="text-sm text-blue-400">${icons.refreshCw(14, 'mr-1 animate-spin')} Restoring wallet from backup...</span>
         </div>
       `;
       statusDiv.classList.remove('hidden');
@@ -1043,7 +1045,7 @@ export function FirstTimeSetupModal(container, onComplete) {
           'bg-green-500/10 border border-green-500/30 rounded-lg p-3';
         statusDiv.innerHTML = `
           <div class="flex items-center">
-            <span class="text-sm text-green-400">✅ Wallet restored successfully!</span>
+            <span class="text-sm text-green-400">${icons.checkCircle(14, 'mr-1')} Wallet restored successfully!</span>
           </div>
         `;
         return true;
@@ -1056,7 +1058,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
       statusDiv.innerHTML = `
         <div class="flex items-center">
-          <span class="text-sm text-red-400">❌ ${error.message}</span>
+          <span class="text-sm text-red-400">${icons.xCircle(14, 'mr-1')} ${error.message}</span>
         </div>
       `;
       statusDiv.classList.remove('hidden');
