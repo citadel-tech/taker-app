@@ -3,13 +3,28 @@ name: Release
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - "v*.*.*"
 
 permissions:
   contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          # Auto-generates description from merged PRs and commits since the last tag.
+          # To use a changelog file instead, replace with:
+          #   body_path: CHANGELOG.md
+          generate_release_notes: true
+
   release-linux:
+    needs: create-release
     runs-on: ubuntu-latest
 
     steps:
@@ -32,13 +47,13 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libssl-dev pkg-config rpm imagemagick
+          sudo apt-get install -y libssl-dev pkg-config rpm imagemagick libarchive-tools
 
       - name: Generate Linux icons
         run: |
@@ -65,18 +80,16 @@ jobs:
       - name: Upload Linux artifacts
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
           files: |
             dist/*.AppImage
             dist/*.snap
             dist/*.deb
             dist/*.rpm
             dist/*.tar.gz
+            dist/*.pacman
 
   release-macos:
+    needs: create-release
     runs-on: macos-latest
 
     steps:
@@ -99,8 +112,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Generate macOS icon (icns)
         run: |
@@ -128,14 +141,12 @@ jobs:
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
           files: |
             dist/*.dmg
             dist/mac/*.zip
 
   release-windows:
+    needs: create-release
     runs-on: windows-latest
 
     steps:
@@ -158,8 +169,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - name: Generate Windows icon (ico)
         run: |
@@ -181,9 +192,6 @@ jobs:
       - name: Upload Windows artifacts
         uses: softprops/action-gh-release@v2
         with:
-          name: Release ${{ github.ref_name }}
-          draft: false
-          prerelease: false
           files: |
             dist/*.exe
             dist/*.zip
