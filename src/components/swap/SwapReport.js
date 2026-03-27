@@ -1,4 +1,20 @@
 export function SwapReportComponent(container, swapReport) {
+  function normalizeProtocol(value, fallbackIsTaproot = false) {
+    switch (value) {
+      case 'v2':
+      case 'Taproot':
+        return 'Taproot';
+      case 'Unified':
+        return 'Unified';
+      case 'v1':
+      case 'Legacy':
+      case 'Legacy P2WSH':
+        return 'Legacy';
+      default:
+        return fallbackIsTaproot ? 'Taproot' : 'Legacy';
+    }
+  }
+
   console.log('📊 SwapReportComponent loading with report:', swapReport);
   console.log('📊 Report keys:', Object.keys(swapReport || {}));
 
@@ -56,14 +72,22 @@ export function SwapReportComponent(container, swapReport) {
       nestedReport.total_fee,
     NaN
   );
-  const derivedTotalFee = Number.isFinite(rawFeePaidOrEarned)
+  const componentTotalFee = rawTotalMakerFees + Math.max(0, rawMiningFee);
+  const netFeePaidOrEarned = Number.isFinite(rawFeePaidOrEarned)
     ? Math.abs(rawFeePaidOrEarned)
-    : rawTotalMakerFees + rawMiningFee;
+    : NaN;
   const rawTotalFee =
-    Number.isFinite(providedTotalFee) &&
-    (providedTotalFee > 0 || derivedTotalFee <= 0)
+    Number.isFinite(providedTotalFee) && providedTotalFee >= 0
       ? providedTotalFee
-      : derivedTotalFee;
+      : componentTotalFee > 0
+        ? componentTotalFee
+        : Number.isFinite(netFeePaidOrEarned)
+          ? netFeePaidOrEarned
+          : 0;
+  const normalizedMiningFee =
+    rawMiningFee >= 0
+      ? rawMiningFee
+      : Math.max(0, rawTotalFee - rawTotalMakerFees);
 
   // Extract values with safe defaults
   const normalizedFundingTxids =
@@ -77,6 +101,10 @@ export function SwapReportComponent(container, swapReport) {
   const normalizedTargetAmount = toNumber(
     swapReport.targetAmount ??
       swapReport.target_amount ??
+      swapReport.incomingAmount ??
+      swapReport.incoming_amount ??
+      swapReport.outgoingAmount ??
+      swapReport.outgoing_amount ??
       nestedReport.targetAmount ??
       nestedReport.target_amount ??
       swapReport.amount ??
@@ -101,8 +129,19 @@ export function SwapReportComponent(container, swapReport) {
     normalizedTargetAmount > 0 ? (rawTotalFee / normalizedTargetAmount) * 100 : 0
   );
 
+  const protocol = normalizeProtocol(
+    swapReport.protocol || nestedReport.protocol,
+    swapReport.isTaproot || nestedReport.isTaproot || false
+  );
+
   const report = {
     swapId: swapReport.swapId || swapReport.swap_id || 'unknown',
+    nativeSwapId:
+      swapReport.nativeSwapId ||
+      swapReport.native_swap_id ||
+      nestedReport.nativeSwapId ||
+      nestedReport.native_swap_id ||
+      null,
     swapDurationSeconds:
       toNumber(
         swapReport.swapDurationSeconds ??
@@ -116,6 +155,8 @@ export function SwapReportComponent(container, swapReport) {
       toNumber(
         swapReport.totalInputAmount ??
           swapReport.total_input_amount ??
+          swapReport.incomingAmount ??
+          swapReport.incoming_amount ??
           nestedReport.totalInputAmount ??
           nestedReport.total_input_amount,
         normalizedTargetAmount
@@ -124,6 +165,10 @@ export function SwapReportComponent(container, swapReport) {
       toNumber(
         swapReport.totalOutputAmount ??
           swapReport.total_output_amount ??
+          swapReport.outgoingAmount ??
+          swapReport.outgoing_amount ??
+          swapReport.incomingAmount ??
+          swapReport.incoming_amount ??
           nestedReport.totalOutputAmount ??
           nestedReport.total_output_amount ??
           nestedReport.outgoingAmount ??
@@ -147,7 +192,7 @@ export function SwapReportComponent(container, swapReport) {
     fundingTxidsByHop: normalizedFundingTxids,
     totalFee: rawTotalFee,
     totalMakerFees: rawTotalMakerFees,
-    miningFee: rawMiningFee,
+    miningFee: normalizedMiningFee,
     feePercentage: normalizedFeePercentage,
     makerFeeInfo:
       swapReport.makerFeeInfo ||
@@ -181,14 +226,20 @@ export function SwapReportComponent(container, swapReport) {
       swapReport.taker_sweep_txid ||
       swapReport.takerSweepTxid ||
       null,
-    protocol: swapReport.protocol || 'v1',
-    isTaproot: swapReport.isTaproot || false,
-    protocolVersion: swapReport.protocolVersion || 1,
+    protocol,
+    isTaproot:
+      protocol === 'Taproot' ||
+      swapReport.isTaproot ||
+      nestedReport.isTaproot ||
+      false,
+    protocolVersion:
+      swapReport.protocolVersion ||
+      (protocol === 'Taproot' ? 2 : 1),
   };
 
   console.log('📊 Normalized report:', report);
 
-  const isV2Swap = report.isTaproot || false;
+  const isV2Swap = report.protocol === 'Taproot';
 
   // Helper functions
   function satsToBtc(sats) {
@@ -551,6 +602,32 @@ export function SwapReportComponent(container, swapReport) {
   }
 
   function getProtocolInfoLines() {
+    if (report.protocol === 'Unified') {
+      return `
+        <div>
+          <p class="mb-1"><strong>Compatibility:</strong> Treated as compatible with both app modes.</p>
+          <p><strong>Current backend behavior:</strong> Native Unified handling is still being validated.</p>
+        </div>
+        <div>
+          <p class="mb-1"><strong>Anonymity Set:</strong> Determined by the contracts actually used in the swap.</p>
+          <p><strong>Display note:</strong> Shown distinctly so mixed maker markets are easier to inspect.</p>
+        </div>
+      `;
+    }
+
+    if (!isV2Swap) {
+      return `
+        <div>
+          <p class="mb-1"><strong>Compatibility:</strong> Uses Legacy P2WSH swap contracts.</p>
+          <p><strong>Tradeoff:</strong> Wider legacy maker compatibility with higher on-chain footprint.</p>
+        </div>
+        <div>
+          <p class="mb-1"><strong>Anonymity Set:</strong> Legacy P2WSH swap outputs.</p>
+          <p><strong>Routing:</strong> Privacy comes from the maker hop circuit rather than direct links.</p>
+        </div>
+      `;
+    }
+
     return `
       <div>
         <p class="mb-1"><strong>Save Money:</strong> Lesser Fees than V1 swaps.</p>
@@ -565,6 +642,11 @@ export function SwapReportComponent(container, swapReport) {
 
   // Build swap circuit visualization (circular SVG)
   function buildCircularFlowHtml() {
+    const isFinitePoint = (point) =>
+      point &&
+      Number.isFinite(point.x) &&
+      Number.isFinite(point.y);
+
     const makersCount = Number(report.makersCount);
     const actualMakers = Math.max(
       0,
@@ -740,6 +822,40 @@ export function SwapReportComponent(container, swapReport) {
 
     const { centerX, centerY, svgWidth, svgHeight, positions, guideMarkup } =
       buildAdaptiveLayout();
+    const hasValidLayout =
+      Number.isFinite(centerX) &&
+      Number.isFinite(centerY) &&
+      Number.isFinite(svgWidth) &&
+      Number.isFinite(svgHeight) &&
+      Array.isArray(positions) &&
+      positions.length === totalNodes &&
+      positions.every(isFinitePoint);
+
+    if (!hasValidLayout) {
+      console.warn('⚠️ Invalid swap circuit layout, falling back to simple list', {
+        actualMakers,
+        totalNodes,
+        centerX,
+        centerY,
+        svgWidth,
+        svgHeight,
+        positions,
+      });
+
+      return `
+        <div class="bg-[#0f1419] rounded-lg p-5 border border-gray-800">
+          <p class="text-gray-300 text-sm mb-3">Swap path visualization unavailable for this report.</p>
+          <div class="space-y-2">
+            <div class="text-[#10B981] font-semibold">You</div>
+            ${Array.from({ length: actualMakers }, (_, i) => {
+              const addr = report.makerAddresses[i] || `Maker ${i + 1}`;
+              const color = makerColors[i % makerColors.length];
+              return `<div class="font-mono text-xs" style="color: ${color};">Maker ${i + 1}: ${truncateAddress(addr)}</div>`;
+            }).join('')}
+          </div>
+        </div>
+      `;
+    }
 
     return `
       <div class="flex items-center justify-center overflow-auto">
@@ -766,13 +882,16 @@ export function SwapReportComponent(container, swapReport) {
             const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
             const fromHalf = i === 0 ? youHalf : makerHalf;
             const toHalf = (i + 1) % positions.length === 0 ? youHalf : makerHalf;
+            if (!isFinitePoint(pos) || !isFinitePoint(nextPos)) return '';
             const dx = nextPos.x - pos.x;
             const dy = nextPos.y - pos.y;
             const len = Math.sqrt(dx * dx + dy * dy);
+            if (!Number.isFinite(len) || len <= 0) return '';
             const sx = pos.x + (dx / len) * (fromHalf + 4);
             const sy = pos.y + (dy / len) * (fromHalf + 4);
             const ex = nextPos.x - (dx / len) * (toHalf + 10);
             const ey = nextPos.y - (dy / len) * (toHalf + 10);
+            if (![sx, sy, ex, ey].every(Number.isFinite)) return '';
             return `<line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
                           stroke="${color}" stroke-width="2" marker-end="url(#r-arrow-${i})" opacity="0.75"/>`;
           }).join('')}
@@ -808,7 +927,7 @@ export function SwapReportComponent(container, swapReport) {
           }).join('')}
 
           ${isV2Swap ? `
-            <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">Taproot V2</text>
+            <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">${report.protocol}</text>
             <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
           ` : ''}
         </svg>
@@ -921,6 +1040,16 @@ export function SwapReportComponent(container, swapReport) {
             <span class="text-gray-400 text-sm">ID: </span>
             <span class="font-mono text-white text-sm">${report.swapId}</span>
           </div>
+          ${
+            report.nativeSwapId
+              ? `
+          <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
+            <span class="text-gray-400 text-sm">Backend Swap ID: </span>
+            <span class="font-mono text-white text-sm">${report.nativeSwapId}</span>
+          </div>
+          `
+              : ''
+          }
         </div>
       </div>
 
@@ -959,7 +1088,7 @@ export function SwapReportComponent(container, swapReport) {
       </div>
 
       <!-- Stats Grid -->
-      <div class="grid grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-5 gap-4 mb-6">
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-1">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Swap Amount</p>
@@ -989,6 +1118,15 @@ export function SwapReportComponent(container, swapReport) {
 <p class="text-xs text-gray-400 mt-1">
   ${isV2Swap ? 'Funding transactions observed' : `${report.makersCount} makers used`}
 </p>
+        </div>
+
+        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
+          <div class="flex items-center justify-between mb-2">
+            <p class="text-sm text-white">Protocol</p>
+            <span class="text-2xl">${report.protocol === 'Taproot' ? '⚡' : report.protocol === 'Unified' ? '◈' : '🔒'}</span>
+          </div>
+          <p class="text-2xl font-bold text-yellow-400">${report.protocol}</p>
+          <p class="text-xs text-gray-400 mt-1">Rendered from normalized report data</p>
         </div>
 
         <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">

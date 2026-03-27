@@ -22,10 +22,10 @@ export function FirstTimeSetupModal(container, onComplete) {
     'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
 
   let currentStep = 1;
-  const totalSteps = 4;
+  const totalSteps = 3;
   let walletAction = null; // 'create', 'load', or 'restore'
   let walletData = {};
-  let protocolVersion = 'v2'; // 'v1' (P2WSH) or 'v2' (Taproot)
+  let protocolVersion = 'v2'; // Fixed app-local default until the rest of the flow stops expecting v1/v2.
 
   modal.innerHTML = `
     <div class="bg-[#1a2332] rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -35,82 +35,16 @@ export function FirstTimeSetupModal(container, onComplete) {
         <p class="text-white/90 text-sm">Wallet and Other Setups.</p>
         <div class="mt-4 flex items-center">
           <div id="progress-bar" class="bg-white/20 rounded-full h-2 flex-1">
-            <div id="progress-fill" class="bg-white rounded-full h-2 transition-all duration-300" style="width: 25%"></div>
+            <div id="progress-fill" class="bg-white rounded-full h-2 transition-all duration-300" style="width: 33%"></div>
           </div>
-          <span id="step-indicator" class="ml-3 inline-flex items-center self-center rounded-full bg-white px-3 py-1 text-sm font-bold leading-none text-[#FF6B35]">Step 1 of 4</span>
+          <span id="step-indicator" class="ml-3 inline-flex items-center self-center rounded-full bg-white px-3 py-1 text-sm font-bold leading-none text-[#FF6B35]">Step 1 of 3</span>
         </div>
       </div>
 
       <!-- Content -->
       <div class="p-6">
-        <!-- Step 1: Introduction & Protocol Selection -->
+        <!-- Step 1: Bitcoin Endpoints -->
         <div id="step-1" class="setup-step">
-          <div class="text-center mb-6">
-            <h3 class="text-xl font-semibold text-lg text-white mb-2">Getting Started</h3>
-            <p class="text-gray-400 text-sm">Choose your swap protocol and we'll configure your wallet for private Bitcoin swaps.</p>
-          </div>
-
-          <!-- Protocol Selection -->
-<div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-  <h4 class="text-white font-semibold text-lg mb-3">Select Swap Type</h4>
-  <p class="text-sm text-gray-400 mb-4">
-    This determines which type of swap you can perform. Either Taproot or Legacy(P2WSH) swaps.
-  </p>
-  
-  <div class="grid grid-cols-2 gap-4">
-    <!-- Taproot (V2) - Recommended -->
-    <div id="protocol-v2" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-[#FF6B35] cursor-pointer hover:border-[#FF6B35] transition-colors">
-      <div class="flex items-center mb-2">
-        <span class="text-2xl mr-2">⚡</span>
-        <h5 class="text-white font-semibold text-lg">Taproot</h5>
-      </div>
-      <p class="text-xs text-gray-400 mb-3">
-        Contract Tx with <span class="font-mono text-cyan-400">MuSig2 + Taproot HTLC</span>
-      </p>
-      <ul class="text-xs text-gray-300 space-y-1.5 mb-3">
-        <li>✓ Cheaper swap fees</li>
-        <li>✓ Enhanced privacy</li>
-        <li>✓ Modern protocol</li>
-      </ul>
-      <div class="mt-2">
-        <span class="text-xs bg-green-500/20 text-green-400 px-2 py-1 rounded font-semibold text-lg">Recommended</span>
-      </div>
-    </div>
-
-    <!-- Legacy (V1) -->
-    <div id="protocol-v1" class="protocol-choice bg-[#1a2332] rounded-lg p-4 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors">
-      <div class="flex items-center mb-2">
-        <span class="text-2xl mr-2">🔐</span>
-        <h5 class="text-white font-semibold text-lg">Legacy P2WSH</h5>
-      </div>
-      <p class="text-xs text-gray-400 mb-3">
-        Contract Tx with <span class="font-mono text-orange-400">2-of-2 Multisig + P2WSH HTLC</span>
-      </p>
-      <ul class="text-xs text-gray-300 space-y-1.5 mb-3">
-        <li>• Higher swap fees</li>
-        <li>• Less private</li>
-        <li>• Original atomic swap protocol</li>
-      </ul>
-      <div class="mt-2">
-        <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">Battle-tested</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- Important Notice -->
-  <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-3 mt-4">
-    <div class="flex items-start gap-3 text-xs text-yellow-400 leading-relaxed">
-      ${iconWarning}
-      <p>
-        <strong>Important:</strong> You can only perform one type of swap with a taker (Taproot OR Legacy swaps). You cannot do both. However, your wallet can handle both Taproot and Legacy transactions for regular operations of send and receive.
-      </p>
-    </div>
-  </div>
-</div>
-        </div>
-
-        <!-- Step 2: Bitcoin Endpoints -->
-        <div id="step-2" class="setup-step hidden">
           <div class="mb-6">
             <h3 class="text-xl font-semibold text-lg text-white mb-2">Bitcoin Endpoints</h3>
             <p class="text-gray-400 text-sm">Connect to a running bitcoind RPC+REST & ZMQ Ports. This is needed to sync the wallet and market data.</p>
@@ -218,7 +152,7 @@ export function FirstTimeSetupModal(container, onComplete) {
           </div>
         </div>
 
-        <!-- Step 4A: Wallet Action Choice -->
+        <!-- Step 3A: Wallet Action Choice -->
         <div id="step-3a" class="setup-step hidden">
           <div class="mb-6">
             <h3 class="text-xl font-semibold text-lg text-white mb-2">Choose A Wallet. Or Create a New One.</h3>
@@ -481,8 +415,8 @@ export function FirstTimeSetupModal(container, onComplete) {
           </div>
         </div>
 
-  <!-- Step 3: Tor Configuration -->
-  <div id="step-4" class="setup-step hidden">
+  <!-- Step 2: Tor Configuration -->
+  <div id="step-2" class="setup-step hidden">
     <div class="mb-6">
       <h3 class="text-xl font-semibold text-lg text-white mb-2">Tor Configuration</h3>
       <p class="text-gray-400 text-sm">Connect with the Tor Proxy. This is needed for all network communications.</p>
@@ -579,7 +513,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         </button>
         <div class="flex space-x-3 ml-auto">
           <button id="setup-next-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors">
-            Get Started
+            Next
           </button>
         </div>
       </div>
@@ -727,8 +661,6 @@ export function FirstTimeSetupModal(container, onComplete) {
     // Determine which screen to show for each wizard step.
     let stepToShow = `step-${step}`;
     if (step === 3) {
-      stepToShow = 'step-4';
-    } else if (step === 4) {
       if (!walletAction) {
         stepToShow = 'step-3a'; // Show choice screen
       } else if (walletAction === 'create') {
@@ -1194,36 +1126,6 @@ export function FirstTimeSetupModal(container, onComplete) {
 
   console.log('🔧 Attaching event listeners...');
 
-  // Protocol selection
-  const protocolV2 = modal.querySelector('#protocol-v2');
-  const protocolV1 = modal.querySelector('#protocol-v1');
-
-  if (protocolV2) {
-    protocolV2.addEventListener('click', () => {
-      protocolVersion = 'v2';
-      modal.querySelectorAll('.protocol-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
-        el.classList.add('border-gray-700');
-      });
-      protocolV2.classList.remove('border-gray-700');
-      protocolV2.classList.add('border-[#FF6B35]');
-      console.log('Protocol selected: V2 (Taproot)');
-    });
-  }
-
-  if (protocolV1) {
-    protocolV1.addEventListener('click', () => {
-      protocolVersion = 'v1';
-      modal.querySelectorAll('.protocol-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
-        el.classList.add('border-gray-700');
-      });
-      protocolV1.classList.remove('border-gray-700');
-      protocolV1.classList.add('border-[#FF6B35]');
-      console.log('Protocol selected: V1 (P2WSH)');
-    });
-  }
-
   // Wallet action choice
   const choiceCreate = modal.querySelector('#choice-create');
   if (choiceCreate) {
@@ -1361,7 +1263,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         walletAction
       );
 
-      if (currentStep === 4) {
+      if (currentStep === 3) {
         const valid = await validateWalletStep();
         if (!valid) {
           console.log('Validation failed');
@@ -1393,7 +1295,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
   // Back button
   modal.querySelector('#setup-back-btn').addEventListener('click', () => {
-    if (currentStep === 4 && walletAction) {
+    if (currentStep === 3 && walletAction) {
       // If in step 3 substep, go back to step 3a (choice)
       walletAction = null;
       showStep(currentStep);

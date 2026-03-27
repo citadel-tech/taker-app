@@ -1,6 +1,21 @@
 import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
 
 export async function CoinswapComponent(container, swapConfig) {
+  function normalizeProtocol(value, fallbackIsTaproot = false) {
+    switch (value) {
+      case 'v2':
+      case 'Taproot':
+        return 'Taproot';
+      case 'Unified':
+        return 'Unified';
+      case 'v1':
+      case 'Legacy':
+      case 'Legacy P2WSH':
+      default:
+        return fallbackIsTaproot ? 'Taproot' : 'Legacy';
+    }
+  }
+
   const content = document.createElement('div');
   content.id = 'coinswap-content';
 
@@ -28,7 +43,11 @@ export async function CoinswapComponent(container, swapConfig) {
   let logMessages = savedProgress ? savedProgress.logMessages || [] : [];
   let currentHop = 0;
 
-  const isV2 = actualSwapConfig.isTaproot || false;
+  const swapProtocol = normalizeProtocol(
+    actualSwapConfig?.protocol,
+    actualSwapConfig?.isTaproot || false
+  );
+  const isV2 = swapProtocol === 'Taproot';
 
   const swapData = {
     amount: actualSwapConfig.amount,
@@ -159,6 +178,20 @@ export async function CoinswapComponent(container, swapConfig) {
     }
   }
 
+  function markAllMakersComplete() {
+    for (let i = 0; i < swapData.makers; i++) {
+      updateMakerVisibility(i, true);
+      updateHopStatus(i, '✓ Complete', 'green');
+    }
+  }
+
+  function markAllMakersFailed() {
+    for (let i = 0; i < swapData.makers; i++) {
+      updateMakerVisibility(i, true);
+      updateHopStatus(i, 'Failed', 'orange');
+    }
+  }
+
   function updateYouSend(active) {
     const youSend = content.querySelector('#you-send');
     if (youSend) youSend.style.opacity = active ? '1' : '0.5';
@@ -231,6 +264,12 @@ export async function CoinswapComponent(container, swapConfig) {
 
     // Add raw message to log
     addLog(message, type);
+
+    const makerIndexMatch = message.match(/maker\s+(\d+)/i);
+    const makerIndex =
+      makerIndexMatch && Number.isFinite(Number(makerIndexMatch[1]))
+        ? Number(makerIndexMatch[1])
+        : null;
 
     // Update UI based on message content (supports both V1 and V2 protocols)
 
@@ -425,6 +464,71 @@ export async function CoinswapComponent(container, swapConfig) {
     ) {
       updateHopStatus(0, 'Offers received', 'blue');
     }
+    // V2: "Sending contract data to maker N"
+    else if (
+      makerIndex !== null &&
+      message.includes('Sending contract data to maker')
+    ) {
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, 'Contracting...', 'yellow');
+    }
+    // V2: "Received Taproot contract data from maker N"
+    else if (
+      makerIndex !== null &&
+      message.includes('Received Taproot contract data from maker')
+    ) {
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, 'Contract received', 'blue');
+    }
+    // V2: "Verified Taproot contract data from maker N"
+    else if (
+      makerIndex !== null &&
+      message.includes('Verified Taproot contract data from maker')
+    ) {
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, '✓ Contract ready', 'green');
+    }
+    // V2: "Received private key from maker N"
+    else if (
+      makerIndex !== null &&
+      message.includes('Received private key from maker')
+    ) {
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, '🔐 Key received', 'green');
+    }
+    // V2: "Sending privkey to maker N and awaiting response"
+    else if (
+      makerIndex !== null &&
+      message.includes('Sending privkey to maker') &&
+      message.includes('awaiting response')
+    ) {
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, 'Finalizing...', 'yellow');
+    }
+    // V2: "Exchanging contract data with makers..."
+    else if (message.includes('Exchanging contract data with makers')) {
+      for (let i = 0; i < swapData.makers; i++) {
+        updateMakerVisibility(i, true);
+        updateHopStatus(i, 'Exchanging...', 'yellow');
+      }
+    }
+    // V2: "Finalizing swap..."
+    else if (message.includes('Finalizing swap')) {
+      for (let i = 0; i < swapData.makers; i++) {
+        updateMakerVisibility(i, true);
+        updateHopStatus(i, 'Finalizing...', 'yellow');
+      }
+    }
+    // V2: "Swap finalized successfully"
+    else if (message.includes('Swap finalized successfully')) {
+      markAllMakersComplete();
+      updateYouReceive(true);
+    }
+    // V2: "Sweeping N completed incoming swap coins"
+    else if (message.includes('Sweeping') && message.includes('completed incoming swap coins')) {
+      markAllMakersComplete();
+      updateYouReceive(true);
+    }
     // V2: Recovery started
     else if (message.includes('Starting taproot swap recovery')) {
       addLog('Recovery initiated...', 'warn');
@@ -471,6 +575,9 @@ export async function CoinswapComponent(container, swapConfig) {
       currentStep = 1;
       addLog('Coinswap started...', 'info');
       addLog(`Swap ID: ${swapId}`, 'info');
+      if (actualSwapConfig.nativeSwapId) {
+        addLog(`Backend Swap ID: ${actualSwapConfig.nativeSwapId}`, 'info');
+      }
       addLog(`Amount: ${(swapData.amount / 100000000).toFixed(8)} BTC`, 'info');
       addLog(`Makers: ${swapData.makers}`, 'info');
 
@@ -527,6 +634,16 @@ export async function CoinswapComponent(container, swapConfig) {
 
         const swap = result.swap;
 
+        if (swap.nativeSwapId && actualSwapConfig.nativeSwapId !== swap.nativeSwapId) {
+          actualSwapConfig.nativeSwapId = swap.nativeSwapId;
+          addLog(`Backend Swap ID: ${swap.nativeSwapId}`, 'info');
+        }
+
+        if (swap.status === 'prepared') {
+          addLog('Swap prepared, starting execution...', 'info');
+          return;
+        }
+
         if (swap.status === 'completed') {
           clearInterval(pollInterval);
           clearInterval(logPollInterval);
@@ -534,10 +651,10 @@ export async function CoinswapComponent(container, swapConfig) {
           console.log('🎯 Swap completed! Report data:', swap.report);
 
           if (swap.report) {
-            completeSwapWithReport(swap.report);
+            await completeSwapWithReport(swap.report);
           } else {
             console.warn('⚠️ No report from backend, using default');
-            completeSwap();
+            await completeSwap();
           }
         } else if (swap.status === 'failed') {
           if (pollInterval) {
@@ -553,13 +670,15 @@ export async function CoinswapComponent(container, swapConfig) {
           content.dataset.failed = 'true';
 
           addLog('Swap failed: ' + swap.error, 'error');
+          updateHeaderState('failed');
+          markAllMakersFailed();
           content.querySelector('#swap-status-text').textContent =
             'Swap Failed';
           content.querySelector('#swap-status-text').className =
             'text-2xl font-bold text-red-400';
 
-          SwapStateManager.saveSwapProgress({
-            ...SwapStateManager.getSwapProgress(),
+          await SwapStateManager.saveSwapProgress({
+            ...(await SwapStateManager.getSwapProgress()),
             status: 'failed',
             error: swap.error,
           });
@@ -628,7 +747,7 @@ export async function CoinswapComponent(container, swapConfig) {
     });
   }
 
-  function completeSwapWithReport(report) {
+  async function completeSwapWithReport(report) {
     if (content.dataset.completed === 'true') return;
     content.dataset.completed = 'true';
 
@@ -639,28 +758,33 @@ export async function CoinswapComponent(container, swapConfig) {
 
     addLog('Generating swap report...', 'success');
 
+    updateHeaderState('completed');
+    markAllMakersComplete();
+    updateYouReceive(true);
     content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
     content.querySelector('#swap-status-text').className =
       'text-2xl font-bold text-green-400';
     content.querySelector('#complete-button').classList.remove('hidden');
 
     const transformedReport = transformSwapReport(report);
-    transformedReport.protocol = actualSwapConfig.protocol || 'v1';
-    transformedReport.isTaproot = actualSwapConfig.isTaproot || false;
-    transformedReport.protocolVersion = actualSwapConfig.isTaproot ? 2 : 1;
+    transformedReport.protocol = swapProtocol;
+    transformedReport.isTaproot = swapProtocol === 'Taproot';
+    transformedReport.protocolVersion = swapProtocol === 'Taproot' ? 2 : 1;
+    transformedReport.nativeSwapId =
+      transformedReport.nativeSwapId || actualSwapConfig.nativeSwapId || null;
 
     actualSwapConfig.swapReport = transformedReport;
 
-    SwapStateManager.saveSwapProgress({
-      ...SwapStateManager.getSwapProgress(),
+    await SwapStateManager.saveSwapProgress({
+      ...(await SwapStateManager.getSwapProgress()),
       status: 'completed',
       report: transformedReport,
     });
 
-    SwapStateManager.completeSwap(transformedReport);
+    await SwapStateManager.completeSwap(transformedReport);
 
     setTimeout(() => {
-      SwapStateManager.clearSwapData();
+      void SwapStateManager.clearSwapData();
     }, 3000);
 
     if (window.appManager) window.appManager.stopBackgroundSwapManager();
@@ -686,6 +810,11 @@ export async function CoinswapComponent(container, swapConfig) {
       'swap_id',
       'swapId',
       actualSwapConfig.swapId || 'unknown'
+    );
+    const nativeSwapId = getValue(
+      'native_swap_id',
+      'nativeSwapId',
+      actualSwapConfig.nativeSwapId || null
     );
     const swapDurationSeconds = getValue(
       'swap_duration_seconds',
@@ -774,20 +903,28 @@ export async function CoinswapComponent(container, swapConfig) {
       };
     });
 
-    const derivedTotalFee = Number.isFinite(feePaidOrEarned)
+    const componentTotalFee = totalMakerFees + Math.max(0, miningFee);
+    const netFeePaidOrEarned = Number.isFinite(feePaidOrEarned)
       ? Math.abs(feePaidOrEarned)
-      : totalMakerFees + miningFee;
+      : NaN;
     const normalizedTotalFee =
-      Number.isFinite(totalFee) && (totalFee > 0 || derivedTotalFee <= 0)
+      Number.isFinite(totalFee) && totalFee >= 0
         ? totalFee
-        : derivedTotalFee;
+        : componentTotalFee > 0
+          ? componentTotalFee
+          : Number.isFinite(netFeePaidOrEarned)
+            ? netFeePaidOrEarned
+            : 0;
     const calculatedMiningFee =
-      miningFee || normalizedTotalFee - totalMakerFees;
+      Number.isFinite(miningFee) && miningFee >= 0
+        ? miningFee
+        : Math.max(0, normalizedTotalFee - totalMakerFees);
     const feePercentage =
       targetAmount > 0 ? (normalizedTotalFee / targetAmount) * 100 : 0;
 
     return {
       swapId,
+      nativeSwapId,
       swapDurationSeconds,
       targetAmount,
       totalInputAmount,
@@ -812,6 +949,7 @@ export async function CoinswapComponent(container, swapConfig) {
   function getDefaultReport() {
     return {
       swapId: actualSwapConfig.swapId || 'unknown',
+      nativeSwapId: actualSwapConfig.nativeSwapId || null,
       swapDurationSeconds: (Date.now() - startTime) / 1000,
       targetAmount: swapData.amount || 0,
       totalInputAmount: swapData.amount || 0,
@@ -831,19 +969,22 @@ export async function CoinswapComponent(container, swapConfig) {
     };
   }
 
-  function completeSwap() {
+  async function completeSwap() {
     if (content.dataset.completed === 'true') return;
     content.dataset.completed = 'true';
 
     addLog('All operations completed!', 'success');
 
+    updateHeaderState('completed');
+    markAllMakersComplete();
+    updateYouReceive(true);
     content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
     content.querySelector('#swap-status-text').className =
       'text-2xl font-bold text-green-400';
     content.querySelector('#complete-button').classList.remove('hidden');
 
     const defaultReport = getDefaultReport();
-    SwapStateManager.completeSwap(defaultReport);
+    await SwapStateManager.completeSwap(defaultReport);
     actualSwapConfig.swapReport = defaultReport;
 
     if (window.appManager) window.appManager.stopBackgroundSwapManager();
@@ -1188,7 +1329,7 @@ export async function CoinswapComponent(container, swapConfig) {
         }).join('')}
 
         ${isV2 ? `
-          <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">Taproot V2</text>
+          <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">${swapProtocol}</text>
           <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
         ` : ''}
       </svg>
@@ -1224,15 +1365,43 @@ export async function CoinswapComponent(container, swapConfig) {
     }
   }
 
+  function updateHeaderState(state) {
+    const titleEl = content.querySelector('#swap-page-title');
+    const badgeEl = content.querySelector('#swap-page-badge');
+    const badgeDotEl = content.querySelector('#swap-page-badge-dot');
+    const badgeTextEl = content.querySelector('#swap-page-badge-text');
+
+    if (!titleEl || !badgeEl || !badgeDotEl || !badgeTextEl) return;
+
+    if (state === 'completed') {
+      titleEl.textContent = 'Coinswap Complete';
+      badgeEl.className =
+        'flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/20 rounded-full';
+      badgeDotEl.className = 'w-2 h-2 rounded-full bg-green-400';
+      badgeTextEl.className = 'text-xs text-green-400 font-medium';
+      badgeTextEl.textContent = 'Complete';
+      return;
+    }
+
+    if (state === 'failed') {
+      titleEl.textContent = 'Coinswap Failed';
+      badgeEl.className =
+        'flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-full';
+      badgeDotEl.className = 'w-2 h-2 rounded-full bg-red-400';
+      badgeTextEl.className = 'text-xs text-red-400 font-medium';
+      badgeTextEl.textContent = 'Failed';
+    }
+  }
+
   content.innerHTML = `
     <!-- Header -->
     <div class="mb-4">
       <button id="back-to-swap" class="text-gray-500 hover:text-gray-300 text-sm flex items-center gap-1 mb-3 transition-colors">← Back</button>
       <div class="flex items-center gap-3 mb-1">
-        <h2 class="text-2xl font-bold text-[#FF6B35]">Coinswap in Progress</h2>
-        <span class="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
-          <span class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
-          <span class="text-xs text-orange-400 font-medium">Active</span>
+        <h2 id="swap-page-title" class="text-2xl font-bold text-[#FF6B35]">Coinswap in Progress</h2>
+        <span id="swap-page-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
+          <span id="swap-page-badge-dot" class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
+          <span id="swap-page-badge-text" class="text-xs text-orange-400 font-medium">Active</span>
         </span>
       </div>
       <p id="swap-status-text" class="text-gray-500 text-sm">Executing swap through ${swapData.makers} makers...</p>
@@ -1250,7 +1419,7 @@ export async function CoinswapComponent(container, swapConfig) {
         <p class="font-mono text-white font-semibold">${(swapData.amount / 100000000).toFixed(8)} BTC</p>
         ${!isV2
           ? `<p class="text-xs text-gray-500 mt-2">Hops: <span class="text-cyan-400">${swapData.hops}</span></p>`
-          : `<p class="text-xs text-cyan-400 mt-2">Taproot V2 (MuSig2)</p>`
+          : `<p class="text-xs text-cyan-400 mt-2">${swapProtocol} swap</p>`
         }
       </div>
 

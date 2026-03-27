@@ -25,14 +25,28 @@ function formatDate(timestamp) {
 }
 
 function getProtocolLabel(report) {
-  const protocol = report.protocol || report.report?.protocol || 'v1';
-  return protocol === 'v2' ? 'Taproot' : 'Legacy P2WSH';
+  const protocol = report.protocol || report.report?.protocol;
+  switch (protocol) {
+    case 'v2':
+    case 'Taproot':
+      return 'Taproot';
+    case 'Unified':
+      return 'Unified';
+    case 'v1':
+    case 'Legacy':
+    default:
+      return 'Legacy';
+  }
 }
 
 function getProtocolBadgeClasses(protocolLabel) {
-  return protocolLabel === 'Taproot'
-    ? 'bg-purple-500/20 text-purple-400'
-    : 'bg-blue-500/20 text-blue-400';
+  if (protocolLabel === 'Taproot') {
+    return 'bg-purple-500/20 text-purple-400';
+  }
+  if (protocolLabel === 'Unified') {
+    return 'bg-emerald-500/20 text-emerald-400';
+  }
+  return 'bg-blue-500/20 text-blue-400';
 }
 
 function normalizeSwapReport(report) {
@@ -115,7 +129,10 @@ function normalizeSwapReport(report) {
       Math.floor((completedAt - startedAt) / 1000) || 0
     ),
     status: report.status || 'completed',
-    protocol: report.protocol || nested.protocol || 'v1',
+    protocol:
+      report.protocol ||
+      nested.protocol ||
+      (report.isTaproot ? 'Taproot' : nested.isTaproot ? 'Taproot' : 'v1'),
     report: nested,
   };
 }
@@ -193,6 +210,8 @@ export function buildSwapHistoryMarkup(history) {
           const totalOutputAmount = Number(swap.totalOutputAmount) || 0;
           const feePercentage = Number(swap.feePercentage) || 0;
           const totalFee = Number(swap.totalFee) || 0;
+          const protocolLabel = getProtocolLabel(swap);
+          const protocolClasses = getProtocolBadgeClasses(protocolLabel);
           const btcAmount = satsToBtc(amount);
           const outputBtc = satsToBtc(totalOutputAmount);
           const timeAgo = formatRelativeTime(swap.completedAt);
@@ -210,6 +229,7 @@ export function buildSwapHistoryMarkup(history) {
                   <span class="text-white font-semibold text-lg">Coinswap</span>
                   <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">Completed</span>
                   <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">${swap.hops} hops</span>
+                  <span class="px-2 py-0.5 ${protocolClasses} text-xs rounded-full">${protocolLabel}</span>
                 </div>
                 <div class="flex items-center gap-4 text-sm">
                   <span class="text-gray-500">${timeAgo}</span>

@@ -3,7 +3,7 @@ const { parentPort, workerData } = require('worker_threads');
 /**
  * Worker thread for running long-running coinswap operations
  * This prevents blocking the main Electron process
- * Supports both V1 (P2WSH/Taker) and V2 (Taproot/TaprootTaker) protocols
+ * Swap protocol is now a swap parameter on the unified Taker class.
  */
 
 (async () => {
@@ -16,14 +16,10 @@ const { parentPort, workerData } = require('worker_threads');
 
     console.log(`🔧 Coinswap worker starting with ${protocolName} protocol`);
 
-    // Select the appropriate Taker class based on protocol
-    const TakerClass =
-      protocol === 'v2' ? coinswapNapi.TaprootTaker : coinswapNapi.Taker;
+    const TakerClass = coinswapNapi.Taker;
 
     if (!TakerClass) {
-      throw new Error(
-        `${protocol === 'v2' ? 'TaprootTaker' : 'Taker'} class not found. Please rebuild coinswap-napi.`
-      );
+      throw new Error('Taker class not found. Please rebuild coinswap-napi.');
     }
 
     // Setup logging if available
@@ -53,25 +49,43 @@ const { parentPort, workerData } = require('worker_threads');
       type: 'status',
       status: 'in_progress',
       protocol: config.protocol,
-      isTaproot: protocol === 'v2',
     });
 
-    // Run the coinswap
     const swapParams = {
+      protocol: protocol === 'v2' ? 'Taproot' : 'Legacy',
       sendAmount: amount,
       makerCount: makerCount,
       manuallySelectedOutpoints: outpoints || undefined,
     };
 
-    console.log(`🚀 Executing ${protocolName} coinswap...`);
-    const report = taker.doCoinswap(swapParams);
+    console.log(`🔄 Syncing offerbook in swap worker before prepare...`);
+    taker.syncOfferbookAndWait();
+
+    console.log(`🚀 Preparing ${protocolName} coinswap...`);
+    const swapId = taker.prepareCoinswap(swapParams);
+
+    parentPort.postMessage({
+      type: 'status',
+      status: 'prepared',
+      protocol: config.protocol,
+      nativeSwapId: swapId,
+    });
+
+    console.log(`🚀 Starting ${protocolName} coinswap...`);
+    const report = taker.startCoinswap(swapId);
 
     // Send success message
     parentPort.postMessage({
       type: 'complete',
-      report,
+      report: {
+        ...report,
+        nativeSwapId: swapId,
+        appSwapId: config.appSwapId,
+        protocol: config.protocol,
+      },
       protocol: config.protocol || 'v1',
-      isTaproot: (config.protocol || 'v1') === 'v2',
+      nativeSwapId: swapId,
+      appSwapId: config.appSwapId,
     });
   } catch (error) {
     // Send error message

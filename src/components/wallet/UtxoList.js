@@ -23,6 +23,14 @@ export function UtxoListComponent(container) {
     }
   }
 
+  async function syncWalletState() {
+    const result = await window.api.taker.sync();
+    if (!result?.success) {
+      throw new Error(result?.error || 'Wallet sync failed');
+    }
+    console.log('✅ Wallet sync completed before UTXO refresh');
+  }
+
   // Helper Functions
   function satsToBtc(sats) {
     return (sats / 100000000).toFixed(8);
@@ -320,6 +328,7 @@ export function UtxoListComponent(container) {
     refreshBtn.disabled = true;
 
     try {
+      await syncWalletState();
       await loadUtxos();
 
       refreshBtn.textContent = 'Refreshed!';
