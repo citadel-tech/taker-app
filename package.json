@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "com.citadel.coinswap-taker",
-    "productName": "CoinswapTaker",
+    "productName": "coinswap-taker",
     "asar": false,
     "files": [
       "**/*",
