@@ -51,7 +51,7 @@
       ],
       "category": "Finance",
       "executableName": "coinswap-taker",
-      "icon": "coinswap.png",
+      "icon": "build/icons",
       "maintainer": "Citadel Tech"
     },
     "snap": {
@@ -74,14 +74,14 @@
         "zip"
       ],
       "category": "public.app-category.finance",
-      "icon": "coinswap.png"
+      "icon": "build/icon.icns"
     },
     "win": {
       "target": [
         "nsis",
         "zip"
       ],
-      "icon": "coinswap.png"
+      "icon": "build/icon.ico"
     },
     "nsis": {
       "oneClick": false,
