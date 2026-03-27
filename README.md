@@ -1,4 +1,11 @@
-# Coinswap Taker App
+<div align="center">
+
+<img src="assets/coinswap.png" alt="Coinswap Maker Dashboard Logo" width="300" /> 
+
+<h1 align='center'>Coinswap Taker App</h1> 
+
+</div>
+
 
 A desktop application for performing private Bitcoin swaps using the [Coinswap Protocol](https://github.com/citadel-tech/coinswap).
 
@@ -166,14 +173,14 @@ This runs:
 
 ### Development Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm install` | Install dependencies and setup native modules |
-| `npm run dev` | Start app in development mode with hot-reload |
+| Command                  | Description                                       |
+| ------------------------ | ------------------------------------------------- |
+| `npm install`            | Install dependencies and setup native modules     |
+| `npm run dev`            | Start app in development mode with hot-reload     |
 | `npm run setup:coinswap` | Clone/update and build the coinswap native module |
-| `npm run build:css` | Build Tailwind CSS for production |
-| `npm run dist` | Create production build (AppImage + Snap) |
-| `npm start` | Start Electron without hot-reload |
+| `npm run build:css`      | Build Tailwind CSS for production                 |
+| `npm run dist`           | Create production build (AppImage + Snap)         |
+| `npm start`              | Start Electron without hot-reload                 |
 
 ### Troubleshooting
 
