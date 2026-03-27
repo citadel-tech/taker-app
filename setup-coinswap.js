@@ -18,7 +18,7 @@ function runCommand(cmd, options = {}) {
 }
 
 // STEP 1 — Clone coinswap-ffi if missing
-const BRANCH = 'offerbook-fix';
+const BRANCH = 'main';
 const REPO_URL = 'https://github.com/citadel-tech/coinswap-ffi.git';
 
 if (!fs.existsSync(FFI_DIR)) {

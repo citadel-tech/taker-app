@@ -371,7 +371,7 @@ export function getSwapStatus(swapId) {
   return window.api.coinswap.getStatus(swapId);
 }
 
-export function recoverFromSwap() {
+export function recoverActiveSwap() {
   return window.api.taker.recover();
 }
 

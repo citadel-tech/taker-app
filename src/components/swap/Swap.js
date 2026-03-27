@@ -70,13 +70,22 @@ export async function SwapComponent(container) {
   console.log('📊 Active swap check:', { activeSwap, hasActiveSwap });
 
   // If there's an active swap in progress, redirect to coinswap progress
-  if (activeSwap && activeSwap.status === 'configured') {
-    const age = Date.now() - activeSwap.createdAt;
-    if (age > 15 * 60 * 1000) {
-      console.log('🧹 Clearing stale configured swap');
-      await SwapStateManager.clearSwapData();
-    } else {
-      console.log('🔄 Active swap detected, redirecting to progress view');
+  if (activeSwap && hasActiveSwap) {
+    if (activeSwap.status === 'configured') {
+      const age = Date.now() - activeSwap.createdAt;
+      if (age > 15 * 60 * 1000) {
+        console.log('🧹 Clearing stale configured swap');
+        await SwapStateManager.clearSwapData();
+      } else {
+        console.log('🔄 Configured swap detected, redirecting to progress view');
+        import('./Coinswap.js').then((module) => {
+          container.innerHTML = '';
+          module.CoinswapComponent(container, activeSwap);
+        });
+        return; // Exit early, don't render the config page
+      }
+    } else if (activeSwap.status === 'in_progress') {
+      console.log('🔄 In-progress swap detected, redirecting to progress view');
       import('./Coinswap.js').then((module) => {
         container.innerHTML = '';
         module.CoinswapComponent(container, activeSwap);
@@ -142,12 +151,19 @@ export async function SwapComponent(container) {
   let totalBalance = 0;
   const btcPrice = 50000;
 
+  function getMakerProtocol(makerOrItem, offer = makerOrItem?.offer) {
+    return makerOrItem?.protocol || (offer?.tweakablePoint ? 'Taproot' : 'Legacy');
+  }
+
   function filterMakersByProtocol(makers) {
-    return makers.filter((maker) =>
-      currentProtocol === 'v2'
-        ? maker.protocol === 'Taproot'
-        : maker.protocol !== 'Taproot'
-    );
+    return makers.filter((maker) => {
+      const makerProtocol = getMakerProtocol(maker);
+      // Unified treated as compatible but not yet a user-selectable mode.
+      if (makerProtocol === 'Unified') return true;
+      return currentProtocol === 'v2'
+        ? makerProtocol === 'Taproot'
+        : makerProtocol === 'Legacy';
+    });
   }
 
   function updateAvailableMakersCount() {
@@ -243,7 +259,7 @@ export async function SwapComponent(container) {
                 baseFee: offer.baseFee || 0,
                 volumeFeePct: offer.amountRelativeFeePct || 0,
                 timeFeePct: offer.timeRelativeFeePct || 0,
-                protocol: item.protocol || 'Legacy',
+                protocol: getMakerProtocol(item, offer),
                 index: index,
               };
             })
@@ -1261,12 +1277,12 @@ export async function SwapComponent(container) {
 
           // Filter makers by protocol
           const compatibleMakers = goodMakers.filter((maker) => {
-            const makerProtocol = maker.protocol;
-            if (protocol === 'v2') {
-              return makerProtocol === 'Taproot';
-            } else {
-              return makerProtocol === 'Legacy';
-            }
+            const makerProtocol = getMakerProtocol(maker);
+            // Unified treated as compatible but not yet a user-selectable mode.
+            if (makerProtocol === 'Unified') return true;
+            return protocol === 'v2'
+              ? makerProtocol === 'Taproot'
+              : makerProtocol === 'Legacy';
           });
 
           const makersNeeded = getNumberOfMakers();
@@ -1340,7 +1356,7 @@ export async function SwapComponent(container) {
         console.log('✅ Swap started with ID:', result.swapId);
 
         swapConfig.swapId = result.swapId;
-        SwapStateManager.saveSwapConfig(swapConfig);
+        await SwapStateManager.saveSwapConfig(swapConfig);
 
         if (window.appManager) {
           console.log('🔄 Starting background swap manager');

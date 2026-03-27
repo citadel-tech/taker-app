@@ -11,6 +11,31 @@ export function Market(container) {
   let periodicRefreshInterval = null;
   let relayCount = null;
 
+  function getProtocolPresentation(protocol) {
+    switch (protocol) {
+      case 'Taproot':
+        return {
+          label: 'Taproot',
+          icon: '⚡',
+          classes: 'bg-purple-500/20 text-purple-400',
+        };
+      case 'Unified':
+        return {
+          label: 'Unified',
+          icon: '◈',
+          classes: 'bg-emerald-500/20 text-emerald-400',
+        };
+      case 'Legacy':
+      case 'Legacy P2WSH':
+      default:
+        return {
+          label: 'Legacy',
+          icon: '🔒',
+          classes: 'bg-blue-500/20 text-blue-400',
+        };
+    }
+  }
+
   // Check sync state every second
   function startSyncStateMonitor() {
     if (syncCheckInterval) return;
@@ -83,7 +108,7 @@ export function Market(container) {
     return {
       address: fullAddress,
       protocol:
-        item.protocol || (offer.tweakablePoint ? 'Taproot' : 'Legacy P2WSH'),
+        item.protocol || (offer.tweakablePoint ? 'Taproot' : 'Legacy'),
       baseFee: offer.baseFee || 0,
       volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
       timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
@@ -107,11 +132,17 @@ export function Market(container) {
   // API FUNCTIONS
   async function fetchMakers() {
     try {
-      console.log('📡 Fetching makers from API...');
+      console.log('📡 [market] Fetching makers from API...');
       isLoading = true;
       updateUI();
 
       const data = await window.api.taker.getOffers();
+      console.log('📡 [market] Raw getOffers response', {
+        success: data.success,
+        cached: data.cached,
+        message: data.message,
+        error: data.error,
+      });
 
       if (data.success && data.offerbook) {
         const goodMakers = data.offerbook.goodMakers || [];
@@ -141,10 +172,17 @@ export function Market(container) {
           })),
         ];
 
-        console.log('✅ Loaded', makers.length, 'makers:', {
+        console.log('✅ [market] Loaded makers into UI', {
+          total: makers.length,
           good: goodMakers.length,
           bad: badMakers.length,
           unresponsive: unresponsiveMakers.length,
+          sample: makers.slice(0, 3).map((maker) => ({
+            address: maker.address,
+            status: maker.status,
+            maxSize: maker.maxSize,
+            bond: maker.bond,
+          })),
         });
         isLoading = false;
         updateUI();
@@ -260,9 +298,11 @@ export function Market(container) {
 
   async function handleRefresh() {
     const refreshBtn = content.querySelector('#refresh-market-btn');
+    console.log('🔁 [market] Refresh button clicked');
 
     // Guard against double-click if sync already running
     const stateCheck = await window.api.taker.getCurrentSyncState();
+    console.log('🔁 [market] Current sync state before refresh', stateCheck);
     if (stateCheck.success && stateCheck.isRunning) {
       showError('Sync already in progress');
       return;
@@ -277,6 +317,7 @@ export function Market(container) {
 
     try {
       const result = await window.api.taker.syncOfferbookAndWait();
+      console.log('🔁 [market] syncOfferbookAndWait start result', result);
       if (!result.success) {
         throw new Error(result.error || 'Failed to start sync');
       }
@@ -286,6 +327,13 @@ export function Market(container) {
         const poll = setInterval(async () => {
           try {
             const status = await window.api.taker.getSyncStatus(syncId);
+            console.log('🔁 [market] Polled sync status', {
+              syncId,
+              success: status.success,
+              status: status.sync?.status,
+              error: status.sync?.error || status.error,
+              offerbook: status.sync?.offerbook,
+            });
             if (!status.success) { clearInterval(poll); reject(new Error('Failed to get sync status')); return; }
             if (status.sync.status === 'completed') { clearInterval(poll); resolve(); }
             else if (status.sync.status === 'failed') { clearInterval(poll); reject(new Error(status.sync.error || 'Sync failed')); }
@@ -294,6 +342,7 @@ export function Market(container) {
       });
 
       syncProgress = null;
+      console.log('🔁 [market] Sync finished, reloading makers');
       await fetchMakers();
 
       refreshBtn.innerHTML = 'Refreshed!';
@@ -302,6 +351,7 @@ export function Market(container) {
         refreshBtn.innerHTML = originalText;
       }, 2000);
     } catch (error) {
+      console.error('❌ [market] Refresh failed', error);
       syncProgress = null;
       updateUI();
       refreshBtn.innerHTML = 'Refresh Failed';
@@ -694,16 +744,14 @@ export function Market(container) {
         } else {
           tableBody.innerHTML = displayedMakers
             .map(
-              (maker) => `
+              (maker) => {
+                const protocolBadge = getProtocolPresentation(maker.protocol);
+                return `
           <div class="grid grid-cols-8 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
             
             <div class="text-sm">
-              <span class="px-2 py-1 ${
-                maker.protocol === 'Taproot'
-                  ? 'bg-purple-500/20 text-purple-400'
-                  : 'bg-blue-500/20 text-blue-400'
-              } rounded text-xs font-semibold text-lg">
-                ${maker.protocol === 'Taproot' ? '⚡ Taproot' : '🔒 Legacy'}
+              <span class="px-2 py-1 ${protocolBadge.classes} rounded text-xs font-semibold text-lg">
+                ${protocolBadge.icon} ${protocolBadge.label}
               </span>
             </div>
             <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${maker.address.substring(0, 18)}...</div>
@@ -716,7 +764,8 @@ export function Market(container) {
               ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
             </div>
           </div>
-        `
+        `;
+              }
             )
             .join('');
         }

@@ -96,6 +96,14 @@ export async function WalletComponent(container) {
     }
   }
 
+  async function syncWalletState() {
+    const result = await window.api.taker.sync();
+    if (!result?.success) {
+      throw new Error(result?.error || 'Wallet sync failed');
+    }
+    console.log('✅ Wallet sync completed before refresh');
+  }
+
   // Helper Functions
   function satsToBtc(sats) {
     return (sats / 100000000).toFixed(8);
@@ -345,7 +353,9 @@ export async function WalletComponent(container) {
     refreshBtn.disabled = true;
 
     try {
-      // ✅ FORCE FRESH FETCH
+      await syncWalletState();
+
+      // ✅ FORCE FRESH FETCH AFTER WALLET SYNC
       const [balance, transactions, utxos] = await Promise.all([
         fetchBalance(),
         fetchTransactions(),
