@@ -16,7 +16,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ github.ref_name }}
-          draft: false
+          draft: true
           prerelease: false
           # Auto-generates description from merged PRs and commits since the last tag.
           # To use a changelog file instead, replace with:
