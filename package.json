@@ -47,7 +47,8 @@
         "snap",
         "deb",
         "rpm",
-        "tar.gz"
+        "tar.gz",
+        "pacman"
       ],
       "category": "Finance",
       "executableName": "coinswap-taker",
