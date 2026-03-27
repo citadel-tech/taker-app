@@ -51,7 +51,8 @@
       ],
       "category": "Finance",
       "executableName": "coinswap-taker",
-      "icon": "coinswap.png"
+      "icon": "coinswap.png",
+      "maintainer": "Citadel Tech"
     },
     "snap": {
       "confinement": "classic",

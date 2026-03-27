@@ -53,7 +53,7 @@ jobs:
         run: npm run build:css
 
       - name: Build Electron packages
-        run: npm run build:electron -- --linux
+        run: npm run build:electron -- --linux --publish never
 
       - name: Upload Linux artifacts
         uses: softprops/action-gh-release@v2
@@ -105,7 +105,7 @@ jobs:
         run: npm run build:css
 
       - name: Build Electron packages
-        run: npm run build:electron -- --mac
+        run: npm run build:electron -- --mac --publish never
 
       - name: Upload macOS artifacts
         uses: softprops/action-gh-release@v2
@@ -147,14 +147,13 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Build Rust NAPI module
-        shell: bash
         run: node setup-coinswap.js
 
       - name: Build CSS
         run: npm run build:css
 
       - name: Build Electron packages
-        run: npm run build:electron -- --win
+        run: npm run build:electron -- --win --publish never
 
       - name: Upload Windows artifacts
         uses: softprops/action-gh-release@v2
