@@ -36,6 +36,22 @@ export function Market(container) {
     }
   }
 
+  function formatTorEndpoint(address, start = 14, end = 16) {
+    if (!address || typeof address !== 'string') return 'unknown';
+
+    const separatorIndex = address.lastIndexOf(':');
+    if (separatorIndex === -1) return address;
+
+    const host = address.slice(0, separatorIndex);
+    const port = address.slice(separatorIndex + 1);
+
+    if (host.length <= start + end + 3) {
+      return `${host}:${port}`;
+    }
+
+    return `${host.slice(0, start)}...${host.slice(-end)}:${port}`;
+  }
+
   // Check sync state every second
   function startSyncStateMonitor() {
     if (syncCheckInterval) return;
@@ -754,7 +770,7 @@ export function Market(container) {
                 ${protocolBadge.icon} ${protocolBadge.label}
               </span>
             </div>
-            <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${maker.address.substring(0, 18)}...</div>
+            <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
             <div class="text-green-400">${maker.baseFee}</div>
             <div class="text-blue-400">${maker.volumeFee}%</div>
             <div class="text-cyan-400">${maker.timeFee}%</div>

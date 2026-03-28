@@ -6,6 +6,18 @@ import {
 
 let swapHistory = [];
 
+function normalizeTimestamp(value, fallback = null) {
+  if (value == null || value === '') return fallback;
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return numeric < 1e12 ? numeric * 1000 : numeric;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function formatDuration(seconds) {
   if (typeof seconds !== 'number' || isNaN(seconds)) return '0m 0s';
   const mins = Math.floor(seconds / 60);
@@ -14,6 +26,7 @@ function formatDuration(seconds) {
 }
 
 function formatDate(timestamp) {
+  if (!Number.isFinite(timestamp)) return 'Unknown date';
   const date = new Date(timestamp);
   return date.toLocaleDateString('en-US', {
     year: 'numeric',
@@ -55,9 +68,25 @@ function normalizeSwapReport(report) {
     const normalized = Number(value);
     return Number.isFinite(normalized) ? normalized : fallback;
   };
-  const startedAt = report.startedAt || nested.startedAt || Date.now();
-  const completedAt =
-    report.completedAt || report.failedAt || nested.completedAt || Date.now();
+  const startedAt = normalizeTimestamp(
+    report.startedAt ||
+      report.started_at ||
+      nested.startedAt ||
+      nested.started_at,
+    null
+  );
+  const completedAt = normalizeTimestamp(
+    report.completedAt ||
+      report.completed_at ||
+      report.failedAt ||
+      report.failed_at ||
+      nested.completedAt ||
+      nested.completed_at ||
+      nested.endTimestamp ||
+      nested.end_timestamp ||
+      report.fileModifiedAt,
+    null
+  );
   const totalMakerFees = toNumber(
     nested.totalMakerFees ??
       nested.total_maker_fees ??
@@ -126,7 +155,15 @@ function normalizeSwapReport(report) {
       nested.feePercentage || nested.fee_percentage || report.feePercentage || 0,
     durationSeconds: Math.max(
       0,
-      Math.floor((completedAt - startedAt) / 1000) || 0
+      Number.isFinite(completedAt) && Number.isFinite(startedAt)
+        ? Math.floor((completedAt - startedAt) / 1000)
+        : toNumber(
+            nested.swapDurationSeconds ??
+              nested.swap_duration_seconds ??
+              report.swapDurationSeconds ??
+              report.swap_duration_seconds,
+            0
+          )
     ),
     status: report.status || 'completed',
     protocol:
@@ -158,7 +195,8 @@ export async function loadSwapHistory() {
             status: normalized.status,
             report: normalized.report,
           };
-        });
+        })
+        .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0));
     } else {
       swapHistory = [];
       throw new Error(result.error || 'Failed to load swap history');
@@ -214,7 +252,9 @@ export function buildSwapHistoryMarkup(history) {
           const protocolClasses = getProtocolBadgeClasses(protocolLabel);
           const btcAmount = satsToBtc(amount);
           const outputBtc = satsToBtc(totalOutputAmount);
-          const timeAgo = formatRelativeTime(swap.completedAt);
+          const timeAgo = Number.isFinite(swap.completedAt)
+            ? formatRelativeTime(swap.completedAt)
+            : 'Unknown time';
           const dateStr = formatDate(swap.completedAt);
           const duration = formatDuration(swap.durationSeconds);
 
@@ -300,6 +340,7 @@ export async function SwapHistoryComponent(container) {
   }
 
   function formatDate(timestamp) {
+    if (!Number.isFinite(timestamp)) return 'Unknown date';
     const date = new Date(timestamp);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -357,7 +398,9 @@ export async function SwapHistoryComponent(container) {
           .map((swap, index) => {
             const btcAmount = satsToBtc(swap.amount);
             const outputBtc = satsToBtc(swap.totalOutputAmount);
-            const timeAgo = formatRelativeTime(swap.completedAt);
+            const timeAgo = Number.isFinite(swap.completedAt)
+              ? formatRelativeTime(swap.completedAt)
+              : 'Unknown time';
             const dateStr = formatDate(swap.completedAt);
             const duration = formatDuration(swap.durationSeconds);
 

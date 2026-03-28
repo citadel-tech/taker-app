@@ -17,9 +17,9 @@ export function ReceiveComponent(container) {
                 <!-- QR Code -->
                 <div class="bg-white p-4 rounded-lg mb-6 flex items-center justify-center">
                     <div id="qr-container" class="flex items-center justify-center" style="min-height: 256px; min-width: 256px;">
-                        <div id="qr-loading" class="text-center">
-                            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-2"></div>
-                            <p class="text-sm text-gray-500">Generating address...</p>
+                        <div id="qr-loading" class="text-center text-gray-500">
+                            <p class="text-sm">No address loaded</p>
+                            <p class="text-xs mt-2">Click the button below to generate a receive address.</p>
                         </div>
                     </div>
                 </div>
@@ -28,7 +28,7 @@ export function ReceiveComponent(container) {
                 <div class="mb-6">
                     <div class="bg-[#0f1419] border border-gray-700 rounded-lg p-4 flex items-center justify-between">
                         <span id="current-address" class="font-mono text-sm text-white break-all flex-1 mr-4">
-                            Loading...
+                            No address loaded
                         </span>
                         <button id="copy-address" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors whitespace-nowrap">
                             Copy
@@ -40,8 +40,8 @@ export function ReceiveComponent(container) {
                 </div>
 
                 <!-- Generate New Address Button -->
-                <button id="generate-new" disabled class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
-                    <span class="generate-text">Generate New Address</span>
+                <button id="generate-new" class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
+                    <span class="generate-text">Generate Address</span>
                     <span class="generate-loading hidden">
                         <span class="inline-block animate-spin mr-2">⟳</span>
                         Generating...
@@ -399,9 +399,9 @@ export function ReceiveComponent(container) {
 
     // Show loading in QR container
     qrContainer.innerHTML = `
-      <div class="text-center">
+        <div class="text-center">
         <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-2"></div>
-        <p class="text-sm text-gray-500">Generating...</p>
+        <p class="text-sm text-gray-500">Generating address...</p>
       </div>
     `;
 
@@ -457,17 +457,10 @@ export function ReceiveComponent(container) {
     }
   }
 
-  // Initialize - always generate a new address on page load
   async function initialize() {
     try {
-      // Always generate a new address
-      await generateNewAddress();
-
-      // Update recent addresses list
       await updateRecentAddresses();
-
-      // Enable generate button
-      generateButton.disabled = false;
+      updateAddressStatus(null);
     } catch (error) {
       console.error('❌ Initialization failed:', error);
       currentAddressEl.textContent = 'Failed to initialize';

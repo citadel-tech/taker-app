@@ -39,7 +39,7 @@ Unlike traditional Bitcoin transactions that create an on-chain trail, coinswaps
 
 The Taker app requires the following components to operate:
 
-1. **Bitcoin Core (Mutinynet)** - A fully synced Mutinynet node with proper RPC and ZMQ configuration
+1. **Bitcoin Core (Mutinynet)** - A fully synced Mutinynet node with proper RPC, REST, and ZMQ configuration
    - See the [Bitcoin Core setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoind.md) for detailed instructions
 
 2. **Tor** - Required for anonymous maker discovery and privacy
@@ -117,30 +117,30 @@ npm run dist
 ```
 
 This creates production-ready packages in the `dist/` directory:
-- `TakerApp-1.0.0.AppImage` - Portable executable for all Linux distributions
-- `taker-app_1.0.0_amd64.snap` - Optional snap package
+- `CoinswapTaker-0.2.1.AppImage` - Portable executable for Linux distributions
+- `coinswaptaker_0.2.1_amd64.snap` - Optional snap package
 
 ### Using the AppImage
 ```bash
 # Make executable (one-time)
-chmod +x dist/TakerApp-1.0.0.AppImage
+chmod +x dist/CoinswapTaker-0.2.1.AppImage
 
 # Run directly
-./dist/TakerApp-1.0.0.AppImage
+./dist/CoinswapTaker-0.2.1.AppImage
 ```
 
 **Optional desktop integration:**
 ```bash
 # Integrate with application menu
-./dist/TakerApp-1.0.0.AppImage --appimage-integrate
+./dist/CoinswapTaker-0.2.1.AppImage --appimage-integrate
 
 # Remove integration
-./dist/TakerApp-1.0.0.AppImage --appimage-unintegrate
+./dist/CoinswapTaker-0.2.1.AppImage --appimage-unintegrate
 ```
 
 **Extract and inspect:**
 ```bash
-./dist/TakerApp-1.0.0.AppImage --appimage-extract
+./dist/CoinswapTaker-0.2.1.AppImage --appimage-extract
 cd squashfs-root
 ./TakerApp
 ```
@@ -186,8 +186,8 @@ which fusermount
 sudo apt install fuse libfuse2
 
 # Or extract and run directly
-./TakerApp-1.0.0.AppImage --appimage-extract
-./squashfs-root/TakerApp
+./CoinswapTaker-0.2.1.AppImage --appimage-extract
+./squashfs-root/coinswap-taker
 ```
 
 **Error: Cannot find module 'coinswap-napi'**
@@ -228,7 +228,7 @@ Report security issues on our [Discord](https://discord.gg/Wz42hVmrrK) or email 
 
 ## License
 
-Dual-licensed under MIT or Apache 2.0 at your option.
+Licensed under Apache 2.0. See [LICENSE](LICENSE).
 
 ## Community
 

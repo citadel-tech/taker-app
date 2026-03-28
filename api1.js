@@ -111,6 +111,18 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(normalized) ? normalized : fallback;
 }
 
+function normalizeTimestamp(value, fallback = null) {
+  if (value == null || value === '') return fallback;
+
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    return numeric < 1e12 ? numeric * 1000 : numeric;
+  }
+
+  const parsed = new Date(value).getTime();
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function getOfferbookSnapshot() {
   const offerbookPath = path.join(api1State.DATA_DIR, 'offerbook.json');
   const snapshot = {
@@ -249,6 +261,7 @@ function inferTaprootFromReport(rawReport = {}) {
 }
 
 function buildSwapReportRecord(filePath, rawReport) {
+  const fileStats = fs.statSync(filePath);
   const fileName = path.basename(filePath, '.json');
   const nativeSwapId =
     rawReport.nativeSwapId ||
@@ -293,10 +306,16 @@ function buildSwapReportRecord(filePath, rawReport) {
     rawReport.report?.endTimestamp ||
     rawReport.report?.end_timestamp ||
     null;
-  const completedAt =
-    Number.isFinite(Number(rawCompletedAt)) && Number(rawCompletedAt) < 1e12
-      ? Number(rawCompletedAt) * 1000
-      : rawCompletedAt;
+  const completedAt = normalizeTimestamp(rawCompletedAt, fileStats.mtimeMs);
+  const startedAt = normalizeTimestamp(
+    rawReport.startedAt ||
+      rawReport.started_at ||
+      rawReport.report?.startedAt ||
+      rawReport.report?.started_at ||
+      rawReport.report?.startTimestamp ||
+      rawReport.report?.start_timestamp,
+    null
+  );
   const isTaproot = inferTaprootFromReport(rawReport);
   const protocol = normalizeSwapProtocol(
     rawReport.protocol || nestedReport.protocol,
@@ -316,7 +335,9 @@ function buildSwapReportRecord(filePath, rawReport) {
     nativeSwapId,
     appSwapId,
     status: normalizedStatus,
+    startedAt,
     completedAt,
+    fileModifiedAt: fileStats.mtimeMs,
     filePath,
     fileName,
     isCoreReport,
