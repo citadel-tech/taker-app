@@ -16,14 +16,14 @@ This guide covers all features and functionality of the Coinswap Taker App.
 
 ## Setup and Connection
 
-On each launch, the app loads your configuration:
+On launch, the app walks through setup and connection configuration:
 
 1. **Bitcoin Core Connection** - Configure RPC credentials and port
 2. **Tor Configuration** - Set control and SOCKS ports (defaults: 9051, 9050)
-3. **Wallet Loading** - Opens your existing encrypted wallet, prompts creation, or allows restoration from seed
-4. **ZMQ Setup** - Configure real-time block and transaction notifications
+3. **Wallet Loading** - Opens your existing encrypted wallet, prompts creation, or allows restoration from backup JSON
+4. **ZMQ Setup** - Configure real-time block and transaction notifications as part of the Bitcoin endpoint setup
 
-The setup page allows you to review and update your configuration at any time.
+The setup page allows you to review and update your configuration.
 
 ## Wallet Page
 
@@ -102,7 +102,7 @@ Configure app and Bitcoin Core connection:
 - **Wallet Backup** - Create encrypted wallet backups
 - **Connection Testing** - Verify Bitcoin Core and Tor connectivity
 
-Settings are persisted locally and can be updated at any time without restarting the app.
+Settings can be reviewed and updated from the app, though the current development build may require re-running setup on launch.
 
 ## Log Page
 

@@ -303,10 +303,23 @@ export function SwapReportComponent(container, swapReport) {
     return num.toLocaleString();
   }
 
-  function truncateAddress(addr, start = 16, end = 8) {
+  function truncateAddress(addr, start = 14, end = 16) {
     if (!addr || typeof addr !== 'string') return 'unknown';
-    if (addr.length <= start + end) return addr;
-    return `${addr.substring(0, start)}...${addr.substring(addr.length - end)}`;
+
+    const separatorIndex = addr.lastIndexOf(':');
+    if (separatorIndex === -1) {
+      if (addr.length <= start + end) return addr;
+      return `${addr.substring(0, start)}...${addr.substring(addr.length - end)}`;
+    }
+
+    const host = addr.substring(0, separatorIndex);
+    const port = addr.substring(separatorIndex + 1);
+
+    if (host.length <= start + end + 3) {
+      return `${host}:${port}`;
+    }
+
+    return `${host.substring(0, start)}...${host.substring(host.length - end)}:${port}`;
   }
 
   function truncateTxid(txid, start = 20, end = 12) {
@@ -495,7 +508,7 @@ export function SwapReportComponent(container, swapReport) {
       return `
         <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800">
           <p class="text-gray-400 text-sm">
-            No transaction IDs were embedded in this report file. The report still includes makers, fees, and UTXO outputs below.
+            No on-chain transaction IDs were saved with this swap report. Maker, fee, and UTXO details are still shown below.
           </p>
         </div>
       `;

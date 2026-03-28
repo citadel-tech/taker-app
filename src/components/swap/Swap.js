@@ -50,6 +50,22 @@ function saveSwapDataToCache(utxos, makers, balance) {
   }
 }
 
+function formatTorEndpoint(address, start = 14, end = 16) {
+  if (!address || typeof address !== 'string') return 'unknown';
+
+  const separatorIndex = address.lastIndexOf(':');
+  if (separatorIndex === -1) return address;
+
+  const host = address.slice(0, separatorIndex);
+  const port = address.slice(separatorIndex + 1);
+
+  if (host.length <= start + end + 3) {
+    return `${host}:${port}`;
+  }
+
+  return `${host.slice(0, start)}...${host.slice(-end)}:${port}`;
+}
+
 export async function SwapComponent(container) {
   const existingContent = container.querySelector('#swap-content');
   if (existingContent) {
@@ -662,10 +678,13 @@ export async function SwapComponent(container) {
       details.hops + ' hop' + (details.hops !== 1 ? 's' : '');
     content.querySelector('#estimated-time').textContent =
       formatEstimatedTime(details.timeSeconds);
-    content.querySelector('#selected-makers-display').textContent =
+    const selectedMakersText =
       getTopCandidateMakers()
-        .map((maker) => maker.address)
+        .map((maker) => formatTorEndpoint(maker.address))
         .join(', ') || 'None selected';
+    const selectedMakersEl = content.querySelector('#selected-makers-display');
+    selectedMakersEl.textContent = selectedMakersText;
+    selectedMakersEl.title = selectedMakersText;
     content.querySelector('#maker-fee-percent').textContent =
       details.makerFeePercent + '%';
     content.querySelector('#maker-fee-sats').textContent =
@@ -1104,7 +1123,7 @@ export async function SwapComponent(container) {
               </div>
               <div class="flex justify-between mb-2 gap-3">
                 <span class="text-sm text-gray-400">Top Maker Candidates</span>
-                <span id="selected-makers-display" class="text-sm text-cyan-400 text-right break-all">None selected</span>
+                <span id="selected-makers-display" class="text-sm text-cyan-400 text-right whitespace-nowrap overflow-hidden text-ellipsis block max-w-[220px] md:max-w-[280px] lg:max-w-[340px]" title="None selected">None selected</span>
               </div>
               <div class="flex justify-between mb-2">
                 <span class="text-sm text-gray-400">Hops</span>
