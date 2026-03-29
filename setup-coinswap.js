@@ -12,7 +12,7 @@ console.log('\n=== Coinswap Native Module Auto Setup ===\n');
 function runCommand(cmd, options = {}) {
   return execSync(cmd, {
     stdio: 'inherit',
-    shell: '/bin/bash',
+    shell: process.platform === 'win32' ? 'bash' : '/bin/bash',
     ...options,
   });
 }

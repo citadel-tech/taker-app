@@ -19,7 +19,7 @@
   },
   "build": {
     "appId": "com.citadel.coinswap-taker",
-    "productName": "CoinswapTaker",
+    "productName": "coinswap-taker",
     "asar": false,
     "files": [
       "**/*",
@@ -44,11 +44,16 @@
     "linux": {
       "target": [
         "AppImage",
-        "snap"
+        "snap",
+        "deb",
+        "rpm",
+        "tar.gz",
+        "pacman"
       ],
       "category": "Finance",
       "executableName": "coinswap-taker",
-      "icon": "coinswap.png"
+      "icon": "build/icons",
+      "maintainer": "Citadel Tech"
     },
     "snap": {
       "confinement": "classic",
@@ -63,6 +68,25 @@
         "desktop-legacy",
         "x11"
       ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.finance",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "repository": {
