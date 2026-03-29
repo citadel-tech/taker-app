@@ -1,4 +1,5 @@
 import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
+import { icons } from '../../js/icons.js';
 
 export async function CoinswapComponent(container, swapConfig) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
@@ -181,7 +182,7 @@ export async function CoinswapComponent(container, swapConfig) {
   function markAllMakersComplete() {
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
-      updateHopStatus(i, '✓ Complete', 'green');
+      updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
     }
   }
 
@@ -317,7 +318,7 @@ export async function CoinswapComponent(container, swapConfig) {
         );
         if (slot !== -1) {
           setTransactionConfirmed(slot);
-          updateHopStatus(slot, '✓ Confirmed', 'green');
+          updateHopStatus(slot, `${icons.check(14, 'mr-1')} Confirmed`, 'green');
 
           const confirmedHops = swapData.transactions.filter(
             (tx) => tx.status === 'confirmed'
@@ -342,7 +343,7 @@ export async function CoinswapComponent(container, swapConfig) {
         );
         if (slot !== -1) {
           setTransactionConfirmed(slot);
-          updateHopStatus(slot, '✓ Confirmed', 'green');
+          updateHopStatus(slot, `${icons.check(14, 'mr-1')} Confirmed`, 'green');
 
           // ✅ When outgoing is confirmed, light up ALL makers and mark intermediate hops as "Processing"
           if (slot === 0) {
@@ -352,7 +353,7 @@ export async function CoinswapComponent(container, swapConfig) {
             }
             // Mark intermediate hops as processing (hops 1 to N-1)
             for (let i = 1; i < swapData.hops - 1; i++) {
-              updateHopStatus(i, '🔄 Processing...', 'blue');
+              updateHopStatus(i, `${icons.refreshCw(14, 'mr-1 animate-spin')} Processing...`, 'blue');
             }
             console.log(
               `✅ Outgoing contract confirmed. All ${swapData.makers} makers now active`
@@ -384,7 +385,7 @@ export async function CoinswapComponent(container, swapConfig) {
     ) {
       // Mark all intermediate hops as "Keys received"
       for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, '🔑 Keys received', 'green');
+        updateHopStatus(i, `${icons.key(14, 'mr-1')} Keys received`, 'green');
       }
     }
     // V2: "Registered watcher for taker's incoming contract"
@@ -395,7 +396,7 @@ export async function CoinswapComponent(container, swapConfig) {
       if (txMatch) {
         // This is the final hop - mark it
         const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, '📥 Receiving...', 'blue');
+        updateHopStatus(lastHop, `${icons.arrowDownCircle(14, 'mr-1')} Receiving...`, 'blue');
       }
     }
     // V2: "Sweeping taker's incoming contract"
@@ -408,19 +409,19 @@ export async function CoinswapComponent(container, swapConfig) {
       const txMatch = message.match(/([a-f0-9]{64})/i);
       if (txMatch) {
         const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, '✓ Swept', 'green');
+        updateHopStatus(lastHop, `${icons.check(14, 'mr-1')} Swept`, 'green');
       }
     }
     // V1: "Swaps settled successfully"
     else if (message.includes('Swaps settled successfully')) {
       for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, '✓ Complete', 'green');
+        updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
       }
     }
     // V2: "Taker sweep completed successfully"
     else if (message.includes('Taker sweep completed successfully')) {
       for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, '✓ Complete', 'green');
+        updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
       }
       // Make sure all makers are visible
       for (let i = 0; i < swapData.makers; i++) {
@@ -431,7 +432,7 @@ export async function CoinswapComponent(container, swapConfig) {
     // V2: "Successfully Completed Taproot Coinswap"
     else if (message.includes('Successfully Completed Taproot Coinswap')) {
       for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, '✓ Complete', 'green');
+        updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
       }
       // Make sure all makers are visible
       for (let i = 0; i < swapData.makers; i++) {
@@ -451,7 +452,7 @@ export async function CoinswapComponent(container, swapConfig) {
     else if (message.includes('Starting forward-flow private key handover')) {
       // Mark intermediate hops as doing key exchange
       for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, '🔐 Key exchange...', 'yellow');
+        updateHopStatus(i, `${icons.keyRound(14, 'mr-1')} Key exchange...`, 'yellow');
       }
     }
     // V2: "Downloading offer from taproot maker"
@@ -486,7 +487,7 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Verified Taproot contract data from maker')
     ) {
       updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, '✓ Contract ready', 'green');
+      updateHopStatus(makerIndex, `${icons.check(14, 'mr-1')} Contract ready`, 'green');
     }
     // V2: "Received private key from maker N"
     else if (
@@ -494,7 +495,7 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Received private key from maker')
     ) {
       updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, '🔐 Key received', 'green');
+      updateHopStatus(makerIndex, `${icons.keyRound(14, 'mr-1')} Key received`, 'green');
     }
     // V2: "Sending privkey to maker N and awaiting response"
     else if (
@@ -720,7 +721,7 @@ export async function CoinswapComponent(container, swapConfig) {
         </div>
         
         <div class="bg-blue-500/10 border border-blue-500/30 rounded p-3 text-xs text-blue-300">
-          <p class="font-semibold mb-1">🔒 Your funds are protected</p>
+          <p class="font-semibold mb-1">${icons.shieldCheck(16, 'mr-2')} Your funds are protected</p>
           <p>Recovery process has started automatically. Check your wallet for returned funds.</p>
         </div>
       </div>
@@ -1023,7 +1024,7 @@ export async function CoinswapComponent(container, swapConfig) {
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Locking Funds</span>
             <span class="${outgoing.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
-              ${outgoing.status === 'confirmed' ? '✓ Confirmed' : outgoing.txid ? 'Broadcasted' : 'Pending'}
+              ${outgoing.status === 'confirmed' ? `${icons.check(14, 'mr-1')} Confirmed` : outgoing.txid ? 'Broadcasted' : 'Pending'}
             </span>
           </div>
           ${outgoing.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${outgoing.txid}</div>` : '<div class="text-gray-500 text-xs">Waiting for broadcast...</div>'}
@@ -1033,7 +1034,7 @@ export async function CoinswapComponent(container, swapConfig) {
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Receiving Funds</span>
             <span class="${incoming.status === 'confirmed' ? 'text-green-400' : 'text-gray-500'}">
-              ${incoming.status === 'confirmed' ? '✓ Received' : 'Waiting...'}
+              ${incoming.status === 'confirmed' ? `${icons.check(14, 'mr-1')} Received` : 'Waiting...'}
             </span>
           </div>
           ${incoming.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${incoming.txid}</div>` : '<div class="text-gray-500 text-xs">Sweep pending</div>'}
@@ -1061,7 +1062,7 @@ export async function CoinswapComponent(container, swapConfig) {
           <div class="flex justify-between mb-1">
             <span class="text-gray-400">Hop ${index + 1}</span>
             <span class="${tx.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
-              ${tx.status === 'confirmed' ? '✓' : tx.status === 'broadcasting' ? '📡' : '⏳'}
+              ${tx.status === 'confirmed' ? icons.check(14) : tx.status === 'broadcasting' ? icons.radio(14) : icons.hourglass(14)}
             </span>
           </div>
           <div class="font-mono text-gray-300">${tx.txid ? tx.txid.substring(0, 12) + '...' : 'Pending'}</div>

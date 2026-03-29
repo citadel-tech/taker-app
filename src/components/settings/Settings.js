@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function SettingsComponent(container) {
   const content = document.createElement('div');
   content.id = 'settings-content';
@@ -19,7 +21,7 @@ export function SettingsComponent(container) {
                         </p>
                         
                         <button id="backup-wallet-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
-                            💾 Create Backup
+                            ${icons.save(16, 'mr-2')} Create Backup
                         </button>
                     </div>
                     
@@ -201,7 +203,7 @@ export function SettingsComponent(container) {
                                 </div>
                             </div>
                             <button id="copy-zmq-config-btn" class="w-full mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
-                                📋 Copy ZMQ Config
+                                ${icons.clipboardCopy(14, 'mr-1')} Copy ZMQ Config
                             </button>
                         </div>
                     </div>
@@ -259,7 +261,7 @@ blockfilterindex=1
                 </div>
                 
                 <button id="copy-full-config-btn" class="mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
-                    📋 Copy Full Config
+                    ${icons.clipboardCopy(14, 'mr-1')} Copy Full Config
                 </button>
             </div>
 
@@ -368,7 +370,7 @@ blockfilterindex=1
 
       const label = document.createElement('span');
       label.className = `text-sm ${result.ok ? 'text-green-400' : 'text-red-400'}`;
-      label.textContent = `${result.ok ? '✅' : '❌'} ${result.label}`;
+      label.innerHTML = `${result.ok ? icons.checkCircle(14, 'mr-1 text-green-400') : icons.xCircle(14, 'mr-1 text-red-400')} ${result.label}`;
 
       const message = document.createElement('span');
       message.className = 'text-xs text-gray-400 text-right';
@@ -538,14 +540,14 @@ blockfilterindex=1`;
 
       if (result.success) {
         alert(
-          `✅ Backup created successfully!\n\nLocation: ${destinationPath}`
+          `Backup created successfully!\n\nLocation: ${destinationPath}`
         );
       } else {
-        alert(`❌ Backup failed: ${result.error}`);
+        alert(`Backup failed: ${result.error}`);
       }
     } catch (error) {
       console.error('Backup error:', error);
-      alert(`❌ Backup failed: ${error.message}`);
+      alert(`Backup failed: ${error.message}`);
     }
   }
 
@@ -641,7 +643,7 @@ blockfilterindex=1`;
         await navigator.clipboard.writeText(configText);
         const btn = content.querySelector('#copy-zmq-config-btn');
         const originalText = btn.textContent;
-        btn.textContent = '✓ Copied!';
+        btn.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
         setTimeout(() => {
           btn.textContent = originalText;
         }, 2000);
@@ -703,7 +705,7 @@ zmqpubrawtx=${rawtx}`;
         await navigator.clipboard.writeText(configText);
         const btn = content.querySelector('#copy-full-config-btn');
         const originalText = btn.textContent;
-        btn.textContent = '✓ Copied!';
+        btn.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
         setTimeout(() => {
           btn.textContent = originalText;
         }, 2000);

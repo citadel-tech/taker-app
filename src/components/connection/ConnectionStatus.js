@@ -2,6 +2,8 @@
  * Bitcoin Core Connection Status Component
  * Shows connection progress and status while connecting to bitcoind
  */
+import { icons } from '../../js/icons.js';
+
 export function ConnectionStatusComponent(container, onConnected) {
     const connectionDiv = document.createElement('div');
     connectionDiv.id = 'connection-status';
@@ -60,7 +62,7 @@ export function ConnectionStatusComponent(container, onConnected) {
             <!-- Error Display (hidden by default) -->
             <div id="connection-error" class="hidden mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                 <div class="flex items-start">
-                    <span class="text-red-400 mr-2">⚠️</span>
+                    <span class="text-red-400 mr-2">${icons.alertTriangle(16)}</span>
                     <div>
                         <p class="text-sm font-medium text-red-400">Connection Failed</p>
                         <p id="error-message" class="text-xs text-red-300 mt-1"></p>

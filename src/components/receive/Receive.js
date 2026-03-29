@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function ReceiveComponent(container) {
   const content = document.createElement('div');
   content.id = 'receive-content';
@@ -43,7 +45,7 @@ export function ReceiveComponent(container) {
                 <button id="generate-new" class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
                     <span class="generate-text">Generate Address</span>
                     <span class="generate-loading hidden">
-                        <span class="inline-block animate-spin mr-2">⟳</span>
+                        <span class="inline-block animate-spin mr-2">${icons.loader(16)}</span>
                         Generating...
                     </span>
                 </button>
@@ -54,7 +56,7 @@ export function ReceiveComponent(container) {
                 <!-- Info Card -->
                 <div class="mt-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
                   <p class="text-xs text-red-400">
-                      ⚠️ Reusing addresses can cause significant privacy reduction. Always generate a fresh address for each transaction to maintain anonymity.
+                      ${icons.alertTriangle(16, 'mr-1')} Reusing addresses can cause significant privacy reduction. Always generate a fresh address for each transaction to maintain anonymity.
                   </p>
                 </div>
 
@@ -226,7 +228,7 @@ export function ReceiveComponent(container) {
   async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      copyButton.textContent = '✓ Copied!';
+      copyButton.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
       copyButton.classList.add('bg-green-500');
       copyButton.classList.remove('bg-[#FF6B35]');
 
@@ -245,7 +247,7 @@ export function ReceiveComponent(container) {
       document.execCommand('copy');
       document.body.removeChild(textArea);
 
-      copyButton.textContent = '✓ Copied!';
+      copyButton.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
       setTimeout(() => {
         copyButton.textContent = 'Copy';
       }, 2000);
@@ -444,7 +446,7 @@ export function ReceiveComponent(container) {
       currentAddressEl.textContent = `Error: ${error.message}`;
       qrContainer.innerHTML = `
         <div class="text-center text-red-400 p-4">
-          <p class="text-2xl mb-2">❌</p>
+          <div class="flex justify-center mb-2">${icons.xCircle(40, 'text-red-400')}</div>
           <p class="text-sm">Address generation failed</p>
           <p class="text-xs text-gray-500 mt-2">${error.message}</p>
         </div>
@@ -466,7 +468,7 @@ export function ReceiveComponent(container) {
       currentAddressEl.textContent = 'Failed to initialize';
       qrContainer.innerHTML = `
       <div class="text-center text-red-400 p-4">
-        <p class="text-2xl mb-2">❌</p>
+        <div class="flex justify-center mb-2">${icons.xCircle(40, 'text-red-400')}</div>
         <p class="text-sm">Initialization failed</p>
         <button onclick="location.reload()" class="mt-2 text-xs underline">Retry</button>
       </div>

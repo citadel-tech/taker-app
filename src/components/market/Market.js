@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function Market(container) {
   const content = document.createElement('div');
   content.id = 'market-content';
@@ -16,7 +18,7 @@ export function Market(container) {
       case 'Taproot':
         return {
           label: 'Taproot',
-          icon: '⚡',
+          icon: icons.zap(14),
           classes: 'bg-purple-500/20 text-purple-400',
         };
       case 'Unified':
@@ -30,7 +32,7 @@ export function Market(container) {
       default:
         return {
           label: 'Legacy',
-          icon: '🔒',
+          icon: icons.lock(14),
           classes: 'bg-blue-500/20 text-blue-400',
         };
     }
@@ -494,7 +496,7 @@ export function Market(container) {
       'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
     errorDiv.innerHTML = `
       <div class="flex items-start gap-3">
-        <span class="text-xl">❌</span>
+        <span class="text-xl">${icons.xCircle(20)}</span>
         <div class="flex-1">
           <div class="font-semibold text-lg mb-1">Error</div>
           <div class="text-sm">${message}</div>
@@ -633,7 +635,7 @@ export function Market(container) {
         <div class="bg-[#0f1419] rounded-lg p-6 border border-blue-500/30">
           <div class="flex items-center justify-between mb-4">
             <span class="text-lg font-semibold text-lg text-blue-400">
-              🔄 Syncing Market Data...
+              ${icons.refreshCw(16, 'mr-2 animate-spin')} Syncing Market Data...
             </span>
             <span class="text-sm text-gray-400">
               Please wait
@@ -681,7 +683,7 @@ export function Market(container) {
           
           <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
             <div class="text-cyan-400">
-              🔍 Discovering makers over Tor network...
+              ${icons.search(16, 'mr-2')} Discovering makers over Tor network...
             </div>
           </div>
         </div>
@@ -824,7 +826,7 @@ export function Market(container) {
 
     <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
       <div class="flex items-start gap-3">
-        <span class="text-2xl">ℹ️</span>
+        <span class="text-[#FF6B35]">${icons.info(24)}</span>
         <div>
           <h3 class="text-lg font-semibold text-lg text-[#FF6B35] mb-2">Fee Calculation</h3>
           <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
@@ -857,13 +859,13 @@ export function Market(container) {
       <!-- Maker Status Tabs -->
       <div class="flex border-b-2 border-[#FF6B35]">
   <button id="tab-good" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#FF6B35] text-white border-b-4 border-[#FF6B35] transition-all">
-    ✅ Good Makers (<span id="good-count">0</span>)
+    ${icons.checkCircle(14, 'mr-1')} Good Makers (<span id="good-count">0</span>)
   </button>
   <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
-    ❌ Bad Makers (<span id="bad-count">0</span>)
+    ${icons.xCircle(14, 'mr-1')} Bad Makers (<span id="bad-count">0</span>)
   </button>
   <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
-    ⏸️ Unresponsive (<span id="unresponsive-count">0</span>)
+    ${icons.pauseCircle(14, 'mr-1')} Unresponsive (<span id="unresponsive-count">0</span>)
   </button>
 </div>
 

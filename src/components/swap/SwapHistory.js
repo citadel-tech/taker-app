@@ -3,6 +3,7 @@ import {
   formatRelativeTime,
   formatElapsedTime,
 } from './SwapStateManager.js';
+import { icons } from '../../js/icons.js';
 
 let swapHistory = [];
 
@@ -233,7 +234,7 @@ export function buildSwapHistoryMarkup(history) {
   if (history.length === 0) {
     return `
       <div class="text-center py-16">
-        <div class="text-6xl mb-4">🔄</div>
+        <div class="text-gray-500 mb-4 flex justify-center">${icons.refreshCw(64)}</div>
         <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
         <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
       </div>
@@ -262,7 +263,7 @@ export function buildSwapHistoryMarkup(history) {
           <div class="swap-history-row bg-[#1a2332] hover:bg-[#242d3d] rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-[#FF6B35]/30" data-swap-id="${swap.id}">
             <div class="flex items-center gap-4">
               <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                <span class="text-2xl">✓</span>
+                <span class="text-green-400">${icons.check(24)}</span>
               </div>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-3 mb-1">
@@ -382,7 +383,7 @@ export async function SwapHistoryComponent(container) {
     if (swapHistory.length === 0) {
       return `
         <div class="text-center py-16">
-          <div class="text-6xl mb-4">🔄</div>
+          <div class="text-gray-500 mb-4 flex justify-center">${icons.refreshCw(64)}</div>
           <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
           <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
           <button id="start-first-swap" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-3 rounded-lg transition-colors">
@@ -409,7 +410,7 @@ export async function SwapHistoryComponent(container) {
               <div class="flex items-center gap-4">
                 <!-- Status Icon -->
                 <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                  <span class="text-2xl">✓</span>
+                  <span class="text-green-400">${icons.check(24)}</span>
                 </div>
                 
                 <!-- Main Info -->

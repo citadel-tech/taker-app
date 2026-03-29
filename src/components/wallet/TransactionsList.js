@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function TransactionsListComponent(container) {
   // State
   let currentFilter = 'all';
@@ -204,7 +206,7 @@ export function TransactionsListComponent(container) {
     if (filteredTransactions.length === 0) {
       transactionContainer.innerHTML = `
         <div class="text-center py-12">
-          <div class="text-4xl mb-4">📭</div>
+          <div class="text-gray-500 mb-4 flex justify-center">${icons.inbox(48)}</div>
           <p class="text-gray-400">No transactions found for the selected filter.</p>
           <p class="text-gray-500 text-sm mt-2">Try selecting a different filter or refresh.</p>
         </div>
@@ -232,7 +234,7 @@ export function TransactionsListComponent(container) {
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 mb-1 flex-wrap">
                         <p class="text-white font-semibold text-lg capitalize">
-                          ${type === 'swap' ? '🔄 Coinswap' : type === 'received' ? '📥 Received' : '📤 Sent'}
+                          ${type === 'swap' ? icons.refreshCw(14, 'mr-1') + ' Coinswap' : type === 'received' ? icons.arrowDownCircle(14, 'mr-1') + ' Received' : icons.arrowUpCircle(14, 'mr-1') + ' Sent'}
                         </p>
                         <span class="text-xs px-2 py-0.5 rounded ${statusBadge.class}">${statusBadge.text}</span>
                         ${label ? `<span class="text-xs text-gray-500 truncate max-w-[150px]" title="${label}">${label}</span>` : ''}
@@ -334,7 +336,7 @@ export function TransactionsListComponent(container) {
       console.error('❌ Failed to load transactions:', error);
       transactionContainer.innerHTML = `
         <div class="text-center py-12">
-          <div class="text-4xl mb-4">❌</div>
+          <div class="text-red-400 mb-4 flex justify-center">${icons.xCircle(48)}</div>
           <p class="text-red-400">Failed to load transactions</p>
           <p class="text-gray-500 text-sm mt-2">${error.message}</p>
           <button onclick="location.reload()" class="mt-4 bg-[#FF6B35] text-white px-4 py-2 rounded-lg">Retry</button>
@@ -409,13 +411,13 @@ export function TransactionsListComponent(container) {
                         All (<span id="filter-all-count">--</span>)
                     </button>
                     <button data-filter="received" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-                        📥 Received (<span id="filter-received-count">--</span>)
+                        ${icons.arrowDownCircle(14, 'mr-1')} Received (<span id="filter-received-count">--</span>)
                     </button>
                     <button data-filter="sent" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-                        📤 Sent (<span id="filter-sent-count">--</span>)
+                        ${icons.arrowUpCircle(14, 'mr-1')} Sent (<span id="filter-sent-count">--</span>)
                     </button>
                     <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-                        🔄 Swaps (<span id="filter-swaps-count">--</span>)
+                        ${icons.refreshCw(14, 'mr-1')} Swaps (<span id="filter-swaps-count">--</span>)
                     </button>
                     <button data-sort="newest" id="sort-newest" class="sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Newest

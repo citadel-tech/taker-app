@@ -1,3 +1,5 @@
+import { icons } from '../../js/icons.js';
+
 export function TakerInitializationComponent(container, config, onInitialized) {
   const initDiv = document.createElement('div');
   initDiv.id = 'taker-initialization';
@@ -8,7 +10,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
         <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-8">
             <div class="text-center mb-8">
                 <div class="w-20 h-20 bg-[#FF6B35]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-4xl">🔄</span>
+                    <span class="animate-spin">${icons.loader(40)}</span>
                 </div>
                 <h2 class="text-2xl font-bold text-white mb-2">Initializing Taker</h2>
                 <p id="taker-status-text" class="text-gray-400 text-sm">Setting up coinswap functionality...</p>
@@ -61,14 +63,14 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                 </button>
                 <div class="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
                     <p class="text-xs text-blue-400">
-                        💡 <strong>Tip:</strong> This is the password you set when creating your wallet.
+                        ${icons.lightbulb(16, 'mr-1')} <strong>Tip:</strong> This is the password you set when creating your wallet.
                     </p>
                 </div>
             </div>
 
             <div id="taker-error" class="hidden mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
                 <div class="flex items-start">
-                    <span class="text-red-400 mr-2">⚠️</span>
+                    <span class="text-red-400 mr-2">${icons.alertTriangle(16)}</span>
                     <div>
                         <p class="text-sm font-medium text-red-400">Initialization Failed</p>
                         <p id="error-message" class="text-xs text-red-300 mt-1"></p>
@@ -86,7 +88,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
             <div id="tor-setup" class="hidden mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
                 <p class="text-xs text-blue-400 mb-3">
-                    💡 <strong>Tor Not Running:</strong>
+                    ${icons.lightbulb(16, 'mr-1')} <strong>Tor Not Running:</strong>
                 </p>
                 <div class="bg-[#0f1419] rounded p-3 font-mono text-xs text-gray-300">
                     sudo systemctl start tor@coinswap
