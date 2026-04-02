@@ -119,19 +119,19 @@ export function SwapReportComponent(container, swapReport) {
     [];
   const flattenedFundingTxids = dedupeTxids(normalizedFundingTxids);
   const normalizedTargetAmount = toNumber(
-    swapReport.targetAmount ??
+    swapReport.outgoingAmount ??
+      swapReport.outgoing_amount ??
+      swapReport.targetAmount ??
       swapReport.target_amount ??
       swapReport.incomingAmount ??
       swapReport.incoming_amount ??
-      swapReport.outgoingAmount ??
-      swapReport.outgoing_amount ??
       nestedReport.targetAmount ??
       nestedReport.target_amount ??
+      nestedReport.outgoingAmount ??
+      nestedReport.outgoing_amount ??
       swapReport.amount ??
       nestedReport.incomingAmount ??
-      nestedReport.incoming_amount ??
-      nestedReport.outgoingAmount ??
-      nestedReport.outgoing_amount,
+      nestedReport.incoming_amount,
     0
   );
   const normalizedTotalFundingTxs = toNumber(

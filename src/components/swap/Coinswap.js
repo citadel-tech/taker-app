@@ -147,22 +147,29 @@ export async function CoinswapComponent(container, swapConfig) {
 
     const hopStatus = hop.querySelector('.hop-status');
     if (hopStatus) {
-      hopStatus.textContent = statusText;
-      const colorClass =
+      // Hop labels are SVG <text> nodes, so icon SVG markup must be stripped.
+      const normalizedStatus = String(statusText)
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      const fillColor =
         color === 'green'
-          ? 'text-green-400'
+          ? '#4ADE80'
           : color === 'yellow'
-            ? 'text-yellow-400'
+            ? '#FACC15'
             : color === 'orange'
-              ? 'text-orange-400'
+              ? '#FB923C'
               : color === 'blue'
-                ? 'text-blue-400'
-                : 'text-gray-400';
+                ? '#60A5FA'
+                : '#9CA3AF';
+
+      hopStatus.textContent = normalizedStatus;
+      hopStatus.setAttribute('fill', fillColor);
 
       // ✅ FIX: Use setAttribute for SVG elements
       hopStatus.setAttribute(
         'class',
-        `hop-status text-xs ${colorClass} font-bold`
+        'hop-status text-xs font-bold'
       );
 
       if (color === 'yellow' || color === 'orange') {
@@ -182,7 +189,7 @@ export async function CoinswapComponent(container, swapConfig) {
   function markAllMakersComplete() {
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
-      updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
+      updateHopStatus(i, 'Complete', 'green');
     }
   }
 
@@ -318,7 +325,7 @@ export async function CoinswapComponent(container, swapConfig) {
         );
         if (slot !== -1) {
           setTransactionConfirmed(slot);
-          updateHopStatus(slot, `${icons.check(14, 'mr-1')} Confirmed`, 'green');
+          updateHopStatus(slot, 'Confirmed', 'green');
 
           const confirmedHops = swapData.transactions.filter(
             (tx) => tx.status === 'confirmed'
@@ -343,7 +350,7 @@ export async function CoinswapComponent(container, swapConfig) {
         );
         if (slot !== -1) {
           setTransactionConfirmed(slot);
-          updateHopStatus(slot, `${icons.check(14, 'mr-1')} Confirmed`, 'green');
+          updateHopStatus(slot, 'Confirmed', 'green');
 
           // ✅ When outgoing is confirmed, light up ALL makers and mark intermediate hops as "Processing"
           if (slot === 0) {
@@ -353,7 +360,7 @@ export async function CoinswapComponent(container, swapConfig) {
             }
             // Mark intermediate hops as processing (hops 1 to N-1)
             for (let i = 1; i < swapData.hops - 1; i++) {
-              updateHopStatus(i, `${icons.refreshCw(14, 'mr-1 animate-spin')} Processing...`, 'blue');
+              updateHopStatus(i, 'Processing...', 'blue');
             }
             console.log(
               `✅ Outgoing contract confirmed. All ${swapData.makers} makers now active`
@@ -385,7 +392,7 @@ export async function CoinswapComponent(container, swapConfig) {
     ) {
       // Mark all intermediate hops as "Keys received"
       for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, `${icons.key(14, 'mr-1')} Keys received`, 'green');
+        updateHopStatus(i, 'Keys received', 'green');
       }
     }
     // V2: "Registered watcher for taker's incoming contract"
@@ -396,7 +403,7 @@ export async function CoinswapComponent(container, swapConfig) {
       if (txMatch) {
         // This is the final hop - mark it
         const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, `${icons.arrowDownCircle(14, 'mr-1')} Receiving...`, 'blue');
+        updateHopStatus(lastHop, 'Receiving...', 'blue');
       }
     }
     // V2: "Sweeping taker's incoming contract"
@@ -409,19 +416,19 @@ export async function CoinswapComponent(container, swapConfig) {
       const txMatch = message.match(/([a-f0-9]{64})/i);
       if (txMatch) {
         const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, `${icons.check(14, 'mr-1')} Swept`, 'green');
+        updateHopStatus(lastHop, 'Swept', 'green');
       }
     }
     // V1: "Swaps settled successfully"
     else if (message.includes('Swaps settled successfully')) {
       for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
+        updateHopStatus(i, 'Complete', 'green');
       }
     }
     // V2: "Taker sweep completed successfully"
     else if (message.includes('Taker sweep completed successfully')) {
       for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
+        updateHopStatus(i, 'Complete', 'green');
       }
       // Make sure all makers are visible
       for (let i = 0; i < swapData.makers; i++) {
@@ -432,7 +439,7 @@ export async function CoinswapComponent(container, swapConfig) {
     // V2: "Successfully Completed Taproot Coinswap"
     else if (message.includes('Successfully Completed Taproot Coinswap')) {
       for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, `${icons.check(14, 'mr-1')} Complete`, 'green');
+        updateHopStatus(i, 'Complete', 'green');
       }
       // Make sure all makers are visible
       for (let i = 0; i < swapData.makers; i++) {
@@ -452,7 +459,7 @@ export async function CoinswapComponent(container, swapConfig) {
     else if (message.includes('Starting forward-flow private key handover')) {
       // Mark intermediate hops as doing key exchange
       for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, `${icons.keyRound(14, 'mr-1')} Key exchange...`, 'yellow');
+        updateHopStatus(i, 'Key exchange...', 'yellow');
       }
     }
     // V2: "Downloading offer from taproot maker"
@@ -487,7 +494,7 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Verified Taproot contract data from maker')
     ) {
       updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, `${icons.check(14, 'mr-1')} Contract ready`, 'green');
+      updateHopStatus(makerIndex, 'Contract ready', 'green');
     }
     // V2: "Received private key from maker N"
     else if (
@@ -495,7 +502,7 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Received private key from maker')
     ) {
       updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, `${icons.keyRound(14, 'mr-1')} Key received`, 'green');
+      updateHopStatus(makerIndex, 'Key received', 'green');
     }
     // V2: "Sending privkey to maker N and awaiting response"
     else if (
@@ -526,7 +533,10 @@ export async function CoinswapComponent(container, swapConfig) {
       updateYouReceive(true);
     }
     // V2: "Sweeping N completed incoming swap coins"
-    else if (message.includes('Sweeping') && message.includes('completed incoming swap coins')) {
+    else if (
+      message.includes('Sweeping') &&
+      message.includes('completed incoming swap coins')
+    ) {
       markAllMakersComplete();
       updateYouReceive(true);
     }
@@ -635,7 +645,10 @@ export async function CoinswapComponent(container, swapConfig) {
 
         const swap = result.swap;
 
-        if (swap.nativeSwapId && actualSwapConfig.nativeSwapId !== swap.nativeSwapId) {
+        if (
+          swap.nativeSwapId &&
+          actualSwapConfig.nativeSwapId !== swap.nativeSwapId
+        ) {
           actualSwapConfig.nativeSwapId = swap.nativeSwapId;
           addLog(`Backend Swap ID: ${swap.nativeSwapId}`, 'info');
         }
@@ -822,11 +835,10 @@ export async function CoinswapComponent(container, swapConfig) {
       'swapDurationSeconds',
       0
     );
-    const targetAmount = getValue(
-      'target_amount',
-      'targetAmount',
-      swapData.amount || 0
-    );
+    const targetAmount =
+      backendReport.outgoing_amount ??
+      backendReport.outgoingAmount ??
+      getValue('target_amount', 'targetAmount', swapData.amount || 0);
     const totalInputAmount = getValue(
       'total_input_amount',
       'totalInputAmount',
@@ -1153,8 +1165,7 @@ export async function CoinswapComponent(container, swapConfig) {
       const gap = 14;
 
       if (actualMakers <= 4) {
-        const minRadius =
-          (maxNodeHalf + gap) / Math.sin(Math.PI / totalNodes);
+        const minRadius = (maxNodeHalf + gap) / Math.sin(Math.PI / totalNodes);
         const radius = Math.max(minRadius, 140);
         const svgSize = Math.round((radius + labelPad) * 2);
         const centerX = svgSize / 2;
@@ -1258,7 +1269,10 @@ export async function CoinswapComponent(container, swapConfig) {
       <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" class="mx-auto max-w-full">
         <defs>
           ${Array.from({ length: totalNodes }, (_, i) => {
-            const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
+            const color =
+              i < actualMakers
+                ? makerColors[i % makerColors.length]
+                : '#10B981';
             return `<marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
               <polygon points="0 0, 8 3, 0 6" fill="${color}" opacity="0.85"/>
             </marker>`;
@@ -1273,23 +1287,29 @@ export async function CoinswapComponent(container, swapConfig) {
         ${guideMarkup}
 
         <!-- Arrows -->
-        ${positions.map((pos, i) => {
-          const nextPos = positions[(i + 1) % positions.length];
-          const color = i < actualMakers ? makerColors[i % makerColors.length] : '#10B981';
-          const fromHalf = i === 0 ? youHalf : makerHalf;
-          const toHalf = (i + 1) % positions.length === 0 ? youHalf : makerHalf;
-          const dx = nextPos.x - pos.x;
-          const dy = nextPos.y - pos.y;
-          const len = Math.sqrt(dx * dx + dy * dy);
-          const sx = pos.x + (dx / len) * (fromHalf + 4);
-          const sy = pos.y + (dy / len) * (fromHalf + 4);
-          const ex = nextPos.x - (dx / len) * (toHalf + 10);
-          const ey = nextPos.y - (dy / len) * (toHalf + 10);
-          return `<a id="arrow-link-${i}" href="#" target="_blank" rel="noopener noreferrer" title="View transaction">
+        ${positions
+          .map((pos, i) => {
+            const nextPos = positions[(i + 1) % positions.length];
+            const color =
+              i < actualMakers
+                ? makerColors[i % makerColors.length]
+                : '#10B981';
+            const fromHalf = i === 0 ? youHalf : makerHalf;
+            const toHalf =
+              (i + 1) % positions.length === 0 ? youHalf : makerHalf;
+            const dx = nextPos.x - pos.x;
+            const dy = nextPos.y - pos.y;
+            const len = Math.sqrt(dx * dx + dy * dy);
+            const sx = pos.x + (dx / len) * (fromHalf + 4);
+            const sy = pos.y + (dy / len) * (fromHalf + 4);
+            const ex = nextPos.x - (dx / len) * (toHalf + 10);
+            const ey = nextPos.y - (dy / len) * (toHalf + 10);
+            return `<a id="arrow-link-${i}" href="#" target="_blank" rel="noopener noreferrer" title="View transaction">
             <line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
                   stroke="${color}" stroke-width="2" marker-end="url(#arrow-${i})" opacity="0.6" class="transition-opacity"/>
           </a>`;
-        }).join('')}
+          })
+          .join('')}
 
         <!-- You node -->
         <g id="you-node" style="transition: all 0.3s;">
@@ -1315,11 +1335,15 @@ export async function CoinswapComponent(container, swapConfig) {
                   width="${makerHalf * 2}" height="${makerHalf * 2}" rx="${makerRx}" fill="${color}"/>
             <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerFont * 0.38).toFixed(1)}"
                   text-anchor="middle" fill="white" font-size="${makerFont}" font-weight="bold">M${i + 1}</text>
-            ${actualMakers <= 12 ? `
+            ${
+              actualMakers <= 12
+                ? `
             <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerHalf + 14).toFixed(1)}"
                   text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(7, makerFont - 3)}">Maker ${i + 1}</text>
-            ` : ''}
-            <g id="hop-${i}">
+            `
+                : ''
+            }
+            <g id="hop-${i}"
               <rect x="${(pos.x - statusHalfW).toFixed(1)}" y="${(pos.y - makerHalf - 26).toFixed(1)}"
                     width="${statusW.toFixed(1)}" height="20" rx="4"
                     fill="#0f1419" stroke="#374151" stroke-width="1"/>
@@ -1329,10 +1353,14 @@ export async function CoinswapComponent(container, swapConfig) {
           </g>`;
         }).join('')}
 
-        ${isV2 ? `
+        ${
+          isV2
+            ? `
           <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">${swapProtocol}</text>
           <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
-        ` : ''}
+        `
+            : ''
+        }
       </svg>
     </div>
   `;
@@ -1418,18 +1446,23 @@ export async function CoinswapComponent(container, swapConfig) {
       <div class="bg-[#1a2332] rounded-xl p-4">
         <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Amount</p>
         <p class="font-mono text-white font-semibold">${(swapData.amount / 100000000).toFixed(8)} BTC</p>
-        ${!isV2
-          ? `<p class="text-xs text-gray-500 mt-2">Hops: <span class="text-cyan-400">${swapData.hops}</span></p>`
-          : `<p class="text-xs text-cyan-400 mt-2">${swapProtocol} swap</p>`
+        ${
+          !isV2
+            ? `<p class="text-xs text-gray-500 mt-2">Hops: <span class="text-cyan-400">${swapData.hops}</span></p>`
+            : `<p class="text-xs text-cyan-400 mt-2">${swapProtocol} swap</p>`
         }
       </div>
 
-      ${!isV2 ? `
+      ${
+        !isV2
+          ? `
       <div class="bg-[#1a2332] rounded-xl p-4">
         <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Hop Transactions</p>
         <div id="transaction-list" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
       </div>
-      ` : ''}
+      `
+          : ''
+      }
 
       <div class="bg-[#1a2332] rounded-xl p-4">
         <div class="flex items-center justify-between mb-3">
