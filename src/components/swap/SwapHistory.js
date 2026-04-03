@@ -132,7 +132,11 @@ function normalizeSwapReport(report) {
     completedAt,
     amount:
       toNumber(
-        report.amount ??
+        nested.outgoingAmount ??
+          nested.outgoing_amount ??
+          report.totalOutputAmount ??
+          report.total_output_amount ??
+          report.amount ??
           nested.amount ??
           nested.targetAmount ??
           nested.target_amount ??

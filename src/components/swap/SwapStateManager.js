@@ -124,7 +124,7 @@ export const SwapStateManager = {
       const historyEntry = {
         id: report.swapId || `swap_${Date.now()}`,
         completedAt: Date.now(),
-        amount: report.targetAmount || 0,
+        amount: report.totalOutputAmount || report.targetAmount || 0,
         totalOutputAmount: report.totalOutputAmount || 0,
         makersCount: report.makersCount || 0,
         hops: (report.makersCount || 0) + 1,
