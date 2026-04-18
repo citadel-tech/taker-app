@@ -184,7 +184,8 @@ async function checkTakerInitialization(config) {
 
       if (result.success) {
         console.log('✅ Taker initialized');
-        await performLaunchSync(startMainApp);
+        startMainApp();
+        startBackgroundOfferbookSync();
       } else {
         console.error('❌ Taker initialization failed:', result.error);
         alert('Failed to initialize: ' + result.error);
@@ -283,7 +284,8 @@ async function showPasswordPrompt(config) {
         if (result.success) {
           modal.remove();
           resolve(true);
-          await performLaunchSync(startMainApp);
+          startMainApp();
+          startBackgroundOfferbookSync();
         } else if (result.wrongPassword) {
           errorDiv.classList.remove('hidden');
           errorDiv.querySelector('p').textContent =
@@ -317,206 +319,34 @@ async function showPasswordPrompt(config) {
   });
 }
 
-/**
- * Show an offerbook sync overlay, wait for sync to complete, then call onComplete.
- * Used on launch so the user sees makers as soon as the app opens.
- */
-async function performLaunchSync(onComplete) {
-  const escapeHtml = (value) => {
-    const div = document.createElement('div');
-    div.textContent = value || '';
-    return div.innerHTML;
-  };
-
-  const parseLogLine = (line) => {
-    const match = line.match(
-      /^(\d{4}-\d{2}-\d{2}T[\d:.]+)[^\s]*\s+(INFO|WARN|ERROR|DEBUG|TRACE)\s+(.+)$/
-    );
-    if (!match) {
-      return {
-        timestamp: Date.now(),
-        type: 'info',
-        message: line,
-      };
-    }
-
-    return {
-      timestamp: new Date(match[1]).getTime(),
-      type: match[2].toLowerCase(),
-      message: match[3],
-    };
-  };
-
-  const getTypeColor = (type) => {
-    switch (type) {
-      case 'error':
-        return 'text-red-400';
-      case 'warn':
-        return 'text-yellow-400';
-      case 'debug':
-        return 'text-blue-400';
-      case 'trace':
-        return 'text-purple-400';
-      default:
-        return 'text-green-400';
-    }
-  };
-
-  const formatTime = (timestamp) =>
-    new Date(timestamp).toLocaleTimeString('en-US', { hour12: false });
-
-  const overlay = document.createElement('div');
-  overlay.id = 'launch-sync-overlay';
-  overlay.className = 'fixed inset-0 bg-[#0f1419] flex items-center justify-center z-50';
-  overlay.innerHTML = `
-    <div class="bg-[#1a2332] rounded-lg max-w-3xl w-full mx-4 p-8 border border-[#FF6B35]/10 shadow-2xl">
-      <div class="text-center mb-6">
-        <div class="w-16 h-16 bg-[#FF6B35]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-        <span class="text-3xl animate-spin inline-block">⏳</span>
-        </div>
-        <h2 class="text-xl font-bold text-white mb-2">Syncing Market Data</h2>
-        <p class="text-gray-400 text-sm mb-4">Discovering available makers via Tor. This may take a minute...</p>
-        <p id="launch-sync-status" class="text-xs uppercase tracking-[0.2em] text-[#FF6B35]">Starting offerbook sync...</p>
-      </div>
-
-      <div class="bg-gray-700 rounded-full h-2 overflow-hidden">
-        <div id="launch-sync-progress" class="bg-[#FF6B35] h-2 rounded-full transition-all duration-500" style="width: 18%"></div>
-      </div>
-
-      <div class="mt-6 bg-[#0f1419] rounded-xl border border-white/5 overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
-          <div>
-            <p class="text-sm font-semibold text-white">Live sync logs</p>
-            <p class="text-xs text-gray-500">Latest coinswap and backend activity during startup</p>
-          </div>
-          <span id="launch-sync-log-count" class="text-xs text-gray-500">0 lines</span>
-        </div>
-        <div id="launch-sync-log-output" class="h-64 overflow-y-auto px-4 py-3 font-mono text-xs text-left"></div>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-
-  const logOutput = overlay.querySelector('#launch-sync-log-output');
-  const logCount = overlay.querySelector('#launch-sync-log-count');
-  const statusLabel = overlay.querySelector('#launch-sync-status');
-  const progressBar = overlay.querySelector('#launch-sync-progress');
-  const syncStartedAt = Date.now();
-  let logPoll = null;
-
-  function renderLogs(logs) {
-    if (!logOutput) return;
-
-    if (logCount) {
-      logCount.textContent = `${logs.length} ${logs.length === 1 ? 'line' : 'lines'}`;
-    }
-
-    if (logs.length === 0) {
-      logOutput.innerHTML =
-        '<div class="text-gray-500 text-center py-12">Waiting for startup logs...</div>';
+async function startBackgroundOfferbookSync() {
+  try {
+    const syncResult = await window.api.taker.syncOfferbookAndWait();
+    if (!syncResult.success) {
+      console.warn('⚠️ Background offerbook sync failed to start:', syncResult.error);
       return;
     }
-
-    logOutput.innerHTML = logs
-      .map((log) => {
-        return `
-          <div class="mb-1 rounded px-2 py-1 hover:bg-white/5">
-            <span class="text-gray-500">[${formatTime(log.timestamp)}]</span>
-            <span class="${getTypeColor(log.type)}">[${log.type.toUpperCase()}]</span>
-            <span class="text-gray-300">${escapeHtml(log.message)}</span>
-          </div>
-        `;
-      })
-      .join('');
-    logOutput.scrollTop = logOutput.scrollHeight;
-  }
-
-  async function refreshLaunchLogs() {
-    try {
-      const data = await window.api.logs.get(120);
-      if (!data.success || !Array.isArray(data.logs)) return;
-
-      const recentLogs = data.logs
-        .map(parseLogLine)
-        .filter((log) => log.timestamp >= syncStartedAt - 5000)
-        .slice(-50);
-
-      renderLogs(recentLogs);
-    } catch (error) {
-      console.error('Failed to refresh launch sync logs:', error);
-    }
-  }
-
-  try {
-    await refreshLaunchLogs();
-    logPoll = setInterval(refreshLaunchLogs, 1500);
-
-    const syncResult = await window.api.taker.syncOfferbookAndWait();
-    if (syncResult.success) {
-      if (statusLabel) statusLabel.textContent = 'Offerbook sync in progress...';
-      if (progressBar) progressBar.style.width = '52%';
-
-      const syncId = syncResult.syncId;
-      await new Promise((resolve) => {
-        const poll = setInterval(async () => {
-          try {
-            const status = await window.api.taker.getSyncStatus(syncId);
-            const sync = status.sync || {};
-            const syncStatus = sync.status || 'syncing';
-            const syncMessage =
-              sync.message ||
-              (syncStatus === 'completed'
-                ? 'Offerbook ready'
-                : syncStatus === 'failed'
-                  ? 'Sync failed'
-                  : 'Syncing offerbook...');
-
-            if (statusLabel) statusLabel.textContent = syncMessage;
-            if (progressBar) {
-              const nextWidth =
-                typeof sync.progress === 'number'
-                  ? Math.max(18, Math.min(100, sync.progress))
-                  : syncStatus === 'completed'
-                    ? 100
-                    : syncStatus === 'failed'
-                      ? 100
-                      : 76;
-              progressBar.style.width = `${nextWidth}%`;
-            }
-
-            const done =
-              !status.success ||
-              syncStatus === 'completed' ||
-              syncStatus === 'failed';
-            if (done) {
-              clearInterval(poll);
-              resolve();
-            }
-          } catch (err) {
-            console.error('Sync polling error:', err);
+    const syncId = syncResult.syncId;
+    await new Promise((resolve) => {
+      const poll = setInterval(async () => {
+        try {
+          const status = await window.api.taker.getSyncStatus(syncId);
+          const syncStatus = (status.sync || {}).status || 'syncing';
+          if (!status.success || syncStatus === 'completed' || syncStatus === 'failed') {
             clearInterval(poll);
             resolve();
           }
-        }, 1000);
-      });
-    } else {
-      if (statusLabel) {
-        statusLabel.textContent =
-          syncResult.error || 'Unable to start offerbook sync';
-      }
-      if (progressBar) progressBar.style.width = '100%';
-    }
+        } catch (err) {
+          console.warn('⚠️ Sync poll error:', err.message);
+          clearInterval(poll);
+          resolve();
+        }
+      }, 1000);
+    });
+    console.log('✅ Background offerbook sync complete');
   } catch (err) {
-    console.warn('⚠️ Launch offerbook sync error:', err.message);
-    if (statusLabel) statusLabel.textContent = 'Offerbook sync hit an issue';
-    if (progressBar) progressBar.style.width = '100%';
-  } finally {
-    if (logPoll) clearInterval(logPoll);
-    await refreshLaunchLogs();
+    console.warn('⚠️ Background offerbook sync error:', err.message);
   }
-
-  overlay.remove();
-  onComplete();
 }
 
 // Start the main app after bitcoind connection is established
