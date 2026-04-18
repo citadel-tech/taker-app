@@ -355,22 +355,13 @@ export async function WalletComponent(container) {
     try {
       await syncWalletState();
 
-      // ✅ FORCE FRESH FETCH AFTER WALLET SYNC
       const [balance, transactions, utxos] = await Promise.all([
-        fetchBalance(),
-        fetchTransactions(),
-        fetchUtxos(),
-      ]);
-
-      // Save to cache
-      saveWalletToCache(balance, transactions, utxos);
-
-      // Update UI
-      await Promise.all([
         updateBalance(false),
         updateTransactions(false),
         updateUtxos(false),
       ]);
+
+      if (balance) saveWalletToCache(balance, transactions, utxos);
 
       refreshBtn.textContent = 'Refreshed!';
       setTimeout(() => {
@@ -520,28 +511,21 @@ export async function WalletComponent(container) {
     });
   }
 
-  // Initialize data
-  updateBalance();
-  updateTransactions();
-  updateUtxos();
-
-  // ✅ SMART INITIALIZATION
   if (shouldFetchFresh) {
-    console.log('🔄 Fetching fresh data...');
-    // Fetch fresh data
+    console.log('🔄 Syncing and fetching fresh data...');
+    try {
+      await window.api.taker.sync();
+    } catch (syncErr) {
+      console.warn('⚠️ Initial wallet sync failed, proceeding anyway:', syncErr.message);
+    }
     const [balance, transactions, utxos] = await Promise.all([
       updateBalance(false),
       updateTransactions(false),
       updateUtxos(false),
     ]);
-
-    // Save to cache
-    if (balance && transactions && utxos) {
-      saveWalletToCache(balance, transactions, utxos);
-    }
+    if (balance) saveWalletToCache(balance, transactions, utxos);
   } else {
     console.log('⚡ Using cached data (still fresh)');
-    // Just use cache
     await Promise.all([
       updateBalance(true),
       updateTransactions(true),
