@@ -44,12 +44,6 @@ function saveWalletToCache(balance, transactions, utxos) {
 export async function WalletComponent(container) {
   console.log('🔍 WalletComponent called at', new Date().toISOString());
 
-  // ✅ LOAD FROM CACHE FIRST
-  const cached = loadWalletFromCache();
-  let shouldFetchFresh = !cached || cached.isStale;
-
-  console.log(`🎯 Should fetch fresh: ${shouldFetchFresh}`);
-
   async function fetchBalance() {
     try {
       const data = await window.api.taker.getBalance();
@@ -69,6 +63,7 @@ export async function WalletComponent(container) {
   async function fetchTransactions() {
     try {
       const data = await window.api.taker.getTransactions(5, 0);
+      console.log('[REFRESH] raw getTransactions response:', JSON.stringify(data, null, 2));
 
       if (data.success) {
         return data.transactions || [];
@@ -84,6 +79,7 @@ export async function WalletComponent(container) {
   async function fetchUtxos() {
     try {
       const data = await window.api.taker.getUtxos();
+      console.log('[REFRESH] raw getUtxos response:', JSON.stringify(data, null, 2));
 
       if (data.success) {
         return data.utxos || [];
@@ -174,24 +170,8 @@ export async function WalletComponent(container) {
   }
 
   // UI Update Functions
-  async function updateBalance(useCache = false) {
+  async function updateBalance() {
     try {
-      // Use cached data if requested
-      if (useCache && cached && cached.balance) {
-        console.log('💳 Wallet balance from cache:', cached.balance);
-        content.querySelector('#regular-balance').textContent =
-          satsToBtc(cached.balance.regular) + ' BTC';
-        content.querySelector('#swap-balance').textContent =
-          satsToBtc(cached.balance.swap) + ' BTC';
-        content.querySelector('#contract-balance').textContent =
-          satsToBtc(cached.balance.contract) + ' BTC';
-        content.querySelector('#spendable-balance').textContent =
-          satsToBtc(cached.balance.spendable) + ' BTC';
-        console.log('✅ Balance loaded from cache');
-        return;
-      }
-
-      // Fetch fresh data
       const balance = await fetchBalance();
       console.log('💳 Wallet balance used by UI:', balance);
 
@@ -211,7 +191,7 @@ export async function WalletComponent(container) {
     }
   }
 
-  async function updateTransactions(useCache = false) {
+  async function updateTransactions() {
     const transactionsContainer = content.querySelector(
       '#transactions-container'
     );
@@ -265,16 +245,6 @@ export async function WalletComponent(container) {
     };
 
     try {
-      // Use cached data if requested
-      if (useCache && cached && cached.transactions) {
-        transactionsContainer.innerHTML = renderTransactions(
-          cached.transactions
-        );
-        console.log('✅ Transactions loaded from cache');
-        return;
-      }
-
-      // Fetch fresh data
       const transactions = await fetchTransactions();
       transactionsContainer.innerHTML = renderTransactions(transactions);
       console.log('✅ Transactions updated from API:', transactions.length);
@@ -286,8 +256,24 @@ export async function WalletComponent(container) {
     }
   }
 
-  async function updateUtxos(useCache = false) {
+  async function updateUtxos() {
     const utxoTableBody = content.querySelector('#utxo-table-body');
+
+    // Build a txid→confirmations map from Bitcoin Core's listtransactions
+    // (getUtxos uses in-memory wallet state which stores stale confirmation counts)
+    const txConfMap = new Map();
+    try {
+      const txData = await window.api.taker.getTransactions(200, 0);
+      if (txData.success) {
+        for (const tx of txData.transactions || []) {
+          const txid = typeof tx.info.txid === 'object' ? tx.info.txid.value : tx.info.txid;
+          txConfMap.set(txid, tx.info.confirmations);
+        }
+      }
+      console.log('[UTXO] built tx confirmation map:', Object.fromEntries(txConfMap));
+    } catch (e) {
+      console.warn('[UTXO] could not build tx confirmation map, using raw values:', e.message);
+    }
 
     // Helper to render UTXOs
     const renderUtxos = (utxos) => {
@@ -320,17 +306,25 @@ export async function WalletComponent(container) {
     };
 
     try {
-      // Use cached data if requested
-      if (useCache && cached && cached.utxos) {
-        utxoTableBody.innerHTML = renderUtxos(cached.utxos);
-        console.log('✅ UTXOs loaded from cache');
-        return;
-      }
+      const rawUtxos = await fetchUtxos();
 
-      // Fetch fresh data
-      const utxos = await fetchUtxos();
+      // Enrich confirmation counts using the live tx data
+      const utxos = rawUtxos.map(u => {
+        const txid = typeof u.utxo.txid === 'object' ? u.utxo.txid.value : u.utxo.txid;
+        const liveConfs = txConfMap.get(txid);
+        if (liveConfs !== undefined && liveConfs !== u.utxo.confirmations) {
+          console.log(`[UTXO] enriching ${txid.slice(0, 8)}: ${u.utxo.confirmations} → ${liveConfs}`);
+          return { ...u, utxo: { ...u.utxo, confirmations: liveConfs } };
+        }
+        return u;
+      });
+
+      console.log('[REFRESH] UTXOs after enrichment:', utxos.map(u => ({
+        txid: typeof u.utxo.txid === 'object' ? u.utxo.txid.value : u.utxo.txid,
+        confirmations: u.utxo.confirmations,
+      })));
+
       utxoTableBody.innerHTML = renderUtxos(utxos);
-      console.log('✅ UTXOs updated from API:', utxos.length);
       return utxos;
     } catch (error) {
       console.error('❌ UTXO update failed:', error);
@@ -353,23 +347,32 @@ export async function WalletComponent(container) {
     refreshBtn.disabled = true;
 
     try {
-      await syncWalletState();
+      localStorage.removeItem(WALLET_CACHE_KEY);
+
+      try {
+        await syncWalletState();
+      } catch (syncErr) {
+        console.warn('⚠️ Wallet sync failed, refreshing data anyway:', syncErr.message);
+      }
 
       const [balance, transactions, utxos] = await Promise.all([
-        updateBalance(false),
-        updateTransactions(false),
-        updateUtxos(false),
+        updateBalance(),
+        updateTransactions(),
+        updateUtxos(),
       ]);
 
       if (balance) saveWalletToCache(balance, transactions, utxos);
+
+      console.log('[REFRESH] Complete summary:');
+      console.log('  balance:', balance);
+      console.log('  transactions confirmations:', transactions?.map(t => ({ txid: typeof t.info.txid === 'object' ? t.info.txid.value : t.info.txid, confirmations: t.info.confirmations })));
+      console.log('  utxo confirmations:', utxos?.map(u => ({ txid: typeof u.utxo.txid === 'object' ? u.utxo.txid.value : u.utxo.txid, confirmations: u.utxo.confirmations })));
 
       refreshBtn.textContent = 'Refreshed!';
       setTimeout(() => {
         refreshBtn.textContent = originalText;
         refreshBtn.disabled = false;
       }, 2000);
-
-      console.log('✅ All data refreshed');
     } catch (error) {
       refreshBtn.textContent = 'Refresh Failed';
       setTimeout(() => {
@@ -471,7 +474,7 @@ export async function WalletComponent(container) {
 
   // Global function for opening transactions on mempool.space
   window.openTxOnMempool = (txid) => {
-    const url = `https://mutinynet.com/tx/${txid}`;
+    const url = `http://170.75.166.88:8080/tx/${txid}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');
@@ -511,25 +514,16 @@ export async function WalletComponent(container) {
     });
   }
 
-  if (shouldFetchFresh) {
-    console.log('🔄 Syncing and fetching fresh data...');
-    try {
-      await window.api.taker.sync();
-    } catch (syncErr) {
-      console.warn('⚠️ Initial wallet sync failed, proceeding anyway:', syncErr.message);
-    }
-    const [balance, transactions, utxos] = await Promise.all([
-      updateBalance(false),
-      updateTransactions(false),
-      updateUtxos(false),
-    ]);
-    if (balance) saveWalletToCache(balance, transactions, utxos);
-  } else {
-    console.log('⚡ Using cached data (still fresh)');
-    await Promise.all([
-      updateBalance(true),
-      updateTransactions(true),
-      updateUtxos(true),
-    ]);
+  console.log('🔄 Syncing and fetching fresh data...');
+  try {
+    await window.api.taker.sync();
+  } catch (syncErr) {
+    console.warn('⚠️ Initial wallet sync failed, proceeding anyway:', syncErr.message);
   }
+  const [balance, transactions, utxos] = await Promise.all([
+    updateBalance(),
+    updateTransactions(),
+    updateUtxos(),
+  ]);
+  if (balance) saveWalletToCache(balance, transactions, utxos);
 }

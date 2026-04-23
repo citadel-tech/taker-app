@@ -781,7 +781,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <p class="text-xs text-gray-400 mb-2">Recipient: ${address}</p>
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-400">TXID:</span>
-                <a href="https://mempool.space/testnet/tx/${txid}" target="_blank" 
+                <a href="http://170.75.166.88:8080/tx/${txid}" target="_blank"
                    class="text-sm font-mono text-blue-400 hover:text-blue-300 underline flex-1 truncate">
                   ${txid}
                 </a>

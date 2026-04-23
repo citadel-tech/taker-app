@@ -518,7 +518,7 @@ export async function SwapComponent(container) {
   async function fetchNetworkFees() {
     try {
       const response = await fetch(
-        'https://mempool.space/api/v1/fees/recommended'
+        'http://170.75.166.88:8080/api/v1/fees/recommended'
       );
       const data = await response.json();
       networkFeeRate = data.halfHourFee;

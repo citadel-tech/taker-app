@@ -566,7 +566,7 @@ export function UtxoListComponent(container) {
 
   // Global function for opening transactions on mempool.space
   window.openTxOnMempool = (txid) => {
-    const url = `https://mutinynet.com/tx/${txid}`;
+    const url = `http://170.75.166.88:8080/tx/${txid}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');
