@@ -38,20 +38,20 @@ export function Market(container) {
     }
   }
 
-  function formatTorEndpoint(address, start = 14, end = 16) {
+  function formatTorEndpoint(address, start = 6, end = 0) {
     if (!address || typeof address !== 'string') return 'unknown';
 
     const separatorIndex = address.lastIndexOf(':');
     if (separatorIndex === -1) return address;
 
-    const host = address.slice(0, separatorIndex);
+    const host = address.slice(0, separatorIndex).replace(/\.onion$/i, '');
     const port = address.slice(separatorIndex + 1);
 
     if (host.length <= start + end + 3) {
       return `${host}:${port}`;
     }
 
-    return `${host.slice(0, start)}...${host.slice(-end)}:${port}`;
+    return end > 0 ? `${host.slice(0, start)}..${host.slice(-end)}:${port}` : `${host.slice(0, start)}..:${port}`;
   }
 
   // Check sync state every second
@@ -89,10 +89,16 @@ export function Market(container) {
 
   function transformMaker(item, index) {
     const offer = item.offer;
-    const addressObj = item.address || {};
-    const onionAddr = addressObj.onion_addr || '';
-    const port = addressObj.port || '6102';
-    const fullAddress = `${onionAddr}:${port}`;
+    const addr = item.address;
+    let fullAddress;
+    if (typeof addr === 'string') {
+      fullAddress = addr.includes(':') ? addr : `${addr}:6102`;
+    } else {
+      const addressObj = addr || {};
+      const onionAddr = addressObj.onion_addr || '';
+      const port = addressObj.port || '6102';
+      fullAddress = `${onionAddr}:${port}`;
+    }
 
     // Handle null offers (unresponsive makers)
     if (!offer) {
@@ -584,7 +590,7 @@ export function Market(container) {
           <div class="bg-[#0f1419] p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-1">Bond Txid</p>
             <button
-              onclick="window.open('https://mempool.space/tx/${maker.bondTxid}', '_blank')"
+              onclick="window.open('http://170.75.166.88:8080/tx/${maker.bondTxid}', '_blank')"
               class="text-cyan-400 hover:text-cyan-300 underline font-mono text-sm break-all text-left w-full"
             >
               ${maker.bondTxid}
@@ -763,15 +769,9 @@ export function Market(container) {
           tableBody.innerHTML = displayedMakers
             .map(
               (maker) => {
-                const protocolBadge = getProtocolPresentation(maker.protocol);
                 return `
-          <div class="grid grid-cols-8 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
-            
-            <div class="text-sm">
-              <span class="px-2 py-1 ${protocolBadge.classes} rounded text-xs font-semibold text-lg">
-                ${protocolBadge.icon} ${protocolBadge.label}
-              </span>
-            </div>
+          <div class="grid grid-cols-7 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
+
             <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
             <div class="text-green-400">${maker.baseFee}</div>
             <div class="text-blue-400">${maker.volumeFee}%</div>
@@ -871,8 +871,7 @@ export function Market(container) {
 
       
 
-      <div class="grid grid-cols-8 gap-4 bg-[#FF6B35] p-4 text-xs">
-        <div class="font-semibold">Protocol</div>
+      <div class="grid grid-cols-7 gap-4 bg-[#FF6B35] p-4 text-xs">
         <div class="font-semibold">Tor Address</div>
         <div class="font-semibold">Base Fee</div>
         <div class="font-semibold">% Fee Rate</div>

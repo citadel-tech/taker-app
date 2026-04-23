@@ -3,3 +3,4 @@ package-lock.json
 coinswap-ffi
 dist/
 squashfs-root/
+.DS_Store
