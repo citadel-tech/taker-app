@@ -7,6 +7,7 @@ import { SwapComponent } from '../components/swap/Swap.js';
 import { RecoveryComponent } from '../components/recovery/Recovery.js';
 import { LogComponent } from '../components/log/Log.js';
 import { SettingsComponent } from '../components/settings/Settings.js';
+import { AboutComponent } from '../components/about/About.js';
 import { FirstTimeSetupModal } from '../components/settings/FirstTimeSetup.js';
 import { SwapStateManager } from '../components/swap/SwapStateManager.js';
 import { ConnectionStatusComponent } from '../components/connection/ConnectionStatus.js';
@@ -23,6 +24,7 @@ const components = {
   recovery: RecoveryComponent,
   log: LogComponent,
   settings: SettingsComponent,
+  about: AboutComponent,
 };
 
 // Background swap manager - runs independently of UI components
@@ -133,68 +135,15 @@ function setupNavigation() {
 async function checkBitcoindConnection(config) {
   console.log('🔌 Checking Bitcoin Core connection...');
 
-  // Update the connection manager with config from setup
   if (config) {
     bitcoindConnection.updateConfig(config);
   }
 
-  // Show connection status component
   const appContainer = document.querySelector('body');
   ConnectionStatusComponent(appContainer, (connectionInfo) => {
     console.log('✅ Bitcoin Core connected, starting app...', connectionInfo);
-    checkTakerInitialization(config);
+    startTakerInitWithConfig(config);
   });
-}
-
-async function checkTakerInitialization(config) {
-  console.log('🔄 Checking Taker initialization...');
-
-  if (!config || !config.rpc) {
-    console.log('⚠️ RPC configuration missing, skipping taker initialization');
-    startMainApp();
-    return;
-  }
-
-  try {
-    // Extract wallet name from config
-    const walletName =
-      config.wallet?.name || config.wallet?.fileName || 'taker-wallet';
-
-    console.log('🔍 Checking wallet:', walletName);
-
-    // Store it in config so showPasswordPrompt can use it
-    if (!config.wallet.name && !config.wallet.fileName) {
-      config.wallet.name = walletName;
-    }
-
-    // Check if wallet file is encrypted
-    const isEncrypted = await window.api.taker.isWalletEncrypted(
-      null,
-      walletName
-    );
-    console.log('🔐 Wallet file encrypted:', isEncrypted);
-
-    if (isEncrypted) {
-      console.log('🔓 Wallet is encrypted, showing password prompt...');
-      await showPasswordPrompt(config); // ✅ Config has correct wallet name
-    } else {
-      console.log('🔓 Wallet is not encrypted');
-
-      const result = await window.api.taker.initialize(config);
-
-      if (result.success) {
-        console.log('✅ Taker initialized');
-        startMainApp();
-        startBackgroundOfferbookSync();
-      } else {
-        console.error('❌ Taker initialization failed:', result.error);
-        alert('Failed to initialize: ' + result.error);
-      }
-    }
-  } catch (error) {
-    console.error('❌ Initialization check failed:', error);
-    alert('Initialization failed: ' + error.message);
-  }
 }
 
 function startTakerInitWithConfig(config) {
@@ -348,6 +297,7 @@ async function startBackgroundOfferbookSync() {
     console.warn('⚠️ Background offerbook sync error:', err.message);
   }
 }
+
 
 // Start the main app after bitcoind connection is established
 async function startMainApp() {

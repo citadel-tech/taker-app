@@ -68,6 +68,10 @@ contextBridge.exposeInMainWorld('api', {
     set: (key, value) => ipcRenderer.invoke('preferences:set', key, value),
   },
 
+  app: {
+    getVersionInfo: () => ipcRenderer.invoke('app:getVersionInfo'),
+  },
+
   // File dialogs - TOP LEVEL, NOT INSIDE TAKER!
   openFile: (options) => ipcRenderer.invoke('dialog:openFile', options),
   saveFile: (options) => ipcRenderer.invoke('dialog:saveFile', options),
