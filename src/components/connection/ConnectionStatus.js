@@ -228,7 +228,16 @@ export function ConnectionStatusComponent(container, onConnected) {
         
         try {
             const result = await bitcoindConnection.connect();
-            if (!result.success) {
+            if (result.alreadyConnected) {
+                // Connection existed before our patch was in place — verify and proceed
+                const check = await bitcoindConnection.testConnection();
+                if (check.success) {
+                    showSuccess(check.info);
+                } else {
+                    bitcoindConnection.disconnect();
+                    startConnection(); // retry from scratch
+                }
+            } else if (!result.success) {
                 showError(result.finalError || result.error);
             }
         } catch (error) {

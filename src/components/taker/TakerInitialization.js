@@ -30,12 +30,6 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                         </div>
                         <span id="step-taker-text" class="text-gray-400 text-sm">Initializing taker (creates wallet)</span>
                     </div>
-                    <div id="step-offerbook" class="flex items-center space-x-3">
-                        <div id="step-offerbook-icon" class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                            <span class="text-xs text-white">3</span>
-                        </div>
-                        <span id="step-offerbook-text" class="text-gray-400 text-sm">Syncing offerbook</span>
-                    </div>
                 </div>
             </div>
 
@@ -269,31 +263,6 @@ export function TakerInitializationComponent(container, config, onInitialized) {
       }
 
       updateStep('step-taker', 'complete', 'Taker ready (wallet loaded)');
-      updateProgress(66, 'Syncing offerbook...');
-      updateStep('step-offerbook', 'active', 'Syncing offerbook...');
-
-      const syncResult = await window.api.taker.syncOfferbookAndWait();
-      if (!syncResult.success) {
-        console.warn('⚠️ Offerbook sync failed on launch:', syncResult.error);
-        updateStep('step-offerbook', 'error', 'Sync failed (will retry later)');
-      } else {
-        const syncId = syncResult.syncId;
-        await new Promise((resolve) => {
-          const poll = setInterval(async () => {
-            try {
-              const status = await window.api.taker.getSyncStatus(syncId);
-              const done = !status.success || status.sync.status === 'completed' || status.sync.status === 'failed';
-              if (done) {
-                clearInterval(poll);
-                const ok = status.success && status.sync.status === 'completed';
-                updateStep('step-offerbook', ok ? 'complete' : 'error', ok ? 'Offerbook ready' : 'Sync failed (will retry later)');
-                resolve();
-              }
-            } catch { clearInterval(poll); updateStep('step-offerbook', 'error', 'Sync failed (will retry later)'); resolve(); }
-          }, 1000);
-        });
-      }
-
       updateProgress(100, 'Initialization complete');
       showSuccess();
     } catch (error) {

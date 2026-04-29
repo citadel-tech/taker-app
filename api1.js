@@ -1921,6 +1921,23 @@ function registerTorHandlers() {
 // MAIN REGISTRATION FUNCTION
 // ============================================================================
 
+function registerAppHandlers() {
+  ipcMain.handle('app:getVersionInfo', async () => {
+    try {
+      const appVersion = app.getVersion();
+      let binaryVersion = 'unknown';
+      try {
+        const napiPkgPath = require.resolve('coinswap-napi/package.json');
+        const napiPkg = JSON.parse(fs.readFileSync(napiPkgPath, 'utf8'));
+        binaryVersion = napiPkg.version || 'unknown';
+      } catch (_) {}
+      return { success: true, appVersion, binaryVersion };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+}
+
 function registerAPI1() {
   console.log('📦 Registering API v1 handlers...');
 
@@ -1932,6 +1949,7 @@ function registerAPI1() {
   registerDialogHandlers();
   registerShellHandlers();
   registerTorHandlers();
+  registerAppHandlers();
 
   console.log('✅ API v1 handlers registered');
 }
