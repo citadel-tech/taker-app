@@ -6,25 +6,36 @@ export function SettingsComponent(container) {
 
   content.innerHTML = `
         <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Settings</h2>
-        <p class="text-gray-400 mb-8">Configure your taker wallet and Bitcoin Core connection</p>
+        <p class="text-gray-400 mb-6">Configure your taker wallet and Bitcoin Core connection</p>
 
-        <div class="space-y-8">
+        <!-- Tab Navigation -->
+        <div class="flex border-b border-gray-700 mb-8">
+            <button data-tab="wallet" class="settings-tab px-5 py-3 text-sm font-medium border-b-2 border-bitcoin-orange text-bitcoin-orange transition-colors">
+                Wallet
+            </button>
+            <button data-tab="network" class="settings-tab px-5 py-3 text-sm font-medium border-b-2 border-transparent text-gray-400 hover:text-gray-200 transition-colors">
+                Network
+            </button>
+        </div>
+
+        <!-- Tab: Wallet -->
+        <div id="tab-wallet" class="tab-panel space-y-8">
             <!-- Wallet Backup Section -->
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Wallet Backup</h3>
-                
+
                 <div class="space-y-4">
                     <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
                         <h4 class="text-lg font-medium text-white mb-3">Create Backup</h4>
                         <p class="text-sm text-gray-400 mb-4">
                             Export your wallet to an encrypted JSON file. You can use this backup to restore your wallet on another device or after reinstallation.
                         </p>
-                        
+
                         <button id="backup-wallet-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                             ${icons.save(16, 'mr-2')} Create Backup
                         </button>
                     </div>
-                    
+
                     <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
                         <div class="space-y-2 text-sm text-gray-400">
                             <p>• Wallet Backup is an encrypted json file that restores your coinswap wallet in any client app.</p>
@@ -36,11 +47,14 @@ export function SettingsComponent(container) {
                     </div>
                 </div>
             </div>
+        </div>
 
+        <!-- Tab: Network -->
+        <div id="tab-network" class="tab-panel space-y-8 hidden">
             <!-- Node & Network Configuration -->
             <div class="bg-[#1a2332] rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Node & Network Configuration</h3>
-                
+
                 <div class="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-6">
                     <div class="space-y-6">
                         <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
@@ -48,8 +62,8 @@ export function SettingsComponent(container) {
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">Control Port</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         id="tor-control-port-input"
                                         value="9051"
                                         min="1024"
@@ -59,8 +73,8 @@ export function SettingsComponent(container) {
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">SOCKS Port</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         id="tor-socks-port-input"
                                         value="9050"
                                         min="1024"
@@ -71,8 +85,8 @@ export function SettingsComponent(container) {
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">Tor Auth Password</label>
                                     <div class="relative">
-                                        <input 
-                                            type="password" 
+                                        <input
+                                            type="password"
                                             id="tor-auth-password-input"
                                             placeholder="Optional"
                                             class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -107,8 +121,8 @@ export function SettingsComponent(container) {
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">RPC Host</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         id="rpc-host-input"
                                         value="127.0.0.1"
                                         class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -116,8 +130,8 @@ export function SettingsComponent(container) {
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">RPC Port</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         id="rpc-port-input"
                                         value="38332"
                                         min="1"
@@ -127,8 +141,8 @@ export function SettingsComponent(container) {
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">RPC Username</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         id="rpc-username-input"
                                         value="user"
                                         class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -136,8 +150,8 @@ export function SettingsComponent(container) {
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">RPC Password</label>
-                                    <input 
-                                        type="password" 
+                                    <input
+                                        type="password"
                                         id="rpc-password-input"
                                         placeholder="Enter RPC password"
                                         class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
@@ -145,8 +159,8 @@ export function SettingsComponent(container) {
                                 </div>
                                 <div>
                                     <label class="block text-sm text-gray-400 mb-2">ZMQ Port</label>
-                                    <input 
-                                        type="number" 
+                                    <input
+                                        type="number"
                                         id="zmq-port-input"
                                         value="28332"
                                         min="1"
@@ -195,74 +209,19 @@ export function SettingsComponent(container) {
                         </div>
 
                         <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-                            <h4 class="text-lg font-medium text-white mb-4">Bitcoin.conf Setup</h4>
-                            <div class="bg-[#111827] rounded-lg p-4 font-mono text-xs text-gray-300">
-                                <div id="zmq-config-preview">
-                                    zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-                                    zmqpubrawtx=tcp://127.0.0.1:28332
-                                </div>
-                            </div>
-                            <button id="copy-zmq-config-btn" class="w-full mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
-                                ${icons.clipboardCopy(14, 'mr-1')} Copy ZMQ Config
-                            </button>
+                            <h4 class="text-lg font-medium text-white mb-2">Bitcoin.conf Setup</h4>
+                            <p class="text-sm text-gray-400 mb-4">Full configuration reference for setting up Bitcoin Core with Coinswap.</p>
+                            <a
+                                href="https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoin.conf"
+                                target="_blank"
+                                rel="noreferrer"
+                                class="flex items-center gap-2 text-sm text-bitcoin-orange hover:underline"
+                            >
+                                ${icons.externalLink(14, 'shrink-0')} View bitcoin.conf reference on GitHub
+                            </a>
                         </div>
                     </div>
                 </div>
-            </div>
-
-            <!-- Full Bitcoin.conf Reference -->
-            <div class="bg-[#1a2332] rounded-lg p-6">
-                <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Complete bitcoin.conf Reference</h3>
-                
-                <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
-                    <div id="full-config-preview">
-[signet]<br/>
-# Signet network configuration for running Coinswap Taker and Maker<br/>
-# Mutinynet default signet parameters<br/>
-signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae<br/>
-addnode=45.79.52.207:38333<br/>
-dnsseed=0<br/>
-signetblocktime=30<br/>
-# RPC Configurations for Coinswap operations<br/>
-server=1<br/>
-rpcuser=user<br/>
-rpcpassword=password<br/>
-rpcport=38332<br/>
-rpcbind=127.0.0.1<br/>
-rpcallowip=127.0.0.1<br/>
-rest=1<br/>
-# ZMQ Configurations for real-time transaction and block notifications<br/>
-# Needed for the Watchers.<br/>
-zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-zmqpubrawtx=tcp://127.0.0.1:28332<br/>
-# Required indexes for faster wallet sync<br/>
-txindex=1<br/>
-blockfilterindex=1<br/>
-<br/>
-[regtest]<br/>
-# Regtest network configurations for running Coinswap Taker and Maker<br/>
-fallbackfee=0.00001000<br/>
-# RPC Configurations for Coinswap operations<br/>
-server=1<br/>
-rpcuser=user<br/>
-rpcpassword=password<br/>
-rpcport=18442<br/>
-rpcbind=127.0.0.1<br/>
-rpcallowip=127.0.0.1<br/>
-rest=1<br/>
-# ZMQ Configurations for real-time transaction and block notifications<br/>
-# Needed for the Watchers.<br/>
-zmqpubrawblock=tcp://127.0.0.1:28332<br/>
-zmqpubrawtx=tcp://127.0.0.1:28332<br/>
-# Required indexes for faster wallet sync<br/>
-txindex=1<br/>
-blockfilterindex=1
-</div>
-                </div>
-                
-                <button id="copy-full-config-btn" class="mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
-                    ${icons.clipboardCopy(14, 'mr-1')} Copy Full Config
-                </button>
             </div>
 
             <!-- Save Settings Button -->
@@ -276,6 +235,7 @@ blockfilterindex=1
             </div>
         </div>
 
+
         <!-- Backup Password Modal -->
         <div id="backup-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
             <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-6">
@@ -283,31 +243,31 @@ blockfilterindex=1
                 <p class="text-gray-400 text-sm mb-6">
                     Set a password to encrypt your wallet backup. You'll need this password to restore from this backup.
                 </p>
-                
+
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Backup Password</label>
-                        <input 
-                            type="password" 
+                        <input
+                            type="password"
                             id="backup-password-input"
                             placeholder="Enter backup password"
                             class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                         />
                     </div>
-                    
+
                     <div>
                         <label class="block text-sm text-gray-400 mb-2">Confirm Password</label>
-                        <input 
-                            type="password" 
+                        <input
+                            type="password"
                             id="backup-password-confirm-input"
                             placeholder="Re-enter password"
                             class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
                         />
                     </div>
-                    
+
                     <div class="flex items-center">
-                        <input 
-                            type="checkbox" 
+                        <input
+                            type="checkbox"
                             id="skip-backup-encryption"
                             class="mr-2"
                         />
@@ -315,12 +275,12 @@ blockfilterindex=1
                             Skip encryption (not recommended)
                         </label>
                     </div>
-                    
+
                     <div id="backup-password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                         <p class="text-xs text-red-400"></p>
                     </div>
                 </div>
-                
+
                 <div class="flex space-x-3 mt-6">
                     <button id="cancel-backup-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                         Cancel
@@ -334,6 +294,31 @@ blockfilterindex=1
     `;
 
   container.appendChild(content);
+
+  // TAB SWITCHING
+
+  function switchTab(tabName) {
+    content.querySelectorAll('.tab-panel').forEach((panel) => {
+      panel.classList.add('hidden');
+    });
+    content.querySelectorAll('.settings-tab').forEach((btn) => {
+      btn.classList.remove('border-bitcoin-orange', 'text-bitcoin-orange');
+      btn.classList.add('border-transparent', 'text-gray-400');
+    });
+
+    const activePanel = content.querySelector(`#tab-${tabName}`);
+    if (activePanel) activePanel.classList.remove('hidden');
+
+    const activeBtn = content.querySelector(`[data-tab="${tabName}"]`);
+    if (activeBtn) {
+      activeBtn.classList.remove('border-transparent', 'text-gray-400');
+      activeBtn.classList.add('border-bitcoin-orange', 'text-bitcoin-orange');
+    }
+  }
+
+  content.querySelectorAll('.settings-tab').forEach((btn) => {
+    btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+  });
 
   // FUNCTIONS
 
@@ -427,77 +412,12 @@ blockfilterindex=1
           content.querySelector('#zmq-port-input').value = derivedPort;
         }
 
-        // Update config previews
-        updateConfigPreviews();
       }
     } catch (error) {
       console.error('Error loading existing config:', error);
     }
   }
 
-  // Update the config preview sections
-  function updateConfigPreviews() {
-    const zmqPort = content.querySelector('#zmq-port-input').value || '28332';
-    const rawblock = getZmqAddress(zmqPort);
-    const rawtx = getZmqAddress(zmqPort);
-    const rpcUser =
-      content.querySelector('#rpc-username-input').value || 'user';
-    const rpcPass =
-      content.querySelector('#rpc-password-input').value || 'password';
-    const rpcPort = content.querySelector('#rpc-port-input').value || '18442';
-
-    // Update ZMQ config preview
-    const zmqPreview = content.querySelector('#zmq-config-preview');
-    if (zmqPreview) {
-      zmqPreview.innerHTML = `zmqpubrawblock=${rawblock}<br/>zmqpubrawtx=${rawtx}`;
-    }
-
-    // Update full config preview
-    const fullPreview = content.querySelector('#full-config-preview');
-    if (fullPreview) {
-      fullPreview.innerHTML = `[signet]<br/>
-# Signet network configuration for running Coinswap Taker and Maker<br/>
-# Mutinynet default signet parameters<br/>
-signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae<br/>
-addnode=45.79.52.207:38333<br/>
-dnsseed=0<br/>
-signetblocktime=30<br/>
-# RPC Configurations for Coinswap operations<br/>
-server=1<br/>
-rpcuser=${rpcUser}<br/>
-rpcpassword=${rpcPass}<br/>
-rpcport=38332<br/>
-rpcbind=127.0.0.1<br/>
-rpcallowip=127.0.0.1<br/>
-rest=1<br/>
-# ZMQ Configurations for real-time transaction and block notifications<br/>
-# Needed for the Watchers.<br/>
-zmqpubrawblock=${rawblock}<br/>
-zmqpubrawtx=${rawtx}<br/>
-# Required indexes for faster wallet sync<br/>
-txindex=1<br/>
-blockfilterindex=1<br/>
-<br/>
-[regtest]<br/>
-# Regtest network configurations for running Coinswap Taker and Maker<br/>
-fallbackfee=0.00001000<br/>
-# RPC Configurations for Coinswap operations<br/>
-server=1<br/>
-rpcuser=${rpcUser}<br/>
-rpcpassword=${rpcPass}<br/>
-rpcport=${rpcPort}<br/>
-rpcbind=127.0.0.1<br/>
-rpcallowip=127.0.0.1<br/>
-rest=1<br/>
-# ZMQ Configurations for real-time transaction and block notifications<br/>
-# Needed for the Watchers.<br/>
-zmqpubrawblock=${rawblock}<br/>
-zmqpubrawtx=${rawtx}<br/>
-# Required indexes for faster wallet sync<br/>
-txindex=1<br/>
-blockfilterindex=1`;
-    }
-  }
 
   // Show backup password modal
   function showBackupModal() {
@@ -618,101 +538,6 @@ blockfilterindex=1`;
       await performBackup(skipEncryption ? '' : password);
     });
 
-  // Config input changes - update previews
-  content.querySelector('#zmq-port-input').addEventListener('input', updateConfigPreviews);
-  content
-    .querySelector('#rpc-username-input')
-    .addEventListener('input', updateConfigPreviews);
-  content
-    .querySelector('#rpc-password-input')
-    .addEventListener('input', updateConfigPreviews);
-  content
-    .querySelector('#rpc-port-input')
-    .addEventListener('input', updateConfigPreviews);
-
-  // Copy ZMQ config
-  content
-    .querySelector('#copy-zmq-config-btn')
-    .addEventListener('click', async () => {
-      const zmqPort = content.querySelector('#zmq-port-input').value || '28332';
-      const rawblock = getZmqAddress(zmqPort);
-      const rawtx = getZmqAddress(zmqPort);
-      const configText = `zmqpubrawblock=${rawblock}\nzmqpubrawtx=${rawtx}`;
-
-      try {
-        await navigator.clipboard.writeText(configText);
-        const btn = content.querySelector('#copy-zmq-config-btn');
-        const originalText = btn.textContent;
-        btn.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
-        setTimeout(() => {
-          btn.textContent = originalText;
-        }, 2000);
-      } catch (err) {
-        console.error('Failed to copy:', err);
-      }
-    });
-
-  // Copy full config
-  content
-    .querySelector('#copy-full-config-btn')
-    .addEventListener('click', async () => {
-      const zmqPort = content.querySelector('#zmq-port-input').value || '28332';
-      const rawblock = getZmqAddress(zmqPort);
-      const rawtx = getZmqAddress(zmqPort);
-      const rpcUser =
-        content.querySelector('#rpc-username-input').value || 'user';
-      const rpcPass =
-        content.querySelector('#rpc-password-input').value || 'password';
-      const rpcPort = content.querySelector('#rpc-port-input').value || '38332';
-
-      const configText = `# ========================================
-# SIGNET CONFIGURATION
-# ========================================
-[signet]
-signetchallenge=512102f7561d208dd9ae99bf497273e16f389bdbd6c4742ddb8e6b216e64fa2928ad8f51ae
-addnode=45.79.52.207:38333
-dnsseed=0
-signetblocktime=30
-rpcuser=${rpcUser}
-rpcpassword=${rpcPass}
-server=1
-txindex=1
-blockfilterindex=1
-rpcport=38332
-rpcbind=127.0.0.1
-rpcallowip=127.0.0.1
-rest=1
-zmqpubrawblock=${rawblock}
-zmqpubrawtx=${rawtx}
-
-# ========================================
-# REGTEST CONFIGURATION
-# ========================================
-[regtest]
-rpcuser=${rpcUser}
-rpcpassword=${rpcPass}
-fallbackfee=0.00001000
-server=1
-txindex=1
-blockfilterindex=1
-rpcport=18442
-rpcbind=127.0.0.1
-rpcallowip=127.0.0.1
-rest=1
-zmqpubrawblock=${rawblock}
-zmqpubrawtx=${rawtx}`;
-      try {
-        await navigator.clipboard.writeText(configText);
-        const btn = content.querySelector('#copy-full-config-btn');
-        const originalText = btn.textContent;
-        btn.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
-        setTimeout(() => {
-          btn.textContent = originalText;
-        }, 2000);
-      } catch (err) {
-        console.error('Failed to copy:', err);
-      }
-    });
 
   function updateConnectionStatus(connected, info = {}) {
     const indicator = content.querySelector('#connection-indicator');
@@ -1053,8 +878,6 @@ zmqpubrawtx=${rawtx}`;
       // Reset ZMQ field
       content.querySelector('#zmq-port-input').value = '28332';
 
-      // Update previews
-      updateConfigPreviews();
       updateConnectionStatus(false);
 
       alert('Settings reset to defaults');
@@ -1063,7 +886,6 @@ zmqpubrawtx=${rawtx}`;
 
   // INITIALIZE
   loadExistingConfig();
-  updateConfigPreviews();
 
   // Auto-check connection status on page load
   (async function checkInitialStatus() {
