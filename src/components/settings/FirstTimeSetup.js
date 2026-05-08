@@ -140,7 +140,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
             <div id="rpc-test-result" class="hidden"></div>
 
-            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+            <div id="node-setup-info" class="hidden bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
   <div class="flex items-start gap-3 text-sm text-yellow-400">
     ${iconInfo}
     <p>
@@ -485,7 +485,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
       <div id="tor-test-result" class="hidden"></div>
 
-      <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
+      <div id="tor-setup-info" class="hidden bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
         <div class="flex items-start gap-3 text-xs text-blue-400">
           ${iconInfo}
           <p>
@@ -986,6 +986,9 @@ export function FirstTimeSetupModal(container, onComplete) {
       ];
 
       renderConnectionResults(resultDiv, results);
+      const nodeFailed = results.some((r) => !r.ok);
+      const infoDiv = modal.querySelector('#node-setup-info');
+      if (infoDiv) infoDiv.classList.toggle('hidden', !nodeFailed);
     } catch (error) {
       console.error('RPC test failed:', error);
 
@@ -1000,6 +1003,8 @@ export function FirstTimeSetupModal(container, onComplete) {
               : error.message,
         },
       ]);
+      const infoDiv = modal.querySelector('#node-setup-info');
+      if (infoDiv) infoDiv.classList.remove('hidden');
     }
 
     btn.textContent = originalText;
@@ -1090,6 +1095,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         window.api.testTcpPort({ host: '127.0.0.1', port: controlPort }),
       ]);
 
+      const torFailed = !socksResult?.success || !controlResult?.success;
       renderConnectionResults(resultDiv, [
         {
           label: 'SOCKS Port',
@@ -1106,6 +1112,8 @@ export function FirstTimeSetupModal(container, onComplete) {
             : controlResult?.error,
         },
       ]);
+      const infoDiv = modal.querySelector('#tor-setup-info');
+      if (infoDiv) infoDiv.classList.toggle('hidden', !torFailed);
     } catch (error) {
       console.error('Tor test failed:', error);
 
@@ -1116,6 +1124,8 @@ export function FirstTimeSetupModal(container, onComplete) {
           message: error.message || String(error),
         },
       ]);
+      const infoDiv = modal.querySelector('#tor-setup-info');
+      if (infoDiv) infoDiv.classList.remove('hidden');
     }
 
     btn.textContent = originalText;

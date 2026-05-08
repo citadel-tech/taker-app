@@ -38,20 +38,14 @@ export function Market(container) {
     }
   }
 
-  function formatTorEndpoint(address, start = 6, end = 0) {
+  function formatTorEndpoint(address, start = 8, end = 6) {
     if (!address || typeof address !== 'string') return 'unknown';
 
     const separatorIndex = address.lastIndexOf(':');
-    if (separatorIndex === -1) return address;
+    const host = (separatorIndex !== -1 ? address.slice(0, separatorIndex) : address).replace(/\.onion$/i, '');
 
-    const host = address.slice(0, separatorIndex).replace(/\.onion$/i, '');
-    const port = address.slice(separatorIndex + 1);
-
-    if (host.length <= start + end + 3) {
-      return `${host}:${port}`;
-    }
-
-    return end > 0 ? `${host.slice(0, start)}..${host.slice(-end)}:${port}` : `${host.slice(0, start)}..:${port}`;
+    if (host.length <= start + end + 3) return host;
+    return `${host.slice(0, start)}...${host.slice(-end)}`;
   }
 
   // Check sync state every second
@@ -91,14 +85,7 @@ export function Market(container) {
     const offer = item.offer;
     const addr = item.address;
     let fullAddress;
-    if (typeof addr === 'string') {
-      fullAddress = addr.includes(':') ? addr : `${addr}:6102`;
-    } else {
-      const addressObj = addr || {};
-      const onionAddr = addressObj.onion_addr || '';
-      const port = addressObj.port || '6102';
-      fullAddress = `${onionAddr}:${port}`;
-    }
+    fullAddress = typeof addr === 'string' ? addr : `${addr?.onion_addr || ''}:${addr?.port || ''}`;
 
     // Handle null offers (unresponsive makers)
     if (!offer) {
@@ -770,7 +757,7 @@ export function Market(container) {
             .map(
               (maker) => {
                 return `
-          <div class="grid grid-cols-7 gap-4 p-4 hover:bg-[#242d3d] transition-colors">
+          <div class="grid gap-4 p-4 hover:bg-[#242d3d] transition-colors" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr">
 
             <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
             <div class="text-green-400">${maker.baseFee}</div>
@@ -871,7 +858,7 @@ export function Market(container) {
 
       
 
-      <div class="grid grid-cols-7 gap-4 bg-[#FF6B35] p-4 text-xs">
+      <div class="grid gap-4 bg-[#FF6B35] p-4 text-xs" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr">
         <div class="font-semibold">Tor Address</div>
         <div class="font-semibold">Base Fee</div>
         <div class="font-semibold">% Fee Rate</div>

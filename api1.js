@@ -1453,7 +1453,7 @@ function registerCoinswapHandlers() {
   // Start coinswap
   ipcMain.handle(
     'coinswap:start',
-    async (event, { amount, makerCount, outpoints, password }) => {
+    async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses }) => {
       try {
         if (!api1State.takerInstance) {
           return { success: false, error: 'Taker not initialized' };
@@ -1571,7 +1571,7 @@ function registerCoinswapHandlers() {
         });
 
         const worker = new Worker(path.join(__dirname, 'coinswap-worker.js'), {
-          workerData: { amount, makerCount, outpoints, config },
+          workerData: { amount, makerCount, outpoints, selectedMakerAddresses, config },
         });
 
         api1State.activeSwaps.set(swapId, {
