@@ -1464,6 +1464,14 @@ function registerCoinswapHandlers() {
           return { success: false, error: 'Invalid amount' };
         }
 
+        if (
+          selectedMakerAddresses != null &&
+          (!Array.isArray(selectedMakerAddresses) ||
+            selectedMakerAddresses.some((a) => typeof a !== 'string' || !a.trim()))
+        ) {
+          return { success: false, error: 'Invalid selectedMakerAddresses: must be an array of non-empty strings' };
+        }
+
         const protocol = api1State.protocolVersion || 'v1';
         const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
         const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;

@@ -85,7 +85,13 @@ export function Market(container) {
     const offer = item.offer;
     const addr = item.address;
     let fullAddress;
-    fullAddress = typeof addr === 'string' ? addr : `${addr?.onion_addr || ''}:${addr?.port || ''}`;
+    if (typeof addr === 'string') {
+      fullAddress = addr;
+    } else {
+      const host = addr?.onion_addr || '';
+      const portSuffix = addr?.port ? `:${addr.port}` : '';
+      fullAddress = host || portSuffix ? `${host}${portSuffix}` : '';
+    }
 
     // Handle null offers (unresponsive makers)
     if (!offer) {

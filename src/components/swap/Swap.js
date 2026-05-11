@@ -51,6 +51,15 @@ function saveSwapDataToCache(utxos, makers, balance) {
   }
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatTorEndpoint(address, start = 14, end = 16) {
   if (!address || typeof address !== 'string') return 'unknown';
 
@@ -437,6 +446,9 @@ export async function SwapComponent(container) {
     const makerListContainer = content.querySelector('#maker-list');
     if (!makerListContainer) return;
 
+    const availableAddrs = new Set(availableMakers.map((m) => m.address));
+    selectedMakerAddresses = selectedMakerAddresses.filter((a) => availableAddrs.has(a));
+
     if (availableMakers.length === 0) {
       makerListContainer.innerHTML =
         '<p class="text-gray-400 text-center py-4">No makers available</p>';
@@ -450,11 +462,11 @@ export async function SwapComponent(container) {
           <input type="checkbox" id="maker-addr-${index}" class="w-4 h-4 accent-[#FF6B35]" />
           <div class="flex-1">
             <div class="flex justify-between items-center">
-              <span class="font-mono text-sm text-gray-300">${formatTorEndpoint(maker.address)}</span>
+              <span class="font-mono text-sm text-gray-300">${escapeHtml(formatTorEndpoint(maker.address))}</span>
             </div>
             <div class="flex justify-between items-center mt-1">
-              <span class="text-xs text-gray-500">${maker.baseFee} sats + ${maker.volumeFeePct.toFixed(3)}%</span>
-              <span class="text-xs text-gray-500">${maker.minSize.toLocaleString()} – ${maker.maxSize.toLocaleString()} sats</span>
+              <span class="text-xs text-gray-500">${escapeHtml(maker.baseFee)} sats + ${escapeHtml(maker.volumeFeePct.toFixed(3))}%</span>
+              <span class="text-xs text-gray-500">${escapeHtml(maker.minSize.toLocaleString())} – ${escapeHtml(maker.maxSize.toLocaleString())} sats</span>
             </div>
           </div>
         </label>
