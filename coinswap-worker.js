@@ -10,7 +10,7 @@ const { parentPort, workerData } = require('worker_threads');
   try {
     const coinswapNapi = require('coinswap-napi');
 
-    const { amount, makerCount, outpoints, config } = workerData;
+    const { amount, makerCount, outpoints, selectedMakerAddresses, config } = workerData;
     const protocol = config.protocol || 'v1';
     const normalizedProtocol = protocol === 'v2' ? 'Taproot' : 'Legacy';
     const protocolName =
@@ -58,6 +58,7 @@ const { parentPort, workerData } = require('worker_threads');
       sendAmount: amount,
       makerCount: makerCount,
       manuallySelectedOutpoints: outpoints || undefined,
+      preferredMakers: selectedMakerAddresses && selectedMakerAddresses.length > 0 ? selectedMakerAddresses : undefined,
     };
 
     console.log(`🔄 Syncing offerbook in swap worker before prepare...`);

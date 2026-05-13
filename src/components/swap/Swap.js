@@ -51,20 +51,23 @@ function saveSwapDataToCache(utxos, makers, balance) {
   }
 }
 
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatTorEndpoint(address, start = 14, end = 16) {
   if (!address || typeof address !== 'string') return 'unknown';
 
   const separatorIndex = address.lastIndexOf(':');
-  if (separatorIndex === -1) return address;
+  const host = separatorIndex !== -1 ? address.slice(0, separatorIndex) : address;
 
-  const host = address.slice(0, separatorIndex);
-  const port = address.slice(separatorIndex + 1);
-
-  if (host.length <= start + end + 3) {
-    return `${host}:${port}`;
-  }
-
-  return `${host.slice(0, start)}...${host.slice(-end)}:${port}`;
+  if (host.length <= start + end + 3) return host;
+  return `${host.slice(0, start)}...${host.slice(-end)}`;
 }
 
 export async function SwapComponent(container) {
@@ -122,6 +125,8 @@ export async function SwapComponent(container) {
   let numberOfHops = 3;
   let selectionMode = 'auto';
   let selectedUtxos = [];
+  let makerSelectionMode = 'auto'; // 'auto' | 'manual'
+  let selectedMakerAddresses = []; // array of maker address strings
   let useCustomHops = false;
   let customHopCount = 6;
   let networkFeeRate = 2;
@@ -156,6 +161,8 @@ export async function SwapComponent(container) {
     numberOfHops = savedSelections.numberOfHops || 3;
     selectionMode = savedSelections.selectionMode || 'auto';
     selectedUtxos = savedSelections.selectedUtxos || [];
+    makerSelectionMode = savedSelections.makerSelectionMode || 'auto';
+    selectedMakerAddresses = savedSelections.selectedMakerAddresses || [];
     useCustomHops = savedSelections.useCustomHops || false;
     customHopCount = savedSelections.customHopCount || 6;
     networkFeeRate = savedSelections.networkFeeRate || 5;
@@ -265,10 +272,10 @@ export async function SwapComponent(container) {
             .filter((item) => item.offer !== null)
             .map((item, index) => {
               const offer = item.offer;
-              const addressObj = item.address || {};
-              const onionAddr = addressObj.onion_addr || '';
-              const port = addressObj.port || '6102';
-              const makerAddress = `${onionAddr}:${port}`;
+              const makerAddress = typeof item.address === 'string'
+                ? item.address
+                : `${item.address?.onion_addr || ''}:${item.address?.port || ''}`;
+
               return {
                 address: makerAddress,
                 minSize: offer.minSize || 0,
@@ -429,6 +436,62 @@ export async function SwapComponent(container) {
       if (checkbox) {
         checkbox.addEventListener('change', () => {
           toggleUtxoSelection(index);
+          saveCurrentSelections();
+        });
+      }
+    });
+  }
+
+  function renderMakerList() {
+    const makerListContainer = content.querySelector('#maker-list');
+    if (!makerListContainer) return;
+
+    const availableAddrs = new Set(availableMakers.map((m) => m.address));
+    selectedMakerAddresses = selectedMakerAddresses.filter((a) => availableAddrs.has(a));
+
+    if (availableMakers.length === 0) {
+      makerListContainer.innerHTML =
+        '<p class="text-gray-400 text-center py-4">No makers available</p>';
+      return;
+    }
+
+    makerListContainer.innerHTML = availableMakers
+      .map((maker, index) => {
+        return `
+        <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
+          <input type="checkbox" id="maker-addr-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+          <div class="flex-1">
+            <div class="flex justify-between items-center">
+              <span class="font-mono text-sm text-gray-300">${escapeHtml(formatTorEndpoint(maker.address))}</span>
+            </div>
+            <div class="flex justify-between items-center mt-1">
+              <span class="text-xs text-gray-500">${escapeHtml(maker.baseFee)} sats + ${escapeHtml(maker.volumeFeePct.toFixed(3))}%</span>
+              <span class="text-xs text-gray-500">${escapeHtml(maker.minSize.toLocaleString())} – ${escapeHtml(maker.maxSize.toLocaleString())} sats</span>
+            </div>
+          </div>
+        </label>
+      `;
+      })
+      .join('');
+
+    // Restore checked state from selectedMakerAddresses
+    availableMakers.forEach((maker, index) => {
+      const checkbox = content.querySelector('#maker-addr-' + index);
+      if (checkbox) {
+        checkbox.checked = selectedMakerAddresses.includes(maker.address);
+      }
+    });
+
+    // Update count display
+    const countEl = content.querySelector('#selected-makers-count');
+    if (countEl) countEl.textContent = selectedMakerAddresses.length;
+
+    // Attach change listeners
+    availableMakers.forEach((maker, index) => {
+      const checkbox = content.querySelector('#maker-addr-' + index);
+      if (checkbox) {
+        checkbox.addEventListener('change', () => {
+          toggleMakerSelection(maker.address);
           saveCurrentSelections();
         });
       }
@@ -679,10 +742,25 @@ export async function SwapComponent(container) {
       details.hops + ' hop' + (details.hops !== 1 ? 's' : '');
     content.querySelector('#estimated-time').textContent =
       formatEstimatedTime(details.timeSeconds);
-    const selectedMakersText =
-      getTopCandidateMakers()
-        .map((maker) => formatTorEndpoint(maker.address))
-        .join(', ') || 'None selected';
+
+    // Update required-makers-count in the maker selection section
+    const requiredMakersCountEl = content.querySelector('#required-makers-count');
+    if (requiredMakersCountEl) requiredMakersCountEl.textContent = getNumberOfMakers();
+
+    // Update makers label and display based on selection mode
+    const makersLabelEl = content.querySelector('#makers-label');
+    let selectedMakersText;
+    if (makerSelectionMode === 'manual' && selectedMakerAddresses.length > 0) {
+      selectedMakersText =
+        selectedMakerAddresses.map((addr) => formatTorEndpoint(addr)).join(', ');
+      if (makersLabelEl) makersLabelEl.textContent = 'Selected Makers';
+    } else {
+      selectedMakersText =
+        getTopCandidateMakers()
+          .map((maker) => formatTorEndpoint(maker.address))
+          .join(', ') || 'None selected';
+      if (makersLabelEl) makersLabelEl.textContent = 'Top Maker Candidates';
+    }
     const selectedMakersEl = content.querySelector('#selected-makers-display');
     selectedMakersEl.textContent = selectedMakersText;
     selectedMakersEl.title = selectedMakersText;
@@ -761,6 +839,13 @@ export async function SwapComponent(container) {
     if (availableMakers.length > 0 && makersNeeded > availableMakers.length) {
       warnings.push(
         `Need ${makersNeeded} makers for ${getNumberOfHops()} hops, but only ${availableMakers.length} available`
+      );
+    }
+
+    // Manual maker mode: check enough makers selected
+    if (makerSelectionMode === 'manual' && selectedMakerAddresses.length < makersNeeded) {
+      warnings.push(
+        `Need ${makersNeeded} maker${makersNeeded !== 1 ? 's' : ''} for this swap, but only ${selectedMakerAddresses.length} selected`
       );
     }
 
@@ -873,6 +958,52 @@ export async function SwapComponent(container) {
     updateSummary();
   }
 
+  function toggleMakerSelectionMode(mode) {
+    makerSelectionMode = mode;
+
+    content.querySelectorAll('.maker-mode-btn').forEach((btn) => {
+      btn.className =
+        'maker-mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+    });
+    content.querySelector('#maker-mode-' + mode).className =
+      'maker-mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
+
+    const makerSelectionSection = content.querySelector('#maker-selection-section');
+    if (makerSelectionSection) {
+      if (mode === 'manual') {
+        makerSelectionSection.classList.remove('hidden');
+      } else {
+        makerSelectionSection.classList.add('hidden');
+      }
+    }
+
+    updateSummary();
+  }
+
+  function toggleMakerSelection(address) {
+    const addrIndex = selectedMakerAddresses.indexOf(address);
+    if (addrIndex > -1) {
+      selectedMakerAddresses.splice(addrIndex, 1);
+    } else {
+      selectedMakerAddresses.push(address);
+    }
+
+    // Update checkbox state
+    const makerIndex = availableMakers.findIndex((m) => m.address === address);
+    if (makerIndex > -1) {
+      const checkbox = content.querySelector('#maker-addr-' + makerIndex);
+      if (checkbox) {
+        checkbox.checked = selectedMakerAddresses.includes(address);
+      }
+    }
+
+    // Update count display
+    const countEl = content.querySelector('#selected-makers-count');
+    if (countEl) countEl.textContent = selectedMakerAddresses.length;
+
+    updateSummary();
+  }
+
   function checkUtxoTypeWarning() {
     const warningEl = content.querySelector('#utxo-warning');
     if (!warningEl) return;
@@ -948,6 +1079,8 @@ export async function SwapComponent(container) {
       numberOfHops,
       selectionMode,
       selectedUtxos,
+      makerSelectionMode,
+      selectedMakerAddresses,
       useCustomHops,
       customHopCount,
       networkFeeRate,
@@ -1082,6 +1215,30 @@ export async function SwapComponent(container) {
 
             <p class="text-xs text-gray-500 mt-2">More hops = better privacy, higher fees</p>
           </div>
+
+          <!-- Maker Selection Mode -->
+          <div class="mb-6">
+            <label class="block text-sm text-gray-400 mb-2">Select Makers</label>
+            <div class="flex gap-2">
+              <button id="maker-mode-auto" class="maker-mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
+                Auto Select Makers
+              </button>
+              <button id="maker-mode-manual" class="maker-mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+                Manual Select Makers
+              </button>
+            </div>
+          </div>
+
+          <!-- Maker List (Only in Manual mode) -->
+          <div id="maker-selection-section" class="mb-6 hidden">
+            <div class="flex justify-between items-center mb-4">
+              <label class="block text-sm text-gray-400">Select Makers</label>
+              <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> / <span id="required-makers-count">2</span> needed</span>
+            </div>
+            <div id="maker-list" class="space-y-2 max-h-72 overflow-y-auto">
+              <p class="text-gray-400 text-center py-4">Loading makers...</p>
+            </div>
+          </div>
         </div>
 
         <!-- Validation Warning -->
@@ -1123,7 +1280,7 @@ export async function SwapComponent(container) {
                 <span id="num-makers-display" class="text-sm text-white">2 makers</span>
               </div>
               <div class="flex justify-between mb-2 gap-3">
-                <span class="text-sm text-gray-400">Top Maker Candidates</span>
+                <span id="makers-label" class="text-sm text-gray-400">Top Maker Candidates</span>
                 <span id="selected-makers-display" class="text-sm text-cyan-400 text-right whitespace-nowrap overflow-hidden text-ellipsis block max-w-[220px] md:max-w-[280px] lg:max-w-[340px]" title="None selected">None selected</span>
               </div>
               <div class="flex justify-between mb-2">
@@ -1265,6 +1422,15 @@ export async function SwapComponent(container) {
     saveCurrentSelections();
   });
 
+  content.querySelector('#maker-mode-auto').addEventListener('click', () => {
+    toggleMakerSelectionMode('auto');
+    saveCurrentSelections();
+  });
+  content.querySelector('#maker-mode-manual').addEventListener('click', () => {
+    toggleMakerSelectionMode('manual');
+    saveCurrentSelections();
+  });
+
   content
     .querySelector('#start-coinswap-btn')
     .addEventListener('click', async () => {
@@ -1360,10 +1526,14 @@ export async function SwapComponent(container) {
                   vout: availableUtxos[i].vout,
                 }))
               : undefined,
+          selectedMakerAddresses:
+            makerSelectionMode === 'manual' && selectedMakerAddresses.length > 0
+              ? selectedMakerAddresses
+              : undefined,
           password: localStorage.getItem('coinswap_config')
             ? JSON.parse(localStorage.getItem('coinswap_config')).wallet
                 ?.password || ''
-            : '', // ← ADD THIS
+            : '',
         });
         if (!result.success) {
           alert('Failed to start swap: ' + result.error);
@@ -1404,6 +1574,11 @@ export async function SwapComponent(container) {
     toggleSelectionMode('manual');
   }
 
+  // Restore maker selection mode
+  if (makerSelectionMode === 'manual') {
+    toggleMakerSelectionMode('manual');
+  }
+
   if (amountUnit !== 'sats') {
     switchUnit(amountUnit);
   }
@@ -1438,6 +1613,7 @@ export async function SwapComponent(container) {
 
       updateAvailableMakersCount();
       renderUtxoList();
+      renderMakerList();
       await renderSwapHistorySection();
 
       // Restore UTXO selections
@@ -1471,6 +1647,7 @@ export async function SwapComponent(container) {
     console.log('⚡ Using cached swap data (still fresh)');
     // Just use cache - render immediately
     renderUtxoList();
+    renderMakerList();
     ensureBalancesLoaded().then(() => fetchSwapLiquidity()).then(() => {
       updateBalanceUI();
       updateSummary();

@@ -1453,7 +1453,7 @@ function registerCoinswapHandlers() {
   // Start coinswap
   ipcMain.handle(
     'coinswap:start',
-    async (event, { amount, makerCount, outpoints, password }) => {
+    async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses }) => {
       try {
         if (!api1State.takerInstance) {
           return { success: false, error: 'Taker not initialized' };
@@ -1462,6 +1462,14 @@ function registerCoinswapHandlers() {
 
         if (!amount || amount <= 0) {
           return { success: false, error: 'Invalid amount' };
+        }
+
+        if (
+          selectedMakerAddresses != null &&
+          (!Array.isArray(selectedMakerAddresses) ||
+            selectedMakerAddresses.some((a) => typeof a !== 'string' || !a.trim()))
+        ) {
+          return { success: false, error: 'Invalid selectedMakerAddresses: must be an array of non-empty strings' };
         }
 
         const protocol = api1State.protocolVersion || 'v1';
@@ -1571,7 +1579,7 @@ function registerCoinswapHandlers() {
         });
 
         const worker = new Worker(path.join(__dirname, 'coinswap-worker.js'), {
-          workerData: { amount, makerCount, outpoints, config },
+          workerData: { amount, makerCount, outpoints, selectedMakerAddresses, config },
         });
 
         api1State.activeSwaps.set(swapId, {
