@@ -99,6 +99,14 @@ function buildTakerConfig({
   };
 }
 
+function requireWalletPassword(password) {
+  if (typeof password !== 'string' || password.trim().length === 0) {
+    throw new Error('Wallet password is required');
+  }
+
+  return password;
+}
+
 function safelyShutdownTaker(takerInstance) {
   if (!takerInstance) return;
   if (typeof takerInstance.shutdown === 'function') {
@@ -608,17 +616,20 @@ function registerTakerHandlers() {
       const protocol = config.protocol || 'v1';
       const network = config.network || 'signet';
       const walletPath = path.join(api1State.DATA_DIR, 'wallets', walletName);
+      const finalPassword = requireWalletPassword(config.wallet?.password);
 
       // ✅ CHECK IF WE CAN REUSE EXISTING INSTANCE (simplified)
       const canReuse =
         api1State.takerInstance &&
         api1State.protocolVersion === protocol &&
-        api1State.currentWalletName === walletName;
+        api1State.currentWalletName === walletName &&
+        api1State.currentWalletPassword === finalPassword;
 
       console.log('🔍 Reuse check:', {
         hasInstance: !!api1State.takerInstance,
         protocolMatch: api1State.protocolVersion === protocol,
         walletMatch: api1State.currentWalletName === walletName,
+        passwordMatch: api1State.currentWalletPassword === finalPassword,
         canReuse,
       });
 
@@ -670,7 +681,6 @@ function registerTakerHandlers() {
         password: config.rpc?.password || 'password',
         walletName,
       };
-      const finalPassword = config.wallet?.password?.trim() || '';
       const torAuthPassword = config.taker?.tor_auth_password;
       const controlPort = config.taker?.control_port || 9051;
 
@@ -682,6 +692,24 @@ function registerTakerHandlers() {
           success: false,
           error: 'Taker class not found. Rebuild coinswap-napi.',
         };
+      }
+
+      if (fs.existsSync(walletPath)) {
+        if (typeof TakerClass.isWalletEncrypted !== 'function') {
+          return {
+            success: false,
+            error: 'Unable to verify wallet encryption',
+          };
+        }
+
+        const isEncrypted = TakerClass.isWalletEncrypted(walletPath);
+        if (!isEncrypted) {
+          return {
+            success: false,
+            error:
+              'This wallet is not encrypted. Password-protected wallets are required.',
+          };
+        }
       }
 
       // ✅ SETUP LOGGING
@@ -753,6 +781,10 @@ function registerTakerHandlers() {
           error: 'Incorrect password',
           wrongPassword: true,
         };
+      }
+
+      if (error.message === 'Wallet password is required') {
+        return { success: false, error: error.message, needsPassword: true };
       }
 
       return { success: false, error: error.message };
@@ -1179,6 +1211,8 @@ function registerTakerHandlers() {
           }
         }
 
+        const finalPassword = requireWalletPassword(password);
+
         console.log(`♻️ Restoring wallet from: ${backupFilePath}`);
 
         const restoredWalletName =
@@ -1199,7 +1233,7 @@ function registerTakerHandlers() {
           restoredWalletName,
           rpcConfig,
           backupFilePath,
-          password || ''
+          finalPassword
         );
 
         console.log('✅ Wallet restored successfully to:', restoredWalletName);
@@ -1601,7 +1635,9 @@ function registerCoinswapHandlers() {
             password: 'password',
             walletName,
           },
-          password: password || api1State.storedTakerConfig?.password || '',
+          password: requireWalletPassword(
+            password || api1State.storedTakerConfig?.password
+          ),
           protocol,
           appSwapId: swapId,
         });

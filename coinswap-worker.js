@@ -1,5 +1,13 @@
 const { parentPort, workerData } = require('worker_threads');
 
+function requireWalletPassword(password) {
+  if (typeof password !== 'string' || password.trim().length === 0) {
+    throw new Error('Wallet password is required');
+  }
+
+  return password;
+}
+
 /**
  * Worker thread for running long-running coinswap operations
  * This prevents blocking the main Electron process
@@ -11,6 +19,7 @@ const { parentPort, workerData } = require('worker_threads');
     const coinswapNapi = require('coinswap-napi');
 
     const { amount, makerCount, outpoints, selectedMakerAddresses, config } = workerData;
+    const walletPassword = requireWalletPassword(config.password);
     const protocol = config.protocol || 'v1';
     const normalizedProtocol = protocol === 'v2' ? 'Taproot' : 'Legacy';
     const protocolName =
@@ -43,7 +52,7 @@ const { parentPort, workerData } = require('worker_threads');
       config.controlPort || 9051,
       config.torAuthPassword || undefined,
       config.zmqAddr,
-      config.password || ''
+      walletPassword
     );
 
     // Notify that we're in progress

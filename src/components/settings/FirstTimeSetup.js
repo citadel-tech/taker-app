@@ -313,8 +313,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 </div>
 
                 <div>
-  <label class="block text-sm text-gray-400 mb-2">Wallet Password</label>
-  <p class="text-xs text-gray-500 mb-1">Leaving it empty will create unencrypted wallet file</p>
+  <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
   <div class="relative">
     <input 
       type="password" 
@@ -339,7 +338,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   </div>
 </div>
 <div>
-  <label class="block text-sm text-gray-400 mb-2">Confirm Password</label>
+  <label class="block text-sm text-gray-400 mb-2">Confirm Password <span class="text-red-400">*</span></label>
   <div class="relative">
     <input 
       type="password" 
@@ -389,7 +388,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <div id="step-3b-load" class="setup-step hidden">
           <div class="mb-6">
             <h3 class="text-xl font-semibold text-lg text-white mb-2">Load Existing Wallet</h3>
-            <p class="text-gray-400 text-sm">Browse for your wallet file and enter the password if encrypted.</p>
+            <p class="text-gray-400 text-sm">Browse for your wallet file and enter its password.</p>
           </div>
 
           <div class="space-y-4">
@@ -414,7 +413,7 @@ export function FirstTimeSetupModal(container, onComplete) {
             </div>
 
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-  <label class="block text-sm text-gray-400 mb-2">Wallet Password (if encrypted)</label>
+  <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
   <div class="relative">
     <input 
       type="password" 
@@ -437,7 +436,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       </svg>
     </button>
   </div>
-  <p class="text-xs text-gray-500 mt-2">Leave empty if wallet is not encrypted</p>
+  <p class="text-xs text-gray-500 mt-2">Required — all wallets must be password-protected</p>
 </div>
 
             <div id="load-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
@@ -450,7 +449,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <div id="step-3b-restore" class="setup-step hidden">
           <div class="mb-6">
             <h3 class="text-xl font-semibold text-lg text-white mb-2">Restore from Backup</h3>
-            <p class="text-gray-400 text-sm">Select your backup JSON file and enter the password if it was encrypted.</p>
+            <p class="text-gray-400 text-sm">Select your backup JSON file and enter its password.</p>
           </div>
 
           <div class="space-y-4">
@@ -484,7 +483,7 @@ export function FirstTimeSetupModal(container, onComplete) {
             </div>
 
             <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-              <label class="block text-sm text-gray-400 mb-2">Backup Password (if encrypted)</label>
+              <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
               <input 
                 type="password" 
                 id="restore-password"
@@ -613,9 +612,42 @@ export function FirstTimeSetupModal(container, onComplete) {
 
     if (currentStep === 1) {
       nextBtn.disabled = !(connectionPassed.node && connectionPassed.tor);
+    } else if (currentStep === 2) {
+      nextBtn.disabled = !hasWalletStepRequirements();
     } else {
       nextBtn.disabled = false;
     }
+  }
+
+  function hasWalletStepRequirements() {
+    if (!walletAction) return false;
+
+    if (walletAction === 'create') {
+      const walletName = modal.querySelector('#create-wallet-name')?.value?.trim();
+      const password = modal.querySelector('#create-password')?.value || '';
+      const confirmPassword =
+        modal.querySelector('#create-password-confirm')?.value || '';
+
+      return Boolean(walletName && password && confirmPassword);
+    }
+
+    if (walletAction === 'load') {
+      const walletPath = modal.querySelector('#load-wallet-path')?.value || '';
+      const password = modal.querySelector('#load-password')?.value || '';
+
+      return Boolean(walletPath && password);
+    }
+
+    if (walletAction === 'restore') {
+      const backupPath = modal.querySelector('#restore-backup-path')?.value || '';
+      const walletName =
+        modal.querySelector('#restore-wallet-name')?.value?.trim() || '';
+      const password = modal.querySelector('#restore-password')?.value || '';
+
+      return Boolean(backupPath && walletName && password);
+    }
+
+    return false;
   }
 
   function resetConnectionCheck(which) {
@@ -779,13 +811,18 @@ export function FirstTimeSetupModal(container, onComplete) {
         return false;
       }
 
-      if (password !== confirmPassword) {
-        showError('password-error', 'Passwords do not match');
+      if (!password) {
+        showError('password-error', 'A password is required — unencrypted wallets are not permitted');
         return false;
       }
 
-      if (password && password.length < 8) {
+      if (password.length < 8) {
         showError('password-error', 'Password must be at least 8 characters');
+        return false;
+      }
+
+      if (password !== confirmPassword) {
+        showError('password-error', 'Passwords do not match');
         return false;
       }
 
@@ -810,10 +847,15 @@ export function FirstTimeSetupModal(container, onComplete) {
         return false;
       }
 
+      if (!password) {
+        showError('load-error', 'A password is required — unencrypted wallets are not permitted');
+        return false;
+      }
+
       // Extract filename from path
       const walletFileName = walletPath.split('/').pop();
       walletData.walletFileName = walletFileName;
-      walletData.password = password || undefined;
+      walletData.password = password;
       walletData.load = {
         walletPath,
         password,
@@ -842,8 +884,13 @@ export function FirstTimeSetupModal(container, onComplete) {
         return false;
       }
 
+      if (!password) {
+        showError('restore-status', 'A password is required — unencrypted wallets are not permitted');
+        return false;
+      }
+
       walletData.backupPath = backupPath;
-      walletData.password = password || '';
+      walletData.password = password;
       walletData.walletName = walletName;
       walletData.restore = {
         walletName,
@@ -1110,7 +1157,8 @@ export function FirstTimeSetupModal(container, onComplete) {
       // Call Electron API to restore wallet
       const result = await window.api.restoreWallet({
         backupFilePath: backupPath,
-        password: password || '',
+        password,
+        walletName: modal.querySelector('#restore-wallet-name').value.trim(),
       });
 
       if (result.success) {
@@ -1282,6 +1330,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         if (result.success && result.filePath) {
           modal.querySelector('#load-wallet-path').value = result.filePath;
           modal.querySelector('#load-error').classList.add('hidden');
+          updateConnectionGate();
         }
       } catch (error) {
         console.error('File picker error:', error);
@@ -1305,6 +1354,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         if (result.success && result.filePath) {
           modal.querySelector('#restore-backup-path').value = result.filePath;
           modal.querySelector('#restore-status').classList.add('hidden');
+          updateConnectionGate();
         }
       } catch (error) {
         console.error('File picker error:', error);
@@ -1363,6 +1413,17 @@ export function FirstTimeSetupModal(container, onComplete) {
     modal
       .querySelector(selector)
       ?.addEventListener('input', () => resetConnectionCheck('tor'));
+  });
+
+  [
+    '#create-wallet-name',
+    '#create-password',
+    '#create-password-confirm',
+    '#load-password',
+    '#restore-wallet-name',
+    '#restore-password',
+  ].forEach((selector) => {
+    modal.querySelector(selector)?.addEventListener('input', updateConnectionGate);
   });
 
   // Next button
