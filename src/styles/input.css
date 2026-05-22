@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* Add font-face declarations */
 @font-face {
@@ -26,9 +26,9 @@
   --color-primary: #518def;
   --color-primary-hover: #6fa2ff;
 
-  --color-app-bg: #090a0d;
-  --color-surface: #121318;
-  --color-surface-raised: #1a1b21;
+  --color-app-bg: #101015;
+  --color-surface: #16161a;
+  --color-surface-raised: #1c1c22;
   --color-secondary: #1c1d23;
   --color-secondary-hover: #242832;
 
@@ -43,7 +43,832 @@
   --color-warning: #f5c451;
   --color-danger: #ff5b6e;
   --color-info: #518def;
-  
+
   /* Add font family */
   --font-family-mono: 'JetBrains Mono', monospace;
+}
+
+.app-page {
+  min-height: calc(100vh - 4rem);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  color: var(--color-foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+.app-page button {
+  font: inherit;
+}
+
+.app-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.app-head h2 {
+  margin: 0;
+  color: var(--color-foreground);
+  font-size: 34px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.app-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-button {
+  height: 40px;
+  border-radius: 999px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--color-foreground);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+}
+
+.app-button svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-button.primary {
+  background: var(--color-primary);
+}
+
+.app-button.primary:hover {
+  background: var(--color-primary-hover);
+  transform: translateY(-1px);
+}
+
+.app-button.ghost {
+  background: transparent;
+  border-color: var(--color-line-strong);
+  color: var(--color-muted);
+}
+
+.app-button.ghost:hover {
+  background: var(--color-secondary);
+  color: var(--color-foreground);
+}
+
+.app-button.loading svg {
+  animation: app-spin 800ms linear infinite;
+}
+
+@keyframes app-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.app-balances {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.45fr) repeat(3, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.app-balance-card {
+  position: relative;
+  min-height: 170px;
+  padding: 24px 24px 22px;
+  border: 1px solid var(--color-line);
+  border-radius: 18px;
+  background: var(--color-surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+}
+
+.app-balance-card:hover {
+  border-color: var(--color-line-strong);
+}
+
+.app-balance-card.hero {
+  min-height: 190px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-primary) 20%, transparent),
+    rgba(81, 141, 239, 0.03)
+  );
+  border-color: color-mix(in srgb, var(--color-primary) 42%, var(--color-line));
+}
+
+.app-accent {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: var(--color-primary);
+  opacity: 0.75;
+}
+
+.app-balance-card.info .app-accent {
+  background: var(--color-info);
+}
+
+.app-balance-card.wallet .app-accent {
+  background: var(--color-foreground);
+  opacity: 0.4;
+}
+
+.app-balance-card.warning .app-accent {
+  background: var(--color-warning);
+}
+
+.app-card-label {
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.app-card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-foreground);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(24px, 2vw, 32px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.app-balance-card.hero .app-card-value {
+  color: var(--color-primary);
+  font-size: clamp(40px, 4vw, 58px);
+}
+
+.app-balance-card.info .app-card-value {
+  color: var(--color-info);
+}
+
+.app-balance-card.warning .app-card-value {
+  color: var(--color-warning);
+}
+
+.app-card-value span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-card-value small {
+  color: var(--color-subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.app-balance-card p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
+.app-share {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-share > span:first-child {
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.app-share-track {
+  width: 170px;
+  max-width: 40%;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.app-share-track span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-primary);
+  box-shadow: 0 0 14px rgba(81, 141, 239, 0.55);
+}
+
+.app-lower {
+  display: grid;
+  grid-template-columns: minmax(0, 1.46fr) minmax(410px, 1fr);
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.app-panel {
+  min-height: 520px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.app-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.app-panel-head.compact {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.app-panel-head > div:first-child {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.app-panel h3 {
+  margin: 0;
+  color: var(--color-foreground);
+  font-size: 19px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
+.app-panel-head span,
+.app-panel-foot span {
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-panel-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--color-line);
+}
+
+.app-panel-foot button {
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-primary) 55%, transparent);
+  background: transparent;
+  color: var(--color-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.app-panel-foot button:hover {
+  color: var(--color-primary-hover);
+  border-bottom-color: var(--color-primary-hover);
+}
+
+.app-metrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.app-metrics div {
+  min-width: 0;
+  padding: 13px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+}
+
+.app-metrics span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.app-metrics strong {
+  color: var(--color-foreground);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.app-page .positive {
+  color: var(--color-success) !important;
+}
+
+.app-page .negative {
+  color: var(--color-danger) !important;
+}
+
+.app-page .warning {
+  color: var(--color-warning) !important;
+}
+
+.app-panel-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 2px;
+  scrollbar-width: none;
+}
+
+.app-panel-controls::-webkit-scrollbar {
+  display: none;
+}
+
+.app-panel-head.compact .app-panel-controls {
+  flex: 1 1 100%;
+}
+
+.app-tabs {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: 999px;
+  background: var(--color-surface-raised);
+  overflow: visible;
+}
+
+.app-tabs button {
+  min-height: 30px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app-tabs button span {
+  margin-left: 3px;
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+
+.app-tabs button:hover {
+  color: var(--color-foreground);
+}
+
+.app-tabs button.active {
+  background: var(--color-primary);
+  color: white;
+}
+
+.app-tabs button.active span {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.app-sort-arrow {
+  width: 13px;
+  height: 13px;
+  margin-left: 0;
+  display: inline-grid;
+  place-items: center;
+  color: currentColor;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.app-sort-arrow svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-utxo-head {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1.1fr 52px;
+  gap: 14px;
+  padding: 0 14px;
+  color: var(--color-subtle);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.app-list {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.app-list::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.app-list::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.app-utxo-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1.35fr 1fr 1.1fr 52px;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.app-utxo-row:hover,
+.app-tx-row:hover {
+  border-color: var(--color-line-strong);
+  background: var(--color-secondary-hover);
+}
+
+.app-utxo-main,
+.app-pill-stack,
+.app-address,
+.app-tx-mid,
+.app-tx-right {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.app-address {
+  color: var(--color-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-mono,
+.app-amount,
+.app-time,
+.app-conf {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.app-id {
+  color: var(--color-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-amount {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.app-pill {
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  color: var(--color-muted);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-pill.taproot {
+  color: #b990ff;
+  border-color: rgba(185, 144, 255, 0.35);
+  background: rgba(185, 144, 255, 0.1);
+}
+
+.app-pill.segwit,
+.app-conf.swap {
+  color: var(--color-primary);
+  border-color: rgba(81, 141, 239, 0.35);
+  background: rgba(81, 141, 239, 0.12);
+}
+
+.app-pill.regular,
+.app-pill.swap {
+  color: var(--color-success);
+  border-color: rgba(47, 212, 131, 0.32);
+  background: rgba(47, 212, 131, 0.1);
+}
+
+.app-pill.contract,
+.app-pill.fidelity {
+  color: var(--color-warning);
+  border-color: rgba(245, 196, 81, 0.35);
+  background: rgba(245, 196, 81, 0.1);
+}
+
+.app-open-icon {
+  width: fit-content;
+  color: var(--color-primary);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.app-icon-action {
+  width: 44px;
+  height: 44px;
+  justify-self: end;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(81, 141, 239, 0.35);
+  border-radius: 12px;
+  background: rgba(81, 141, 239, 0.08);
+  color: var(--color-primary);
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.app-icon-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.app-utxo-row:hover .app-icon-action,
+.app-tx-row:hover .app-icon-action {
+  border-color: rgba(81, 141, 239, 0.6);
+  background: rgba(81, 141, 239, 0.14);
+  color: var(--color-primary-hover);
+}
+
+.app-list.tx {
+  gap: 9px;
+}
+
+.app-tx-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) auto 52px;
+  align-items: center;
+  gap: 12px;
+  min-height: 70px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.app-tx-icon {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.app-tx-row.in .app-tx-icon {
+  background: rgba(47, 212, 131, 0.13);
+  color: var(--color-success);
+}
+
+.app-tx-row.out .app-tx-icon {
+  background: rgba(255, 91, 110, 0.13);
+  color: var(--color-danger);
+}
+
+.app-tx-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.app-conf {
+  width: fit-content;
+  padding: 2px 7px;
+  border: 1px solid rgba(245, 196, 81, 0.35);
+  border-radius: 5px;
+  color: var(--color-warning);
+  background: rgba(245, 196, 81, 0.1);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-conf.full {
+  color: var(--color-success);
+  border-color: rgba(47, 212, 131, 0.32);
+  background: rgba(47, 212, 131, 0.1);
+}
+
+.app-tx-right {
+  align-items: flex-end;
+}
+
+.app-time {
+  color: var(--color-subtle);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.app-empty {
+  padding: 28px;
+  border: 1px dashed var(--color-line);
+  border-radius: 12px;
+  color: var(--color-subtle);
+  text-align: center;
+  font-size: 13px;
+}
+
+@media (max-width: 1280px) {
+  .app-balances {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-lower {
+    grid-template-columns: 1fr;
+  }
+
+  .app-panel {
+    min-height: 460px;
+  }
+}
+
+@media (max-width: 820px) {
+  .app-page {
+    gap: 14px;
+  }
+
+  .app-head,
+  .app-panel-head,
+  .app-panel-head.compact {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .app-actions,
+  .app-panel-controls {
+    justify-content: flex-start;
+  }
+
+  .app-balances,
+  .app-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .app-balance-card,
+  .app-balance-card.hero {
+    min-height: 150px;
+  }
+
+  .app-utxo-head {
+    display: none;
+  }
+
+  .app-utxo-row {
+    grid-template-columns: 1fr 44px;
+  }
+
+  .app-utxo-main,
+  .app-pill-stack,
+  .app-address {
+    grid-column: 1 / -1;
+  }
+
+  .app-utxo-row .app-icon-action {
+    grid-column: 2;
+  }
+
+  .app-tx-row {
+    grid-template-columns: 34px minmax(0, 1fr) 44px;
+  }
+
+  .app-tx-right {
+    align-items: flex-start;
+    grid-column: 2 / 3;
+  }
+
+  .app-tx-row .app-icon-action {
+    grid-column: 3;
+  }
+
+  .app-panel-foot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
