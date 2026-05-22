@@ -118,12 +118,12 @@ function setupNavigation() {
       e.preventDefault();
 
       navItems.forEach((nav) => {
-        nav.classList.remove('bg-[#FF6B35]', 'text-white');
-        nav.classList.add('bg-[#242d3d]', 'text-gray-400');
+        nav.classList.remove('bg-primary', 'text-white');
+        nav.classList.add('bg-secondary', 'text-gray-400');
       });
 
-      item.classList.remove('bg-[#242d3d]', 'text-gray-400');
-      item.classList.add('bg-[#FF6B35]', 'text-white');
+      item.classList.remove('bg-secondary', 'text-gray-400');
+      item.classList.add('bg-primary', 'text-white');
 
       const navName = item.getAttribute('data-nav');
       await renderComponent(navName);
@@ -167,10 +167,10 @@ async function showPasswordPrompt(config) {
   modal.className =
     'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
   modal.innerHTML = `
-    <div class="bg-[#1a2332] rounded-lg p-6 max-w-md w-full mx-4">
+    <div class="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
       <h3 class="text-xl font-bold text-white mb-4">🔐 Wallet Password Required</h3>
       <p class="text-gray-400 text-sm mb-4">
-        Your wallet "<span class="font-mono text-[#FF6B35]">${walletName}</span>" is encrypted. 
+        Your wallet "<span class="font-mono text-primary">${walletName}</span>" is encrypted. 
         Please enter your password to unlock it.
       </p>
       
@@ -178,7 +178,7 @@ async function showPasswordPrompt(config) {
         type="password" 
         id="wallet-password-input"
         placeholder="Enter wallet password"
-        class="w-full bg-[#0f1419] border border-gray-600 rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-[#FF6B35]"
+        class="w-full bg-app-bg border border-gray-600 rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-primary"
       />
       
       <div id="password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded p-3 mb-4">
@@ -186,10 +186,10 @@ async function showPasswordPrompt(config) {
       </div>
       
       <div class="flex gap-3">
-        <button id="cancel-password-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white py-3 rounded-lg">
+        <button id="cancel-password-btn" class="flex-1 bg-secondary hover:bg-secondary-hover text-white py-3 rounded-lg">
           Cancel
         </button>
-        <button id="submit-password-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-3 rounded-lg">
+        <button id="submit-password-btn" class="flex-1 bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-lg">
           Unlock Wallet
         </button>
       </div>
@@ -315,12 +315,12 @@ async function startMainApp() {
       const swapNavItem = document.querySelector('[data-nav="swap"]');
       if (swapNavItem) {
         document.querySelectorAll('.nav-item').forEach((nav) => {
-          nav.classList.remove('bg-[#FF6B35]', 'text-white');
-          nav.classList.add('bg-[#242d3d]', 'text-gray-400');
+          nav.classList.remove('bg-primary', 'text-white');
+          nav.classList.add('bg-secondary', 'text-gray-400');
         });
-        if (!swapNavItem.classList.contains('bg-orange-500')) {
-          swapNavItem.classList.remove('bg-[#242d3d]', 'text-gray-400');
-          swapNavItem.classList.add('bg-[#FF6B35]', 'text-white');
+        if (!swapNavItem.classList.contains('bg-primary')) {
+          swapNavItem.classList.remove('bg-secondary', 'text-gray-400');
+          swapNavItem.classList.add('bg-primary', 'text-white');
         }
       }
     }, 100);

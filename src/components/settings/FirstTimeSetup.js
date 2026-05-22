@@ -39,8 +39,8 @@ export function FirstTimeSetupModal(container, onComplete) {
         --setup-text: #f5f5f7;
         --setup-text-2: #a7a7ad;
         --setup-text-3: #6c6c72;
-        --setup-orange: #E85002;
-        --setup-orange-2: #FF541B;
+        --setup-primary: #518def;
+        --setup-primary-hover: #6fa2ff;
         --setup-green: #2fbf71;
         --setup-red: #ff4d5a;
         background: var(--setup-bg);
@@ -52,9 +52,9 @@ export function FirstTimeSetupModal(container, onComplete) {
       }
       #setup-modal * { box-sizing: border-box; }
       #setup-modal .setup-ambient { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
-      #setup-modal .setup-glow-1 { position: absolute; left: 50%; top: -30%; transform: translateX(-50%); width: 1100px; height: 900px; border-radius: 50%; background: radial-gradient(closest-side, rgba(232,80,2,0.28), rgba(232,80,2,0.05) 50%, transparent 70%); filter: blur(50px); }
-      #setup-modal .setup-glow-2 { position: absolute; left: -10%; bottom: -20%; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(closest-side, rgba(255,84,27,0.12), transparent 70%); filter: blur(60px); }
-      #setup-modal .setup-glow-3 { position: absolute; right: -10%; top: 30%; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(closest-side, rgba(232,80,2,0.10), transparent 70%); filter: blur(60px); }
+      #setup-modal .setup-glow-1 { position: absolute; left: 50%; top: -30%; transform: translateX(-50%); width: 1100px; height: 900px; border-radius: 50%; background: radial-gradient(closest-side, rgba(81,141,239,0.28), rgba(81,141,239,0.05) 50%, transparent 70%); filter: blur(50px); }
+      #setup-modal .setup-glow-2 { position: absolute; left: -10%; bottom: -20%; width: 600px; height: 600px; border-radius: 50%; background: radial-gradient(closest-side, rgba(111,162,255,0.12), transparent 70%); filter: blur(60px); }
+      #setup-modal .setup-glow-3 { position: absolute; right: -10%; top: 30%; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(closest-side, rgba(81,141,239,0.10), transparent 70%); filter: blur(60px); }
       #setup-modal .setup-grain { position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.05; mix-blend-mode: overlay; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
       #setup-modal .setup-shell { position: relative; z-index: 2; width: min(1080px, 100%); max-height: 92vh; overflow-y: auto; border-radius: 32px; background: #101014; border: 1px solid var(--setup-border); box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 40px 120px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02); }
       #setup-modal .setup-titlebar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--setup-border); position: relative; }
@@ -63,25 +63,25 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-traffic span:first-child { background: #ff5f57; box-shadow: 0 0 0 0.5px rgba(0,0,0,0.2); }
       #setup-modal .setup-titlebar-name { font-size: 12px; color: var(--setup-text-3); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); }
       #setup-modal .setup-titlebar-right { font-size: 11px; color: var(--setup-text-3); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
-      #setup-modal .setup-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--setup-orange); box-shadow: 0 0 10px var(--setup-orange); }
+      #setup-modal .setup-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--setup-primary); box-shadow: 0 0 10px var(--setup-primary); }
       #setup-modal .setup-content { padding: 48px 52px 44px; position: relative; }
       #setup-modal .setup-header { display: flex; flex-direction: column; align-items: flex-start; text-align: left; margin-bottom: 36px; }
       #setup-modal .setup-eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 5px 11px 5px 8px; border: 1px solid var(--setup-border); border-radius: 999px; background: rgba(255,255,255,0.02); font-size: 10.5px; color: var(--setup-text-2); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 18px; }
-      #setup-modal .setup-pip { width: 5px; height: 5px; border-radius: 50%; background: var(--setup-orange); box-shadow: 0 0 0 3px rgba(232,80,2,0.18), 0 0 10px var(--setup-orange); }
+      #setup-modal .setup-pip { width: 5px; height: 5px; border-radius: 50%; background: var(--setup-primary); box-shadow: 0 0 0 3px rgba(81,141,239,0.18), 0 0 10px var(--setup-primary); }
       #setup-modal .setup-title { font-size: clamp(32px, 4.4vw, 52px); font-weight: 700; letter-spacing: -0.035em; line-height: 1; margin: 0 0 14px; }
-      #setup-modal .setup-title .accent { color: var(--setup-orange); font-style: italic; font-weight: 600; }
+      #setup-modal .setup-title .accent { color: var(--setup-primary); font-style: italic; font-weight: 600; }
       #setup-modal .setup-subtitle { color: var(--setup-text-2); font-size: 15px; line-height: 1.55; max-width: 560px; margin: 0; }
       #setup-modal .setup-stepper { display: flex; align-items: center; justify-content: flex-start; gap: 10px; margin: 28px 0 0; font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; font-size: 10.5px; color: var(--setup-text-3); letter-spacing: 0.1em; text-transform: uppercase; width: 100%; }
       #setup-modal .setup-bar { width: 160px; height: 3px; border-radius: 999px; background: rgba(255,255,255,0.06); overflow: hidden; position: relative; }
-      #setup-modal #progress-fill { display: block; width: 50%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--setup-orange), var(--setup-orange-2)); transition: width 0.4s cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 12px rgba(232,80,2,0.6); }
+      #setup-modal #progress-fill { display: block; width: 50%; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--setup-primary), var(--setup-primary-hover)); transition: width 0.4s cubic-bezier(.2,.8,.2,1); box-shadow: 0 0 12px rgba(81,141,239,0.6); }
       #setup-modal .setup-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 34px; align-items: stretch; }
       #setup-modal .setup-card { position: relative; border-radius: 20px; padding: 22px; background: #16161a; border: 1px solid var(--setup-border); transition: border-color 0.4s, transform 0.4s; overflow: hidden; display: flex; flex-direction: column; height: 100%; }
       #setup-modal .setup-card:hover { transform: translateY(-2px); border-color: var(--setup-border-strong); }
       #setup-modal .setup-card.is-success { border-color: rgba(47,191,113,0.4); }
       #setup-modal .setup-card.is-fail { border-color: rgba(255,77,90,0.45); }
       #setup-modal .setup-card-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-      #setup-modal .setup-num { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; background: linear-gradient(160deg, rgba(255,122,61,0.9), var(--setup-orange) 60%, #b53800); box-shadow: 0 6px 16px -4px rgba(232,80,2,0.6), inset 0 1px 0 rgba(255,255,255,0.35); }
-      #setup-modal .setup-kicker { font-size: 10px; color: var(--setup-orange); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.14em; text-transform: uppercase; display: block; margin-bottom: 2px; }
+      #setup-modal .setup-num { width: 32px; height: 32px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: #fff; flex-shrink: 0; background: linear-gradient(160deg, rgba(111,162,255,0.9), var(--setup-primary) 60%, #275fb8); box-shadow: 0 6px 16px -4px rgba(81,141,239,0.6), inset 0 1px 0 rgba(255,255,255,0.35); }
+      #setup-modal .setup-kicker { font-size: 10px; color: var(--setup-primary); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.14em; text-transform: uppercase; display: block; margin-bottom: 2px; }
       #setup-modal .setup-card h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.015em; }
       #setup-modal .setup-desc { color: var(--setup-text-2); font-size: 13px; line-height: 1.55; min-height: 62px; margin: 0 0 14px; }
       #setup-modal .setup-spec-area { min-height: 64px; margin-bottom: 18px; display: flex; flex-direction: column; justify-content: flex-start; gap: 6px; }
@@ -97,8 +97,8 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-spec input::-webkit-outer-spin-button, #setup-modal .setup-spec input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       #setup-modal .setup-eye { color: var(--setup-text-3); background: transparent; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; }
       #setup-modal .setup-eye:hover { color: var(--setup-text); }
-      #setup-modal .setup-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 12px; border: 0; cursor: pointer; font-family: inherit; font-size: 13.5px; font-weight: 600; color: #fff; background: var(--setup-orange); transition: background 0.2s, transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
-      #setup-modal .setup-btn:hover { background: #FF6A2A; transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(232,80,2,0.9), 0 0 0 1px rgba(255,255,255,0.08) inset; }
+      #setup-modal .setup-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 12px; border: 0; cursor: pointer; font-family: inherit; font-size: 13.5px; font-weight: 600; color: #fff; background: var(--setup-primary); transition: background 0.2s, transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+      #setup-modal .setup-btn:hover { background: #6fa2ff; transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(81,141,239,0.9), 0 0 0 1px rgba(255,255,255,0.08) inset; }
       #setup-modal .setup-btn.is-success { background: var(--setup-green); box-shadow: 0 10px 24px -14px rgba(47,191,113,0.85); }
       #setup-modal .setup-btn.is-success:hover { background: #37ce7d; box-shadow: 0 12px 28px -14px rgba(47,191,113,0.95), 0 0 0 1px rgba(255,255,255,0.08) inset; }
       #setup-modal .setup-btn.secondary { background: rgba(255,255,255,0.05); color: var(--setup-text); border: 1px solid var(--setup-border-strong); }
@@ -114,13 +114,13 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-status-row.err .msg { color: var(--setup-red); }
       #setup-modal .indicator { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
       #setup-modal .setup-info { margin-top: 12px; border-radius: 10px; padding: 12px; font-size: 12px; line-height: 1.45; }
-      #setup-modal .setup-info a { color: var(--setup-orange); text-decoration: none; border-bottom: 1px solid rgba(232,80,2,0.4); }
+      #setup-modal .setup-info a { color: var(--setup-primary); text-decoration: none; border-bottom: 1px solid rgba(81,141,239,0.4); }
       #setup-modal .setup-footer { margin-top: 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 22px; border-top: 1px solid var(--setup-border); }
       #setup-modal .setup-help { color: var(--setup-text-3); font-size: 12.5px; display: flex; align-items: center; gap: 8px; }
-      #setup-modal .setup-help a { color: var(--setup-orange); text-decoration: none; font-weight: 500; border-bottom: 1px solid rgba(232,80,2,0.4); padding-bottom: 1px; }
+      #setup-modal .setup-help a { color: var(--setup-primary); text-decoration: none; font-weight: 500; border-bottom: 1px solid rgba(81,141,239,0.4); padding-bottom: 1px; }
       #setup-modal .setup-footer-actions { display: flex; gap: 12px; margin-left: auto; }
       #setup-modal .setup-footer-actions .setup-btn { width: auto; min-width: 130px; padding: 0 22px; }
-      #setup-modal .setup-footer-actions .setup-btn[disabled]:hover { background: var(--setup-orange); transform: none; }
+      #setup-modal .setup-footer-actions .setup-btn[disabled]:hover { background: var(--setup-primary); transform: none; }
       #setup-modal .setup-wallet-panel { padding: 0; }
       #setup-modal .hidden { display: none !important; }
       @media (max-width: 760px) {
@@ -255,21 +255,21 @@ export function FirstTimeSetupModal(container, onComplete) {
             <!-- Choice Cards -->
             <div class="grid grid-cols-3 gap-4">
               <!-- Create New Wallet -->
-              <div id="choice-create" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
+              <div id="choice-create" class="wallet-choice bg-app-bg rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-primary transition-colors text-center">
                 <div class="text-gray-400 mb-3 flex justify-center">${icons.plusCircle(40)}</div>
                 <h4 class="text-white font-semibold text-lg mb-2">Create New</h4>
                 <p class="text-xs text-gray-400">Start fresh with a new wallet</p>
               </div>
 
               <!-- Load Existing Wallet -->
-              <div id="choice-load" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
+              <div id="choice-load" class="wallet-choice bg-app-bg rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-primary transition-colors text-center">
                 <div class="text-gray-400 mb-3 flex justify-center">${icons.folderOpen(40)}</div>
                 <h4 class="text-white font-semibold text-lg mb-2">Load Existing</h4>
                 <p class="text-xs text-gray-400">Load a wallet from file</p>
               </div>
 
               <!-- Restore Wallet -->
-              <div id="choice-restore" class="wallet-choice bg-[#0f1419] rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-[#FF6B35] transition-colors text-center">
+              <div id="choice-restore" class="wallet-choice bg-app-bg rounded-lg p-6 border-2 border-gray-700 cursor-pointer hover:border-primary transition-colors text-center">
                 <div class="text-gray-400 mb-3 flex justify-center">${icons.recycle(40)}</div>
                 <h4 class="text-white font-semibold text-lg mb-2">Restore</h4>
                 <p class="text-xs text-gray-400">Restore from backup JSON</p>
@@ -297,7 +297,7 @@ export function FirstTimeSetupModal(container, onComplete) {
               </div>
             </div>
 
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
               <div class="space-y-4">
                 <!-- NEW: Wallet Name Input -->
                 <div>
@@ -307,7 +307,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                     id="create-wallet-name"
                     value="${defaultWalletName}"
                     placeholder="my-wallet"
-                    class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                    class="w-full bg-surface border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-primary transition-colors"
                   />
                   <p class="text-xs text-gray-500 mt-1">Choose a unique name for your wallet</p>
                 </div>
@@ -319,7 +319,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       type="password" 
       id="create-password"
       placeholder="Enter a strong password"
-      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+      class="w-full bg-surface border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-primary transition-colors"
     />
     <button
       type="button"
@@ -344,7 +344,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       type="password" 
       id="create-password-confirm"
       placeholder="Re-enter your password"
-      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+      class="w-full bg-surface border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-primary transition-colors"
     />
     <button
       type="button"
@@ -392,7 +392,7 @@ export function FirstTimeSetupModal(container, onComplete) {
           </div>
 
           <div class="space-y-4">
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
               <label class="block text-sm text-gray-400 mb-2">Wallet File</label>
               <div class="flex gap-2">
                 <input 
@@ -400,11 +400,11 @@ export function FirstTimeSetupModal(container, onComplete) {
                   id="load-wallet-path"
                   placeholder="No file selected"
                   readonly
-                  class="flex-1 bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none"
+                  class="flex-1 bg-surface border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none"
                 />
                 <button 
                   id="browse-wallet-file"
-                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors"
+                  class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors"
                 >
                   Browse
                 </button>
@@ -412,14 +412,14 @@ export function FirstTimeSetupModal(container, onComplete) {
               <p class="text-xs text-gray-500 mt-2">Default location: ~/.coinswap/taker/wallets/</p>
             </div>
 
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
   <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
   <div class="relative">
     <input 
       type="password" 
       id="load-password"
       placeholder="Enter wallet password"
-      class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+      class="w-full bg-surface border border-gray-600 rounded-lg px-4 py-2 pr-10 text-white text-sm focus:outline-none focus:border-primary transition-colors"
     />
     <button
       type="button"
@@ -453,17 +453,17 @@ export function FirstTimeSetupModal(container, onComplete) {
           </div>
 
           <div class="space-y-4">
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
               <label class="block text-sm text-gray-400 mb-2">Wallet Name (for restored wallet)</label>
               <input 
                 type="text" 
                 id="restore-wallet-name"
                 placeholder="my-restored-wallet"
-                class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                class="w-full bg-surface border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-primary transition-colors"
               />
               <p class="text-xs text-gray-500 mt-1">Choose a name for the restored wallet</p>
             </div>
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
               <label class="block text-sm text-gray-400 mb-2">Backup File (JSON)</label>
               <div class="flex gap-2">
                 <input 
@@ -471,24 +471,24 @@ export function FirstTimeSetupModal(container, onComplete) {
                   id="restore-backup-path"
                   placeholder="No file selected"
                   readonly
-                  class="flex-1 bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none"
+                  class="flex-1 bg-surface border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none"
                 />
                 <button 
                   id="browse-backup-file"
-                  class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors"
+                  class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors"
                 >
                   Browse
                 </button>
               </div>
             </div>
 
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
               <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
               <input 
                 type="password" 
                 id="restore-password"
                 placeholder="Enter backup password"
-                class="w-full bg-[#1a2332] border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                class="w-full bg-surface border border-gray-600 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-primary transition-colors"
               />
             </div>
 
@@ -1273,11 +1273,11 @@ export function FirstTimeSetupModal(container, onComplete) {
       console.log('Create clicked!');
       walletAction = 'create';
       modal.querySelectorAll('.wallet-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
+        el.classList.remove('border-primary');
         el.classList.add('border-gray-700');
       });
       choiceCreate.classList.remove('border-gray-700');
-      choiceCreate.classList.add('border-[#FF6B35]');
+      choiceCreate.classList.add('border-primary');
       const msg = modal.querySelector('#choice-message');
       if (msg) msg.classList.add('hidden');
       showStep(currentStep);
@@ -1290,11 +1290,11 @@ export function FirstTimeSetupModal(container, onComplete) {
       console.log('Load clicked!');
       walletAction = 'load';
       modal.querySelectorAll('.wallet-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
+        el.classList.remove('border-primary');
         el.classList.add('border-gray-700');
       });
       choiceLoad.classList.remove('border-gray-700');
-      choiceLoad.classList.add('border-[#FF6B35]');
+      choiceLoad.classList.add('border-primary');
       const msg = modal.querySelector('#choice-message');
       if (msg) msg.classList.add('hidden');
       showStep(currentStep);
@@ -1307,11 +1307,11 @@ export function FirstTimeSetupModal(container, onComplete) {
       console.log('Restore clicked!');
       walletAction = 'restore';
       modal.querySelectorAll('.wallet-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
+        el.classList.remove('border-primary');
         el.classList.add('border-gray-700');
       });
       choiceRestore.classList.remove('border-gray-700');
-      choiceRestore.classList.add('border-[#FF6B35]');
+      choiceRestore.classList.add('border-primary');
       const msg = modal.querySelector('#choice-message');
       if (msg) msg.classList.add('hidden');
       showStep(currentStep);
@@ -1479,7 +1479,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       showStep(currentStep);
       // Reset choice borders
       modal.querySelectorAll('.wallet-choice').forEach((el) => {
-        el.classList.remove('border-[#FF6B35]');
+        el.classList.remove('border-primary');
         el.classList.add('border-gray-700');
       });
     } else if (currentStep > 1) {

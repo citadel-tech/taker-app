@@ -23,11 +23,26 @@
 }
 
 @theme {
-  --color-bitcoin-orange: #FF6B35;
-  --color-dark-bg: #0f1419;
-  --color-dark-surface: #1a2332;
-  --color-dark-card: #242d3d;
-  --color-text-muted: #8b95a8;
+  --color-primary: #518def;
+  --color-primary-hover: #6fa2ff;
+
+  --color-app-bg: #090a0d;
+  --color-surface: #121318;
+  --color-surface-raised: #1a1b21;
+  --color-secondary: #1c1d23;
+  --color-secondary-hover: #242832;
+
+  --color-foreground: #f4f7ff;
+  --color-muted: #a6adbb;
+  --color-subtle: #717987;
+
+  --color-line: #272a33;
+  --color-line-strong: #343846;
+
+  --color-success: #2fd483;
+  --color-warning: #f5c451;
+  --color-danger: #ff5b6e;
+  --color-info: #518def;
   
   /* Add font family */
   --font-family-mono: 'JetBrains Mono', monospace;

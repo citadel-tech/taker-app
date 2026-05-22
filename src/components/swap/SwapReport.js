@@ -29,7 +29,7 @@ export function SwapReportComponent(container, swapReport) {
     content.innerHTML = `
       <div class="text-center py-20">
         <p class="text-red-400 text-xl">Error: No swap report data available</p>
-        <button id="back-btn" class="mt-4 bg-[#FF6B35] text-white px-6 py-3 rounded-lg">Back to Swaps</button>
+        <button id="back-btn" class="mt-4 bg-primary text-white px-6 py-3 rounded-lg">Back to Swaps</button>
       </div>
     `;
     container.appendChild(content);
@@ -374,7 +374,7 @@ export function SwapReportComponent(container, swapReport) {
     overlay.className =
       'maker-popup-overlay fixed inset-0 bg-black/60 flex items-center justify-center z-50';
     overlay.innerHTML = `
-      <div class="maker-popup bg-[#1a2332] border-2 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform animate-popup"
+      <div class="maker-popup bg-surface border-2 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform animate-popup"
            style="border-color: ${color};">
         <div class="flex items-center justify-between mb-4">
           <div class="flex items-center gap-3">
@@ -392,16 +392,16 @@ export function SwapReportComponent(container, swapReport) {
         
         <div class="space-y-4">
           <!-- Address -->
-          <div class="bg-[#0f1419] rounded-lg p-4">
+          <div class="bg-app-bg rounded-lg p-4">
             <p class="text-xs text-gray-400 mb-1">Onion Address</p>
             <div class="flex items-center gap-2">
               <p class="font-mono text-sm text-white break-all flex-1">${makerAddr}</p>
-              <button class="copy-addr-btn text-gray-400 hover:text-[#FF6B35] transition-colors" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
+              <button class="copy-addr-btn text-gray-400 hover:text-primary transition-colors" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
             </div>
           </div>
           
           <!-- Fee Info -->
-          <div class="bg-[#0f1419] rounded-lg p-4">
+          <div class="bg-app-bg rounded-lg p-4">
             <p class="text-xs text-gray-400 mb-2">Fee Information</p>
             <div class="grid grid-cols-2 gap-3">
               <div>
@@ -416,7 +416,7 @@ export function SwapReportComponent(container, swapReport) {
           </div>
           
           <!-- Hop Position -->
-          <div class="bg-[#0f1419] rounded-lg p-4">
+          <div class="bg-app-bg rounded-lg p-4">
             <p class="text-xs text-gray-400 mb-2">Swap Position</p>
             <div class="flex items-center gap-2">
               <span class="px-3 py-1 rounded-full text-xs font-bold" style="background: ${color}20; color: ${color};">
@@ -436,7 +436,7 @@ export function SwapReportComponent(container, swapReport) {
         </div>
         
         <div class="mt-6 flex gap-3">
-          <button class="copy-addr-btn flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white py-3 rounded-lg transition-colors">
+          <button class="copy-addr-btn flex-1 bg-secondary hover:bg-secondary-hover text-white py-3 rounded-lg transition-colors">
             ${icons.clipboardCopy(14, 'mr-1')} Copy Address
           </button>
           <button class="close-popup flex-1 text-white py-3 rounded-lg transition-colors"
@@ -465,12 +465,12 @@ export function SwapReportComponent(container, swapReport) {
     });
   }
 
-  const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const makerColors = ['#518def', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
   const transactionArtifacts = [
     {
       label: 'Outgoing Contract',
       txid: report.outgoingContractTxid,
-      accent: '#FF6B35',
+      accent: '#518def',
       description: 'Contract transaction recorded on the outgoing side.',
     },
     {
@@ -508,7 +508,7 @@ export function SwapReportComponent(container, swapReport) {
   function buildTransactionArtifactsHtml() {
     if (!report.transactionArtifacts || report.transactionArtifacts.length === 0) {
       return `
-        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800">
+        <div class="bg-app-bg rounded-lg p-4 border border-gray-800">
           <p class="text-gray-400 text-sm">
             No on-chain transaction IDs were saved with this swap report. Maker, fee, and UTXO details are still shown below.
           </p>
@@ -519,7 +519,7 @@ export function SwapReportComponent(container, swapReport) {
     return report.transactionArtifacts
       .map((artifact) => {
         return `
-          <div class="bg-[#0f1419] rounded-lg p-4 border-l-4" style="border-color: ${artifact.accent}">
+          <div class="bg-app-bg rounded-lg p-4 border-l-4" style="border-color: ${artifact.accent}">
             <div class="flex items-center justify-between gap-3">
               <div class="flex-1 min-w-0">
                 <p class="text-sm font-semibold mb-1" style="color: ${artifact.accent}">
@@ -531,7 +531,7 @@ export function SwapReportComponent(container, swapReport) {
               <div class="flex gap-2 shrink-0">
                 <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors"
                         data-txid="${artifact.txid}" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
-                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors"
+                <button class="view-txid-btn text-gray-400 hover:text-primary text-sm transition-colors"
                         data-txid="${artifact.txid}" title="View on Explorer">${icons.externalLink(14, 'mr-1')}</button>
               </div>
             </div>
@@ -551,7 +551,7 @@ export function SwapReportComponent(container, swapReport) {
       .map((addr, idx) => {
         const color = makerColors[idx % makerColors.length];
         return `
-        <div class="maker-card bg-[#0f1419] rounded-lg p-4 border hover:border-[${color}] transition-all cursor-pointer hover:scale-102 hover:shadow-lg"
+        <div class="maker-card bg-app-bg rounded-lg p-4 border hover:border-[${color}] transition-all cursor-pointer hover:scale-102 hover:shadow-lg"
              style="border-color: ${color}40;" data-maker-index="${idx}">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
@@ -786,7 +786,7 @@ export function SwapReportComponent(container, swapReport) {
       });
 
       return `
-        <div class="bg-[#0f1419] rounded-lg p-5 border border-gray-800">
+        <div class="bg-app-bg rounded-lg p-5 border border-gray-800">
           <p class="text-gray-300 text-sm mb-3">Swap path visualization unavailable for this report.</p>
           <div class="space-y-2">
             <div class="text-[#10B981] font-semibold">You</div>
@@ -958,17 +958,17 @@ export function SwapReportComponent(container, swapReport) {
       <div class="mb-8 animate-fade-in-up">
         <div class="flex items-center justify-between mb-6">
           <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-[#FF6B35] rounded-xl flex items-center justify-center shadow-lg">
+            <div class="w-16 h-16 bg-primary rounded-xl flex items-center justify-center shadow-lg">
               <span>${icons.circleDollarSign(20, 'mr-2')}</span>
             </div>
             <div>
-              <h2 class="text-4xl font-bold text-[#FF6B35]">
+              <h2 class="text-4xl font-bold text-primary">
                 Coinswap Report
               </h2>
               <p class="text-gray-400 text-sm mt-1">View Detailed Swap Data.</p>
             </div>
           </div>
-          <button id="back-to-wallet" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-6 py-3 rounded-lg transition-all hover:scale-105">
+          <button id="back-to-wallet" class="bg-secondary hover:bg-secondary-hover text-white px-6 py-3 rounded-lg transition-all hover:scale-105">
             ← Back to Swaps
           </button>
         </div>
@@ -977,14 +977,14 @@ export function SwapReportComponent(container, swapReport) {
           <div class="px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg backdrop-blur-sm">
             <span class="text-green-400 font-semibold text-lg flex items-center">${icons.checkCircle(20, 'mr-2')} SWAP COMPLETED SUCCESSFULLY</span>
           </div>
-          <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
+          <div class="px-4 py-2 bg-surface rounded-lg">
             <span class="text-gray-400 text-sm">ID: </span>
             <span class="font-mono text-white text-sm">${report.swapId}</span>
           </div>
           ${
             report.nativeSwapId
               ? `
-          <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
+          <div class="px-4 py-2 bg-surface rounded-lg">
             <span class="text-gray-400 text-sm">Backend Swap ID: </span>
             <span class="font-mono text-white text-sm">${report.nativeSwapId}</span>
           </div>
@@ -996,9 +996,9 @@ export function SwapReportComponent(container, swapReport) {
 
       <!-- Circular Flow Diagram -->
       <div class="mb-8 animate-fade-in-up stagger-1">
-        <div class="bg-gradient-to-br from-[#1a2332] to-[#0f1419] rounded-xl p-8 border border-[#FF6B35]/20 shadow-2xl">
+        <div class="bg-gradient-to-br from-surface to-app-bg rounded-xl p-8 border border-primary/20 shadow-2xl">
           <h3 class="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-            <svg class="w-7 h-7 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-7 h-7 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <circle cx="6" cy="6" r="2" stroke-width="2"></circle>
               <circle cx="18" cy="6" r="2" stroke-width="2"></circle>
               <circle cx="12" cy="18" r="2" stroke-width="2"></circle>
@@ -1029,16 +1029,16 @@ export function SwapReportComponent(container, swapReport) {
 
       <!-- Stats Grid -->
       <div class="grid grid-cols-5 gap-4 mb-6">
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-1">
+        <div class="bg-surface rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-1">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Swap Amount</p>
             <span>${icons.circleDollarSign(16, 'mr-2')}</span>
           </div>
-          <p class="text-2xl font-bold text-[#FF6B35]">${satsToBtc(report.targetAmount)} BTC</p>
+          <p class="text-2xl font-bold text-primary">${satsToBtc(report.targetAmount)} BTC</p>
           <p class="text-xs text-gray-400 mt-1">${formatNumber(report.targetAmount)} sats</p>
         </div>
 
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-2">
+        <div class="bg-surface rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-2">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Duration</p>
             <span>${icons.timer(16, 'mr-2')}</span>
@@ -1047,7 +1047,7 @@ export function SwapReportComponent(container, swapReport) {
           <p class="text-xs text-gray-400 mt-1">${report.swapDurationSeconds.toFixed(1)}s total</p>
         </div>
 
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-3">
+        <div class="bg-surface rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-3">
           <div class="flex items-center justify-between mb-2">
 <p class="text-sm text-white">On-Chain Artifacts</p>
             <span>${icons.link(16, 'mr-2')}</span>
@@ -1060,7 +1060,7 @@ export function SwapReportComponent(container, swapReport) {
 </p>
         </div>
 
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
+        <div class="bg-surface rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Swap Partners</p>
             <span>${icons.handshake(16, 'mr-2')}</span>
@@ -1069,7 +1069,7 @@ export function SwapReportComponent(container, swapReport) {
           <p class="text-xs text-gray-400 mt-1">Makers recorded in the report</p>
         </div>
 
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
+        <div class="bg-surface rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
           <div class="flex items-center justify-between mb-2">
             <p class="text-sm text-white">Total Fee</p>
             <span>${icons.receipt(16, 'mr-2')}</span>
@@ -1086,7 +1086,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="col-span-2 space-y-6">
           
           <!-- Transaction Artifacts -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
+          <div class="bg-surface rounded-lg p-6 animate-fade-in-up stagger-2">
             <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
               ${icons.fileText(16, 'mr-2')} Transaction Artifacts
             </h3>
@@ -1096,7 +1096,7 @@ export function SwapReportComponent(container, swapReport) {
           </div>
 
           <!-- Swap Partners / Makers -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-3">
+          <div class="bg-surface rounded-lg p-6 animate-fade-in-up stagger-3">
             <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
               ${icons.handshake(16, 'mr-2')} Swap Partners
               <span class="text-xs text-gray-500 font-normal ml-2">(Click for details)</span>
@@ -1112,7 +1112,7 @@ export function SwapReportComponent(container, swapReport) {
         <div class="space-y-6">
           
           <!-- Fee Breakdown -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
+          <div class="bg-surface rounded-lg p-6 animate-fade-in-up stagger-2">
             <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
               ${icons.circleDollarSign(16, 'mr-2')} Fee Details
             </h3>
@@ -1128,7 +1128,7 @@ export function SwapReportComponent(container, swapReport) {
               <div class="flex justify-between items-center pt-2">
                 <span class="text-sm font-semibold text-lg text-white">Total</span>
                 <div class="text-right">
-                  <p class="font-mono text-lg text-[#FF6B35] font-bold">${formatNumber(report.totalFee)}</p>
+                  <p class="font-mono text-lg text-primary font-bold">${formatNumber(report.totalFee)}</p>
                   <p class="text-xs text-gray-500">${satsToBtc(report.totalFee)} BTC</p>
                 </div>
               </div>
@@ -1136,7 +1136,7 @@ export function SwapReportComponent(container, swapReport) {
           </div>
 
           <!-- UTXO Summary with Tooltip -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-4">
+          <div class="bg-surface rounded-lg p-6 animate-fade-in-up stagger-4">
             <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
               ${icons.package(16, 'mr-2')} UTXO Summary
             </h3>
@@ -1157,10 +1157,10 @@ export function SwapReportComponent(container, swapReport) {
 
       <!-- Action Buttons -->
       <div class="mt-8 flex gap-4 animate-fade-in-up stagger-4">
-        <button id="export-report" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-4 rounded-lg transition-all hover:scale-105">
+        <button id="export-report" class="flex-1 bg-secondary hover:bg-secondary-hover text-white font-semibold text-lg py-4 rounded-lg transition-all hover:scale-105">
           ${icons.arrowDownCircle(16, 'mr-1')} Export Report
         </button>
-        <button id="done-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
+        <button id="done-btn" class="flex-1 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
           Back to Swaps
         </button>
       </div>

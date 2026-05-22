@@ -7,14 +7,14 @@ import { icons } from '../../js/icons.js';
 export function ConnectionStatusComponent(container, onConnected) {
     const connectionDiv = document.createElement('div');
     connectionDiv.id = 'connection-status';
-    connectionDiv.className = 'fixed inset-0 bg-[#0f1419] flex items-center justify-center z-50';
+    connectionDiv.className = 'fixed inset-0 bg-app-bg flex items-center justify-center z-50';
 
     // Initial loading state
     connectionDiv.innerHTML = `
-        <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-8">
+        <div class="bg-surface rounded-lg max-w-md w-full mx-4 p-8">
             <!-- Header -->
             <div class="text-center mb-8">
-                <div class="w-20 h-20 bg-[#FF6B35]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <span class="text-4xl">₿</span>
                 </div>
                 <h2 class="text-2xl font-bold text-white mb-2">Connecting to Bitcoin Core</h2>
@@ -25,19 +25,19 @@ export function ConnectionStatusComponent(container, onConnected) {
             <div class="mb-6">
                 <div class="flex justify-center mb-4">
                     <div class="flex space-x-2">
-                        <div id="dot-1" class="w-3 h-3 bg-[#FF6B35] rounded-full animate-pulse"></div>
-                        <div id="dot-2" class="w-3 h-3 bg-[#FF6B35]/50 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
-                        <div id="dot-3" class="w-3 h-3 bg-[#FF6B35]/30 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
+                        <div id="dot-1" class="w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                        <div id="dot-2" class="w-3 h-3 bg-primary/50 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+                        <div id="dot-3" class="w-3 h-3 bg-primary/30 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
                     </div>
                 </div>
                 <div class="bg-gray-700 rounded-full h-2">
-                    <div id="progress-bar" class="bg-[#FF6B35] h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    <div id="progress-bar" class="bg-primary h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
                 </div>
                 <p id="progress-text" class="text-xs text-gray-400 mt-2 text-center">Attempt 1 of 5</p>
             </div>
 
             <!-- Connection Details -->
-            <div id="connection-details" class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div id="connection-details" class="bg-app-bg rounded-lg p-4 border border-gray-700">
                 <h4 class="text-white text-sm font-semibold text-lg mb-2">Connection Details:</h4>
                 <div class="space-y-1 text-xs text-gray-400">
                     <div class="flex justify-between">
@@ -71,7 +71,7 @@ export function ConnectionStatusComponent(container, onConnected) {
                 <button id="retry-connection" class="mt-3 w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm">
                     Retry Connection
                 </button>
-                <button id="configure-rpc" class="mt-2 w-full bg-[#242d3d] hover:bg-[#2d3748] text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-gray-600">
+                <button id="configure-rpc" class="mt-2 w-full bg-secondary hover:bg-secondary-hover text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-gray-600">
                     Configure RPC Settings
                 </button>
             </div>
@@ -152,7 +152,7 @@ export function ConnectionStatusComponent(container, onConnected) {
         // Restart pulse animation
         ['dot-1', 'dot-2', 'dot-3'].forEach((id, index) => {
             const dot = document.getElementById(id);
-            dot.className = `w-3 h-3 bg-[#FF6B35] rounded-full animate-pulse`;
+            dot.className = `w-3 h-3 bg-primary rounded-full animate-pulse`;
             dot.style.animationDelay = (index * 0.2) + 's';
         });
 

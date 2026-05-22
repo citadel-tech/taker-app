@@ -217,7 +217,7 @@ export async function WalletComponent(container) {
           const txidShort = `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
 
           return `
-    <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
+    <div class="flex items-center justify-between p-3 bg-secondary rounded">
       <div class="flex items-center space-x-3">
         <div class="w-10 h-10 bg-${isReceive ? 'green' : 'red'}-500/20 rounded-full flex items-center justify-center">
           <span class="text-${isReceive ? 'green' : 'red'}-400">${isReceive ? '↓' : '↑'}</span>
@@ -227,7 +227,7 @@ export async function WalletComponent(container) {
             <p class="text-white font-mono text-sm">${isReceive ? 'Received' : 'Sent'}</p>
          
           </div>
-          <p class="text-gray-400 text-xs cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+          <p class="text-gray-400 text-xs cursor-pointer hover:text-primary hover:underline transition-colors" 
              onclick="openTxOnMempool('${txid}')"
              title="${txid}">
             ${txidShort} • ${formatDate(tx.info.time)}
@@ -289,8 +289,8 @@ export async function WalletComponent(container) {
           const typeColor = getUtxoTypeColor(spendInfo.spendType);
 
           return `
-        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+        <tr class="border-b border-gray-800 hover:bg-secondary">
+          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-primary hover:underline transition-colors" 
               onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid}')">${txidShort}:${utxo.vout}</td>
           <td class="py-3 px-4 text-green-400 font-mono">${satsToBtc(utxo.amount)}</td>
           <td class="py-3 px-4 ${utxo.confirmations === 0 ? 'text-yellow-400' : 'text-gray-300'}">${utxo.confirmations}</td>
@@ -329,7 +329,7 @@ export async function WalletComponent(container) {
     } catch (error) {
       console.error('❌ UTXO update failed:', error);
       utxoTableBody.innerHTML = `
-        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+        <tr class="border-b border-gray-800 hover:bg-secondary">
           <td class="py-3 px-4 font-mono text-sm text-gray-300">No UTXOs</td>
           <td class="py-3 px-4 text-gray-400 font-mono">--</td>
           <td class="py-3 px-4 text-gray-400">--</td>
@@ -400,16 +400,16 @@ export async function WalletComponent(container) {
   content.innerHTML = `
         <div class="flex justify-between items-center mb-8">
             <div>
-                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">${walletInfo.walletName}</h2>
+                <h2 class="text-3xl font-bold text-primary mb-2">${walletInfo.walletName}</h2>
                 <p class="text-gray-400 font-mono text-sm">${walletInfo.walletPath}</p>
             </div>
-            <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
+            <button id="refresh-all-btn" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
                 Refresh
             </button>
         </div>
 
         <!-- Balance Card -->
-        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+        <div class="bg-surface rounded-lg p-6 mb-6">
             <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">Balance</h3>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
@@ -429,14 +429,14 @@ export async function WalletComponent(container) {
                 </div>
                 <div>
                     <p class="text-sm text-gray-400 mb-1">Spendable</p>
-                    <p id="spendable-balance" class="text-2xl font-mono text-[#FF6B35]">0.00000000 BTC</p>
+                    <p id="spendable-balance" class="text-2xl font-mono text-primary">0.00000000 BTC</p>
                     <p class="text-xs text-gray-500 mt-1">Total available</p>
                 </div>
             </div>
         </div>
 
        <!-- UTXOs Section -->
-        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+        <div class="bg-surface rounded-lg p-6 mb-6">
             <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">UTXOs</h3>
             <div class="overflow-x-auto">
                 <table class="w-full">
@@ -452,19 +452,19 @@ export async function WalletComponent(container) {
                         <!-- UTXOs will be populated here -->
                     </tbody>
                 </table>
-                <button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
+                <button id="view-all-utxos" class="mt-4 text-primary hover:text-primary-hover text-sm font-semibold text-lg transition-colors">
                     View All UTXOs →
                 </button>
             </div>
         </div>
 
         <!-- Recent Transactions -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
             <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">Recent Transactions</h3>
             <div id="transactions-container" class="space-y-3">
                 <!-- Transactions will be populated here -->
             </div>
-            <button id="view-all-transactions" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
+            <button id="view-all-transactions" class="mt-4 text-primary hover:text-primary-hover text-sm font-semibold text-lg transition-colors">
                 View All Transactions →
             </button>
         </div>

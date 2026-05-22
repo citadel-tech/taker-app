@@ -5,27 +5,27 @@ export function SettingsComponent(container) {
   content.id = 'settings-content';
 
   content.innerHTML = `
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Settings</h2>
+        <h2 class="text-3xl font-bold text-primary mb-2">Settings</h2>
         <p class="text-gray-400 mb-8">Configure your taker wallet and Bitcoin Core connection</p>
 
         <div class="space-y-8">
             <!-- Wallet Backup Section -->
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Wallet Backup</h3>
                 
                 <div class="space-y-4">
-                    <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                    <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
                         <h4 class="text-lg font-medium text-white mb-3">Create Backup</h4>
                         <p class="text-sm text-gray-400 mb-4">
                             Export your wallet to an encrypted JSON file. You can use this backup to restore your wallet on another device or after reinstallation.
                         </p>
                         
-                        <button id="backup-wallet-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
+                        <button id="backup-wallet-btn" class="w-full bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                             ${icons.save(16, 'mr-2')} Create Backup
                         </button>
                     </div>
                     
-                    <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                    <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
                         <div class="space-y-2 text-sm text-gray-400">
                             <p>• Wallet Backup is an encrypted json file that restores your coinswap wallet in any client app.</p>
                             <p>• The backup file contains all data related to swaps to restore swap histories.</p>
@@ -38,12 +38,12 @@ export function SettingsComponent(container) {
             </div>
 
             <!-- Node & Network Configuration -->
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Node & Network Configuration</h3>
                 
                 <div class="grid grid-cols-1 xl:grid-cols-[1.5fr_1fr] gap-6">
                     <div class="space-y-6">
-                        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                        <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
                             <h4 class="text-lg font-medium text-white mb-4">Tor</h4>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
@@ -54,7 +54,7 @@ export function SettingsComponent(container) {
                                         value="9051"
                                         min="1024"
                                         max="65535"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -65,7 +65,7 @@ export function SettingsComponent(container) {
                                         value="9050"
                                         min="1024"
                                         max="65535"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -75,7 +75,7 @@ export function SettingsComponent(container) {
                                             type="password" 
                                             id="tor-auth-password-input"
                                             placeholder="Optional"
-                                            class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                            class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-primary transition-colors"
                                         />
                                         <button
                                             type="button"
@@ -95,14 +95,14 @@ export function SettingsComponent(container) {
                                 </div>
                             </div>
                             <div class="mt-4 flex items-center gap-3">
-                                <button id="test-tor-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">
+                                <button id="test-tor-btn" class="bg-secondary hover:bg-secondary-hover text-white font-semibold py-2.5 px-4 rounded-lg transition-colors">
                                     Test Tor
                                 </button>
                                 <div id="tor-test-result" class="hidden flex-1"></div>
                             </div>
                         </div>
 
-                        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                        <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
                             <h4 class="text-lg font-medium text-white mb-4">Bitcoin Core</h4>
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                                 <div>
@@ -111,7 +111,7 @@ export function SettingsComponent(container) {
                                         type="text" 
                                         id="rpc-host-input"
                                         value="127.0.0.1"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -122,7 +122,7 @@ export function SettingsComponent(container) {
                                         value="38332"
                                         min="1"
                                         max="65535"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -131,7 +131,7 @@ export function SettingsComponent(container) {
                                         type="text" 
                                         id="rpc-username-input"
                                         value="user"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -140,7 +140,7 @@ export function SettingsComponent(container) {
                                         type="password" 
                                         id="rpc-password-input"
                                         placeholder="Enter RPC password"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                                 <div>
@@ -151,7 +151,7 @@ export function SettingsComponent(container) {
                                         value="28332"
                                         min="1"
                                         max="65535"
-                                        class="w-full bg-[#111827] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                                        class="w-full bg-slate-900 border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                                     />
                                 </div>
                             </div>
@@ -165,7 +165,7 @@ export function SettingsComponent(container) {
                     </div>
 
                     <div class="space-y-4">
-                        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                        <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
                             <h4 class="text-lg font-medium text-white mb-4">Connection Status</h4>
                             <div class="flex justify-between items-center mb-3">
                                 <div class="flex items-center">
@@ -194,15 +194,15 @@ export function SettingsComponent(container) {
                             </div>
                         </div>
 
-                        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+                        <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
                             <h4 class="text-lg font-medium text-white mb-4">Bitcoin.conf Setup</h4>
-                            <div class="bg-[#111827] rounded-lg p-4 font-mono text-xs text-gray-300">
+                            <div class="bg-slate-900 rounded-lg p-4 font-mono text-xs text-gray-300">
                                 <div id="zmq-config-preview">
                                     zmqpubrawblock=tcp://127.0.0.1:28332<br/>
                                     zmqpubrawtx=tcp://127.0.0.1:28332
                                 </div>
                             </div>
-                            <button id="copy-zmq-config-btn" class="w-full mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
+                            <button id="copy-zmq-config-btn" class="w-full mt-4 bg-secondary hover:bg-secondary-hover text-white py-2 px-4 rounded-lg text-sm transition-colors">
                                 ${icons.clipboardCopy(14, 'mr-1')} Copy ZMQ Config
                             </button>
                         </div>
@@ -211,10 +211,10 @@ export function SettingsComponent(container) {
             </div>
 
             <!-- Full Bitcoin.conf Reference -->
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Complete bitcoin.conf Reference</h3>
                 
-                <div class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
+                <div class="bg-app-bg rounded-lg p-4 font-mono text-xs text-gray-300 overflow-x-auto">
                     <div id="full-config-preview">
 [signet]<br/>
 # Signet network configuration for running Coinswap Taker and Maker<br/>
@@ -260,17 +260,17 @@ blockfilterindex=1
 </div>
                 </div>
                 
-                <button id="copy-full-config-btn" class="mt-4 bg-[#242d3d] hover:bg-[#2d3748] text-white py-2 px-4 rounded-lg text-sm transition-colors">
+                <button id="copy-full-config-btn" class="mt-4 bg-secondary hover:bg-secondary-hover text-white py-2 px-4 rounded-lg text-sm transition-colors">
                     ${icons.clipboardCopy(14, 'mr-1')} Copy Full Config
                 </button>
             </div>
 
             <!-- Save Settings Button -->
             <div class="flex justify-end space-x-4">
-                <button id="reset-settings-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors border border-gray-700">
+                <button id="reset-settings-btn" class="bg-secondary hover:bg-secondary-hover text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors border border-gray-700">
                     Reset to Defaults
                 </button>
-                <button id="save-settings-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors">
+                <button id="save-settings-btn" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-3 px-6 rounded-lg transition-colors">
                     Save Settings
                 </button>
             </div>
@@ -278,7 +278,7 @@ blockfilterindex=1
 
         <!-- Backup Password Modal -->
         <div id="backup-password-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-50 hidden">
-            <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-6">
+            <div class="bg-surface rounded-lg max-w-md w-full mx-4 p-6">
                 <h3 class="text-xl font-semibold text-lg text-white mb-4">Encrypt Backup</h3>
                 <p class="text-gray-400 text-sm mb-6">
                     Set a password to encrypt your wallet backup. You'll need this password to restore from this backup.
@@ -291,7 +291,7 @@ blockfilterindex=1
                             type="password" 
                             id="backup-password-input"
                             placeholder="Enter backup password"
-                            class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                            class="w-full bg-app-bg border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-primary transition-colors"
                         />
                     </div>
                     
@@ -301,7 +301,7 @@ blockfilterindex=1
                             type="password" 
                             id="backup-password-confirm-input"
                             placeholder="Re-enter password"
-                            class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-[#FF6B35] transition-colors"
+                            class="w-full bg-app-bg border border-gray-700 rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-primary transition-colors"
                         />
                     </div>
                     
@@ -322,10 +322,10 @@ blockfilterindex=1
                 </div>
                 
                 <div class="flex space-x-3 mt-6">
-                    <button id="cancel-backup-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
+                    <button id="cancel-backup-btn" class="flex-1 bg-secondary hover:bg-secondary-hover text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                         Cancel
                     </button>
-                    <button id="confirm-backup-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
+                    <button id="confirm-backup-btn" class="flex-1 bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                         Create Backup
                     </button>
                 </div>
@@ -1026,13 +1026,13 @@ zmqpubrawtx=${rawtx}`;
     const btn = content.querySelector('#save-settings-btn');
     const originalText = btn.textContent;
     btn.textContent = 'Saved!';
-    btn.classList.remove('bg-[#FF6B35]', 'hover:bg-[#ff7d4d]');
+    btn.classList.remove('bg-primary', 'hover:bg-primary-hover');
     btn.classList.add('bg-green-600', 'hover:bg-green-700');
 
     setTimeout(() => {
       btn.textContent = originalText;
       btn.classList.remove('bg-green-600', 'hover:bg-green-700');
-      btn.classList.add('bg-[#FF6B35]', 'hover:bg-[#ff7d4d]');
+      btn.classList.add('bg-primary', 'hover:bg-primary-hover');
     }, 2000);
   });
 

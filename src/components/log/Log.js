@@ -100,7 +100,7 @@ export function LogComponent(container) {
           const timeStr = showTimestamps
             ? `<span class="text-gray-500">[${formatTime(log.timestamp)}]</span>`
             : '';
-          return `<div class="mb-1 hover:bg-[#1a2332] px-2 py-1 rounded">${timeStr} <span class="${getTypeColor(log.type)}">[${getTypeLabel(log.type)}]</span> <span class="text-gray-300">${escapeHtml(log.message)}</span></div>`;
+          return `<div class="mb-1 hover:bg-surface px-2 py-1 rounded">${timeStr} <span class="${getTypeColor(log.type)}">[${getTypeLabel(log.type)}]</span> <span class="text-gray-300">${escapeHtml(log.message)}</span></div>`;
         })
         .join('');
     }
@@ -137,15 +137,15 @@ export function LogComponent(container) {
     currentFilter = filter;
     content.querySelectorAll('.filter-btn').forEach((btn) => {
       btn.className =
-        'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors';
+        'filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors';
     });
     content.querySelector(`#filter-${filter}`).className =
-      'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold';
+      'filter-btn bg-primary text-white px-4 py-2 rounded text-sm font-semibold';
     renderLogs();
   }
 
   content.innerHTML = `
-    <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">System Logs</h2>
+    <h2 class="text-3xl font-bold text-primary mb-2">System Logs</h2>
     <p class="text-gray-400 mb-4">Real-time coinswap protocol logs (last ${MAX_LOGS} lines)</p>
     
     <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
@@ -162,30 +162,30 @@ export function LogComponent(container) {
 
     <div class="grid grid-cols-4 gap-6">
       <div class="col-span-3">
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
           <div class="flex justify-between items-center mb-6">
             <div class="flex gap-2">
-              <button id="filter-all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold">All</button>
-              <button id="filter-info" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Info</button>
-              <button id="filter-warn" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Warning</button>
-              <button id="filter-error" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Error</button>
-              <button id="filter-debug" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Debug</button>
+              <button id="filter-all" class="filter-btn bg-primary text-white px-4 py-2 rounded text-sm font-semibold">All</button>
+              <button id="filter-info" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Info</button>
+              <button id="filter-warn" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Warning</button>
+              <button id="filter-error" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Error</button>
+              <button id="filter-debug" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Debug</button>
             </div>
             <div class="flex gap-2">
-              <button id="refresh-logs" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded text-sm transition-colors">
+              <button id="refresh-logs" class="bg-secondary hover:bg-secondary-hover text-white px-4 py-2 rounded text-sm transition-colors">
                 ${icons.refreshCw(14, 'mr-1')} Refresh
               </button>
-              <button id="open-log-file" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded text-sm font-semibold transition-colors">
+              <button id="open-log-file" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded text-sm font-semibold transition-colors">
                 ${icons.folder(14, 'mr-1')} Open Log File
               </button>
             </div>
           </div>
-          <div id="log-output" class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs h-[500px] overflow-y-auto"></div>
+          <div id="log-output" class="bg-app-bg rounded-lg p-4 font-mono text-xs h-[500px] overflow-y-auto"></div>
         </div>
       </div>
       
       <div class="col-span-1 space-y-6">
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
           <h3 class="text-lg font-semibold text-gray-300 mb-4">Log Stats</h3>
           <div class="space-y-4">
             <div>
@@ -193,7 +193,7 @@ export function LogComponent(container) {
                 <span class="text-sm text-gray-400">Info</span>
                 <span id="info-count" class="text-green-400 font-semibold">0</span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
+              <div class="w-full bg-app-bg rounded-full h-2">
                 <div id="info-bar" class="bg-green-400 h-2 rounded-full" style="width:0%"></div>
               </div>
             </div>
@@ -202,7 +202,7 @@ export function LogComponent(container) {
                 <span class="text-sm text-gray-400">Warning</span>
                 <span id="warn-count" class="text-yellow-400 font-semibold">0</span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
+              <div class="w-full bg-app-bg rounded-full h-2">
                 <div id="warn-bar" class="bg-yellow-400 h-2 rounded-full" style="width:0%"></div>
               </div>
             </div>
@@ -211,7 +211,7 @@ export function LogComponent(container) {
                 <span class="text-sm text-gray-400">Error</span>
                 <span id="error-count" class="text-red-400 font-semibold">0</span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
+              <div class="w-full bg-app-bg rounded-full h-2">
                 <div id="error-bar" class="bg-red-400 h-2 rounded-full" style="width:0%"></div>
               </div>
             </div>
@@ -220,26 +220,26 @@ export function LogComponent(container) {
                 <span class="text-sm text-gray-400">Debug</span>
                 <span id="debug-count" class="text-blue-400 font-semibold">0</span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
+              <div class="w-full bg-app-bg rounded-full h-2">
                 <div id="debug-bar" class="bg-blue-400 h-2 rounded-full" style="width:0%"></div>
               </div>
             </div>
           </div>
         </div>
         
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
           <h3 class="text-lg font-semibold text-gray-300 mb-4">Display Settings</h3>
           <div class="space-y-3">
             <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="auto-scroll" checked class="w-4 h-4 accent-[#FF6B35]" />
+              <input type="checkbox" id="auto-scroll" checked class="w-4 h-4 accent-primary" />
               <span class="text-sm text-gray-300">Auto-scroll</span>
             </label>
             <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="show-timestamps" checked class="w-4 h-4 accent-[#FF6B35]" />
+              <input type="checkbox" id="show-timestamps" checked class="w-4 h-4 accent-primary" />
               <span class="text-sm text-gray-300">Show timestamps</span>
             </label>
             <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="auto-refresh" checked class="w-4 h-4 accent-[#FF6B35]" />
+              <input type="checkbox" id="auto-refresh" checked class="w-4 h-4 accent-primary" />
               <span class="text-sm text-gray-300">Auto-refresh (2s)</span>
             </label>
           </div>

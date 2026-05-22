@@ -116,7 +116,7 @@ const result = await window.api.taker.getTransactions(200, 0);
       P2WSH: 'blue',
       P2TR: 'purple',
       P2PKH: 'yellow',
-      P2SH: 'orange',
+      P2SH: 'yellow',
     };
     return colors[type] || 'gray';
   }
@@ -215,14 +215,14 @@ const result = await window.api.taker.getTransactions(200, 0);
             <button id="back-to-receive" class="text-gray-400 hover:text-white transition-colors mb-4 flex items-center gap-2">
               <span>←</span> Back to Receive
             </button>
-            <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Addresses</h2>
+            <h2 class="text-3xl font-bold text-primary mb-2">All Addresses</h2>
             <p class="text-gray-400">Addresses derived from transaction history</p>
           </div>
           <div class="flex gap-2">
-            <button id="export-addresses" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+            <button id="export-addresses" class="bg-secondary hover:bg-secondary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
               ${icons.arrowDownCircle(14, 'mr-1')} Export CSV
             </button>
-            <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+            <button id="refresh-addresses" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
               Refresh
             </button>
           </div>
@@ -230,27 +230,27 @@ const result = await window.api.taker.getTransactions(200, 0);
 
         <!-- Address Stats -->
         <div class="grid grid-cols-3 gap-4 mb-6">
-          <div class="bg-[#1a2332] rounded-lg p-6">
+          <div class="bg-surface rounded-lg p-6">
             <p class="text-sm text-gray-400 mb-2">Used Addresses</p>
             <p class="text-2xl font-mono text-green-400">${stats.used}</p>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-6">
+          <div class="bg-surface rounded-lg p-6">
             <p class="text-sm text-gray-400 mb-2">Reused Addresses</p>
             <p class="text-2xl font-mono text-blue-400">${stats.reused}</p>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-6">
+          <div class="bg-surface rounded-lg p-6">
             <p class="text-sm text-gray-400 mb-2">Total Received</p>
             <p class="text-2xl font-mono text-cyan-400">${(stats.totalReceived / 100000000).toFixed(8)} BTC</p>
           </div>
         </div>
 
         <!-- Filter & Sort -->
-        <div class="bg-[#1a2332] rounded-lg p-4 mb-6">
+        <div class="bg-surface rounded-lg p-4 mb-6">
           <div class="flex items-center justify-between flex-wrap gap-4">
             <!-- Type Filter -->
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-400 mr-2">Filter:</span>
-              <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] text-gray-400 border border-gray-700 hover:bg-[#242d3d]'} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
+              <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-primary text-white' : 'bg-app-bg text-gray-400 border border-gray-700 hover:bg-secondary'} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
                 All (${allAddresses.length})
               </button>
               ${spendTypeFilters
@@ -265,7 +265,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                         ? 'yellow'
                         : 'blue';
                   return `
-                  <button data-filter="${type.value}" class="filter-btn ${currentFilter === type.value ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
+                  <button data-filter="${type.value}" class="filter-btn ${currentFilter === type.value ? 'bg-primary text-white' : `bg-app-bg text-${color}-400 border border-gray-700 hover:bg-secondary`} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
                     ${type.label} (${count})
                   </button>
                 `;
@@ -276,7 +276,7 @@ const result = await window.api.taker.getTransactions(200, 0);
             <!-- Sort -->
             <div class="flex items-center gap-2">
               <span class="text-sm text-gray-400">Sort:</span>
-              <select id="sort-select" class="bg-[#0f1419] border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#FF6B35]">
+              <select id="sort-select" class="bg-app-bg border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-primary">
                 <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Newest First</option>
                 <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                 <option value="most-used" ${sortBy === 'most-used' ? 'selected' : ''}>Most Used</option>
@@ -287,7 +287,7 @@ const result = await window.api.taker.getTransactions(200, 0);
         </div>
 
         <!-- Address Table -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
           <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Address Details</h3>
 
           ${
@@ -296,7 +296,7 @@ const result = await window.api.taker.getTransactions(200, 0);
             <div class="text-center py-12">
               <div class="text-gray-500 mb-4 flex justify-center">${icons.inbox(48)}</div>
               <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `for ${currentFilter} spend type` : 'found in transaction history'}</p>
-              <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-2 rounded-lg transition-colors">
+              <button id="go-to-receive" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg px-6 py-2 rounded-lg transition-colors">
                 Generate New Address
               </button>
             </div>
@@ -328,7 +328,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                       const createdDate = new Date(addr.createdAt);
 
                       return `
-                      <tr class="border-b border-gray-800 hover:bg-[#242d3d] transition-colors address-row" data-address="${addr.address}">
+                      <tr class="border-b border-gray-800 hover:bg-secondary transition-colors address-row" data-address="${addr.address}">
                         <td class="py-3 px-4">
                           <div class="flex items-center gap-2">
                             <a href="https://mutinynet.com/address/${addr.address}" 
@@ -337,7 +337,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                                title="${addr.address}">
                                 ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
                             </a>
-                            <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
+                            <button class="copy-btn text-gray-500 hover:text-primary transition-colors" data-address="${addr.address}" title="Copy address">
                                 ${icons.clipboardCopy(14)}
                             </button>
                           </div>
@@ -461,7 +461,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     container.innerHTML = `
       <div class="flex items-center justify-center h-64">
         <div class="text-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p class="text-gray-400">Loading addresses...</p>
         </div>
       </div>

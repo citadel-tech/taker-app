@@ -580,32 +580,32 @@ export function Market(container) {
       : 0;
 
     modal.innerHTML = `
-      <div class="bg-[#1a2332] rounded-lg p-6 max-w-2xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <div class="bg-surface rounded-lg p-6 max-w-2xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
         <div class="flex justify-between items-start mb-6">
-          <h3 class="text-2xl font-bold text-[#FF6B35]">Fidelity Bond Details</h3>
+          <h3 class="text-2xl font-bold text-primary">Fidelity Bond Details</h3>
           <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
         </div>
         
         <div class="space-y-4">
-          <div class="bg-[#0f1419] p-4 rounded-lg">
+          <div class="bg-app-bg p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-1">Tor Address</p>
             <p class="text-white font-mono text-sm break-all">${maker.address}</p>
           </div>
 
-          <div class="bg-[#0f1419] p-4 rounded-lg">
+          <div class="bg-app-bg p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
             <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
             <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
           </div>
 
-          <div class="bg-[#0f1419] p-4 rounded-lg">
+          <div class="bg-app-bg p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-1">Bond Status</p>
             <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
               ${maker.bondIsSpent ? 'Spent' : 'Active'}
             </p>
           </div>
 
-          <div class="bg-[#0f1419] p-4 rounded-lg">
+          <div class="bg-app-bg p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-1">Expires In</p>
             <p class="text-2xl font-mono text-yellow-400">~${locktimeDays} days</p>
             ${
@@ -618,7 +618,7 @@ export function Market(container) {
           ${
             maker.bondTxid
               ? `
-          <div class="bg-[#0f1419] p-4 rounded-lg">
+          <div class="bg-app-bg p-4 rounded-lg">
             <p class="text-sm text-gray-400 mb-1">Bond Txid</p>
             <button
               onclick="window.open('http://170.75.166.88:8080/tx/${maker.bondTxid}', '_blank')"
@@ -669,7 +669,7 @@ export function Market(container) {
         // ✅ SHOW LOADING ANIMATION
         progressContainer.classList.remove('hidden');
         progressContainer.innerHTML = `
-        <div class="bg-[#0f1419] rounded-lg p-6 border border-blue-500/30">
+        <div class="bg-app-bg rounded-lg p-6 border border-blue-500/30">
           <div class="flex items-center justify-between mb-4">
             <span class="text-lg font-semibold text-lg text-blue-400">
               ${icons.refreshCw(16, 'mr-2 animate-spin')} Syncing Market Data...
@@ -680,7 +680,7 @@ export function Market(container) {
           </div>
           
           <div class="bg-gray-700 rounded-full h-4 overflow-hidden mb-4">
-            <div class="bg-gradient-to-r from-[#FF6B35] via-[#ff7d4d] to-[#FF6B35] h-4 rounded-full animate-pulse"
+            <div class="bg-gradient-to-r from-primary via-primary-hover to-primary h-4 rounded-full animate-pulse"
                  style="width: 100%; animation: shimmer 2s infinite linear;">
             </div>
           </div>
@@ -701,7 +701,7 @@ export function Market(container) {
       ) {
         progressContainer.classList.remove('hidden');
         progressContainer.innerHTML = `
-        <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
+        <div class="bg-app-bg rounded-lg p-4 border border-blue-500/30">
           <div class="flex items-center justify-between mb-2">
             <span class="text-sm font-semibold text-lg text-blue-400">
               ${syncProgress.message || 'Syncing market data...'}
@@ -712,7 +712,7 @@ export function Market(container) {
           </div>
           
           <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
-            <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
+            <div class="bg-gradient-to-r from-primary to-primary-hover h-3 rounded-full transition-all duration-500 relative animate-pulse"
                  style="width: 100%">
               <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
             </div>
@@ -732,15 +732,15 @@ export function Market(container) {
 
     if (statsContainer) {
       statsContainer.innerHTML = `
-      <div class="bg-[#1a2332] rounded-lg p-6">
+      <div class="bg-surface rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-        <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
+        <p class="text-2xl font-mono text-primary">${stats.totalLiquidity} BTC</p>
       </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
+      <div class="bg-surface rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Total Fidelity Locked</p>
         <p class="text-2xl font-mono text-purple-400">${stats.totalFidelity} sats</p>
       </div>
-      <!-- <div class="bg-[#1a2332] rounded-lg p-6">
+      <!-- <div class="bg-surface rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Nostr Relays</p>
         <p class="text-2xl font-mono text-cyan-400">${stats.nostrRelays}</p>
       </div> -->
@@ -767,7 +767,7 @@ export function Market(container) {
         tableBody.innerHTML = `
         <div class="col-span-8 text-center py-16">
           <div class="inline-block">
-            <svg class="animate-spin h-16 w-16 text-[#FF6B35] mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg class="animate-spin h-16 w-16 text-primary mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -780,7 +780,7 @@ export function Market(container) {
         tableBody.innerHTML = `
         <div class="col-span-8 text-center py-12">
           <p class="text-gray-400 mb-4">No makers found</p>
-          <button onclick="document.querySelector('#refresh-market-btn').click()" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg">
+          <button onclick="document.querySelector('#refresh-market-btn').click()" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg">
             Refresh
           </button>
         </div>
@@ -801,7 +801,7 @@ export function Market(container) {
             .map(
               (maker) => {
                 return `
-          <div class="grid gap-4 p-4 hover:bg-[#242d3d] transition-colors items-center" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
+          <div class="grid gap-4 p-4 hover:bg-secondary transition-colors items-center" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
 
             <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
             <div class="text-green-400">${maker.baseFee}</div>
@@ -847,29 +847,29 @@ export function Market(container) {
   content.innerHTML = `
     <div class="flex justify-between items-center mb-8">
       <div>
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
+        <h2 class="text-3xl font-bold text-primary mb-2">Coinswap Market</h2>
         <p class="text-gray-400">Live view of the current coinswap market</p>
       </div>
-      <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
+      <button id="refresh-market-btn" class="bg-primary hover:bg-primary-hover text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
         Refresh
       </button>
     </div>
 
     <!-- Sync Status Display -->
-    <div class="bg-[#1a2332] rounded-lg p-4 mb-4">
+    <div class="bg-surface rounded-lg p-4 mb-4">
       <div id="sync-status"></div>
     </div>
 
     <!-- Progress Bar -->
     <div id="sync-progress-container" class="mb-4 hidden"></div>
 
-    <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
+    <div class="bg-surface rounded-lg p-6 mb-6">
       <div class="flex items-start gap-3">
-        <span class="text-[#FF6B35]">${icons.info(24)}</span>
+        <span class="text-primary">${icons.info(24)}</span>
         <div>
-          <h3 class="text-lg font-semibold text-lg text-[#FF6B35] mb-2">Fee Calculation</h3>
+          <h3 class="text-lg font-semibold text-lg text-primary mb-2">Fee Calculation</h3>
           <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
-          <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
+          <code class="block bg-app-bg p-3 rounded text-green-400 font-mono text-sm">
             Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Locktime × Swap Amount × % Time Rate)
           </code>
           <p class="text-gray-400 text-sm mt-3">
@@ -880,37 +880,37 @@ export function Market(container) {
     </div>
 
     <div id="market-stats" class="grid grid-cols-2 gap-4 mb-6">
-      <div class="bg-[#1a2332] rounded-lg p-6">
+      <div class="bg-surface rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-        <p class="text-2xl font-mono text-[#FF6B35]">0.00 BTC</p>
+        <p class="text-2xl font-mono text-primary">0.00 BTC</p>
       </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
+      <div class="bg-surface rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Total Fidelity Locked</p>
         <p class="text-2xl font-mono text-purple-400">0 sats</p>
       </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
+      <div class="bg-surface rounded-lg p-6">
         <p class="text-sm text-gray-400 mb-2">Nostr Relays</p>
         <p class="text-2xl font-mono text-cyan-400">0</p>
       </div>
     </div>
 
-    <div class="bg-[#1a2332] rounded-lg overflow-hidden">
+    <div class="bg-surface rounded-lg overflow-hidden">
       <!-- Maker Status Tabs -->
-      <div class="flex border-b-2 border-[#FF6B35]">
-  <button id="tab-good" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#FF6B35] text-white border-b-4 border-[#FF6B35] transition-all">
+      <div class="flex border-b-2 border-primary">
+  <button id="tab-good" class="flex-1 px-6 py-4 font-semibold text-lg bg-primary text-white border-b-4 border-primary transition-all">
     ${icons.checkCircle(14, 'mr-1')} Good Makers (<span id="good-count">0</span>)
   </button>
-  <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
+  <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold text-lg bg-surface text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
     ${icons.xCircle(14, 'mr-1')} Bad Makers (<span id="bad-count">0</span>)
   </button>
-  <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
+  <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold text-lg bg-surface text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
     ${icons.pauseCircle(14, 'mr-1')} Unresponsive (<span id="unresponsive-count">0</span>)
   </button>
 </div>
 
       
 
-      <div class="grid gap-4 bg-[#FF6B35] p-4 text-xs" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
+      <div class="grid gap-4 bg-primary p-4 text-xs" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
         <div class="font-semibold">Tor Address</div>
         <div class="font-semibold">Base Fee</div>
         <div class="font-semibold">% Fee Rate</div>
@@ -923,7 +923,7 @@ export function Market(container) {
 
       <div id="maker-table-body" class="divide-y divide-gray-700">
         <div class="col-span-8 text-center py-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p class="text-gray-400">Loading makers...</p>
         </div>
       </div>
@@ -948,16 +948,16 @@ export function Market(container) {
     ['good', 'bad', 'unresponsive'].forEach((s) => {
       const tab = content.querySelector(`#tab-${s}`);
       if (s === status) {
-        tab.classList.add('bg-[#FF6B35]', 'text-white', 'border-[#FF6B35]');
+        tab.classList.add('bg-primary', 'text-white', 'border-primary');
         tab.classList.remove(
-          'bg-[#1a2332]',
+          'bg-surface',
           'text-gray-400',
           'border-transparent'
         );
       } else {
-        tab.classList.remove('bg-[#FF6B35]', 'text-white', 'border-[#FF6B35]');
+        tab.classList.remove('bg-primary', 'text-white', 'border-primary');
         tab.classList.add(
-          'bg-[#1a2332]',
+          'bg-surface',
           'text-gray-400',
           'border-transparent'
         );

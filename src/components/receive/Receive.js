@@ -8,12 +8,12 @@ export function ReceiveComponent(container) {
   let isGenerating = false;
 
   content.innerHTML = `
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Receive Bitcoin</h2>
+        <h2 class="text-3xl font-bold text-primary mb-2">Receive Bitcoin</h2>
         <p class="text-gray-400 mb-8">Generate a new address to receive BTC</p>
 
         <div class="grid grid-cols-2 gap-6">
             <!-- Left: Address Display -->
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <h3 class="text-lg font-semibold text-lg text-gray-300 mb-6">Your Bitcoin Address</h3>
                 
                 <!-- QR Code -->
@@ -28,11 +28,11 @@ export function ReceiveComponent(container) {
 
                 <!-- Address Display -->
                 <div class="mb-6">
-                    <div class="bg-[#0f1419] border border-gray-700 rounded-lg p-4 flex items-center justify-between">
+                    <div class="bg-app-bg border border-gray-700 rounded-lg p-4 flex items-center justify-between">
                         <span id="current-address" class="font-mono text-sm text-white break-all flex-1 mr-4">
                             No address loaded
                         </span>
-                        <button id="copy-address" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors whitespace-nowrap">
+                        <button id="copy-address" disabled class="bg-primary hover:bg-primary-hover disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors whitespace-nowrap">
                             Copy
                         </button>
                     </div>
@@ -42,7 +42,7 @@ export function ReceiveComponent(container) {
                 </div>
 
                 <!-- Generate New Address Button -->
-                <button id="generate-new" class="w-full bg-[#242d3d] hover:bg-[#2d3748] disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
+                <button id="generate-new" class="w-full bg-secondary hover:bg-secondary-hover disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
                     <span class="generate-text">Generate Address</span>
                     <span class="generate-loading hidden">
                         <span class="inline-block animate-spin mr-2">${icons.loader(16)}</span>
@@ -61,7 +61,7 @@ export function ReceiveComponent(container) {
                 </div>
 
                 <!-- Address Status Card -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
+                <div class="bg-surface rounded-lg p-6">
                     <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Address Status</h3>
                     <div id="address-status" class="space-y-3">
                         <div class="flex justify-between items-center text-sm">
@@ -84,7 +84,7 @@ export function ReceiveComponent(container) {
                 </div>
 
                 <!-- Recent Addresses -->
-                <div class="bg-[#1a2332] rounded-lg p-6">
+                <div class="bg-surface rounded-lg p-6">
                     <div class="flex justify-between items-center mb-4">
                         <h3 class="text-lg font-semibold text-lg text-gray-300">Recent Addresses</h3>
                         <span id="total-addresses" class="text-xs text-gray-500">0 total</span>
@@ -95,7 +95,7 @@ export function ReceiveComponent(container) {
                         </div>
                     </div>
                     
-                    <button id="view-all-addresses" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors w-full text-left">
+                    <button id="view-all-addresses" class="mt-4 text-primary hover:text-primary-hover text-sm font-semibold text-lg transition-colors w-full text-left">
                         View All Addresses →
                     </button>
                 </div>
@@ -230,12 +230,12 @@ export function ReceiveComponent(container) {
       await navigator.clipboard.writeText(text);
       copyButton.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
       copyButton.classList.add('bg-green-500');
-      copyButton.classList.remove('bg-[#FF6B35]');
+      copyButton.classList.remove('bg-primary');
 
       setTimeout(() => {
         copyButton.textContent = 'Copy';
         copyButton.classList.remove('bg-green-500');
-        copyButton.classList.add('bg-[#FF6B35]');
+        copyButton.classList.add('bg-primary');
       }, 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
@@ -289,7 +289,7 @@ export function ReceiveComponent(container) {
       P2WSH: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
       P2TR: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
       P2PKH: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      P2SH: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+      P2SH: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
     };
     const colorClass =
       typeColors[addressData.type] ||
@@ -344,11 +344,11 @@ export function ReceiveComponent(container) {
         const typeColor = typeColors[addr.type] || 'text-gray-400';
 
         return `
-      <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-[#FF6B35]/10 border border-[#FF6B35]/30' : 'bg-[#0f1419] hover:bg-[#242d3d]'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
+      <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-primary/10 border border-primary/30' : 'bg-app-bg hover:bg-secondary'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-mono text-xs text-gray-300 truncate">${addr.address.substring(0, 16)}...${addr.address.substring(addr.address.length - 8)}</span>
-            ${isCurrent ? '<span class="text-xs text-[#FF6B35]">● Current</span>' : ''}
+            ${isCurrent ? '<span class="text-xs text-primary">● Current</span>' : ''}
           </div>
           <div class="flex items-center gap-2 mt-1">
             <span class="text-xs ${typeColor}">${addr.type}</span>

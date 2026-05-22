@@ -92,7 +92,7 @@ export async function CoinswapComponent(container, swapConfig) {
     }
   }
 
-  const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const makerColors = ['#518def', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
 
   function addLog(message, type = 'info') {
     // Avoid duplicate logs
@@ -715,7 +715,7 @@ export async function CoinswapComponent(container, swapConfig) {
     modal.className =
       'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
     modal.innerHTML = `
-    <div class="bg-[#1a2332] rounded-lg p-6 max-w-md mx-4 border border-red-500/30">
+    <div class="bg-surface rounded-lg p-6 max-w-md mx-4 border border-red-500/30">
       <div class="flex items-center mb-4">
         <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mr-4">
           <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -728,7 +728,7 @@ export async function CoinswapComponent(container, swapConfig) {
       <div class="mb-6">
         <p class="text-gray-300 mb-3">The coinswap could not be completed. Your funds are safe and recovery has been initiated.</p>
         
-        <div class="bg-[#0f1419] rounded p-3 mb-3">
+        <div class="bg-app-bg rounded p-3 mb-3">
           <p class="text-xs text-gray-400 mb-1">Error Details:</p>
           <p class="text-sm text-red-300 font-mono break-words">${errorMessage || 'Unknown error'}</p>
         </div>
@@ -739,7 +739,7 @@ export async function CoinswapComponent(container, swapConfig) {
         </div>
       </div>
       
-      <button id="modal-to-swap" class="w-full bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
+      <button id="modal-to-swap" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-lg transition-colors">
         Back to Swap Page
       </button>
     </div>
@@ -1032,7 +1032,7 @@ export async function CoinswapComponent(container, swapConfig) {
       const [outgoing, incoming] = swapData.transactions;
       txList.innerHTML = `
       <div class="space-y-3">
-        <div class="bg-[#0f1419] rounded p-3">
+        <div class="bg-app-bg rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Locking Funds</span>
             <span class="${outgoing.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
@@ -1042,7 +1042,7 @@ export async function CoinswapComponent(container, swapConfig) {
           ${outgoing.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${outgoing.txid}</div>` : '<div class="text-gray-500 text-xs">Waiting for broadcast...</div>'}
         </div>
 
-        <div class="bg-[#0f1419] rounded p-3">
+        <div class="bg-app-bg rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Receiving Funds</span>
             <span class="${incoming.status === 'confirmed' ? 'text-green-400' : 'text-gray-500'}">
@@ -1059,7 +1059,7 @@ export async function CoinswapComponent(container, swapConfig) {
           const hasData = tx.txid || tx.status !== 'pending';
           if (!hasData) {
             return `
-          <div class="bg-[#0f1419] rounded p-2 text-xs opacity-50">
+          <div class="bg-app-bg rounded p-2 text-xs opacity-50">
             <div class="flex justify-between mb-1">
               <span class="text-gray-400">Hop ${index + 1}</span>
               <span class="text-gray-500">⏳</span>
@@ -1070,7 +1070,7 @@ export async function CoinswapComponent(container, swapConfig) {
           }
 
           return `
-        <div class="bg-[#0f1419] rounded p-2 text-xs">
+        <div class="bg-app-bg rounded p-2 text-xs">
           <div class="flex justify-between mb-1">
             <span class="text-gray-400">Hop ${index + 1}</span>
             <span class="${tx.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
@@ -1315,7 +1315,7 @@ export async function CoinswapComponent(container, swapConfig) {
         <g id="you-node" style="transition: all 0.3s;">
           <rect x="${(positions[0].x - youHalf).toFixed(1)}" y="${(positions[0].y - youHalf).toFixed(1)}"
                 width="${youHalf * 2}" height="${youHalf * 2}" rx="${youRx}"
-                fill="#FF6B35" id="you-rect" style="transition: fill 0.5s;" filter="url(#glow-you)"/>
+                fill="#518def" id="you-rect" style="transition: fill 0.5s;" filter="url(#glow-you)"/>
           <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youFont * 0.38).toFixed(1)}"
                 text-anchor="middle" fill="white" font-size="${youFont}" font-weight="bold">You</text>
           <text id="you-state-text"
@@ -1373,7 +1373,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
     if (youNode && active) {
       youNode.style.opacity = '1';
-      if (youRect) youRect.setAttribute('fill', '#FF6B35');
+      if (youRect) youRect.setAttribute('fill', '#518def');
       if (youStateText) youStateText.textContent = 'Sending...';
     }
   }
@@ -1427,23 +1427,23 @@ export async function CoinswapComponent(container, swapConfig) {
     <div class="mb-4">
       <button id="back-to-swap" class="text-gray-500 hover:text-gray-300 text-sm flex items-center gap-1 mb-3 transition-colors">← Back</button>
       <div class="flex items-center gap-3 mb-1">
-        <h2 id="swap-page-title" class="text-2xl font-bold text-[#FF6B35]">Coinswap in Progress</h2>
-        <span id="swap-page-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
-          <span id="swap-page-badge-dot" class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
-          <span id="swap-page-badge-text" class="text-xs text-orange-400 font-medium">Active</span>
+        <h2 id="swap-page-title" class="text-2xl font-bold text-primary">Coinswap in Progress</h2>
+        <span id="swap-page-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full">
+          <span id="swap-page-badge-dot" class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+          <span id="swap-page-badge-text" class="text-xs text-primary font-medium">Active</span>
         </span>
       </div>
       <p id="swap-status-text" class="text-gray-500 text-sm">Executing swap through ${swapData.makers} makers...</p>
     </div>
 
     <!-- Flow diagram -->
-    <div class="bg-[#1a2332] rounded-xl mb-4 overflow-hidden">
+    <div class="bg-surface rounded-xl mb-4 overflow-hidden">
       ${buildFlowDiagram()}
     </div>
 
     <!-- Stats row -->
     <div class="grid grid-cols-${isV2 ? '2' : '3'} gap-3 mb-4">
-      <div class="bg-[#1a2332] rounded-xl p-4">
+      <div class="bg-surface rounded-xl p-4">
         <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Amount</p>
         <p class="font-mono text-white font-semibold">${(swapData.amount / 100000000).toFixed(8)} BTC</p>
         ${
@@ -1456,7 +1456,7 @@ export async function CoinswapComponent(container, swapConfig) {
       ${
         !isV2
           ? `
-      <div class="bg-[#1a2332] rounded-xl p-4">
+      <div class="bg-surface rounded-xl p-4">
         <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Hop Transactions</p>
         <div id="transaction-list" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
       </div>
@@ -1464,7 +1464,7 @@ export async function CoinswapComponent(container, swapConfig) {
           : ''
       }
 
-      <div class="bg-[#1a2332] rounded-xl p-4">
+      <div class="bg-surface rounded-xl p-4">
         <div class="flex items-center justify-between mb-3">
           <p class="text-xs text-gray-500 uppercase tracking-wide">Elapsed</p>
           <span id="elapsed-time" class="font-mono text-yellow-400 font-bold text-xl">0:00</span>
@@ -1483,7 +1483,7 @@ export async function CoinswapComponent(container, swapConfig) {
     </div>
 
     <!-- Activity log -->
-    <div class="bg-[#1a2332] rounded-xl p-4">
+    <div class="bg-surface rounded-xl p-4">
       <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Activity Log</p>
       <div id="log-container" class="bg-[#0a0f16] rounded-lg p-3 h-36 overflow-y-auto font-mono text-xs"></div>
     </div>

@@ -5,17 +5,17 @@ export async function AboutComponent(container) {
       <!-- Header -->
       <div class="flex items-start justify-between mb-8">
         <div>
-          <h2 class="text-3xl font-bold text-[#FF6B35]">Coinswap</h2>
+          <h2 class="text-3xl font-bold text-primary">Coinswap</h2>
           <p class="text-gray-400 text-sm mt-1">Taker Wallet — Bitcoin Privacy Tool</p>
         </div>
         <div class="flex items-center gap-3 mt-1">
           <span class="text-gray-500 text-sm">Version</span>
-          <span id="app-version" class="text-white font-mono text-sm bg-[#1a2332] px-3 py-1 rounded">Loading...</span>
+          <span id="app-version" class="text-white font-mono text-sm bg-surface px-3 py-1 rounded">Loading...</span>
         </div>
       </div>
 
       <!-- What is Coinswap -->
-      <div class="bg-[#1a2332] rounded-lg p-8 max-w-3xl space-y-4">
+      <div class="bg-surface rounded-lg p-8 max-w-3xl space-y-4">
         <h3 class="text-xl font-semibold text-white">About Coinswap</h3>
         <p class="text-gray-300 text-sm leading-relaxed">
           Coinswap is a trustless, self-custodial atomic swap protocol built on Bitcoin. Unlike existing solutions

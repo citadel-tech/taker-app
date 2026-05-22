@@ -264,7 +264,7 @@ export function buildSwapHistoryMarkup(history) {
           const duration = formatDuration(swap.durationSeconds);
 
           return `
-          <div class="swap-history-row bg-[#1a2332] hover:bg-[#242d3d] rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-[#FF6B35]/30" data-swap-id="${swap.id}">
+          <div class="swap-history-row bg-surface hover:bg-secondary rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-primary/30" data-swap-id="${swap.id}">
             <div class="flex items-center gap-4">
               <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
                 <span class="text-green-400">${icons.check(24)}</span>
@@ -390,7 +390,7 @@ export async function SwapHistoryComponent(container) {
           <div class="text-gray-500 mb-4 flex justify-center">${icons.refreshCw(64)}</div>
           <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
           <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
-          <button id="start-first-swap" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-3 rounded-lg transition-colors">
+          <button id="start-first-swap" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg px-6 py-3 rounded-lg transition-colors">
             Start Your First Swap →
           </button>
         </div>
@@ -410,7 +410,7 @@ export async function SwapHistoryComponent(container) {
             const duration = formatDuration(swap.durationSeconds);
 
             return `
-            <div class="swap-history-row bg-[#1a2332] hover:bg-[#242d3d] rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-[#FF6B35]/30" data-swap-id="${swap.id}">
+            <div class="swap-history-row bg-surface hover:bg-secondary rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-primary/30" data-swap-id="${swap.id}">
               <div class="flex items-center gap-4">
                 <!-- Status Icon -->
                 <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
@@ -497,7 +497,7 @@ export async function SwapHistoryComponent(container) {
         </button>
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Swap History</h2>
+            <h2 class="text-3xl font-bold text-primary mb-2">Swap History</h2>
             <p class="text-gray-400">View all your completed coinswap transactions</p>
           </div>
           ${
@@ -517,19 +517,19 @@ export async function SwapHistoryComponent(container) {
         totalSwaps > 0
           ? `
         <div class="grid grid-cols-4 gap-4 mb-8">
-          <div class="bg-[#1a2332] rounded-lg p-4">
+          <div class="bg-surface rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Total Swaps</p>
-            <p class="text-2xl font-bold text-[#FF6B35]">${totalSwaps}</p>
+            <p class="text-2xl font-bold text-primary">${totalSwaps}</p>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-4">
+          <div class="bg-surface rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Total Volume</p>
             <p class="text-2xl font-bold text-green-400">${satsToBtc(totalVolume)} BTC</p>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-4">
+          <div class="bg-surface rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Total Fees Paid</p>
             <p class="text-2xl font-bold text-yellow-400">${totalFees.toLocaleString()} sats</p>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-4">
+          <div class="bg-surface rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Avg. Hops</p>
             <p class="text-2xl font-bold text-cyan-400">${avgHops}</p>
           </div>

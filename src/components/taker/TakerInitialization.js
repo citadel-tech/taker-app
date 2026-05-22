@@ -4,12 +4,12 @@ export function TakerInitializationComponent(container, config, onInitialized) {
   const initDiv = document.createElement('div');
   initDiv.id = 'taker-initialization';
   initDiv.className =
-    'fixed inset-0 bg-[#0f1419] flex items-center justify-center z-50';
+    'fixed inset-0 bg-app-bg flex items-center justify-center z-50';
 
   initDiv.innerHTML = `
-        <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-8">
+        <div class="bg-surface rounded-lg max-w-md w-full mx-4 p-8">
             <div class="text-center mb-8">
-                <div class="w-20 h-20 bg-[#FF6B35]/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                <div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
                     <span class="animate-spin">${icons.loader(40)}</span>
                 </div>
                 <h2 class="text-2xl font-bold text-white mb-2">Initializing Taker</h2>
@@ -35,7 +35,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
             <div class="mb-6">
                 <div class="bg-gray-700 rounded-full h-2">
-                    <div id="progress-bar" class="bg-[#FF6B35] h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                    <div id="progress-bar" class="bg-primary h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
                 </div>
                 <p id="progress-text" class="text-xs text-gray-400 mt-2 text-center">Initializing...</p>
             </div>
@@ -47,12 +47,12 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                     type="password" 
                     id="unlock-password-input"
                     placeholder="Enter wallet password"
-                    class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+                    class="w-full bg-app-bg border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                 />
                 <div id="password-error" class="hidden mt-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
                     <p class="text-xs text-red-400"></p>
                 </div>
-                <button id="unlock-submit-btn" class="w-full mt-4 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
+                <button id="unlock-submit-btn" class="w-full mt-4 bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
                     Unlock Wallet
                 </button>
                 <div class="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
@@ -74,7 +74,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                     <button id="retry-taker" class="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm">
                         Retry
                     </button>
-                    <button id="skip-taker" class="w-full bg-[#242d3d] hover:bg-[#2d3748] text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-gray-600">
+                    <button id="skip-taker" class="w-full bg-secondary hover:bg-secondary-hover text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-gray-600">
                         Skip Setup
                     </button>
                 </div>
@@ -84,7 +84,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                 <p class="text-xs text-blue-400 mb-3">
                     ${icons.lightbulb(16, 'mr-1')} <strong>Tor Not Running:</strong>
                 </p>
-                <div class="bg-[#0f1419] rounded p-3 font-mono text-xs text-gray-300">
+                <div class="bg-app-bg rounded p-3 font-mono text-xs text-gray-300">
                     sudo systemctl start tor@coinswap
                 </div>
             </div>
@@ -103,7 +103,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
     switch (status) {
       case 'active':
-        icon.className += ' bg-[#FF6B35] animate-pulse';
+        icon.className += ' bg-primary animate-pulse';
         icon.innerHTML = '<div class="w-2 h-2 bg-white rounded-full"></div>';
         if (text) textEl.textContent = text;
         textEl.className = 'text-white text-sm font-medium';

@@ -166,13 +166,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     // Update all unit buttons
     content.querySelectorAll('.unit-btn').forEach((btn) => {
-      btn.classList.remove('bg-[#FF6B35]', 'text-white');
-      btn.classList.add('bg-[#0f1419]', 'hover:bg-[#242d3d]', 'border', 'border-gray-700', 'text-gray-400');
+      btn.classList.remove('bg-primary', 'text-white');
+      btn.classList.add('bg-app-bg', 'hover:bg-secondary', 'border', 'border-gray-700', 'text-gray-400');
     });
     
     content.querySelectorAll(`.unit-btn[data-unit="${unit}"]`).forEach((btn) => {
-      btn.classList.remove('bg-[#0f1419]', 'hover:bg-[#242d3d]', 'border', 'border-gray-700', 'text-gray-400');
-      btn.classList.add('bg-[#FF6B35]', 'text-white');
+      btn.classList.remove('bg-app-bg', 'hover:bg-secondary', 'border', 'border-gray-700', 'text-gray-400');
+      btn.classList.add('bg-primary', 'text-white');
     });
 
     // Update all recipient placeholders and values
@@ -245,7 +245,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       const showAmountInput = selectionMode === 'auto';
       
       return `
-      <div class="recipient-row mb-4 p-4 bg-[#0f1419] rounded-lg border border-gray-700">
+      <div class="recipient-row mb-4 p-4 bg-app-bg rounded-lg border border-gray-700">
         <div class="flex justify-between items-center mb-3">
           <label class="text-sm font-semibold text-lg text-gray-300">Recipient ${index + 1}</label>
           ${recipients.length > 1 ? `
@@ -262,7 +262,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             type="text" 
             placeholder="bc1q... or bcrt1q..." 
             value="${recipient.address}"
-            class="recipient-address w-full bg-[#1a2332] border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#FF6B35] transition-colors"
+            class="recipient-address w-full bg-surface border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
             data-index="${index}"
           />
         </div>
@@ -273,13 +273,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <div class="flex justify-between items-center mb-1">
             <label class="block text-xs text-gray-400">Amount</label>
             <div class="flex gap-1">
-              <button class="unit-btn ${amountUnit === 'sats' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="sats" data-recipient="${index}">
+              <button class="unit-btn ${amountUnit === 'sats' ? 'bg-primary text-white' : 'bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="sats" data-recipient="${index}">
                 Sats
               </button>
-              <button class="unit-btn ${amountUnit === 'btc' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="btc" data-recipient="${index}">
+              <button class="unit-btn ${amountUnit === 'btc' ? 'bg-primary text-white' : 'bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="btc" data-recipient="${index}">
                 BTC
               </button>
-              <button class="unit-btn ${amountUnit === 'usd' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="usd" data-recipient="${index}">
+              <button class="unit-btn ${amountUnit === 'usd' ? 'bg-primary text-white' : 'bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400'} px-2 py-0.5 rounded text-[10px] font-semibold text-lg transition-colors" data-unit="usd" data-recipient="${index}">
                 USD
               </button>
             </div>
@@ -290,7 +290,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             step="any"
             placeholder="${amountUnit === 'sats' ? '0' : amountUnit === 'btc' ? '0.00000000' : '0.00'}"
             value="${recipient.amount && recipient.amount > 0 ? (amountUnit === 'sats' ? recipient.amount : amountUnit === 'btc' ? (recipient.amount / 100000000).toFixed(8) : ((recipient.amount / 100000000) * btcPrice).toFixed(2)) : ''}"
-            class="recipient-amount w-full bg-[#1a2332] border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-lg focus:outline-none focus:border-[#FF6B35] transition-colors"
+            class="recipient-amount w-full bg-surface border border-gray-700 rounded-lg px-4 py-3 text-white font-mono text-lg focus:outline-none focus:border-primary transition-colors"
             data-index="${index}"
           />
           <div class="flex justify-between mt-1">
@@ -302,11 +302,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
         <div>
           <div class="flex justify-between items-center mb-2">
             <label class="block text-xs text-gray-400">Amount (from selected UTXOs)</label>
-            <button class="use-utxo-minus-fees text-[#FF6B35] hover:text-[#ff7d4d] text-[10px] font-semibold text-lg" data-index="${index}">
+            <button class="use-utxo-minus-fees text-primary hover:text-primary-hover text-[10px] font-semibold text-lg" data-index="${index}">
               UTXO - Fees
             </button>
           </div>
-          <div class="bg-[#1a2332] border border-gray-700 rounded-lg px-4 py-3">
+          <div class="bg-surface border border-gray-700 rounded-lg px-4 py-3">
             <p class="text-white font-mono text-lg">${getSelectedUtxosTotal().toLocaleString()} sats</p>
             <div class="flex justify-between mt-1">
               <p class="text-xs text-gray-400">≈ ${(getSelectedUtxosTotal() / 100000000).toFixed(8)} BTC</p>
@@ -384,9 +384,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
     selectionMode = mode;
 
     content.querySelectorAll('.mode-btn').forEach((btn) => {
-      btn.className = 'mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+      btn.className = 'mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
     });
-    content.querySelector('#mode-' + mode).className = 'mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
+    content.querySelector('#mode-' + mode).className = 'mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
 
     const manualSection = content.querySelector('#manual-selection-section');
     
@@ -479,11 +479,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
       const btcAmount = (utxo.amount / 100000000).toFixed(8);
       const usdAmount = ((utxo.amount / 100000000) * btcPrice).toFixed(2);
       const isSelected = selectedUtxos.includes(index);
-      const typeColor = utxo.type === 'Swap' ? 'text-orange-500 font-bold' : 'text-green-400';
+      const typeColor = utxo.type === 'Swap' ? 'text-primary font-bold' : 'text-green-400';
       
       return `
-        <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
-          <input type="checkbox" id="utxo-${index}" ${isSelected ? 'checked' : ''} class="w-4 h-4 accent-[#FF6B35]" />
+        <label class="flex items-center gap-3 bg-app-bg hover:bg-secondary rounded-lg p-3 cursor-pointer transition-colors">
+          <input type="checkbox" id="utxo-${index}" ${isSelected ? 'checked' : ''} class="w-4 h-4 accent-primary" />
           <div class="flex-1">
             <div class="flex justify-between items-center">
               <span class="font-mono text-sm text-gray-300">${utxo.txid.substring(0, 16)}...${utxo.txid.substring(utxo.txid.length - 8)}:${utxo.vout}</span>
@@ -514,15 +514,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     content.querySelectorAll('.fee-btn').forEach((btn) => {
       btn.className = btn.className.replace(
-        'bg-[#FF6B35] border-2 border-[#FF6B35]',
-        'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700'
+        'bg-primary border-2 border-primary',
+        'bg-app-bg hover:bg-secondary border border-gray-700'
       );
     });
 
     const selectedBtn = content.querySelector('#fee-' + level);
     selectedBtn.className = selectedBtn.className.replace(
-      'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700',
-      'bg-[#FF6B35] border-2 border-[#FF6B35]'
+      'bg-app-bg hover:bg-secondary border border-gray-700',
+      'bg-primary border-2 border-primary'
     );
 
     updateSummary();
@@ -768,7 +768,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     popup.className = 'fixed inset-0 bg-black/80 flex items-center justify-center z-50';
     
     popup.innerHTML = `
-      <div class="bg-[#1a2332] rounded-lg p-8 max-w-2xl w-full mx-4 border border-green-500/50">
+      <div class="bg-surface rounded-lg p-8 max-w-2xl w-full mx-4 border border-green-500/50">
         <div class="text-center mb-6">
           <div class="flex justify-center mb-4">${icons.checkCircle(64, 'text-green-400')}</div>
           <h2 class="text-2xl font-bold text-green-400 mb-2">Transaction Broadcast Successfully!</h2>
@@ -777,7 +777,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         
         <div class="space-y-4 mb-6">
           ${txids.map(({ address, txid }) => `
-            <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
+            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
               <p class="text-xs text-gray-400 mb-2">Recipient: ${address}</p>
               <div class="flex items-center gap-2">
                 <span class="text-xs text-gray-400">TXID:</span>
@@ -790,7 +790,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           `).join('')}
         </div>
         
-        <button id="close-success-popup" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-3 rounded-lg transition-colors">
+        <button id="close-success-popup" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-lg transition-colors">
           Close
         </button>
       </div>
@@ -808,7 +808,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
   }
 
   content.innerHTML = `
-    <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Send Bitcoin</h2>
+    <h2 class="text-3xl font-bold text-primary mb-2">Send Bitcoin</h2>
     <p class="text-gray-400 mb-4">Send BTC to one or multiple Bitcoin addresses</p>
     
     <!-- Warning Banner -->
@@ -822,12 +822,12 @@ export function SendComponent(container, preSelectedUtxos = null) {
     <div class="grid grid-cols-3 gap-6">
       <!-- Left: Send Form -->
       <div class="col-span-2 space-y-6">
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
           <!-- Recipients -->
           <div class="mb-6">
             <div class="flex justify-between items-center mb-3">
               <label class="block text-sm text-gray-400">Recipients</label>
-              <button id="add-recipient-btn" class="text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg">
+              <button id="add-recipient-btn" class="text-primary hover:text-primary-hover text-sm font-semibold text-lg">
                 + Add Recipient
               </button>
             </div>
@@ -838,10 +838,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <div class="mb-6">
             <label class="block text-sm text-gray-400 mb-2">UTXO Selection</label>
             <div class="flex gap-2">
-              <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
+              <button id="mode-auto" class="mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
                 Auto Select
               </button>
-              <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+              <button id="mode-manual" class="mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 Manual Select
               </button>
             </div>
@@ -855,15 +855,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
             </div>
             
             <div class="grid grid-cols-3 gap-2 mb-4">
-              <button id="fee-low" class="fee-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg p-3 text-center transition-colors">
+              <button id="fee-low" class="fee-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg p-3 text-center transition-colors">
                 <div class="text-white font-semibold text-lg">Low</div>
                 <div class="text-xs text-gray-400 mt-1">1 sat/vB</div>
               </button>
-              <button id="fee-medium" class="fee-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg p-3 text-center">
+              <button id="fee-medium" class="fee-btn bg-primary border-2 border-primary rounded-lg p-3 text-center">
                 <div class="text-white font-semibold text-lg">Medium</div>
                 <div class="text-xs text-white/80 mt-1">2 sat/vB</div>
               </button>
-              <button id="fee-high" class="fee-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg p-3 text-center transition-colors">
+              <button id="fee-high" class="fee-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg p-3 text-center transition-colors">
                 <div class="text-white font-semibold text-lg">High</div>
                 <div class="text-xs text-gray-400 mt-1">4 sat/vB</div>
               </button>
@@ -875,7 +875,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
                 type="number" 
                 min="1"
                 placeholder="Custom" 
-                class="flex-1 bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-[#FF6B35]"
+                class="flex-1 bg-app-bg border border-gray-700 rounded-lg px-4 py-2 text-white text-sm focus:outline-none focus:border-primary"
               />
               <span class="text-sm text-gray-400">sats/vByte</span>
             </div>
@@ -884,7 +884,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
         <!-- Manual Selection Section -->
         <div id="manual-selection-section" class="hidden">
-          <div class="bg-[#1a2332] rounded-lg p-6">
+          <div class="bg-surface rounded-lg p-6">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-xl font-semibold text-lg text-gray-300">Select UTXOs</h3>
               <div class="text-sm text-gray-400">
@@ -909,9 +909,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
         </div>
 
         <!-- Hex Display -->
-        <div id="hex-panel" class="hidden bg-[#1a2332] rounded-lg p-6">
+        <div id="hex-panel" class="hidden bg-surface rounded-lg p-6">
           <h3 class="text-lg font-semibold text-lg text-gray-300 mb-3">Transaction Hex</h3>
-          <div class="bg-[#0f1419] border border-gray-700 rounded-lg p-4 max-h-40 overflow-auto">
+          <div class="bg-app-bg border border-gray-700 rounded-lg p-4 max-h-40 overflow-auto">
             <pre id="tx-hex-content" class="text-xs text-green-400 font-mono whitespace-pre-wrap break-all"></pre>
           </div>
         </div>
@@ -921,7 +921,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <button id="sign-tx-btn" class="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg transition-colors text-lg">
             ${icons.key(14, 'mr-1')} Sign Transaction
           </button>
-          <button id="broadcast-tx-btn" disabled class="bg-[#FF6B35] hover:bg-[#ff7d4d] disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg transition-colors text-lg">
+          <button id="broadcast-tx-btn" disabled class="bg-primary hover:bg-primary-hover disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-4 rounded-lg transition-colors text-lg">
             ${icons.radio(14, 'mr-1')} Broadcast
           </button>
         </div>
@@ -929,7 +929,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
       <!-- Right: Summary -->
       <div class="col-span-1">
-        <div class="bg-[#1a2332] rounded-lg p-6 sticky top-8">
+        <div class="bg-surface rounded-lg p-6 sticky top-8">
           <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Transaction Summary</h3>
           
           <div class="space-y-4">
@@ -952,7 +952,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
               </div>
               <div class="flex justify-between pt-2 border-t border-gray-700">
                 <span class="text-sm font-semibold text-lg text-gray-300">Total Sent</span>
-                <span id="summary-total" class="text-sm font-mono font-semibold text-lg text-[#FF6B35]">280 sats</span>
+                <span id="summary-total" class="text-sm font-mono font-semibold text-lg text-primary">280 sats</span>
               </div>
               <p id="summary-total-usd" class="text-xs text-gray-500 text-right mt-1">≈ $0.00</p>
             </div>
@@ -1027,8 +1027,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
       selectedFeeRate = customRate;
       content.querySelectorAll('.fee-btn').forEach((btn) => {
         btn.className = btn.className.replace(
-          'bg-[#FF6B35] border-2 border-[#FF6B35]',
-          'bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700'
+          'bg-primary border-2 border-primary',
+          'bg-app-bg hover:bg-secondary border border-gray-700'
         );
       });
       updateSummary();

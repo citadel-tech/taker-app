@@ -410,8 +410,8 @@ export async function SwapComponent(container) {
         const timestamp = timestamps[index] || '1 month ago';
 
         return `
-        <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
-          <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+        <label class="flex items-center gap-3 bg-app-bg hover:bg-secondary rounded-lg p-3 cursor-pointer transition-colors">
+          <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-primary" />
           <div class="flex-1">
             <div class="flex justify-between items-center">
               <span class="font-mono text-sm text-gray-300">${utxo.txid.substring(0, 12)}...${utxo.txid.substring(utxo.txid.length - 4)}:${utxo.vout}</span>
@@ -458,8 +458,8 @@ export async function SwapComponent(container) {
     makerListContainer.innerHTML = availableMakers
       .map((maker, index) => {
         return `
-        <label class="flex items-center gap-3 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg p-3 cursor-pointer transition-colors">
-          <input type="checkbox" id="maker-addr-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+        <label class="flex items-center gap-3 bg-app-bg hover:bg-secondary rounded-lg p-3 cursor-pointer transition-colors">
+          <input type="checkbox" id="maker-addr-${index}" class="w-4 h-4 accent-primary" />
           <div class="flex-1">
             <div class="flex justify-between items-center">
               <span class="font-mono text-sm text-gray-300">${escapeHtml(formatTorEndpoint(maker.address))}</span>
@@ -521,21 +521,21 @@ export async function SwapComponent(container) {
     swapHistoryStats.innerHTML =
       stats.totalSwaps > 0
         ? `
-      <div class="bg-[#0f1419] rounded-lg p-4">
+      <div class="bg-app-bg rounded-lg p-4">
         <p class="text-sm text-gray-400 mb-1">Total Swaps</p>
-        <p class="text-2xl font-bold text-[#FF6B35]">${stats.totalSwaps}</p>
+        <p class="text-2xl font-bold text-primary">${stats.totalSwaps}</p>
       </div>
-      <div class="bg-[#0f1419] rounded-lg p-4">
+      <div class="bg-app-bg rounded-lg p-4">
         <p class="text-sm text-gray-400 mb-1">Total Amount</p>
         <p class="text-2xl font-bold text-green-400">${(
           stats.totalAmount / 100000000
         ).toFixed(8)} BTC</p>
       </div>
-      <div class="bg-[#0f1419] rounded-lg p-4">
+      <div class="bg-app-bg rounded-lg p-4">
         <p class="text-sm text-gray-400 mb-1">Total Fees Paid</p>
         <p class="text-2xl font-bold text-yellow-400">${stats.totalFees.toLocaleString()} sats</p>
       </div>
-      <div class="bg-[#0f1419] rounded-lg p-4">
+      <div class="bg-app-bg rounded-lg p-4">
         <p class="text-sm text-gray-400 mb-1">Avg Fee Paid</p>
         <p class="text-2xl font-bold text-cyan-400">${stats.avgFeePaid.toLocaleString()} sats</p>
       </div>
@@ -890,10 +890,10 @@ export async function SwapComponent(container) {
 
     content.querySelectorAll('.unit-btn').forEach((btn) => {
       btn.className =
-        'unit-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors';
+        'unit-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors';
     });
     content.querySelector('#unit-' + unit).className =
-      'unit-btn bg-[#FF6B35] text-white px-3 py-1 rounded text-xs font-semibold text-lg';
+      'unit-btn bg-primary text-white px-3 py-1 rounded text-xs font-semibold text-lg';
 
     const input = content.querySelector('#swap-amount-input');
     if (unit === 'sats') input.placeholder = '0';
@@ -914,18 +914,18 @@ export async function SwapComponent(container) {
     // Update button styles
     content.querySelectorAll('.hop-count-btn').forEach((btn) => {
       btn.className =
-        'hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+        'hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
     });
 
     if (useCustomHops) {
       content.querySelector('#hop-custom').className =
-        'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
+        'hop-count-btn bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
       content
         .querySelector('#custom-hop-input-container')
         .classList.remove('hidden');
     } else {
       content.querySelector('#hop-' + count).className =
-        'hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
+        'hop-count-btn bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
       content
         .querySelector('#custom-hop-input-container')
         .classList.add('hidden');
@@ -939,10 +939,10 @@ export async function SwapComponent(container) {
 
     content.querySelectorAll('.mode-btn').forEach((btn) => {
       btn.className =
-        'mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+        'mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
     });
     content.querySelector('#mode-' + mode).className =
-      'mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
+      'mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
 
     const amountInputSection = content.querySelector('#amount-input-section');
     const utxoSection = content.querySelector('#utxo-selection-section');
@@ -963,10 +963,10 @@ export async function SwapComponent(container) {
 
     content.querySelectorAll('.maker-mode-btn').forEach((btn) => {
       btn.className =
-        'maker-mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+        'maker-mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
     });
     content.querySelector('#maker-mode-' + mode).className =
-      'maker-mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg';
+      'maker-mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
 
     const makerSelectionSection = content.querySelector('#maker-selection-section');
     if (makerSelectionSection) {
@@ -1091,7 +1091,7 @@ export async function SwapComponent(container) {
 
   // UI - Render the HTML template
   content.innerHTML = `
-    <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap</h2>
+    <h2 class="text-3xl font-bold text-primary mb-2">Coinswap</h2>
     <p class="text-gray-400 mb-8">Perform private Bitcoin swaps through multiple makers</p>
 
     <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
@@ -1106,17 +1106,17 @@ export async function SwapComponent(container) {
     <div class="grid grid-cols-3 gap-6">
       <div class="col-span-2 space-y-6">
         <!-- Swap Form -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
           <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Initiate Swap</h3>
 
           <!-- Select UTXOs -->
           <div class="mb-6">
             <label class="block text-sm text-gray-400 mb-2">Select UTXOs</label>
             <div class="flex gap-2">
-              <button id="mode-auto" class="mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
+              <button id="mode-auto" class="mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
                 Auto Select UTXOs
               </button>
-              <button id="mode-manual" class="mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+              <button id="mode-manual" class="mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 Manual Select UTXOs
               </button>
             </div>
@@ -1127,13 +1127,13 @@ export async function SwapComponent(container) {
             <div class="flex justify-between items-center mb-2">
               <label class="block text-sm text-gray-400">Amount to Swap</label>
               <div class="flex gap-2">
-                <button id="unit-sats" class="unit-btn bg-[#FF6B35] text-white px-3 py-1 rounded text-xs font-semibold text-lg">
+                <button id="unit-sats" class="unit-btn bg-primary text-white px-3 py-1 rounded text-xs font-semibold text-lg">
                   Sats
                 </button>
-                <button id="unit-btc" class="unit-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors">
+                <button id="unit-btc" class="unit-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors">
                   BTC
                 </button>
-                <button id="unit-usd" class="unit-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors">
+                <button id="unit-usd" class="unit-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors">
                   USD
                 </button>
               </div>
@@ -1143,14 +1143,14 @@ export async function SwapComponent(container) {
                 id="swap-amount-input"
                 type="text" 
                 placeholder="0" 
-                class="w-full bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-3 pr-20 text-white font-mono text-lg focus:outline-none focus:border-[#FF6B35] transition-colors"
+                class="w-full bg-app-bg border border-gray-700 rounded-lg px-4 py-3 pr-20 text-white font-mono text-lg focus:outline-none focus:border-primary transition-colors"
               />
-              <button id="max-swap-btn" class="absolute right-2 top-1/2 -translate-y-1/2 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-1 rounded text-sm font-semibold text-lg transition-colors">
+              <button id="max-swap-btn" class="absolute right-2 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary-hover text-white px-4 py-1 rounded text-sm font-semibold text-lg transition-colors">
                 Max
               </button>
             </div>
 <p id="amount-input-conversions" class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
-            <p class="text-xs text-gray-500 mt-1">Max swappable: <span id="max-swappable-amount" class="text-[#FF6B35] font-semibold">0 sats</span></p>
+            <p class="text-xs text-gray-500 mt-1">Max swappable: <span id="max-swappable-amount" class="text-primary font-semibold">0 sats</span></p>
           </div>
 
           <!-- UTXO Selection (Only in Manual mode) -->
@@ -1177,22 +1177,22 @@ export async function SwapComponent(container) {
           <div class="mb-6">
             <div class="flex justify-between items-center mb-2">
               <label class="block text-sm text-gray-400">Number of Hops</label>
-              <span class="text-xs text-white font-bold text-2xl">Available Makers: <span id="available-makers-count" class="text-[#FF6B35]">${availableMakers.length}</span></span>
+              <span class="text-xs text-white font-bold text-2xl">Available Makers: <span id="available-makers-count" class="text-primary">${availableMakers.length}</span></span>
             </div>
             <div class="grid grid-cols-4 gap-2">
-              <button id="hop-3" class="hop-count-btn bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
+              <button id="hop-3" class="hop-count-btn bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
                 <div>3 hops</div>
                 <div class="text-xs text-white/80 mt-1">2 makers</div>
               </button>
-              <button id="hop-4" class="hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+              <button id="hop-4" class="hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 <div>4 hops</div>
                 <div class="text-xs text-gray-400 mt-1">3 makers</div>
               </button>
-              <button id="hop-5" class="hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+              <button id="hop-5" class="hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 <div>5 hops</div>
                 <div class="text-xs text-gray-400 mt-1">4 makers</div>
               </button>
-              <button id="hop-custom" class="hop-count-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+              <button id="hop-custom" class="hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 <div>Custom</div>
                 <div class="text-xs text-gray-400 mt-1">6+ hops</div>
               </button>
@@ -1207,7 +1207,7 @@ export async function SwapComponent(container) {
                   min="2" 
                   max="20"
                   value="6"
-                  class="w-24 bg-[#0f1419] border border-gray-700 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-[#FF6B35] transition-colors"
+                  class="w-24 bg-app-bg border border-gray-700 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-primary transition-colors"
                 />
                 <span class="text-gray-400">hops = <span id="custom-makers-display" class="text-cyan-400 font-semibold text-lg">5</span> makers</span>
               </div>
@@ -1220,10 +1220,10 @@ export async function SwapComponent(container) {
           <div class="mb-6">
             <label class="block text-sm text-gray-400 mb-2">Select Makers</label>
             <div class="flex gap-2">
-              <button id="maker-mode-auto" class="maker-mode-btn flex-1 bg-[#FF6B35] border-2 border-[#FF6B35] rounded-lg py-3 text-white font-semibold text-lg">
+              <button id="maker-mode-auto" class="maker-mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
                 Auto Select Makers
               </button>
-              <button id="maker-mode-manual" class="maker-mode-btn flex-1 bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
+              <button id="maker-mode-manual" class="maker-mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
                 Manual Select Makers
               </button>
             </div>
@@ -1246,14 +1246,14 @@ export async function SwapComponent(container) {
         </div>
 
         <!-- Start Swap Button -->
-        <button id="start-coinswap-btn" class="w-full bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-colors text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+        <button id="start-coinswap-btn" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-lg transition-colors text-lg disabled:opacity-50 disabled:cursor-not-allowed">
           Start Coinswap
         </button>
       </div>
 
       <!-- Right: Summary -->
       <div class="col-span-1">
-        <div class="bg-[#1a2332] rounded-lg p-6 top-8">
+        <div class="bg-surface rounded-lg p-6 top-8">
           <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Swap Summary</h3>
           
           <div class="space-y-4">
@@ -1320,7 +1320,7 @@ export async function SwapComponent(container) {
               <div class="flex justify-between pt-2 border-t border-gray-700">
                 <span class="text-sm font-semibold text-lg text-gray-300">You Receive</span>
                 <div class="text-right">
-                  <div id="total-amount" class="text-sm font-mono font-semibold text-lg text-[#FF6B35]">0 sats</div>
+                  <div id="total-amount" class="text-sm font-mono font-semibold text-lg text-primary">0 sats</div>
                   <div id="total-btc" class="text-xs text-gray-500">0.00000000 BTC</div>
                 </div>
               </div>
@@ -1331,7 +1331,7 @@ export async function SwapComponent(container) {
       </div>
     </div>
 
-    <div class="bg-[#1a2332] rounded-lg p-6 mt-6">
+    <div class="bg-surface rounded-lg p-6 mt-6">
       <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Swap History</h3>
       <div id="swap-history-stats" class="grid grid-cols-4 gap-4 mb-4"></div>
       <div id="swap-history-container" class="space-y-3">
