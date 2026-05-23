@@ -57,14 +57,14 @@ function stopBackgroundSwapManager() {
 // Render component
 async function renderComponent(name) {
   const contentContainer = document.querySelector('#content-area');
-  
+
   if (!contentContainer) {
     console.error('❌ Content container not found');
     return;
   }
 
   const parentNode = contentContainer.parentNode;
-  
+
   if (!parentNode) {
     console.error('❌ Content container has no parent');
     return;
@@ -74,7 +74,7 @@ async function renderComponent(name) {
   if (activeSwap && activeSwap.status === 'in_progress' && name === 'swap') {
     const newContainer = contentContainer.cloneNode(false);
     newContainer.id = 'content-area';
-    
+
     try {
       parentNode.replaceChild(newContainer, contentContainer);
     } catch (e) {
@@ -90,7 +90,7 @@ async function renderComponent(name) {
 
   const newContainer = contentContainer.cloneNode(false);
   newContainer.id = 'content-area';
-  
+
   try {
     parentNode.replaceChild(newContainer, contentContainer);
   } catch (e) {
@@ -118,12 +118,10 @@ function setupNavigation() {
       e.preventDefault();
 
       navItems.forEach((nav) => {
-        nav.classList.remove('bg-primary', 'text-white');
-        nav.classList.add('bg-secondary', 'text-gray-400');
+        nav.classList.remove('active');
       });
 
-      item.classList.remove('bg-secondary', 'text-gray-400');
-      item.classList.add('bg-primary', 'text-white');
+      item.classList.add('active');
 
       const navName = item.getAttribute('data-nav');
       await renderComponent(navName);
@@ -272,7 +270,10 @@ async function startBackgroundOfferbookSync() {
   try {
     const syncResult = await window.api.taker.syncOfferbookAndWait();
     if (!syncResult.success) {
-      console.warn('⚠️ Background offerbook sync failed to start:', syncResult.error);
+      console.warn(
+        '⚠️ Background offerbook sync failed to start:',
+        syncResult.error
+      );
       return;
     }
     const syncId = syncResult.syncId;
@@ -281,7 +282,11 @@ async function startBackgroundOfferbookSync() {
         try {
           const status = await window.api.taker.getSyncStatus(syncId);
           const syncStatus = (status.sync || {}).status || 'syncing';
-          if (!status.success || syncStatus === 'completed' || syncStatus === 'failed') {
+          if (
+            !status.success ||
+            syncStatus === 'completed' ||
+            syncStatus === 'failed'
+          ) {
             clearInterval(poll);
             resolve();
           }
@@ -297,7 +302,6 @@ async function startBackgroundOfferbookSync() {
     console.warn('⚠️ Background offerbook sync error:', err.message);
   }
 }
-
 
 // Start the main app after bitcoind connection is established
 async function startMainApp() {
@@ -315,13 +319,9 @@ async function startMainApp() {
       const swapNavItem = document.querySelector('[data-nav="swap"]');
       if (swapNavItem) {
         document.querySelectorAll('.nav-item').forEach((nav) => {
-          nav.classList.remove('bg-primary', 'text-white');
-          nav.classList.add('bg-secondary', 'text-gray-400');
+          nav.classList.remove('active');
         });
-        if (!swapNavItem.classList.contains('bg-primary')) {
-          swapNavItem.classList.remove('bg-secondary', 'text-gray-400');
-          swapNavItem.classList.add('bg-primary', 'text-white');
-        }
+        swapNavItem.classList.add('active');
       }
     }, 100);
   } else {
