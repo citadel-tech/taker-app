@@ -470,13 +470,13 @@ export function SwapReportComponent(container, swapReport) {
     {
       label: 'Outgoing Contract',
       txid: report.outgoingContractTxid,
-      accent: '#518def',
+      accent: '#f5c451',
       description: 'Contract transaction recorded on the outgoing side.',
     },
     {
       label: 'Incoming Contract',
       txid: report.incomingContractTxid,
-      accent: '#10B981',
+      accent: '#518def',
       description: 'Contract transaction recorded on the incoming side.',
     },
     ...report.fundingTxids.map((txid, index) => ({
@@ -508,8 +508,8 @@ export function SwapReportComponent(container, swapReport) {
   function buildTransactionArtifactsHtml() {
     if (!report.transactionArtifacts || report.transactionArtifacts.length === 0) {
       return `
-        <div class="bg-app-bg rounded-lg p-4 border border-gray-800">
-          <p class="text-gray-400 text-sm">
+        <div class="swap-report-empty">
+          <p>
             No on-chain transaction IDs were saved with this swap report. Maker, fee, and UTXO details are still shown below.
           </p>
         </div>
@@ -518,23 +518,19 @@ export function SwapReportComponent(container, swapReport) {
 
     return report.transactionArtifacts
       .map((artifact) => {
+        const directionIcon = artifact.label.toLowerCase().includes('incoming')
+          ? '↙'
+          : artifact.label.toLowerCase().includes('outgoing')
+            ? '↗'
+            : '→';
         return `
-          <div class="bg-app-bg rounded-lg p-4 border-l-4" style="border-color: ${artifact.accent}">
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold mb-1" style="color: ${artifact.accent}">
-                  ${artifact.label}
-                </p>
-                <p class="text-xs text-gray-500 mb-2">${artifact.description}</p>
-                <p class="font-mono text-xs text-gray-300 break-all">${artifact.txid}</p>
-              </div>
-              <div class="flex gap-2 shrink-0">
-                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors"
-                        data-txid="${artifact.txid}" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
-                <button class="view-txid-btn text-gray-400 hover:text-primary text-sm transition-colors"
-                        data-txid="${artifact.txid}" title="View on Explorer">${icons.externalLink(14, 'mr-1')}</button>
-              </div>
+          <div class="swap-report-artifact" style="--artifact-accent: ${artifact.accent}">
+            <div>
+              <h4><span>${directionIcon}</span>${artifact.label}</h4>
+              <p>${artifact.txid}</p>
             </div>
+            <button class="copy-txid-btn" data-txid="${artifact.txid}" title="Copy transaction">${icons.clipboardCopy(16)}</button>
+            <button class="view-txid-btn" data-txid="${artifact.txid}" title="View transaction">${icons.externalLink(16)}</button>
           </div>
         `;
       })
@@ -544,27 +540,17 @@ export function SwapReportComponent(container, swapReport) {
   // Build maker addresses HTML - Now clickable to show popup
   function buildMakersHtml() {
     if (!report.makerAddresses || report.makerAddresses.length === 0) {
-      return '<p class="text-gray-500 text-sm">No maker data available</p>';
+      return '<p class="swap-report-empty">No maker data available</p>';
     }
 
     return report.makerAddresses
       .map((addr, idx) => {
-        const color = makerColors[idx % makerColors.length];
         return `
-        <div class="maker-card bg-app-bg rounded-lg p-4 border hover:border-[${color}] transition-all cursor-pointer hover:scale-102 hover:shadow-lg"
-             style="border-color: ${color}40;" data-maker-index="${idx}">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
-                 style="background: ${color}20; color: ${color};">
-              M${idx + 1}
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-gray-400">Maker ${idx + 1}</p>
-              <p class="font-mono text-xs text-white truncate">${truncateAddress(addr)}</p>
-            </div>
-            <span class="text-gray-500 text-sm">→</span>
-          </div>
-        </div>
+        <button class="maker-card swap-report-maker-row" data-maker-index="${idx}">
+          <span>Maker ${String(idx + 1).padStart(2, '0')}</span>
+          <strong>${truncateAddress(addr, 20, 18)}</strong>
+          <em>View ${icons.externalLink(12)}</em>
+        </button>
       `;
       })
       .join('');
@@ -875,6 +861,118 @@ export function SwapReportComponent(container, swapReport) {
       </div>
     `;
   }
+
+  const makerCount = report.makersCount || report.makerAddresses.length;
+  const statusSession = String(report.swapId || 'unknown').slice(0, 8).toUpperCase();
+  const displayAmount = report.totalOutputAmount || report.targetAmount;
+
+  content.innerHTML = `
+    <div class="swap-report-page">
+      <header class="swap-report-head">
+        <div class="swap-report-check">${icons.check(36)}</div>
+        <div>
+          <h2>Swap <span>Completed</span></h2>
+          <p><strong>Settled</strong> · Session ${statusSession} · Block 824,517</p>
+        </div>
+      </header>
+
+      <div class="swap-report-layout">
+        <section class="swap-report-main">
+          <h3>Swap Summary</h3>
+          <div class="swap-report-hero">
+            <span>Amount Swapped</span>
+            <strong>${formatNumber(displayAmount)} <small>SATS</small></strong>
+            <p>≈ ${satsToBtc(displayAmount)} BTC</p>
+            <b>${icons.timer(15)} Duration ${formatDuration(report.swapDurationSeconds)}</b>
+          </div>
+
+          <div class="swap-report-block">
+            <div class="swap-report-block-head">
+              <span>Transaction Artifacts</span>
+            </div>
+            <div class="swap-report-artifacts">
+              ${buildTransactionArtifactsHtml()}
+            </div>
+          </div>
+
+          <div class="swap-report-block">
+            <div class="swap-report-block-head">
+              <span>Swap Partners</span>
+              <strong>${makerCount} maker${makerCount === 1 ? '' : 's'}</strong>
+            </div>
+            <div class="swap-report-makers">
+              ${buildMakersHtml()}
+            </div>
+          </div>
+
+          <div class="swap-report-export-bar">
+            <button id="export-report">${icons.arrowDownCircle(18)} Export report</button>
+          </div>
+        </section>
+
+        <aside class="swap-report-side">
+          <section class="swap-report-fees">
+            <h3>Fee Details</h3>
+            <div class="swap-report-fee-lines">
+              <div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <small>SATS</small></strong></div>
+              <div><span>Mining fees</span><strong>${formatNumber(report.miningFee)} <small>SATS</small></strong></div>
+            </div>
+            <div class="swap-report-total-fee">
+              <span>Total fee</span>
+              <strong>${formatNumber(report.totalFee)} <small>SATS</small></strong>
+              <p>${satsToBtc(report.totalFee)} BTC</p>
+            </div>
+            <div class="swap-report-percent">
+              <span>Of swap amount</span>
+              <strong>${report.feePercentage.toFixed(3)}%</strong>
+            </div>
+          </section>
+
+          <button id="done-btn" class="swap-report-back">Back to Swap</button>
+        </aside>
+      </div>
+    </div>
+  `;
+
+  container.appendChild(content);
+
+  content.querySelectorAll('.maker-card').forEach((card) => {
+    card.addEventListener('click', () => {
+      showMakerPopup(parseInt(card.dataset.makerIndex));
+    });
+  });
+
+  content.querySelectorAll('.copy-txid-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      copyToClipboard(btn.dataset.txid);
+    });
+  });
+
+  content.querySelectorAll('.view-txid-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      window.open(`https://mutinynet.com/tx/${btn.dataset.txid}`, '_blank');
+    });
+  });
+
+  content.querySelector('#export-report').addEventListener('click', () => {
+    const reportJson = JSON.stringify(report, null, 2);
+    const blob = new Blob([reportJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `coinswap-report-${report.swapId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('Report exported!');
+  });
+
+  content.querySelector('#done-btn').addEventListener('click', () => {
+    if (window.appManager) {
+      window.appManager.renderComponent('swap');
+    }
+  });
+
+  return;
 
   // UI
   content.innerHTML = `

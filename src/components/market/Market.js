@@ -146,19 +146,6 @@ export function Market(container) {
         })),
       ];
 
-      const hasCurrentStatus = makers.some(
-        (maker) => maker.status === currentMakerStatus
-      );
-      if (!hasCurrentStatus) {
-        currentMakerStatus = goodMakers.length
-          ? 'good'
-          : unresponsiveMakers.length
-            ? 'unresponsive'
-            : badMakers.length
-              ? 'bad'
-              : currentMakerStatus;
-      }
-
       isLoading = false;
       updateUI();
     } catch (error) {
@@ -570,7 +557,11 @@ export function Market(container) {
                 <button onclick="window.viewFidelityBond('${maker.address}')" class="market-bond" title="View fidelity bond">
                   ${maker.bond > 0 ? bond.toFixed(5) : 'N/A'} ${icons.externalLink(12)}
                 </button>
-                <button class="market-calc" disabled>Calculate</button>
+                ${
+                  maker.status === 'good'
+                    ? '<button class="market-calc" disabled>Calculate</button>'
+                    : '<div></div>'
+                }
                 <div class="market-actions">
                   <button data-maker-poll="${maker.address}" title="Re-poll this maker now">Poll</button>
                   <button data-maker-remove="${maker.address}" title="Remove this maker from the offerbook">Remove</button>

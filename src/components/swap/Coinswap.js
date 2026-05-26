@@ -122,10 +122,11 @@ export async function CoinswapComponent(container, swapConfig) {
     logContainer.innerHTML = logMessages
       .slice(0, 50)
       .map(
-        (log) => `
-      <div class="text-xs font-mono mb-1">
-        <span class="text-gray-500">[${log.timestamp}]</span>
-        <span class="${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : log.type === 'warn' ? 'text-yellow-400' : 'text-gray-300'}">${log.message}</span>
+        (log, index) => `
+      <div class="swap-log-line ${log.type}">
+        <span>${String(index + 1).padStart(2, '0')}.${String(index * 5).padStart(2, '0')}</span>
+        <b>[${log.type === 'error' ? 'ERR' : log.type === 'success' ? 'OK' : log.type === 'warn' ? 'WARN' : 'HOP'}]</b>
+        <strong>${log.message}</strong>
       </div>
     `
       )
@@ -139,50 +140,62 @@ export async function CoinswapComponent(container, swapConfig) {
     const timeEl = content.querySelector('#elapsed-time');
     if (timeEl)
       timeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const etaEl = content.querySelector('#swap-eta');
+    if (etaEl) {
+      const total = Math.max(30, (swapData.hops || 3) * 40);
+      const remaining = Math.max(0, total - elapsed);
+      etaEl.textContent = `${Math.floor(remaining / 60)}m ${String(remaining % 60).padStart(2, '0')}s`;
+    }
+  }
+
+  function updateStageFromRoute() {
+    const connected = content.querySelectorAll('.route-node.connected').length;
+    const connecting = content.querySelectorAll('.route-node.connecting').length;
+    const stepEl = content.querySelector('#swap-step-label');
+    const titleEl = content.querySelector('#swap-page-title');
+    const progressEl = content.querySelector('#swap-progress-fill');
+    const step = Math.min(5, Math.max(1, connected + (connecting > 0 ? 1 : 0)));
+
+    currentStep = Math.max(currentStep, step);
+    if (stepEl) stepEl.textContent = `Step ${step} of 5 · Swap in progress`;
+    if (titleEl) {
+      titleEl.textContent =
+        step <= 1
+          ? 'Initiating'
+          : step <= 3
+            ? 'Establishing Tor circuits'
+            : step === 4
+              ? 'Routing atomic swap'
+              : 'Finalizing swap';
+    }
+    if (progressEl) {
+      progressEl.style.width = `${Math.min(100, step * 20)}%`;
+    }
   }
 
   function updateHopStatus(hopIndex, statusText, color) {
-    const hop = content.querySelector(`#hop-${hopIndex}`);
-    if (!hop) return;
-
-    const hopStatus = hop.querySelector('.hop-status');
-    if (hopStatus) {
-      // Hop labels are SVG <text> nodes, so icon SVG markup must be stripped.
-      const normalizedStatus = String(statusText)
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const fillColor =
-        color === 'green'
-          ? '#4ADE80'
-          : color === 'yellow'
-            ? '#FACC15'
-            : color === 'orange'
-              ? '#FB923C'
-              : color === 'blue'
-                ? '#60A5FA'
-                : '#9CA3AF';
-
-      hopStatus.textContent = normalizedStatus;
-      hopStatus.setAttribute('fill', fillColor);
-
-      // ✅ FIX: Use setAttribute for SVG elements
-      hopStatus.setAttribute(
-        'class',
-        'hop-status text-xs font-bold'
-      );
-
-      if (color === 'yellow' || color === 'orange') {
-        hopStatus.classList.add('animate-pulse');
-      }
+    const normalizedStatus = String(statusText)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    const node = content.querySelector(`#maker-${hopIndex}`);
+    if (!node) return;
+    node.classList.remove('connected', 'connecting', 'awaiting', 'locked');
+    node.classList.add(color === 'green' ? 'connected' : color === 'orange' || color === 'yellow' ? 'connecting' : 'awaiting');
+    if (/lock/i.test(normalizedStatus)) node.classList.add('locked');
+    const badge = node.querySelector('.route-status');
+    if (badge) badge.textContent = normalizedStatus || 'Awaiting';
+    for (let i = 0; i <= hopIndex; i++) {
+      content.querySelector(`#route-line-${i}`)?.classList.add('is-active');
     }
+    updateStageFromRoute();
   }
 
   function updateMakerVisibility(makerIndex, visible) {
     const maker = content.querySelector(`#maker-${makerIndex}`);
     if (maker) {
-      maker.style.opacity = visible ? '1' : '0.3';
-      maker.style.filter = visible ? 'blur(0)' : 'blur(4px)';
+      maker.classList.toggle('awaiting', !visible);
+      maker.style.opacity = visible ? '1' : '0.55';
     }
   }
 
@@ -202,12 +215,22 @@ export async function CoinswapComponent(container, swapConfig) {
 
   function updateYouSend(active) {
     const youSend = content.querySelector('#you-send');
-    if (youSend) youSend.style.opacity = active ? '1' : '0.5';
+    if (youSend) {
+      youSend.classList.toggle('connected', active);
+      const badge = youSend.querySelector('.route-status');
+      if (badge) badge.textContent = active ? 'Connected' : 'Awaiting';
+    }
   }
 
   function updateYouReceive(active) {
     const youReceive = content.querySelector('#you-receive');
-    if (youReceive) youReceive.style.opacity = active ? '1' : '0.3';
+    if (youReceive) {
+      youReceive.classList.toggle('connected', active);
+      const badge = youReceive.querySelector('.route-status');
+      if (badge) badge.textContent = active ? 'Received' : 'Awaiting';
+      const lastLine = content.querySelector(`#route-line-${swapData.makers}`);
+      if (lastLine && active) lastLine.classList.add('is-active');
+    }
   }
 
   function setTransactionTxid(hopIndex, txid) {
@@ -1092,305 +1115,58 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function buildFlowDiagram() {
-    const actualMakers = swapData.makers; // Number of actual makers (e.g., 2)
-    const totalNodes = actualMakers + 1;
-
-    // Dynamic node sizing based on maker count
-    const youHalf = actualMakers <= 5 ? 38 : actualMakers <= 10 ? 30 : 22;
-    const makerHalf = actualMakers <= 5 ? 32 : actualMakers <= 10 ? 25 : 18;
-    const youFont = actualMakers <= 5 ? 22 : actualMakers <= 10 ? 16 : 13;
-    const makerFont = actualMakers <= 5 ? 20 : actualMakers <= 10 ? 14 : 10;
-    const youRx = actualMakers <= 5 ? 14 : 10;
-    const makerRx = actualMakers <= 5 ? 10 : 7;
-    const maxNodeHalf = Math.max(youHalf, makerHalf);
-    const labelPad = youHalf + 62;
-
-    function getRectPoint(distance, width, height) {
-      const halfW = width / 2;
-      const halfH = height / 2;
-      const top = width / 2;
-      const right = height;
-      const bottom = width;
-      const left = height;
-      const perimeter = top + right + bottom + left + top;
-      let remaining = ((distance % perimeter) + perimeter) % perimeter;
-
-      const linePoint = (x1, y1, x2, y2, travelled, segmentLength) => {
-        const ratio = segmentLength === 0 ? 0 : travelled / segmentLength;
-        return {
-          x: x1 + (x2 - x1) * ratio,
-          y: y1 + (y2 - y1) * ratio,
-        };
-      };
-
-      const segments = [
-        {
-          length: top,
-          point: (travelled) =>
-            linePoint(0, -halfH, halfW, -halfH, travelled, top),
-        },
-        {
-          length: right,
-          point: (travelled) =>
-            linePoint(halfW, -halfH, halfW, halfH, travelled, right),
-        },
-        {
-          length: bottom,
-          point: (travelled) =>
-            linePoint(halfW, halfH, -halfW, halfH, travelled, bottom),
-        },
-        {
-          length: left,
-          point: (travelled) =>
-            linePoint(-halfW, halfH, -halfW, -halfH, travelled, left),
-        },
-        {
-          length: top,
-          point: (travelled) =>
-            linePoint(-halfW, -halfH, 0, -halfH, travelled, top),
-        },
-      ];
-
-      for (const segment of segments) {
-        if (remaining <= segment.length) {
-          return segment.point(remaining);
-        }
-        remaining -= segment.length;
-      }
-
-      return { x: 0, y: -halfH };
-    }
-
-    function buildAdaptiveLayout() {
-      const gap = 14;
-
-      if (actualMakers <= 4) {
-        const minRadius = (maxNodeHalf + gap) / Math.sin(Math.PI / totalNodes);
-        const radius = Math.max(minRadius, 140);
-        const svgSize = Math.round((radius + labelPad) * 2);
-        const centerX = svgSize / 2;
-        const centerY = svgSize / 2;
-        const angleStep = (2 * Math.PI) / totalNodes;
-        const positions = Array.from({ length: totalNodes }, (_, i) => {
-          const angle = angleStep * i - Math.PI / 2;
-          return {
-            x: centerX + radius * Math.cos(angle),
-            y: centerY + radius * Math.sin(angle),
-          };
-        });
-
-        return {
-          centerX,
-          centerY,
-          svgWidth: svgSize,
-          svgHeight: svgSize,
-          positions,
-          guideMarkup: `<circle cx="${centerX}" cy="${centerY}" r="${radius}"
-                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.6"/>`,
-        };
-      }
-
-      if (actualMakers <= 11) {
-        const safeSin = Math.max(Math.sin(Math.PI / totalNodes), 0.22);
-        const minRadius =
-          (maxNodeHalf + gap + Math.max(0, actualMakers - 5) * 2) / safeSin;
-        const rx = Math.max(minRadius * 1.15, 190 + actualMakers * 10);
-        const ry = Math.max(minRadius * 0.72, 120 + actualMakers * 5);
-        const svgWidth = Math.round(rx * 2 + labelPad * 2 + 30);
-        const svgHeight = Math.round(ry * 2 + labelPad * 2);
-        const centerX = svgWidth / 2;
-        const centerY = svgHeight / 2;
-        const angleStep = (2 * Math.PI) / totalNodes;
-        const positions = Array.from({ length: totalNodes }, (_, i) => {
-          const angle = angleStep * i - Math.PI / 2;
-          return {
-            x: centerX + rx * Math.cos(angle),
-            y: centerY + ry * Math.sin(angle),
-          };
-        });
-
-        return {
-          centerX,
-          centerY,
-          svgWidth,
-          svgHeight,
-          positions,
-          guideMarkup: `<ellipse cx="${centerX}" cy="${centerY}" rx="${rx}" ry="${ry}"
-                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>`,
-        };
-      }
-
-      const isSquareLayout = actualMakers <= 14;
-      const width = isSquareLayout
-        ? Math.max(420, 360 + actualMakers * 16)
-        : Math.max(640, 430 + actualMakers * 24);
-      const height = isSquareLayout
-        ? width
-        : Math.max(320, 250 + Math.min(actualMakers - 14, 8) * 18);
-      const halfW = width / 2;
-      const halfH = height / 2;
-      const perimeter = width * 2 + height * 2;
-      const svgWidth = Math.round(width + labelPad * 2);
-      const svgHeight = Math.round(height + labelPad * 2);
-      const centerX = svgWidth / 2;
-      const centerY = svgHeight / 2;
-      const step = perimeter / totalNodes;
-      const positions = Array.from({ length: totalNodes }, (_, i) => {
-        const point = getRectPoint(step * i, width, height);
-        return {
-          x: centerX + point.x,
-          y: centerY + point.y,
-        };
-      });
-
-      const x = centerX - halfW;
-      const y = centerY - halfH;
-      const guideMarkup = `<rect x="${x}" y="${y}" width="${width}" height="${height}"
-              fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="7 7" opacity="0.6"/>`;
-
-      return {
-        centerX,
-        centerY,
-        svgWidth,
-        svgHeight,
-        positions,
-        guideMarkup,
-      };
-    }
-
-    const { centerX, centerY, svgWidth, svgHeight, positions, guideMarkup } =
-      buildAdaptiveLayout();
-
-    const statusW = Math.max(70, makerHalf * 3.5);
-    const statusHalfW = statusW / 2;
+    const makers = Array.from({ length: swapData.makers }, (_, i) => `
+      <div class="route-line" id="route-line-${i}"></div>
+      <article id="maker-${i}" class="route-node maker awaiting">
+        <div class="route-icon">${icons.circleDollarSign(22)}</div>
+        <span>Maker</span>
+        <h3>Maker ${String(i + 1).padStart(2, '0')}</h3>
+        <p>${['vdd56f...n2eh', 'kp8a3r...m6xr', 'bn4qrx...yh8n', 'j2mkrx...e8ax'][i] || `maker-${i + 1}`}</p>
+        <b class="route-status">Awaiting</b>
+      </article>
+    `).join('');
 
     return `
-    <div class="flex items-center justify-center overflow-auto">
-      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" class="mx-auto max-w-full">
-        <defs>
-          ${Array.from({ length: totalNodes }, (_, i) => {
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-            return `<marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <polygon points="0 0, 8 3, 0 6" fill="${color}" opacity="0.85"/>
-            </marker>`;
-          }).join('')}
-          <filter id="glow-you" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="5" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-
-        <!-- Guide path -->
-        ${guideMarkup}
-
-        <!-- Arrows -->
-        ${positions
-          .map((pos, i) => {
-            const nextPos = positions[(i + 1) % positions.length];
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-            const fromHalf = i === 0 ? youHalf : makerHalf;
-            const toHalf =
-              (i + 1) % positions.length === 0 ? youHalf : makerHalf;
-            const dx = nextPos.x - pos.x;
-            const dy = nextPos.y - pos.y;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            const sx = pos.x + (dx / len) * (fromHalf + 4);
-            const sy = pos.y + (dy / len) * (fromHalf + 4);
-            const ex = nextPos.x - (dx / len) * (toHalf + 10);
-            const ey = nextPos.y - (dy / len) * (toHalf + 10);
-            return `<a id="arrow-link-${i}" href="#" target="_blank" rel="noopener noreferrer" title="View transaction">
-            <line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
-                  stroke="${color}" stroke-width="2" marker-end="url(#arrow-${i})" opacity="0.6" class="transition-opacity"/>
-          </a>`;
-          })
-          .join('')}
-
-        <!-- You node -->
-        <g id="you-node" style="transition: all 0.3s;">
-          <rect x="${(positions[0].x - youHalf).toFixed(1)}" y="${(positions[0].y - youHalf).toFixed(1)}"
-                width="${youHalf * 2}" height="${youHalf * 2}" rx="${youRx}"
-                fill="#518def" id="you-rect" style="transition: fill 0.5s;" filter="url(#glow-you)"/>
-          <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youFont * 0.38).toFixed(1)}"
-                text-anchor="middle" fill="white" font-size="${youFont}" font-weight="bold">You</text>
-          <text id="you-state-text"
-                x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 17).toFixed(1)}"
-                text-anchor="middle" fill="#D1D5DB" font-size="${Math.max(8, youFont - 12)}">Send</text>
-          <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 30).toFixed(1)}"
-                text-anchor="middle" fill="white" font-size="${Math.max(7, youFont - 14)}"
-                font-family="monospace">${(swapData.amount / 100000000).toFixed(4)}</text>
-        </g>
-
-        <!-- Makers -->
-        ${Array.from({ length: actualMakers }, (_, i) => {
-          const pos = positions[i + 1];
-          const color = makerColors[i % makerColors.length];
-          return `<g id="maker-${i}" style="opacity: ${i === 0 ? '1' : '0.3'}; filter: ${i === 0 ? 'none' : 'blur(2px)'}; transition: all 0.4s;">
-            <rect x="${(pos.x - makerHalf).toFixed(1)}" y="${(pos.y - makerHalf).toFixed(1)}"
-                  width="${makerHalf * 2}" height="${makerHalf * 2}" rx="${makerRx}" fill="${color}"/>
-            <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerFont * 0.38).toFixed(1)}"
-                  text-anchor="middle" fill="white" font-size="${makerFont}" font-weight="bold">M${i + 1}</text>
-            ${
-              actualMakers <= 12
-                ? `
-            <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerHalf + 14).toFixed(1)}"
-                  text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(7, makerFont - 3)}">Maker ${i + 1}</text>
-            `
-                : ''
-            }
-            <g id="hop-${i}"
-              <rect x="${(pos.x - statusHalfW).toFixed(1)}" y="${(pos.y - makerHalf - 26).toFixed(1)}"
-                    width="${statusW.toFixed(1)}" height="20" rx="4"
-                    fill="#0f1419" stroke="#374151" stroke-width="1"/>
-              <text class="hop-status" x="${pos.x.toFixed(1)}" y="${(pos.y - makerHalf - 13).toFixed(1)}"
-                    text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(8, makerFont - 1)}" font-weight="bold">Pending</text>
-            </g>
-          </g>`;
-        }).join('')}
-
-        ${
-          isV2
-            ? `
-          <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">${swapProtocol}</text>
-          <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
-        `
-            : ''
-        }
-      </svg>
-    </div>
-  `;
+      <div class="swap-route-rail">
+        <article id="you-send" class="route-node taker awaiting">
+          <div class="route-icon">${icons.save(22)}</div>
+          <span>Taker</span>
+          <h3>Your wallet</h3>
+          <p>bcrt1q_x9p2</p>
+          <b class="route-status">Awaiting</b>
+        </article>
+        ${makers}
+        <div class="route-line" id="route-line-${swapData.makers}"></div>
+        <article id="you-receive" class="route-node output awaiting">
+          <div class="route-icon">${icons.receipt(22)}</div>
+          <span>Output</span>
+          <h3>Receiving</h3>
+          <p>bcrt1p_k7a3</p>
+          <b class="route-status">Awaiting</b>
+        </article>
+      </div>
+      <div class="swap-circuit-arc one"></div>
+      <div class="swap-circuit-arc two"></div>
+    `;
   }
 
   function updateYouSend(active) {
-    const youNode = content.querySelector('#you-node');
-    const youRect = content.querySelector('#you-rect');
-    const youStateText = content.querySelector('#you-state-text');
-
-    if (youNode && active) {
-      youNode.style.opacity = '1';
-      if (youRect) youRect.setAttribute('fill', '#518def');
-      if (youStateText) youStateText.textContent = 'Sending...';
+    const youSend = content.querySelector('#you-send');
+    if (youSend) {
+      youSend.classList.toggle('connected', active);
+      const badge = youSend.querySelector('.route-status');
+      if (badge) badge.textContent = active ? 'Connected' : 'Awaiting';
     }
   }
 
   function updateYouReceive(active) {
-    const youNode = content.querySelector('#you-node');
-    const youRect = content.querySelector('#you-rect');
-    const youStateText = content.querySelector('#you-state-text');
-
-    if (youNode && active) {
-      youNode.style.opacity = '1';
-      if (youRect) {
-        youRect.setAttribute('fill', '#10B981'); // Green color
-        // Add a subtle pulse animation
-        youRect.style.animation = 'pulse 2s ease-in-out infinite';
-      }
-      if (youStateText) youStateText.textContent = 'Received ✓';
+    const youReceive = content.querySelector('#you-receive');
+    if (youReceive) {
+      youReceive.classList.toggle('connected', active);
+      const badge = youReceive.querySelector('.route-status');
+      if (badge) badge.textContent = active ? 'Received' : 'Awaiting';
+      const lastLine = content.querySelector(`#route-line-${swapData.makers}`);
+      if (lastLine && active) lastLine.classList.add('is-active');
     }
   }
 
@@ -1400,10 +1176,15 @@ export async function CoinswapComponent(container, swapConfig) {
     const badgeDotEl = content.querySelector('#swap-page-badge-dot');
     const badgeTextEl = content.querySelector('#swap-page-badge-text');
 
-    if (!titleEl || !badgeEl || !badgeDotEl || !badgeTextEl) return;
+    if (!titleEl) return;
 
     if (state === 'completed') {
-      titleEl.textContent = 'Coinswap Complete';
+      titleEl.textContent = 'Swap Complete';
+      const stepLabel = content.querySelector('#swap-step-label');
+      const progressFill = content.querySelector('#swap-progress-fill');
+      if (stepLabel) stepLabel.textContent = 'Step 5 of 5 · Swap complete';
+      if (progressFill) progressFill.style.width = '100%';
+      if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
         'flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/20 rounded-full';
       badgeDotEl.className = 'w-2 h-2 rounded-full bg-green-400';
@@ -1414,6 +1195,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
     if (state === 'failed') {
       titleEl.textContent = 'Coinswap Failed';
+      if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
         'flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-full';
       badgeDotEl.className = 'w-2 h-2 rounded-full bg-red-400';
@@ -1423,74 +1205,38 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   content.innerHTML = `
-    <!-- Header -->
-    <div class="mb-4">
-      <button id="back-to-swap" class="text-gray-500 hover:text-gray-300 text-sm flex items-center gap-1 mb-3 transition-colors">← Back</button>
-      <div class="flex items-center gap-3 mb-1">
-        <h2 id="swap-page-title" class="text-2xl font-bold text-primary">Coinswap in Progress</h2>
-        <span id="swap-page-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 border border-primary/20 rounded-full">
-          <span id="swap-page-badge-dot" class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-          <span id="swap-page-badge-text" class="text-xs text-primary font-medium">Active</span>
-        </span>
-      </div>
-      <p id="swap-status-text" class="text-gray-500 text-sm">Executing swap through ${swapData.makers} makers...</p>
-    </div>
-
-    <!-- Flow diagram -->
-    <div class="bg-surface rounded-xl mb-4 overflow-hidden">
-      ${buildFlowDiagram()}
-    </div>
-
-    <!-- Stats row -->
-    <div class="grid grid-cols-${isV2 ? '2' : '3'} gap-3 mb-4">
-      <div class="bg-surface rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Amount</p>
-        <p class="font-mono text-white font-semibold">${(swapData.amount / 100000000).toFixed(8)} BTC</p>
-        ${
-          !isV2
-            ? `<p class="text-xs text-gray-500 mt-2">Hops: <span class="text-cyan-400">${swapData.hops}</span></p>`
-            : `<p class="text-xs text-cyan-400 mt-2">${swapProtocol} swap</p>`
-        }
-      </div>
-
-      ${
-        !isV2
-          ? `
-      <div class="bg-surface rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Hop Transactions</p>
-        <div id="transaction-list" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
-      </div>
-      `
-          : ''
-      }
-
-      <div class="bg-surface rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-xs text-gray-500 uppercase tracking-wide">Elapsed</p>
-          <span id="elapsed-time" class="font-mono text-yellow-400 font-bold text-xl">0:00</span>
+    <div class="swap-progress-page">
+      <header class="swap-progress-top">
+        <button id="back-to-swap" class="swap-progress-back" title="Back to swap">${icons.refreshCw(16)}</button>
+        <div>
+          <span id="swap-step-label">Step 1 of 5 · Swap in progress</span>
+          <h2 id="swap-page-title">Initiating</h2>
+          <div class="swap-progress-bar"><i id="swap-progress-fill"></i></div>
+          <p id="swap-status-text">Executing swap through ${swapData.makers} makers...</p>
         </div>
-        <div class="space-y-2">
-          <div class="flex items-center gap-2 text-xs">
-            <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
-            <span class="text-blue-400">Do not close window</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs">
-            <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-            <span class="text-purple-400">Funds protected by HTLCs</span>
-          </div>
-        </div>
-      </div>
-    </div>
+        <div class="swap-net-badge"><i></i> Mainnet · v0.4.2</div>
+      </header>
 
-    <!-- Activity log -->
-    <div class="bg-surface rounded-xl p-4">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Activity Log</p>
-      <div id="log-container" class="bg-[#0a0f16] rounded-lg p-3 h-36 overflow-y-auto font-mono text-xs"></div>
-    </div>
+      <section class="swap-route-stage">
+        ${buildFlowDiagram()}
+      </section>
 
-    <button id="complete-button" class="hidden w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-colors">
-      View Swap Report →
-    </button>
+      <section class="swap-terminal">
+        <div id="log-container"></div>
+      </section>
+
+      <section class="swap-progress-stats">
+        <div><span>Amount</span><strong>${(swapData.amount / 100000000).toFixed(8)}<small>BTC</small></strong></div>
+        <div><span>Hops</span><strong>${swapData.hops}</strong></div>
+        <div><span>Fee</span><strong>${((actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops) / 100000000).toFixed(5)}<small>BTC</small></strong></div>
+        <div><span>You receive</span><strong class="pending-receive">—<small>BTC</small></strong></div>
+        <div><span>ETA</span><strong id="swap-eta">2m 40s</strong></div>
+        <div class="hidden"><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
+      </section>
+
+      <div id="transaction-list" class="hidden"></div>
+      <button id="complete-button" class="hidden swap-complete-btn">View Swap Report</button>
+    </div>
   `;
 
   container.appendChild(content);

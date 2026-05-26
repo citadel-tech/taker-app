@@ -393,38 +393,24 @@ export async function SwapComponent(container) {
 
     if (availableUtxos.length === 0) {
       utxoListContainer.innerHTML =
-        '<p class="text-gray-400 text-center py-4">No UTXOs available</p>';
+        '<p class="swap-empty-row">No UTXOs available</p>';
       return;
     }
 
     utxoListContainer.innerHTML = availableUtxos
       .map((utxo, index) => {
-        const btcAmount = (utxo.amount / 100000000).toFixed(8);
-        const usdAmount = ((utxo.amount / 100000000) * btcPrice).toFixed(2);
-        const timestamps = [
-          '2 hours ago',
-          '1 day ago',
-          '3 days ago',
-          '1 week ago',
-        ];
-        const timestamp = timestamps[index] || '1 month ago';
+        const typeLabel = utxo.type.includes('Taproot')
+          ? 'Taproot'
+          : utxo.type.includes('Swap')
+            ? 'Swap'
+            : 'Segwit';
 
         return `
-        <label class="flex items-center gap-3 bg-app-bg hover:bg-secondary rounded-lg p-3 cursor-pointer transition-colors">
-          <input type="checkbox" id="utxo-${index}" class="w-4 h-4 accent-primary" />
-          <div class="flex-1">
-            <div class="flex justify-between items-center">
-              <span class="font-mono text-sm text-gray-300">${utxo.txid.substring(0, 12)}...${utxo.txid.substring(utxo.txid.length - 4)}:${utxo.vout}</span>
-              <div class="text-right">
-                <div class="text-sm font-mono text-green-400">${btcAmount} BTC</div>
-                <div class="text-xs text-gray-500">${usdAmount} USD</div>
-              </div>
-            </div>
-            <div class="flex justify-between items-center mt-1">
-              <span class="text-xs text-gray-500">${timestamp}</span>
-              <span class="text-xs ${utxo.type.includes('Swap') ? 'text-blue-400' : 'text-green-400'}">${utxo.type}</span>
-            </div>
-          </div>
+        <label class="swap-pick-row">
+          <input type="checkbox" id="utxo-${index}" />
+          <span class="swap-row-id">${utxo.txid.substring(0, 8)}...${utxo.txid.substring(utxo.txid.length - 6)}</span>
+          <span class="swap-pill ${typeLabel.toLowerCase()}">${typeLabel}</span>
+          <strong>${utxo.amount.toLocaleString()}<small>SATS</small></strong>
         </label>
       `;
       })
@@ -451,24 +437,18 @@ export async function SwapComponent(container) {
 
     if (availableMakers.length === 0) {
       makerListContainer.innerHTML =
-        '<p class="text-gray-400 text-center py-4">No makers available</p>';
+        '<p class="swap-empty-row">No makers available</p>';
       return;
     }
 
     makerListContainer.innerHTML = availableMakers
       .map((maker, index) => {
         return `
-        <label class="flex items-center gap-3 bg-app-bg hover:bg-secondary rounded-lg p-3 cursor-pointer transition-colors">
-          <input type="checkbox" id="maker-addr-${index}" class="w-4 h-4 accent-primary" />
-          <div class="flex-1">
-            <div class="flex justify-between items-center">
-              <span class="font-mono text-sm text-gray-300">${escapeHtml(formatTorEndpoint(maker.address))}</span>
-            </div>
-            <div class="flex justify-between items-center mt-1">
-              <span class="text-xs text-gray-500">${escapeHtml(maker.baseFee)} sats + ${escapeHtml(maker.volumeFeePct.toFixed(3))}%</span>
-              <span class="text-xs text-gray-500">${escapeHtml(maker.minSize.toLocaleString())} – ${escapeHtml(maker.maxSize.toLocaleString())} sats</span>
-            </div>
-          </div>
+        <label class="swap-pick-row">
+          <input type="checkbox" id="maker-addr-${index}" />
+          <span class="swap-row-id">${escapeHtml(formatTorEndpoint(maker.address, 8, 13))}</span>
+          <span class="swap-maker-fee">Fee ${escapeHtml(maker.volumeFeePct.toFixed(3))}</span>
+          <strong>${escapeHtml(((maker.maxSize || 0) / 100000000).toFixed(3))}<small>BOND</small></strong>
         </label>
       `;
       })
@@ -615,9 +595,7 @@ export async function SwapComponent(container) {
   }
 
   function getBlockIntervalSeconds() {
-    if (currentNetwork === 'mainnet' || currentNetwork === 'bitcoin') return 600;
-    if (currentNetwork === 'regtest') return 0;
-    return 30;
+    return 600;
   }
 
   function formatEstimatedTime(seconds) {
@@ -690,10 +668,10 @@ export async function SwapComponent(container) {
     } else if (selectionMode === 'auto') {
       // In auto mode, read from input
       const input = content.querySelector('#swap-amount-input');
-      const value = parseFloat(input?.value) || 0;
+      const value = parseFloat(String(input?.value || '').replace(/,/g, '')) || 0;
 
       if (amountUnit === 'sats') {
-        swapAmount = value;
+        swapAmount = Math.floor(value);
       } else if (amountUnit === 'btc') {
         swapAmount = Math.floor(value * 100000000);
       } else if (amountUnit === 'usd') {
@@ -730,14 +708,23 @@ export async function SwapComponent(container) {
       if (selectionMode === 'manual' && selectedUtxos.length > 0) {
         selectedUtxosDisplay.textContent =
           selectedTotal.toLocaleString() + ' sats';
-        selectedUtxosDisplay.parentElement.classList.remove('hidden');
       } else {
-        selectedUtxosDisplay.parentElement.classList.add('hidden');
+        selectedUtxosDisplay.textContent =
+          `${selectedUtxos.length || getNumberOfHops()} UTXOs · ${Math.max(selectedTotal, swapAmount).toLocaleString()} sats`;
       }
+    }
+    const utxoPickerTotal = content.querySelector('#utxo-picker-total');
+    if (utxoPickerTotal) {
+      utxoPickerTotal.textContent = `${selectedTotal.toLocaleString()} sats`;
     }
 
     content.querySelector('#num-makers-display').textContent =
       details.makers + ' maker' + (details.makers !== 1 ? 's' : '');
+    const makerCountSummary = content.querySelector('#maker-count-summary');
+    if (makerCountSummary) {
+      makerCountSummary.textContent =
+        `${makerSelectionMode === 'manual' ? selectedMakerAddresses.length : details.makers} selected`;
+    }
     content.querySelector('#num-hops-display').textContent =
       details.hops + ' hop' + (details.hops !== 1 ? 's' : '');
     content.querySelector('#estimated-time').textContent =
@@ -889,11 +876,8 @@ export async function SwapComponent(container) {
     amountUnit = unit;
 
     content.querySelectorAll('.unit-btn').forEach((btn) => {
-      btn.className =
-        'unit-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors';
+      btn.classList.toggle('is-active', btn.id === 'unit-' + unit);
     });
-    content.querySelector('#unit-' + unit).className =
-      'unit-btn bg-primary text-white px-3 py-1 rounded text-xs font-semibold text-lg';
 
     const input = content.querySelector('#swap-amount-input');
     if (unit === 'sats') input.placeholder = '0';
@@ -913,19 +897,16 @@ export async function SwapComponent(container) {
 
     // Update button styles
     content.querySelectorAll('.hop-count-btn').forEach((btn) => {
-      btn.className =
-        'hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+      btn.classList.remove('is-active');
     });
 
     if (useCustomHops) {
-      content.querySelector('#hop-custom').className =
-        'hop-count-btn bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
+      content.querySelector('#hop-custom').classList.add('is-active');
       content
         .querySelector('#custom-hop-input-container')
         .classList.remove('hidden');
     } else {
-      content.querySelector('#hop-' + count).className =
-        'hop-count-btn bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
+      content.querySelector('#hop-' + count)?.classList.add('is-active');
       content
         .querySelector('#custom-hop-input-container')
         .classList.add('hidden');
@@ -938,22 +919,8 @@ export async function SwapComponent(container) {
     selectionMode = mode;
 
     content.querySelectorAll('.mode-btn').forEach((btn) => {
-      btn.className =
-        'mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+      btn.classList.toggle('is-active', btn.id === 'mode-' + mode);
     });
-    content.querySelector('#mode-' + mode).className =
-      'mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
-
-    const amountInputSection = content.querySelector('#amount-input-section');
-    const utxoSection = content.querySelector('#utxo-selection-section');
-
-    if (mode === 'manual') {
-      amountInputSection.classList.add('hidden');
-      utxoSection.classList.remove('hidden');
-    } else {
-      amountInputSection.classList.remove('hidden');
-      utxoSection.classList.add('hidden');
-    }
 
     updateSummary();
   }
@@ -962,20 +929,8 @@ export async function SwapComponent(container) {
     makerSelectionMode = mode;
 
     content.querySelectorAll('.maker-mode-btn').forEach((btn) => {
-      btn.className =
-        'maker-mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors';
+      btn.classList.toggle('is-active', btn.id === 'maker-mode-' + mode);
     });
-    content.querySelector('#maker-mode-' + mode).className =
-      'maker-mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg';
-
-    const makerSelectionSection = content.querySelector('#maker-selection-section');
-    if (makerSelectionSection) {
-      if (mode === 'manual') {
-        makerSelectionSection.classList.remove('hidden');
-      } else {
-        makerSelectionSection.classList.add('hidden');
-      }
-    }
 
     updateSummary();
   }
@@ -1091,252 +1046,159 @@ export async function SwapComponent(container) {
 
   // UI - Render the HTML template
   content.innerHTML = `
-    <h2 class="text-3xl font-bold text-primary mb-2">Coinswap</h2>
-    <p class="text-gray-400 mb-8">Perform private Bitcoin swaps through multiple makers</p>
+    <div class="swap-config-page">
+      <header class="swap-config-head">
+        <h2>Initiate Swap</h2>
+        <p>Route a private Bitcoin swap through multiple makers over Tor.</p>
+      </header>
 
-    <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
-      <div class="flex items-start gap-3">
-        <span class="text-2xl text-yellow-400">⚠</span>
-        <p class="text-sm text-yellow-300">
-          Warning: If swap with only one maker, the maker can deanonymize you. Recommended minimum hop = 2.
-        </p>
-      </div>
-    </div>
-
-    <div class="grid grid-cols-3 gap-6">
-      <div class="col-span-2 space-y-6">
-        <!-- Swap Form -->
-        <div class="bg-surface rounded-lg p-6">
-          <h3 class="text-xl font-semibold text-lg text-gray-300 mb-6">Initiate Swap</h3>
-
-          <!-- Select UTXOs -->
-          <div class="mb-6">
-            <label class="block text-sm text-gray-400 mb-2">Select UTXOs</label>
-            <div class="flex gap-2">
-              <button id="mode-auto" class="mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
-                Auto Select UTXOs
-              </button>
-              <button id="mode-manual" class="mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
-                Manual Select UTXOs
-              </button>
+      <div class="swap-config-layout">
+        <section class="swap-config-card">
+          <div class="swap-section">
+            <div class="swap-section-head">
+              <h3>Amount To Swap</h3>
             </div>
-          </div>
-
-          <!-- Amount to Swap (Only in Auto mode) -->
-          <div id="amount-input-section" class="mb-6">
-            <div class="flex justify-between items-center mb-2">
-              <label class="block text-sm text-gray-400">Amount to Swap</label>
-              <div class="flex gap-2">
-                <button id="unit-sats" class="unit-btn bg-primary text-white px-3 py-1 rounded text-xs font-semibold text-lg">
-                  Sats
-                </button>
-                <button id="unit-btc" class="unit-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors">
-                  BTC
-                </button>
-                <button id="unit-usd" class="unit-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-3 py-1 rounded text-xs font-semibold text-lg transition-colors">
-                  USD
-                </button>
-              </div>
-            </div>
-            <div class="relative">
-              <input 
-                id="swap-amount-input"
-                type="text" 
-                placeholder="0" 
-                class="w-full bg-app-bg border border-gray-700 rounded-lg px-4 py-3 pr-20 text-white font-mono text-lg focus:outline-none focus:border-primary transition-colors"
-              />
-              <button id="max-swap-btn" class="absolute right-2 top-1/2 -translate-y-1/2 bg-primary hover:bg-primary-hover text-white px-4 py-1 rounded text-sm font-semibold text-lg transition-colors">
-                Max
-              </button>
-            </div>
-<p id="amount-input-conversions" class="text-xs text-gray-400 mt-2">≈ 0.00000000 BTC • $0.00 USD</p>
-            <p class="text-xs text-gray-500 mt-1">Max swappable: <span id="max-swappable-amount" class="text-primary font-semibold">0 sats</span></p>
-          </div>
-
-          <!-- UTXO Selection (Only in Manual mode) -->
-          <div id="utxo-selection-section" class="mb-6 hidden">
-            <div class="flex justify-between items-center mb-4">
-              <label class="block text-sm text-gray-400">Select UTXOs</label>
-              <span class="text-sm text-gray-400">Selected: <span id="selected-utxos-count">0</span></span>
-            </div>
-            
-            <!-- Warning Message -->
-            <div id="utxo-warning" class="hidden mb-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <p class="text-xs text-yellow-400">
-                ⚠ Warning: Mixing Regular and Swap UTXOs in the same transaction can compromise privacy. Use only one type per swap.
-              </p>
-            </div>
-            
-            <div id="utxo-list" class="space-y-2 max-h-60 overflow-y-auto">
-              <p class="text-gray-400 text-center py-4">Loading UTXOs...</p>
-            </div>
-
-          </div>
-
-          <!-- Number of Hops -->
-          <div class="mb-6">
-            <div class="flex justify-between items-center mb-2">
-              <label class="block text-sm text-gray-400">Number of Hops</label>
-              <span class="text-xs text-white font-bold text-2xl">Available Makers: <span id="available-makers-count" class="text-primary">${availableMakers.length}</span></span>
-            </div>
-            <div class="grid grid-cols-4 gap-2">
-              <button id="hop-3" class="hop-count-btn bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
-                <div>3 hops</div>
-                <div class="text-xs text-white/80 mt-1">2 makers</div>
-              </button>
-              <button id="hop-4" class="hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
-                <div>4 hops</div>
-                <div class="text-xs text-gray-400 mt-1">3 makers</div>
-              </button>
-              <button id="hop-5" class="hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
-                <div>5 hops</div>
-                <div class="text-xs text-gray-400 mt-1">4 makers</div>
-              </button>
-              <button id="hop-custom" class="hop-count-btn bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
-                <div>Custom</div>
-                <div class="text-xs text-gray-400 mt-1">6+ hops</div>
-              </button>
-            </div>
-            
-            <!-- Custom hop input -->
-            <div id="custom-hop-input-container" class="hidden mt-3">
-              <div class="flex items-center gap-4">
-                <input 
-                  id="custom-hop-input"
-                  type="number" 
-                  min="2" 
-                  max="20"
-                  value="6"
-                  class="w-24 bg-app-bg border border-gray-700 rounded-lg px-4 py-2 text-white font-mono focus:outline-none focus:border-primary transition-colors"
-                />
-                <span class="text-gray-400">hops = <span id="custom-makers-display" class="text-cyan-400 font-semibold text-lg">5</span> makers</span>
-              </div>
-            </div>
-
-            <p class="text-xs text-gray-500 mt-2">More hops = better privacy, higher fees</p>
-          </div>
-
-          <!-- Maker Selection Mode -->
-          <div class="mb-6">
-            <label class="block text-sm text-gray-400 mb-2">Select Makers</label>
-            <div class="flex gap-2">
-              <button id="maker-mode-auto" class="maker-mode-btn flex-1 bg-primary border-2 border-primary rounded-lg py-3 text-white font-semibold text-lg">
-                Auto Select Makers
-              </button>
-              <button id="maker-mode-manual" class="maker-mode-btn flex-1 bg-app-bg hover:bg-secondary border border-gray-700 rounded-lg py-3 text-white font-semibold text-lg transition-colors">
-                Manual Select Makers
-              </button>
-            </div>
-          </div>
-
-          <!-- Maker List (Only in Manual mode) -->
-          <div id="maker-selection-section" class="mb-6 hidden">
-            <div class="flex justify-between items-center mb-4">
-              <label class="block text-sm text-gray-400">Select Makers</label>
-              <span class="text-sm text-gray-400">Selected: <span id="selected-makers-count">0</span> / <span id="required-makers-count">2</span> needed</span>
-            </div>
-            <div id="maker-list" class="space-y-2 max-h-72 overflow-y-auto">
-              <p class="text-gray-400 text-center py-4">Loading makers...</p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Validation Warning -->
-        <div id="validation-warning" class="hidden p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg space-y-1">
-        </div>
-
-        <!-- Start Swap Button -->
-        <button id="start-coinswap-btn" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-lg transition-colors text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-          Start Coinswap
-        </button>
-      </div>
-
-      <!-- Right: Summary -->
-      <div class="col-span-1">
-        <div class="bg-surface rounded-lg p-6 top-8">
-          <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Swap Summary</h3>
-          
-          <div class="space-y-4">
-            <div>
-              <p class="text-sm text-gray-400 mb-1">Swappable Balance</p>
-              <p id="available-balance-sats" class="text-xl font-mono text-green-400">0 sats</p>
-              <p id="available-balance-btc" class="text-xs text-gray-500">0.00000000 BTC</p>
-            </div>
-
-            <!-- Selected UTXOs Total (Manual Mode) -->
-            <div class="hidden border-t border-gray-700 pt-4">
-              <p class="text-sm text-gray-400 mb-1">Selected UTXOs</p>
-              <p id="selected-utxos-total" class="text-lg font-mono text-blue-400">0 sats</p>
-            </div>
-
-            <div class="border-t border-gray-700 pt-4">
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Swap Amount</span>
-                <span id="swap-amount-display" class="text-sm font-mono text-white">0 sats</span>
-              </div>
-              <p id="swap-amount-conversions" class="text-xs text-gray-500 text-right mb-3">≈ 0.00000000 BTC • $0.00 USD</p>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Makers</span>
-                <span id="num-makers-display" class="text-sm text-white">2 makers</span>
-              </div>
-              <div class="flex justify-between mb-2 gap-3">
-                <span id="makers-label" class="text-sm text-gray-400">Top Maker Candidates</span>
-                <span id="selected-makers-display" class="text-sm text-cyan-400 text-right whitespace-nowrap overflow-hidden text-ellipsis block max-w-[220px] md:max-w-[280px] lg:max-w-[340px]" title="None selected">None selected</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Hops</span>
-                <span id="num-hops-display" class="text-sm text-cyan-400">3 hops</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Estimated Time</span>
-                <span id="estimated-time" class="text-sm text-cyan-400">15 min</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Estimated Maker Fee</span>
-                <div class="text-right">
-                  <div id="maker-fee-percent" class="text-sm text-yellow-400">0.20%</div>
-                  <div id="maker-fee-sats" class="text-xs text-gray-500">~0 sats</div>
+            <p class="swap-help">Enter the amount you want to send through the swap.</p>
+            <div id="amount-input-section">
+              <div class="swap-amount-box">
+                <input id="swap-amount-input" type="text" placeholder="0" />
+                <div class="swap-unit-toggle">
+                  <button id="unit-sats" class="unit-btn is-active">Sats</button>
+                  <button id="unit-btc" class="unit-btn">BTC</button>
+                  <button id="unit-usd" class="unit-btn">USD</button>
                 </div>
               </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Funding Txs</span>
-                <span id="funding-txs-count" class="text-sm text-white">3</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Avg Funding Tx Size</span>
-                <span id="avg-funding-tx-size" class="text-sm text-white">300 vB</span>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Network Fee</span>
-                <div class="text-right">
-                  <div id="network-fee-sats" class="text-sm text-yellow-400">0 sats</div>
-                  <div id="network-fee-rate" class="text-xs text-gray-500">2 sat/vB</div>
-                </div>
-              </div>
-              <div class="flex justify-between mb-2">
-                <span class="text-sm text-gray-400">Estimated Total Fee</span>
-                <span id="total-fee-sats" class="text-sm font-mono text-yellow-400">0 sats</span>
-              </div>
-              <div class="flex justify-between pt-2 border-t border-gray-700">
-                <span class="text-sm font-semibold text-lg text-gray-300">You Receive</span>
-                <div class="text-right">
-                  <div id="total-amount" class="text-sm font-mono font-semibold text-lg text-primary">0 sats</div>
-                  <div id="total-btc" class="text-xs text-gray-500">0.00000000 BTC</div>
-                </div>
+              <div class="swap-amount-meta">
+                <span id="amount-input-conversions">= 0.00000000 BTC</span>
+                <button id="max-swap-btn">Use Max Swappable: <span id="max-swappable-amount">0 sats</span></button>
               </div>
             </div>
           </div>
+
+          <div class="swap-section">
+            <div class="swap-section-head">
+              <h3>Select UTXOs</h3>
+              <span>Auto · <strong id="selected-utxos-count">0</strong> selected</span>
+            </div>
+            <div class="swap-segment">
+              <button id="mode-auto" class="mode-btn is-active">Select UTXOs <small>auto</small></button>
+              <button id="mode-manual" class="mode-btn">Select UTXOs <small>manual</small></button>
+            </div>
+            <div class="swap-mode-row">
+              <button class="swap-inline-tab is-active" type="button">Auto select</button>
+              <span></span>
+              <button class="swap-inline-tab muted" type="button">Manual select</button>
+            </div>
+            <div class="swap-auto-note">
+              <span>Wallet picks UTXOs to minimize change</span>
+              <strong><span id="selected-utxos-total">0 sats</span></strong>
+            </div>
+            <div id="utxo-warning" class="hidden swap-warning-note">
+              ${icons.alertTriangle(15)} <span>Mixing Regular and Swap UTXOs in the same transaction can compromise privacy.</span>
+            </div>
+            <div id="utxo-selection-section" class="swap-picker">
+              <div class="swap-picker-head">
+                <span>Pick UTXOs to fund the swap</span>
+                <strong>Total <span id="utxo-picker-total">0 sats</span></strong>
+              </div>
+              <div id="utxo-list" class="swap-list">
+                <p class="swap-empty-row">Loading UTXOs...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="swap-section">
+            <div class="swap-mode-row">
+              <button class="swap-inline-tab is-active" type="button">Auto select</button>
+              <span></span>
+              <button class="swap-inline-tab muted" type="button">Manual select</button>
+            </div>
+            <div class="swap-auto-note">
+              <span>Wallet picks good makers from the market</span>
+              <strong><span id="required-makers-count">2</span> makers from <span id="available-makers-count">${availableMakers.length}</span> candidates</strong>
+            </div>
+            <div class="swap-segment maker">
+              <button id="maker-mode-auto" class="maker-mode-btn is-active">Select Makers <small>auto</small></button>
+              <button id="maker-mode-manual" class="maker-mode-btn">Select Makers <small>manual</small></button>
+            </div>
+            <div id="maker-selection-section" class="swap-picker">
+              <div class="swap-picker-head">
+                <span>Pick makers to route the swap</span>
+                <strong>Selected <span id="selected-makers-count">0</span> makers</strong>
+              </div>
+              <div id="maker-list" class="swap-list maker-list">
+                <p class="swap-empty-row">Loading makers...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="swap-section">
+            <div class="swap-section-head">
+              <h3>Number Of Hops</h3>
+              <span><strong id="num-makers-display">2 makers</strong> required</span>
+            </div>
+            <div class="swap-warning-note">
+              ${icons.alertTriangle(16)} <span>Warning: If swap with only one maker, the maker can deanonymize you. Recommended minimum hop = 2.</span>
+            </div>
+            <div class="swap-hop-grid">
+              <button id="hop-2" class="hop-count-btn"><strong>2</strong><span>Hops</span></button>
+              <button id="hop-3" class="hop-count-btn is-active"><strong>3</strong><span>Hops</span></button>
+              <button id="hop-4" class="hop-count-btn"><strong>4</strong><span>Hops</span></button>
+              <button id="hop-5" class="hop-count-btn"><strong>5</strong><span>Hops</span></button>
+              <button id="hop-custom" class="hop-count-btn"><strong>6+</strong><span>Custom</span></button>
+            </div>
+            <div id="custom-hop-input-container" class="hidden swap-custom-hop">
+              <input id="custom-hop-input" type="number" min="2" max="20" value="6" />
+              <span>hops = <strong id="custom-makers-display">5</strong> makers</span>
+            </div>
+            <p class="swap-help">More hops = better privacy, higher fees.</p>
+          </div>
+
+          <div id="validation-warning" class="hidden swap-validation"></div>
+          <button id="start-coinswap-btn" class="swap-start-btn">Start Swap</button>
+        </section>
+
+        <aside class="swap-summary-stack">
+          <section class="swap-balance-card">
+            <span>Swappable Balance</span>
+            <strong id="available-balance-sats">0 sats</strong>
+            <small id="available-balance-btc">0.00000000 BTC</small>
+          </section>
+
+          <section class="swap-summary-card">
+            <h3>Swap Summary</h3>
+            <div class="swap-time-pill">Estimated Time <strong id="estimated-time">2m 00s</strong></div>
+            <div class="swap-summary-lines">
+              <div><span>Swap amount</span><strong id="swap-amount-display">0 sats</strong></div>
+              <p id="swap-amount-conversions">0.00000000 BTC</p>
+              <div><span>Number of hops</span><strong id="num-hops-display">3 hops</strong></div>
+              <div><span>Makers</span><strong id="maker-count-summary">0 selected</strong></div>
+              <div class="maker-candidates"><span id="makers-label">Top maker candidates</span><strong id="selected-makers-display" title="None selected">None selected</strong></div>
+              <div><span>Funding transactions</span><strong id="funding-txs-count">3</strong></div>
+              <div><span>Avg funding tx size</span><strong id="avg-funding-tx-size">300 vB</strong></div>
+            </div>
+            <div class="swap-fee-box">
+              <div><span>Estimated maker fee</span><strong><span id="maker-fee-sats">0 sats</span></strong></div>
+              <span id="maker-fee-percent" class="swap-hidden-percent">0.00%</span>
+              <div><span>Network fee</span><strong><span id="network-fee-sats">0 sats</span><small id="network-fee-rate">2 sat/vB</small></strong></div>
+              <div class="total"><span>Total estimated fee</span><strong id="total-fee-sats">0 sats</strong></div>
+            </div>
+            <div class="swap-you-receive">
+              <span>You receive</span>
+              <strong id="total-amount">0 sats</strong>
+              <small id="total-btc">0.00000000 BTC</small>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <section class="swap-history-panel">
+        <h3>Swap History</h3>
+        <div id="swap-history-stats" class="swap-history-stats"></div>
+        <div id="swap-history-container" class="space-y-3">
+          <p class="swap-empty-row">Loading swap history...</p>
         </div>
-
-      </div>
-    </div>
-
-    <div class="bg-surface rounded-lg p-6 mt-6">
-      <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Swap History</h3>
-      <div id="swap-history-stats" class="grid grid-cols-4 gap-4 mb-4"></div>
-      <div id="swap-history-container" class="space-y-3">
-        <p class="text-gray-400 text-center py-4">Loading swap history...</p>
-      </div>
+      </section>
     </div>
   `;
 
@@ -1365,6 +1227,9 @@ export async function SwapComponent(container) {
   content
     .querySelector('#swap-amount-input')
     .addEventListener('input', async () => {
+      if (selectionMode !== 'auto') {
+        toggleSelectionMode('auto');
+      }
       updateSummary();
       await saveCurrentSelections();
     });
@@ -1386,6 +1251,10 @@ export async function SwapComponent(container) {
     saveCurrentSelections();
   });
 
+  content.querySelector('#hop-2').addEventListener('click', () => {
+    setHopCount(2);
+    saveCurrentSelections();
+  });
   content.querySelector('#hop-3').addEventListener('click', () => {
     setHopCount(3);
     saveCurrentSelections();
@@ -1538,7 +1407,7 @@ export async function SwapComponent(container) {
         if (!result.success) {
           alert('Failed to start swap: ' + result.error);
           startBtn.disabled = false;
-          startBtn.textContent = 'Start Coinswap';
+          startBtn.textContent = 'Start Swap';
           startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
           return;
         }
@@ -1562,7 +1431,7 @@ export async function SwapComponent(container) {
         console.error('❌ Failed to start coinswap:', error);
         alert('Failed to start coinswap: ' + error.message);
         startBtn.disabled = false;
-        startBtn.textContent = 'Start Coinswap';
+        startBtn.textContent = 'Start Swap';
         startBtn.classList.remove('opacity-50', 'cursor-not-allowed');
       }
     });
