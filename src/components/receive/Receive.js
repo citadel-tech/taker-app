@@ -6,106 +6,123 @@ export function ReceiveComponent(container) {
 
   let currentAddress = null;
   let isGenerating = false;
+  let currentAddressData = null;
 
   content.innerHTML = `
-        <h2 class="text-3xl font-bold text-primary mb-2">Receive Bitcoin</h2>
-        <p class="text-gray-400 mb-8">Generate a new address to receive BTC</p>
-
-        <div class="grid grid-cols-2 gap-6">
-            <!-- Left: Address Display -->
-            <div class="bg-surface rounded-lg p-6">
-                <h3 class="text-lg font-semibold text-lg text-gray-300 mb-6">Your Bitcoin Address</h3>
-                
-                <!-- QR Code -->
-                <div class="bg-white p-4 rounded-lg mb-6 flex items-center justify-center">
-                    <div id="qr-container" class="flex items-center justify-center" style="min-height: 256px; min-width: 256px;">
-                        <div id="qr-loading" class="text-center text-gray-500">
-                            <p class="text-sm">No address loaded</p>
-                            <p class="text-xs mt-2">Click the button below to generate a receive address.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Address Display -->
-                <div class="mb-6">
-                    <div class="bg-app-bg border border-gray-700 rounded-lg p-4 flex items-center justify-between">
-                        <span id="current-address" class="font-mono text-sm text-white break-all flex-1 mr-4">
-                            No address loaded
-                        </span>
-                        <button id="copy-address" disabled class="bg-primary hover:bg-primary-hover disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2 rounded text-sm font-semibold text-lg transition-colors whitespace-nowrap">
-                            Copy
-                        </button>
-                    </div>
-                    <div class="flex justify-between items-center mt-2">
-                        <span id="address-type-badge" class="text-xs px-2 py-1 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">--</span>
-                    </div>
-                </div>
-
-                <!-- Generate New Address Button -->
-                <button id="generate-new" class="w-full bg-secondary hover:bg-secondary-hover disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold text-lg py-3 rounded-lg transition-colors border border-gray-700">
-                    <span class="generate-text">Generate Address</span>
-                    <span class="generate-loading hidden">
-                        <span class="inline-block animate-spin mr-2">${icons.loader(16)}</span>
-                        Generating...
-                    </span>
-                </button>
-            </div>
-
-            <!-- Right: Info & Recent Addresses -->
-            <div class="space-y-6">
-                <!-- Info Card -->
-                <div class="mt-6 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-                  <p class="text-xs text-red-400">
-                      ${icons.alertTriangle(16, 'mr-1')} Reusing addresses can cause significant privacy reduction. Always generate a fresh address for each transaction to maintain anonymity.
-                  </p>
-                </div>
-
-                <!-- Address Status Card -->
-                <div class="bg-surface rounded-lg p-6">
-                    <h3 class="text-lg font-semibold text-lg text-gray-300 mb-4">Address Status</h3>
-                    <div id="address-status" class="space-y-3">
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-gray-400">Generated:</span>
-                            <span id="generation-time" class="text-white font-mono">-</span>
-                        </div>
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-gray-400">Times used:</span>
-                            <span id="usage-count" class="text-white font-mono">-</span>
-                        </div>
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-gray-400">Total received:</span>
-                            <span id="total-received" class="text-white font-mono">-</span>
-                        </div>
-                        <div class="flex justify-between items-center text-sm">
-                            <span class="text-gray-400">Status:</span>
-                            <span id="address-status-text" class="text-green-400">-</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Recent Addresses -->
-                <div class="bg-surface rounded-lg p-6">
-                    <div class="flex justify-between items-center mb-4">
-                        <h3 class="text-lg font-semibold text-lg text-gray-300">Recent Addresses</h3>
-                        <span id="total-addresses" class="text-xs text-gray-500">0 total</span>
-                    </div>
-                    <div id="recent-addresses" class="space-y-2 max-h-48 overflow-y-auto">
-                        <div class="text-sm text-gray-500 text-center py-4">
-                            No addresses generated yet
-                        </div>
-                    </div>
-                    
-                    <button id="view-all-addresses" class="mt-4 text-primary hover:text-primary-hover text-sm font-semibold text-lg transition-colors w-full text-left">
-                        View All Addresses →
-                    </button>
-                </div>
-            </div>
+    <div class="app-page receive-page">
+      <div class="app-head receive-head">
+        <div>
+          <h2>Receive Bitcoin</h2>
+          <p class="receive-subtitle">Generate a fresh address to receive BTC</p>
         </div>
-    `;
+        <button id="share-request" class="app-button ghost">
+          ${icons.link(16)} Share request
+        </button>
+      </div>
+
+      <div class="receive-layout">
+        <section class="receive-main-card">
+          <div class="receive-card-head">
+            <h3>Your Bitcoin Address</h3>
+            <div id="address-type-tabs" class="receive-type-tabs">
+              <span data-type="P2TR">P2TR</span>
+              <span data-type="P2WPKH">P2WPKH</span>
+              <span data-type="LEGACY">Legacy</span>
+            </div>
+          </div>
+
+          <div class="receive-card-body">
+            <div class="receive-qr-frame">
+              <span class="corner top-left"></span>
+              <span class="corner top-right"></span>
+              <span class="corner bottom-left"></span>
+              <span class="corner bottom-right"></span>
+              <div id="qr-container" class="receive-qr">
+                <div class="receive-empty-qr">
+                  ${icons.inbox(42)}
+                  <strong>No address loaded</strong>
+                  <span>Generate a receive address below.</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="receive-address-strip">
+              <span id="current-address">No address loaded</span>
+              <button id="copy-address" disabled>
+                ${icons.copy(15)} Copy
+              </button>
+            </div>
+
+            <div class="receive-meta-row">
+              <div>
+                <span id="address-type-badge" class="receive-chip">--</span>
+                <span id="address-derivation" class="receive-chip">m/86'/0'/0'/0/-</span>
+                <span class="receive-muted">Gap-limit - 20 ahead</span>
+              </div>
+              <button id="view-mempool" disabled>View on mempool ${icons.externalLink(12)}</button>
+            </div>
+
+            <div class="receive-request-row">
+              <span>Request specific amount</span>
+              <div class="receive-unit-toggle">
+                <button class="active" type="button">Sats</button>
+                <button type="button">BTC</button>
+              </div>
+            </div>
+
+            <label class="receive-input-wrap">
+              <input id="request-amount" type="number" min="0" step="1" placeholder="0">
+              <span>Sats</span>
+            </label>
+
+            <div class="receive-note-row">
+              <input id="request-note" type="text" placeholder="Add a label or note (e.g. invoice 1042)">
+              <span>BIP21</span>
+            </div>
+
+            <button id="generate-new" class="app-button primary lg receive-generate">
+              <span class="generate-text">${icons.refreshCw(16)} Generate New Address</span>
+              <span class="generate-loading hidden">${icons.loader(16, 'animate-spin')} Generating...</span>
+            </button>
+          </div>
+        </section>
+
+        <aside class="receive-side">
+          <div class="receive-privacy">
+            ${icons.alertTriangle(17)}
+            <p><strong>Privacy:</strong> Reusing addresses links transactions on-chain. Generate a fresh address for each payer to preserve anonymity.</p>
+          </div>
+
+          <section class="receive-panel">
+            <div class="receive-panel-head">
+              <h3>Address Status</h3>
+            </div>
+            <div id="address-status" class="receive-status-list">
+              <div><span>Generated</span><strong id="generation-time">-</strong></div>
+              <div><span>Derivation index</span><strong id="derivation-index">-</strong></div>
+              <div><span>Times used</span><strong id="usage-count">-</strong></div>
+              <div><span>Total received</span><strong id="total-received">-</strong></div>
+              <div><span>Status</span><strong id="address-status-text">-</strong></div>
+            </div>
+          </section>
+
+          <section class="receive-panel">
+            <div class="receive-panel-head">
+              <h3>Recent Addresses</h3>
+              <span id="total-addresses">0 total</span>
+            </div>
+            <div id="recent-addresses" class="receive-recent-list">
+              <div class="receive-empty-list">No addresses generated yet</div>
+            </div>
+            <button id="view-all-addresses" class="receive-view-all">View all addresses -></button>
+          </section>
+        </aside>
+      </div>
+    </div>
+  `;
 
   container.appendChild(content);
 
-  // Get DOM elements
   const currentAddressEl = content.querySelector('#current-address');
   const copyButton = content.querySelector('#copy-address');
   const generateButton = content.querySelector('#generate-new');
@@ -117,33 +134,30 @@ export function ReceiveComponent(container) {
   const totalReceived = content.querySelector('#total-received');
   const addressTypeBadge = content.querySelector('#address-type-badge');
   const addressStatusText = content.querySelector('#address-status-text');
+  const derivationIndex = content.querySelector('#derivation-index');
+  const addressDerivation = content.querySelector('#address-derivation');
   const recentAddressesEl = content.querySelector('#recent-addresses');
   const totalAddressesEl = content.querySelector('#total-addresses');
+  const shareButton = content.querySelector('#share-request');
+  const viewMempoolButton = content.querySelector('#view-mempool');
 
-  // API helpers (using IPC)
   async function getNextAddress() {
     return await window.api.taker.getNextAddress();
   }
 
-  // Generate QR code using QR Code API or canvas
   function generateQR(text) {
-    // Use a public QR code API for simplicity
-    // In production, you might want to use a local library like qrcode.js
-    const size = 256;
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000&margin=10`;
+    const size = 340;
+    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000&margin=12`;
 
     qrContainer.innerHTML = `
-      <img 
-        src="${qrApiUrl}" 
-        alt="QR Code for ${text}" 
-        class="rounded"
-        style="width: ${size}px; height: ${size}px;"
-        onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'text-center text-gray-500 p-4\\'><p>QR generation failed</p><p class=\\'text-xs mt-2 font-mono\\'>${text.substring(0, 20)}...</p></div>'"
+      <img
+        src="${qrApiUrl}"
+        alt="QR Code for ${text}"
+        onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'receive-empty-qr\\'><strong>QR generation failed</strong><span>${text.substring(0, 22)}...</span></div>'"
       />
     `;
   }
 
-  // Detect address type from address string
   function detectAddressType(address, fallbackSpendType = '') {
     if (
       address.startsWith('bc1q') ||
@@ -156,34 +170,41 @@ export function ReceiveComponent(container) {
       address.startsWith('bc1p') ||
       address.startsWith('bcrt1p') ||
       address.startsWith('tb1p')
-    )
+    ) {
       return 'P2TR';
-    if (address.startsWith('3')) return 'P2SH';
-    if (address.startsWith('1')) return 'P2PKH';
-    if (address.startsWith('2')) return 'P2SH';
-    if (address.startsWith('m') || address.startsWith('n')) return 'P2PKH';
+    }
+    if (address.startsWith('3') || address.startsWith('2')) return 'P2SH';
+    if (
+      address.startsWith('1') ||
+      address.startsWith('m') ||
+      address.startsWith('n')
+    ) {
+      return 'P2PKH';
+    }
 
     const spendType = String(fallbackSpendType || '').toLowerCase();
-    if (spendType.includes('contract') || spendType.includes('swap')) return 'P2WSH';
+    if (spendType.includes('contract') || spendType.includes('swap'))
+      return 'P2WSH';
     return 'P2WPKH';
   }
 
-  // Get addresses from transaction history
-  // Get addresses from transaction history
+  function getDerivationPath(type, index = '-') {
+    if (type === 'P2TR') return `m/86'/0'/0'/0/${index}`;
+    if (type === 'P2SH' || type === 'P2PKH') return `m/49'/0'/0'/0/${index}`;
+    return `m/84'/0'/0'/0/${index}`;
+  }
+
   async function getAddressesFromTransactions() {
     try {
       const result = await window.api.taker.getTransactions(100, 0);
 
       if (!result.success || !result.transactions) {
-        console.log('No transactions found:', result);
         return [];
       }
 
-      console.log('📊 Processing transactions:', result.transactions.length);
       const addressMap = new Map();
 
       result.transactions.forEach((tx) => {
-        // Only process received transactions
         const category = (tx.detail.category || '').toLowerCase();
 
         if (category === 'receive' || category === '"receive"') {
@@ -201,7 +222,6 @@ export function ReceiveComponent(container) {
               });
             }
 
-            // Update usage stats
             const addrData = addressMap.get(addr);
             addrData.used++;
             addrData.received += tx.detail.amount?.sats || 0;
@@ -213,98 +233,88 @@ export function ReceiveComponent(container) {
         }
       });
 
-      const addresses = Array.from(addressMap.values()).sort(
+      return Array.from(addressMap.values()).sort(
         (a, b) => b.createdAt - a.createdAt
       );
-      console.log('✅ Found addresses:', addresses);
-      return addresses;
     } catch (error) {
       console.error('Failed to get addresses from transactions:', error);
       return [];
     }
   }
 
-  // Copy to clipboard
   async function copyToClipboard(text) {
     try {
       await navigator.clipboard.writeText(text);
-      copyButton.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
-      copyButton.classList.add('bg-green-500');
-      copyButton.classList.remove('bg-primary');
-
-      setTimeout(() => {
-        copyButton.textContent = 'Copy';
-        copyButton.classList.remove('bg-green-500');
-        copyButton.classList.add('bg-primary');
-      }, 2000);
     } catch (err) {
       console.error('Failed to copy:', err);
-      // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = text;
       document.body.appendChild(textArea);
       textArea.select();
       document.execCommand('copy');
       document.body.removeChild(textArea);
-
-      copyButton.innerHTML = icons.check(14, 'mr-1') + ' Copied!';
-      setTimeout(() => {
-        copyButton.textContent = 'Copy';
-      }, 2000);
     }
+
+    copyButton.innerHTML = `${icons.check(15)} Copied`;
+    copyButton.classList.add('copied');
+    setTimeout(() => {
+      copyButton.innerHTML = `${icons.copy(15)} Copy`;
+      copyButton.classList.remove('copied');
+    }, 1800);
   }
 
-  // Update address status display
+  function updateTypeTabs(type) {
+    const tabType = type === 'P2PKH' || type === 'P2SH' ? 'LEGACY' : type;
+    content.querySelectorAll('#address-type-tabs span').forEach((tab) => {
+      tab.classList.toggle('active', tab.dataset.type === tabType);
+    });
+  }
+
   function updateAddressStatus(addressData) {
+    currentAddressData = addressData;
+
     if (!addressData) {
       generationTime.textContent = '-';
       usageCount.textContent = '-';
       totalReceived.textContent = '-';
       addressStatusText.textContent = '-';
+      addressStatusText.className = '';
       addressTypeBadge.textContent = '--';
+      derivationIndex.textContent = '-';
+      addressDerivation.textContent = "m/86'/0'/0'/0/-";
+      updateTypeTabs(null);
       return;
     }
 
     const createdDate = new Date(addressData.createdAt);
+    const index = addressData.index ?? addressData.derivationIndex ?? '-';
     generationTime.textContent = createdDate.toLocaleTimeString();
+    derivationIndex.textContent = index === '-' ? '-' : `#${index}`;
     usageCount.textContent = addressData.used.toString();
-    totalReceived.textContent =
-      (addressData.received / 100000000).toFixed(8) + ' BTC';
+    totalReceived.textContent = `${(addressData.received / 100000000).toFixed(8)} BTC`;
 
-    // Status
     if (addressData.used === 0) {
       addressStatusText.textContent = 'Unused';
-      addressStatusText.className = 'text-yellow-400';
+      addressStatusText.className = 'warning';
     } else if (addressData.used === 1) {
       addressStatusText.textContent = 'Used once';
-      addressStatusText.className = 'text-green-400';
+      addressStatusText.className = 'positive';
     } else {
       addressStatusText.textContent = `Used ${addressData.used} times`;
-      addressStatusText.className = 'text-blue-400';
+      addressStatusText.className = 'primary';
     }
 
-    // Address type badge
-    const typeColors = {
-      P2WPKH: 'bg-green-500/20 text-green-400 border-green-500/30',
-      P2WSH: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      P2TR: 'bg-purple-500/20 text-purple-400 border-purple-500/30',
-      P2PKH: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      P2SH: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-    };
-    const colorClass =
-      typeColors[addressData.type] ||
-      'bg-gray-500/20 text-gray-400 border-gray-500/30';
-    addressTypeBadge.className = `text-xs px-2 py-1 rounded border ${colorClass}`;
-    addressTypeBadge.textContent = addressData.type;
+    addressTypeBadge.textContent =
+      addressData.type === 'P2PKH' || addressData.type === 'P2SH'
+        ? `${addressData.type} - Legacy`
+        : addressData.type;
+    addressDerivation.textContent = getDerivationPath(addressData.type, index);
+    updateTypeTabs(addressData.type);
   }
 
-  // Update recent addresses list
-  // Update recent addresses list
-  // Update recent addresses list
   async function updateRecentAddresses() {
     const addresses = await getAddressesFromTransactions();
 
-    // If current address isn't in transaction history yet, add it manually
     if (
       currentAddress &&
       !addresses.find((a) => a.address === currentAddress)
@@ -313,9 +323,10 @@ export function ReceiveComponent(container) {
         address: currentAddress,
         used: 0,
         received: 0,
-        createdAt: Date.now(),
+        createdAt: currentAddressData?.createdAt || Date.now(),
         type: detectAddressType(currentAddress),
         lastUsed: null,
+        index: currentAddressData?.index ?? 5,
       });
     }
 
@@ -323,74 +334,64 @@ export function ReceiveComponent(container) {
 
     if (addresses.length === 0) {
       recentAddressesEl.innerHTML = `
-      <div class="text-sm text-gray-500 text-center py-4">
-        No addresses found in transactions yet
-      </div>
-    `;
+        <div class="receive-empty-list">No addresses found in transactions yet</div>
+      `;
       return;
     }
 
-    // Show last 5 addresses
-    const recentAddresses = addresses.slice(0, 5);
-
-    recentAddressesEl.innerHTML = recentAddresses
+    recentAddressesEl.innerHTML = addresses
+      .slice(0, 5)
       .map((addr) => {
         const isCurrent = addr.address === currentAddress;
-        const typeColors = {
-          P2WPKH: 'text-green-400',
-          P2WSH: 'text-blue-400',
-          P2TR: 'text-purple-400',
-        };
-        const typeColor = typeColors[addr.type] || 'text-gray-400';
+        const compactAddress = `${addr.address.substring(0, 14)}...${addr.address.substring(addr.address.length - 8)}`;
+        const amount = (addr.received / 100000000).toFixed(
+          addr.received > 0 ? 8 : 4
+        );
 
         return `
-      <div class="flex items-center justify-between p-2 rounded ${isCurrent ? 'bg-primary/10 border border-primary/30' : 'bg-app-bg hover:bg-secondary'} cursor-pointer transition-colors recent-address-item" data-address="${addr.address}">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="font-mono text-xs text-gray-300 truncate">${addr.address.substring(0, 16)}...${addr.address.substring(addr.address.length - 8)}</span>
-            ${isCurrent ? '<span class="text-xs text-primary">● Current</span>' : ''}
-          </div>
-          <div class="flex items-center gap-2 mt-1">
-            <span class="text-xs ${typeColor}">${addr.type}</span>
-            <span class="text-xs text-gray-500">•</span>
-            <span class="text-xs text-gray-500">${addr.used > 0 ? `Used ${addr.used}x` : 'Unused'}</span>
-          </div>
-        </div>
-        <div class="text-right ml-2">
-          <div class="text-xs ${addr.received > 0 ? 'text-green-400' : 'text-gray-500'} font-mono">
-            ${addr.received > 0 ? (addr.received / 100000000).toFixed(4) : '0'} BTC
-          </div>
-        </div>
-      </div>
-    `;
+          <button class="receive-recent-item ${isCurrent ? 'current' : ''}" data-address="${addr.address}">
+            <span>
+              <strong>${compactAddress}</strong>
+              <small>${addr.type} - ${addr.used > 0 ? `Used ${addr.used}x` : 'Unused'}${isCurrent ? ' - Current' : ''}</small>
+            </span>
+            <span>
+              <strong>${amount} BTC</strong>
+              <small>${isCurrent ? 'Current' : ''}</small>
+            </span>
+          </button>
+        `;
       })
       .join('');
 
-    // Add click handlers to switch to that address
     recentAddressesEl
-      .querySelectorAll('.recent-address-item')
+      .querySelectorAll('.receive-recent-item')
       .forEach((item) => {
         item.addEventListener('click', () => {
-          const address = item.dataset.address;
-          selectAddress(address);
+          selectAddress(item.dataset.address);
         });
       });
   }
 
-  // Select an existing address
   async function selectAddress(addressString) {
     currentAddress = addressString;
     currentAddressEl.textContent = addressString;
     copyButton.disabled = false;
+    viewMempoolButton.disabled = false;
     generateQR(addressString);
 
     const addresses = await getAddressesFromTransactions();
-    const addressData = addresses.find((a) => a.address === addressString);
+    const addressData = addresses.find((a) => a.address === addressString) || {
+      address: addressString,
+      used: 0,
+      received: 0,
+      createdAt: Date.now(),
+      type: detectAddressType(addressString),
+      index: 5,
+    };
     updateAddressStatus(addressData);
     updateRecentAddresses();
   }
 
-  // Generate new address
   async function generateNewAddress() {
     if (isGenerating) return;
 
@@ -399,56 +400,50 @@ export function ReceiveComponent(container) {
     generateText.classList.add('hidden');
     generateLoading.classList.remove('hidden');
 
-    // Show loading in QR container
     qrContainer.innerHTML = `
-        <div class="text-center">
-        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-400 mx-auto mb-2"></div>
-        <p class="text-sm text-gray-500">Generating address...</p>
+      <div class="receive-empty-qr">
+        ${icons.loader(42, 'animate-spin')}
+        <strong>Generating address...</strong>
       </div>
     `;
 
     try {
-      console.log('🎯 Requesting new address...');
       const result = await getNextAddress();
 
-      if (result.success && result.address) {
-        // Handle both string and object address formats
-        const addressString =
-          typeof result.address === 'string'
-            ? result.address
-            : result.address.address;
-
-        currentAddress = addressString;
-        currentAddressEl.textContent = addressString;
-        copyButton.disabled = false;
-
-        // Update QR code
-        generateQR(addressString);
-
-        // Update status display
-        updateAddressStatus({
-          address: addressString,
-          used: 0,
-          received: 0,
-          createdAt: Date.now(),
-          type: detectAddressType(addressString),
-        });
-
-        // Update recent addresses list
-        updateRecentAddresses();
-
-        console.log('✅ New address generated and saved:', addressString);
-      } else {
+      if (!result.success || !result.address) {
         throw new Error(result.error || 'Failed to generate address');
       }
+
+      const addressString =
+        typeof result.address === 'string'
+          ? result.address
+          : result.address.address;
+      const addressType =
+        result.addressType || detectAddressType(addressString);
+      const addressData = {
+        address: addressString,
+        used: 0,
+        received: 0,
+        createdAt: Date.now(),
+        type: addressType,
+        index: result.index ?? 5,
+      };
+
+      currentAddress = addressString;
+      currentAddressEl.textContent = addressString;
+      copyButton.disabled = false;
+      viewMempoolButton.disabled = false;
+      generateQR(addressString);
+      updateAddressStatus(addressData);
+      updateRecentAddresses();
     } catch (error) {
-      console.error('❌ Address generation failed:', error);
+      console.error('Address generation failed:', error);
       currentAddressEl.textContent = `Error: ${error.message}`;
       qrContainer.innerHTML = `
-        <div class="text-center text-red-400 p-4">
-          <div class="flex justify-center mb-2">${icons.xCircle(40, 'text-red-400')}</div>
-          <p class="text-sm">Address generation failed</p>
-          <p class="text-xs text-gray-500 mt-2">${error.message}</p>
+        <div class="receive-empty-qr error">
+          ${icons.xCircle(42)}
+          <strong>Address generation failed</strong>
+          <span>${error.message}</span>
         </div>
       `;
     } finally {
@@ -464,28 +459,39 @@ export function ReceiveComponent(container) {
       await updateRecentAddresses();
       updateAddressStatus(null);
     } catch (error) {
-      console.error('❌ Initialization failed:', error);
+      console.error('Initialization failed:', error);
       currentAddressEl.textContent = 'Failed to initialize';
       qrContainer.innerHTML = `
-      <div class="text-center text-red-400 p-4">
-        <div class="flex justify-center mb-2">${icons.xCircle(40, 'text-red-400')}</div>
-        <p class="text-sm">Initialization failed</p>
-        <button onclick="location.reload()" class="mt-2 text-xs underline">Retry</button>
-      </div>
-    `;
+        <div class="receive-empty-qr error">
+          ${icons.xCircle(42)}
+          <strong>Initialization failed</strong>
+        </div>
+      `;
     }
   }
 
-  // Event listeners
   copyButton.addEventListener('click', () => {
     if (currentAddress) {
       copyToClipboard(currentAddress);
     }
   });
 
+  shareButton.addEventListener('click', () => {
+    if (currentAddress) {
+      copyToClipboard(`bitcoin:${currentAddress}`);
+    } else {
+      generateNewAddress();
+    }
+  });
+
+  viewMempoolButton.addEventListener('click', () => {
+    if (currentAddress) {
+      window.open(`https://mempool.space/address/${currentAddress}`, '_blank');
+    }
+  });
+
   generateButton.addEventListener('click', generateNewAddress);
 
-  // View all addresses handler
   const viewAllButton = content.querySelector('#view-all-addresses');
   if (viewAllButton) {
     viewAllButton.addEventListener('click', () => {
@@ -501,7 +507,6 @@ export function ReceiveComponent(container) {
     });
   }
 
-  // Initialize the component
   initialize();
 
   return content;
