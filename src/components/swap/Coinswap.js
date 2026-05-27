@@ -1,5 +1,6 @@
 import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export async function CoinswapComponent(container, swapConfig) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
@@ -57,6 +58,14 @@ export async function CoinswapComponent(container, swapConfig) {
     transactions: savedProgress?.transactions || [],
   };
 
+  const routeMakerAddresses = Array.isArray(savedProgress?.routeMakerAddresses)
+    ? savedProgress.routeMakerAddresses.slice(0, swapData.makers)
+    : Array.from({ length: swapData.makers }, () => null);
+  while (routeMakerAddresses.length < swapData.makers) {
+    routeMakerAddresses.push(null);
+  }
+  const pendingMakerAddresses = Array.from({ length: swapData.makers }, () => null);
+
   if (swapData.transactions.length === 0) {
     if (isV2) {
       swapData.transactions = [
@@ -112,8 +121,66 @@ export async function CoinswapComponent(container, swapConfig) {
       startTime,
       logMessages,
       transactions: swapData.transactions,
+      routeMakerAddresses,
       lastUpdated: Date.now(),
     });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function compactEndpoint(value, left = 7, right = 5) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    if (text.length <= left + right + 3) return text;
+    return `${text.slice(0, left)}...${text.slice(-right)}`;
+  }
+
+  function setPendingMakerAddress(makerIndex, address) {
+    if (
+      makerIndex === null ||
+      makerIndex < 0 ||
+      makerIndex >= swapData.makers ||
+      !address
+    ) {
+      return;
+    }
+
+    pendingMakerAddresses[makerIndex] = address;
+  }
+
+  function revealMakerAddress(makerIndex, address = null) {
+    if (
+      makerIndex === null ||
+      makerIndex < 0 ||
+      makerIndex >= swapData.makers
+    ) {
+      return;
+    }
+
+    const resolvedAddress =
+      address ||
+      routeMakerAddresses[makerIndex] ||
+      pendingMakerAddresses[makerIndex];
+    if (!resolvedAddress) return;
+
+    routeMakerAddresses[makerIndex] = resolvedAddress;
+
+    const addressEl = content.querySelector(
+      `#maker-${makerIndex} .route-address`
+    );
+    if (addressEl) {
+      addressEl.textContent = compactEndpoint(resolvedAddress);
+      addressEl.title = resolvedAddress;
+      addressEl.classList.remove('is-pending');
+    }
+    saveProgress();
   }
 
   function updateLogs() {
@@ -301,6 +368,24 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndexMatch && Number.isFinite(Number(makerIndexMatch[1]))
         ? Number(makerIndexMatch[1])
         : null;
+    const connectingMakerMatch = message.match(
+      /Connecting to maker\s+(\d+)\s+at\s+(\S+)/i
+    );
+    if (connectingMakerMatch) {
+      setPendingMakerAddress(
+        Number(connectingMakerMatch[1]),
+        connectingMakerMatch[2]
+      );
+    }
+    const substituteMakerMatch = message.match(
+      /Substituting maker\s+(\d+)\s+with spare at\s+(\S+)/i
+    );
+    if (substituteMakerMatch) {
+      setPendingMakerAddress(
+        Number(substituteMakerMatch[1]),
+        substituteMakerMatch[2]
+      );
+    }
 
     // Update UI based on message content (supports both V1 and V2 protocols)
 
@@ -409,6 +494,19 @@ export async function CoinswapComponent(container, swapConfig) {
       // Mark first few hops as negotiating
       updateHopStatus(0, 'Negotiating...', 'yellow');
     }
+    // V1: Maker responded during negotiation. Only now reveal the address.
+    else if (
+      makerIndex !== null &&
+      (message.includes('Received offer from maker') ||
+        (message.includes('Maker') && message.includes('accepted swap')) ||
+        message.includes('Sending ProofOfFunding to maker') ||
+        (message.includes('Maker') &&
+          message.includes('processed successfully')))
+    ) {
+      revealMakerAddress(makerIndex);
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, 'Connected', 'green');
+    }
     // V2: "All makers have responded with their outgoing keys"
     else if (
       message.includes('All makers have responded with their outgoing keys')
@@ -500,6 +598,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Sending contract data to maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Contracting...', 'yellow');
     }
@@ -508,6 +607,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Received Taproot contract data from maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Contract received', 'blue');
     }
@@ -516,6 +616,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Verified Taproot contract data from maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Contract ready', 'green');
     }
@@ -524,6 +625,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Received private key from maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Key received', 'green');
     }
@@ -533,6 +635,7 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Sending privkey to maker') &&
       message.includes('awaiting response')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Finalizing...', 'yellow');
     }
@@ -612,7 +715,7 @@ export async function CoinswapComponent(container, swapConfig) {
       if (actualSwapConfig.nativeSwapId) {
         addLog(`Backend Swap ID: ${actualSwapConfig.nativeSwapId}`, 'info');
       }
-      addLog(`Amount: ${(swapData.amount / 100000000).toFixed(8)} BTC`, 'info');
+      addLog(`Amount: ${formatSats(swapData.amount)}`, 'info');
       addLog(`Makers: ${swapData.makers}`, 'info');
 
       SwapStateManager.saveSwapProgress({
@@ -620,6 +723,7 @@ export async function CoinswapComponent(container, swapConfig) {
         startTime,
         logMessages,
         transactions: swapData.transactions,
+        routeMakerAddresses,
         status: 'in_progress',
       });
 
@@ -1115,16 +1219,24 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function buildFlowDiagram() {
-    const makers = Array.from({ length: swapData.makers }, (_, i) => `
+    const makers = Array.from({ length: swapData.makers }, (_, i) => {
+      const displayedAddress = routeMakerAddresses[i]
+        ? compactEndpoint(routeMakerAddresses[i])
+        : 'Pending connection';
+      const addressTitle = routeMakerAddresses[i] || '';
+      const pendingClass = routeMakerAddresses[i] ? '' : ' is-pending';
+
+      return `
       <div class="route-line" id="route-line-${i}"></div>
       <article id="maker-${i}" class="route-node maker awaiting">
         <div class="route-icon">${icons.circleDollarSign(22)}</div>
         <span>Maker</span>
         <h3>Maker ${String(i + 1).padStart(2, '0')}</h3>
-        <p>${['vdd56f...n2eh', 'kp8a3r...m6xr', 'bn4qrx...yh8n', 'j2mkrx...e8ax'][i] || `maker-${i + 1}`}</p>
+        <p class="route-address${pendingClass}" title="${escapeHtml(addressTitle)}">${escapeHtml(displayedAddress)}</p>
         <b class="route-status">Awaiting</b>
       </article>
-    `).join('');
+    `;
+    }).join('');
 
     return `
       <div class="swap-route-rail">
@@ -1226,10 +1338,10 @@ export async function CoinswapComponent(container, swapConfig) {
       </section>
 
       <section class="swap-progress-stats">
-        <div><span>Amount</span><strong>${(swapData.amount / 100000000).toFixed(8)}<small>BTC</small></strong></div>
+        <div><span>Amount</span><strong>${formatSats(swapData.amount)}</strong></div>
         <div><span>Hops</span><strong>${swapData.hops}</strong></div>
-        <div><span>Fee</span><strong>${((actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops) / 100000000).toFixed(5)}<small>BTC</small></strong></div>
-        <div><span>You receive</span><strong class="pending-receive">—<small>BTC</small></strong></div>
+        <div><span>Fee</span><strong>${formatSats((actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops))}</strong></div>
+        <div><span>You receive</span><strong class="pending-receive">—</strong><small>sats</small></div>
         <div><span>ETA</span><strong id="swap-eta">2m 40s</strong></div>
         <div class="hidden"><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
       </section>

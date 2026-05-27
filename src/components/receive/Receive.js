@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function ReceiveComponent(container) {
   const content = document.createElement('div');
@@ -291,7 +292,7 @@ export function ReceiveComponent(container) {
     generationTime.textContent = createdDate.toLocaleTimeString();
     derivationIndex.textContent = index === '-' ? '-' : `#${index}`;
     usageCount.textContent = addressData.used.toString();
-    totalReceived.textContent = `${(addressData.received / 100000000).toFixed(8)} BTC`;
+    totalReceived.textContent = formatSats(addressData.received);
 
     if (addressData.used === 0) {
       addressStatusText.textContent = 'Unused';
@@ -344,10 +345,6 @@ export function ReceiveComponent(container) {
       .map((addr) => {
         const isCurrent = addr.address === currentAddress;
         const compactAddress = `${addr.address.substring(0, 14)}...${addr.address.substring(addr.address.length - 8)}`;
-        const amount = (addr.received / 100000000).toFixed(
-          addr.received > 0 ? 8 : 4
-        );
-
         return `
           <button class="receive-recent-item ${isCurrent ? 'current' : ''}" data-address="${addr.address}">
             <span>
@@ -355,7 +352,7 @@ export function ReceiveComponent(container) {
               <small>${addr.type} - ${addr.used > 0 ? `Used ${addr.used}x` : 'Unused'}${isCurrent ? ' - Current' : ''}</small>
             </span>
             <span>
-              <strong>${amount} BTC</strong>
+              <strong>${formatSats(addr.received)}</strong>
               <small>${isCurrent ? 'Current' : ''}</small>
             </span>
           </button>

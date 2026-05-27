@@ -5,6 +5,7 @@ import {
   loadSwapHistory,
   summarizeSwapHistory,
 } from './SwapHistory.js';
+import { getBtcPriceUsd, formatSats } from '../../js/price.js';
 
 // ✅ ADD CACHE CONSTANTS
 const SWAP_DATA_CACHE_KEY = 'swap_data_cache';
@@ -173,7 +174,7 @@ export async function SwapComponent(container) {
   let availableUtxos = [];
   let availableMakers = [];
   let totalBalance = 0;
-  const btcPrice = 50000;
+  const btcPrice = getBtcPriceUsd();
 
   function getMakerProtocol(makerOrItem, offer = makerOrItem?.offer) {
     return makerOrItem?.protocol || (offer?.tweakablePoint ? 'Taproot' : 'Legacy');
@@ -507,9 +508,7 @@ export async function SwapComponent(container) {
       </div>
       <div class="bg-app-bg rounded-lg p-4">
         <p class="text-sm text-gray-400 mb-1">Total Amount</p>
-        <p class="text-2xl font-bold text-green-400">${(
-          stats.totalAmount / 100000000
-        ).toFixed(8)} BTC</p>
+        <p class="text-2xl font-bold text-green-400">${formatSats(stats.totalAmount)}</p>
       </div>
       <div class="bg-app-bg rounded-lg p-4">
         <p class="text-sm text-gray-400 mb-1">Total Fees Paid</p>

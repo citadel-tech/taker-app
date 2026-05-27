@@ -13,6 +13,7 @@ import { SwapStateManager } from '../components/swap/SwapStateManager.js';
 import { ConnectionStatusComponent } from '../components/connection/ConnectionStatus.js';
 import { bitcoindConnection } from '../components/connection/BitcoindConnection.js';
 import { TakerInitializationComponent } from '../components/taker/TakerInitialization.js';
+import { refreshBtcPriceUsd } from './price.js';
 
 // Component map
 const components = {
@@ -346,6 +347,7 @@ function initiateAppStart(config) {
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('App initializing...');
+  await refreshBtcPriceUsd();
 
   const navContainer = document.querySelector('#nav-container');
   if (navContainer) {

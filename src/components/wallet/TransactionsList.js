@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function TransactionsListComponent(container) {
   // State
@@ -25,10 +26,6 @@ export function TransactionsListComponent(container) {
   }
 
   // Helper Functions
-  function satsToBtc(sats) {
-    return (sats / 100000000).toFixed(8);
-  }
-
   function formatDate(timestamp) {
     const date = new Date(timestamp * 1000);
     const now = new Date();
@@ -172,10 +169,12 @@ export function TransactionsListComponent(container) {
   }
 
   function formatAmount(sats) {
-    const btc = satsToBtc(Math.abs(sats));
     const prefix = sats >= 0 ? '+' : '';
     const colorClass = sats >= 0 ? 'text-green-400' : 'text-red-400';
-    return { text: `${prefix}${btc} BTC`, colorClass };
+    return {
+      text: `${prefix}${formatSats(Math.abs(sats))}`,
+      colorClass,
+    };
   }
 
   function getStatusBadge(confirmations) {
@@ -251,7 +250,7 @@ export function TransactionsListComponent(container) {
             </div>
             <div class="text-right flex-shrink-0">
                 <p class="${amountData.colorClass} font-mono text-lg font-semibold text-lg">${amountData.text}</p>
-                ${tx.detail.fee ? `<p class="text-gray-500 text-xs">Fee: ${satsToBtc(Math.abs(tx.detail.fee.sats))} BTC</p>` : ''}
+                ${tx.detail.fee ? `<p class="text-gray-500 text-xs">Fee: ${formatSats(Math.abs(tx.detail.fee.sats))}</p>` : ''}
             </div>
         </div>
       `;
@@ -293,8 +292,8 @@ export function TransactionsListComponent(container) {
     ).length;
 
     return {
-      totalReceived: satsToBtc(totalReceived),
-      totalSent: satsToBtc(totalSent),
+      totalReceived,
+      totalSent,
       totalSwaps,
     };
   }
@@ -362,9 +361,9 @@ export function TransactionsListComponent(container) {
 
     // Update stats cards
     content.querySelector('#total-received').textContent =
-      totals.totalReceived + ' BTC';
+      `${totals.totalReceived.toLocaleString()} sats`;
     content.querySelector('#total-sent').textContent =
-      totals.totalSent + ' BTC';
+      `${totals.totalSent.toLocaleString()} sats`;
     content.querySelector('#total-swaps').textContent = totals.totalSwaps;
   }
 
@@ -390,11 +389,11 @@ export function TransactionsListComponent(container) {
         <div class="grid grid-cols-3 gap-4 mb-6">
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Received</p>
-                <p id="total-received" class="text-2xl font-mono text-green-400">-- BTC</p>
+                <p id="total-received" class="text-2xl font-mono text-green-400">-- sats</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Sent</p>
-                <p id="total-sent" class="text-2xl font-mono text-red-400">-- BTC</p>
+                <p id="total-sent" class="text-2xl font-mono text-red-400">-- sats</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Swaps</p>

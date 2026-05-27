@@ -179,35 +179,33 @@ function getOfferbookSnapshot() {
   return snapshot;
 }
 
-function getAllSwapReportPaths() {
-  const reportsRoot = path.join(api1State.DATA_DIR, 'swap_reports');
+function getWalletSwapReportPaths() {
+  const walletsDir = path.join(api1State.DATA_DIR, 'wallets');
   const reportPaths = [];
+  const walletNames = new Set(
+    [
+      api1State.currentWalletName,
+      getCurrentWalletName(),
+      api1State.storedTakerConfig?.walletName,
+      api1State.DEFAULT_WALLET_NAME,
+    ].filter(Boolean)
+  );
 
-  function walk(dirPath) {
-    if (!fs.existsSync(dirPath)) return;
+  for (const walletName of walletNames) {
+    reportPaths.push(path.join(walletsDir, `${walletName}_swap_report.json`));
+  }
 
-    for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.json')) {
-        reportPaths.push(fullPath);
+  if (fs.existsSync(walletsDir)) {
+    for (const entry of fs.readdirSync(walletsDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('_swap_report.json')) {
+        reportPaths.push(path.join(walletsDir, entry.name));
       }
     }
   }
 
-  walk(reportsRoot);
-  return reportPaths;
-}
-
-function getCoreSwapReportPaths() {
-  const reportsRoot = path.join(api1State.DATA_DIR, 'swap_reports');
-  if (!fs.existsSync(reportsRoot)) return [];
-
-  return fs
-    .readdirSync(reportsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-    .map((entry) => path.join(reportsRoot, entry.name));
+  return [...new Set(reportPaths)].filter((filePath) =>
+    fs.existsSync(filePath)
+  );
 }
 
 function readJsonFile(filePath) {
@@ -268,9 +266,13 @@ function inferTaprootFromReport(rawReport = {}) {
   });
 }
 
-function buildSwapReportRecord(filePath, rawReport) {
+function buildSwapReportRecord(filePath, rawReport, meta = {}) {
   const fileStats = fs.statSync(filePath);
-  const fileName = path.basename(filePath, '.json');
+  const baseFileName = path.basename(filePath, '.json');
+  const fileName =
+    meta.section != null && meta.index != null
+      ? `${baseFileName}:${meta.section}:${meta.index}`
+      : baseFileName;
   const nativeSwapId =
     rawReport.nativeSwapId ||
     rawReport.native_swap_id ||
@@ -293,13 +295,17 @@ function buildSwapReportRecord(filePath, rawReport) {
   const nestedReport = rawReport.report ? rawReport.report : rawReport;
   const normalizedFilePath = path.normalize(String(filePath || ''));
   const escapedSep = path.sep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const walletScopedReportPattern = new RegExp(
-    `${escapedSep}swap_reports${escapedSep}[^${escapedSep}]+${escapedSep}`
+  const walletAdjacentReportPattern = new RegExp(
+    `${escapedSep}wallets${escapedSep}[^${escapedSep}]+_swap_report\\.json$`
   );
-  const isWalletScopedReport = walletScopedReportPattern.test(normalizedFilePath);
-  const isCoreReport = !isWalletScopedReport;
+  const isWalletAdjacentReport =
+    meta.source === 'wallet' ||
+    walletAdjacentReportPattern.test(normalizedFilePath);
+  const isCoreReport = !isWalletAdjacentReport;
   const rawStatus =
-    rawReport.status || rawReport.report?.status || (isCoreReport ? 'Success' : null);
+    rawReport.status ||
+    rawReport.report?.status ||
+    (isCoreReport ? 'Success' : null);
   const normalizedStatus =
     String(rawStatus || '').toLowerCase() === 'success'
       ? 'completed'
@@ -349,37 +355,59 @@ function buildSwapReportRecord(filePath, rawReport) {
     filePath,
     fileName,
     isCoreReport,
+    isWalletAdjacentReport,
+    isUnifiedReport: false,
+    reportSource: 'wallet',
     protocol,
     isTaproot,
     protocolVersion,
   };
 }
 
+function buildSwapReportRecords(filePath, rawReport, source) {
+  if (Array.isArray(rawReport)) {
+    return rawReport.map((entry, index) =>
+      buildSwapReportRecord(filePath, entry, {
+        source,
+        section: 'items',
+        index,
+      })
+    );
+  }
+
+  if (Array.isArray(rawReport?.taker)) {
+    return rawReport.taker.map((entry, index) =>
+      buildSwapReportRecord(filePath, entry, {
+        source,
+        section: 'taker',
+        index,
+      })
+    );
+  }
+
+  return [buildSwapReportRecord(filePath, rawReport, { source })];
+}
+
+function readSwapReportRecords(filePath, source) {
+  return buildSwapReportRecords(filePath, readJsonFile(filePath), source);
+}
+
 function getPreferredSwapReports() {
   const records = [];
   const seen = new Set();
 
-  const corePaths = getCoreSwapReportPaths();
-  for (const filePath of corePaths) {
-    try {
-      const record = buildSwapReportRecord(filePath, readJsonFile(filePath));
-      const key = record.nativeSwapId || record.swapId || record.fileName;
-      seen.add(key);
-      records.push(record);
-    } catch (error) {
-      console.error(`Failed to read core swap report ${filePath}:`, error);
-    }
-  }
+  const addRecord = (record) => {
+    const key = record.nativeSwapId || record.swapId || record.fileName;
+    if (seen.has(key)) return;
+    seen.add(key);
+    records.push(record);
+  };
 
-  for (const filePath of getAllSwapReportPaths()) {
+  for (const filePath of getWalletSwapReportPaths()) {
     try {
-      const record = buildSwapReportRecord(filePath, readJsonFile(filePath));
-      const key = record.nativeSwapId || record.swapId || record.fileName;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      records.push(record);
+      readSwapReportRecords(filePath, 'wallet').forEach(addRecord);
     } catch (error) {
-      console.error(`Failed to read swap report ${filePath}:`, error);
+      console.error(`Failed to read wallet swap report ${filePath}:`, error);
     }
   }
 
@@ -407,9 +435,9 @@ function findSwapReportRecord(swapId) {
 function getHistoricalSwapOutputMap() {
   const swapOutputs = new Map();
 
-  for (const reportPath of getAllSwapReportPaths()) {
+  for (const record of getPreferredSwapReports()) {
     try {
-      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+      const report = record.report || record;
       const outputSwapUtxos =
         report.output_swap_utxos ||
         report.outputSwapUtxos ||
@@ -425,7 +453,7 @@ function getHistoricalSwapOutputMap() {
       });
     } catch (error) {
       console.warn('⚠️ Failed to parse swap report for balance derivation:', {
-        reportPath,
+        reportPath: record.filePath,
         error: error.message,
       });
     }

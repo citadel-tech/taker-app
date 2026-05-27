@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { getBtcPriceUsd } from '../../js/price.js';
 
 export function SendComponent(container, preSelectedUtxos = null) {
   const content = document.createElement('div');
@@ -11,7 +12,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
   let selectionMode =
     preSelectedUtxos && preSelectedUtxos.length > 0 ? 'manual' : 'auto';
   let selectedUtxos = preSelectedUtxos || [];
-  const btcPrice = 30000;
+  const btcPrice = getBtcPriceUsd();
 
   // New state for multi-address and signed tx
   let recipients = [{ address: '', amount: 0 }];
@@ -483,7 +484,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
         (sum, index) => sum + availableUtxos[index].amount,
         0
       );
-      valueEl.textContent = (totalValue / 100000000).toFixed(8) + ' BTC';
+      valueEl.textContent = totalValue.toLocaleString() + ' sats';
+      valueEl.title =
+        (totalValue / 100000000).toFixed(8) +
+        ' BTC - $' +
+        (((totalValue / 100000000) * btcPrice).toFixed(2));
     }
   }
 
@@ -545,8 +550,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <small>${utxo.amount.toLocaleString()} sats - ${utxo.type}</small>
           </div>
           <div>
-            <strong>${btcAmount} BTC</strong>
-            <small>$${usdAmount}</small>
+            <strong>${utxo.amount.toLocaleString()} sats</strong>
+            <small>${btcAmount} BTC - $${usdAmount}</small>
           </div>
         </label>
       `;
@@ -940,7 +945,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <div id="manual-selection-section" class="${selectionMode === 'manual' ? '' : 'hidden'} send-manual-section">
                 <div class="send-section-label">
                   <span>Select UTXOs</span>
-                  <small><span id="selected-utxos-value">0.00000000 BTC</span> selected</small>
+                  <small><span id="selected-utxos-value">0 sats</span> selected</small>
                 </div>
                 <div id="utxo-warning" class="hidden send-utxo-warning">
                   ${icons.alertTriangle(16)}

@@ -4,6 +4,7 @@ import {
   formatElapsedTime,
 } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 let swapHistory = [];
 
@@ -228,12 +229,6 @@ export function summarizeSwapHistory(history) {
   return { totalSwaps, totalAmount, totalFees, avgFeePaid };
 }
 
-function satsToBtc(sats) {
-  const normalized = Number(sats);
-  if (!Number.isFinite(normalized)) return '0.00000000';
-  return (normalized / 100000000).toFixed(8);
-}
-
 export function buildSwapHistoryMarkup(history) {
   if (history.length === 0) {
     return `
@@ -255,8 +250,6 @@ export function buildSwapHistoryMarkup(history) {
           const totalFee = Number(swap.totalFee) || 0;
           const protocolLabel = getProtocolLabel(swap);
           const protocolClasses = getProtocolBadgeClasses(protocolLabel);
-          const btcAmount = satsToBtc(amount);
-          const outputBtc = satsToBtc(totalOutputAmount);
           const timeAgo = Number.isFinite(swap.completedAt)
             ? formatRelativeTime(swap.completedAt)
             : 'Unknown time';
@@ -285,8 +278,7 @@ export function buildSwapHistoryMarkup(history) {
                 </div>
               </div>
               <div class="text-right flex-shrink-0">
-                <div class="text-lg font-mono text-green-400">${btcAmount} BTC</div>
-                <div class="text-xs text-gray-500">${amount.toLocaleString()} sats</div>
+                <div class="text-lg font-mono text-green-400">${formatSats(amount)}</div>
               </div>
               <div class="text-gray-600 flex-shrink-0">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -309,7 +301,7 @@ export function buildSwapHistoryMarkup(history) {
               </div>
               <div>
                 <span class="text-gray-500">Output</span>
-                <p class="text-green-400 font-mono">${outputBtc} BTC</p>
+                <p class="text-green-400 font-mono">${formatSats(totalOutputAmount)}</p>
               </div>
             </div>
           </div>
@@ -331,11 +323,6 @@ export async function SwapHistoryComponent(container) {
 
   const content = document.createElement('div');
   content.id = 'swap-history-content';
-
-  function satsToBtc(sats) {
-    if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
-    return (sats / 100000000).toFixed(8);
-  }
 
   function formatDuration(seconds) {
     if (typeof seconds !== 'number' || isNaN(seconds)) return '0m 0s';
@@ -401,8 +388,6 @@ export async function SwapHistoryComponent(container) {
       <div class="space-y-4">
         ${swapHistory
           .map((swap, index) => {
-            const btcAmount = satsToBtc(swap.amount);
-            const outputBtc = satsToBtc(swap.totalOutputAmount);
             const timeAgo = Number.isFinite(swap.completedAt)
               ? formatRelativeTime(swap.completedAt)
               : 'Unknown time';
@@ -435,8 +420,7 @@ export async function SwapHistoryComponent(container) {
                 
                 <!-- Amount -->
                 <div class="text-right flex-shrink-0">
-                  <div class="text-lg font-mono text-green-400">${btcAmount} BTC</div>
-                  <div class="text-xs text-gray-500">${swap.amount.toLocaleString()} sats</div>
+                  <div class="text-lg font-mono text-green-400">${formatSats(swap.amount)}</div>
                 </div>
                 
                 <!-- Arrow -->
@@ -463,7 +447,7 @@ export async function SwapHistoryComponent(container) {
                 </div>
                 <div>
                   <span class="text-gray-500">Output</span>
-                  <p class="text-green-400 font-mono">${outputBtc} BTC</p>
+                  <p class="text-green-400 font-mono">${formatSats(swap.totalOutputAmount)}</p>
                 </div>
               </div>
             </div>
@@ -523,7 +507,7 @@ export async function SwapHistoryComponent(container) {
           </div>
           <div class="bg-surface rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Total Volume</p>
-            <p class="text-2xl font-bold text-green-400">${satsToBtc(totalVolume)} BTC</p>
+            <p class="text-2xl font-bold text-green-400">${formatSats(totalVolume)}</p>
           </div>
           <div class="bg-surface rounded-lg p-4">
             <p class="text-sm text-gray-400 mb-1">Total Fees Paid</p>

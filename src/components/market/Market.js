@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function Market(container) {
   const content = document.createElement('div');
@@ -376,8 +377,8 @@ export function Market(container) {
     };
 
     return {
-      totalLiquidity: (totalLiquidity / 100000000).toFixed(8),
-      totalFidelity: (totalFidelity / 100000000).toFixed(8),
+      totalLiquidity,
+      totalFidelity,
       counts,
       nostrRelays: relayCount ?? 0,
     };
@@ -413,7 +414,7 @@ export function Market(container) {
           </div>
           <div>
             <span>Bond Amount</span>
-            <strong>${(maker.bond / 100000000).toFixed(8)} BTC</strong>
+            <strong>${formatSats(maker.bond)}</strong>
           </div>
           <div>
             <span>Bond Status</span>
@@ -475,14 +476,14 @@ export function Market(container) {
         <div class="market-stat-card fidelity">
           <span class="app-accent"></span>
           <div class="app-card-label">Fidelity Locked</div>
-          <div class="app-card-value"><span>${stats.totalFidelity}</span></div>
-          <p>Bonded across ${stats.counts.good} active makers.</p>
+          <div class="app-card-value"><span>${formatSats(stats.totalFidelity)}</span></div>
+          <p>Across ${stats.counts.good} active makers.</p>
         </div>
         <div class="market-stat-card liquidity">
           <span class="app-accent"></span>
           <div class="app-card-label">Total Liquidity</div>
-          <div class="app-card-value"><span>${stats.totalLiquidity}</span></div>
-          <p>Spendable depth available for routing.</p>
+          <div class="app-card-value"><span>${formatSats(stats.totalLiquidity)}</span></div>
+          <p>Spendable maker depth.</p>
         </div>
         <div class="market-stat-card makers">
           <span class="app-accent"></span>
@@ -538,10 +539,6 @@ export function Market(container) {
       } else {
         tableBody.innerHTML = displayedMakers
           .map((maker) => {
-            const minSwap = maker.minSize / 100000000;
-            const maxSwap = maker.maxSize / 100000000;
-            const bond = maker.bond / 100000000;
-
             return `
               <div class="market-row">
                 <label class="market-check" title="Select maker">
@@ -549,13 +546,13 @@ export function Market(container) {
                   <span></span>
                 </label>
                 <div class="market-address" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
-                <div class="market-number primary">${Number(maker.baseFee).toFixed(8)}</div>
+                <div class="market-number primary">${formatSats(maker.baseFee)}</div>
                 <div class="market-number">${maker.volumeFee}</div>
                 <div class="market-number">${maker.timeFee}</div>
-                <div class="market-number muted">${minSwap.toFixed(5)}</div>
-                <div class="market-number muted">${maxSwap.toFixed(4)}</div>
+                <div class="market-number muted">${formatSats(maker.minSize)}</div>
+                <div class="market-number muted">${formatSats(maker.maxSize)}</div>
                 <button onclick="window.viewFidelityBond('${maker.address}')" class="market-bond" title="View fidelity bond">
-                  ${maker.bond > 0 ? bond.toFixed(5) : 'N/A'} ${icons.externalLink(12)}
+                  ${maker.bond > 0 ? formatSats(maker.bond) : 'N/A'} ${icons.externalLink(12)}
                 </button>
                 ${
                   maker.status === 'good'

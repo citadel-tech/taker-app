@@ -1,5 +1,12 @@
 import { icons } from '../../js/icons.js';
 
+function satsToBtc(sats) {
+  const normalized = Number(sats || 0);
+  return Number.isFinite(normalized)
+    ? (normalized / 100000000).toFixed(8)
+    : '0.00000000';
+}
+
 export function SwapReportComponent(container, swapReport) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
     switch (value) {
@@ -288,11 +295,6 @@ export function SwapReportComponent(container, swapReport) {
   console.log('📊 Normalized report:', report);
 
   // Helper functions
-  function satsToBtc(sats) {
-    if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
-    return (sats / 100000000).toFixed(8);
-  }
-
   function formatDuration(seconds) {
     if (typeof seconds !== 'number' || isNaN(seconds)) return '0m 0s';
     const mins = Math.floor(seconds / 60);
@@ -1132,8 +1134,8 @@ export function SwapReportComponent(container, swapReport) {
             <p class="text-sm text-white">Swap Amount</p>
             <span>${icons.circleDollarSign(16, 'mr-2')}</span>
           </div>
-          <p class="text-2xl font-bold text-primary">${satsToBtc(report.targetAmount)} BTC</p>
-          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.targetAmount)} sats</p>
+          <p class="text-2xl font-bold text-primary">${formatNumber(report.targetAmount)} sats</p>
+          <p class="text-xs text-gray-400 mt-1">${satsToBtc(report.targetAmount)} BTC</p>
         </div>
 
         <div class="bg-surface rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-2">

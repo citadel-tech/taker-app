@@ -1,3 +1,5 @@
+import { formatSats } from '../../js/price.js';
+
 const WALLET_CACHE_KEY = 'wallet_data_cache';
 
 function saveWalletToCache(balance, transactions, utxos) {
@@ -60,10 +62,6 @@ export async function WalletComponent(container) {
     if (!result?.success) {
       throw new Error(result?.error || 'Wallet sync failed');
     }
-  }
-
-  function satsToBtc(sats = 0) {
-    return (Number(sats || 0) / 100000000).toFixed(8);
   }
 
   function compactId(value, left = 12, right = 8) {
@@ -244,7 +242,7 @@ export async function WalletComponent(container) {
           <button class="app-utxo-row" data-txid="${txid || ''}" type="button">
             <span class="app-utxo-main">
               <span class="app-mono app-id">${compactId(txid, 12, 4)}:${utxo.vout ?? 0}</span>
-              <span class="app-amount positive">${satsToBtc(utxo.amount)} BTC</span>
+              <span class="app-amount positive">${formatSats(utxo.amount)}</span>
             </span>
             <span class="app-pill-stack">
               <span class="app-pill ${scriptType}">${scriptType === 'taproot' ? 'Taproot' : 'SegWit'}</span>
@@ -324,7 +322,7 @@ export async function WalletComponent(container) {
               </span>
             </span>
             <span class="app-tx-right">
-              <span class="app-amount ${isReceive ? 'positive' : 'negative'}">${amountPrefix}${satsToBtc(Math.abs(amount))} BTC</span>
+              <span class="app-amount ${isReceive ? 'positive' : 'negative'}">${amountPrefix}${formatSats(Math.abs(amount))}</span>
               <span class="app-time">${formatDate(timestamp)}</span>
             </span>
             <span class="app-icon-action" aria-label="Open transaction">
@@ -375,16 +373,16 @@ export async function WalletComponent(container) {
       Number(balance.contract || 0);
     const share = total > 0 ? Math.min(100, (spendable / total) * 100) : 0;
 
-    content.querySelector('#spendable-balance').textContent = satsToBtc(
+    content.querySelector('#spendable-balance').textContent = formatSats(
       balance.spendable
     );
-    content.querySelector('#swap-balance').textContent = satsToBtc(
+    content.querySelector('#swap-balance').textContent = formatSats(
       balance.swap
     );
-    content.querySelector('#regular-balance').textContent = satsToBtc(
+    content.querySelector('#regular-balance').textContent = formatSats(
       balance.regular
     );
-    content.querySelector('#contract-balance').textContent = satsToBtc(
+    content.querySelector('#contract-balance').textContent = formatSats(
       balance.contract
     );
     content.querySelector('#balance-share').textContent =
@@ -505,8 +503,7 @@ export async function WalletComponent(container) {
       <article class="app-balance-card hero">
         <span class="app-accent"></span>
         <span class="app-card-label">Balance</span>
-        <div class="app-card-value"><span id="spendable-balance">0.00000000</span><small>BTC</small></div>
-        <p>Total available</p>
+        <div class="app-card-value"><span id="spendable-balance">0 sats</span></div>
         <div class="app-share">
           <span id="balance-share">0.0%</span>
           <span class="app-share-track"><span id="balance-share-bar"></span></span>
@@ -516,20 +513,17 @@ export async function WalletComponent(container) {
       <article class="app-balance-card info">
         <span class="app-accent"></span>
         <span class="app-card-label">Swaps</span>
-        <div class="app-card-value"><span id="swap-balance">0.00000000</span><small>BTC</small></div>
-        <p>Received in swaps</p>
+        <div class="app-card-value"><span id="swap-balance">0 sats</span></div>
       </article>
       <article class="app-balance-card wallet">
         <span class="app-accent"></span>
         <span class="app-card-label">Wallet</span>
-        <div class="app-card-value"><span id="regular-balance">0.00000000</span><small>BTC</small></div>
-        <p>Regular wallet coins</p>
+        <div class="app-card-value"><span id="regular-balance">0 sats</span></div>
       </article>
       <article class="app-balance-card warning">
         <span class="app-accent"></span>
         <span class="app-card-label">Contracts</span>
-        <div class="app-card-value"><span id="contract-balance">0.00000000</span><small>BTC</small></div>
-        <p>In active contracts</p>
+        <div class="app-card-value"><span id="contract-balance">0 sats</span></div>
       </article>
     </section>
 

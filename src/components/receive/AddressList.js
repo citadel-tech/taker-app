@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function AddressListComponent(container) {
   let currentFilter = 'all';
@@ -182,9 +183,9 @@ const result = await window.api.taker.getTransactions(200, 0);
     }
 
     const csv = [
-      'Address,Type,Spend Type,Times Used,Received (BTC),Created At,Last Used',
+      'Address,Type,Spend Type,Times Used,Received (sats),Created At,Last Used',
       ...allAddresses.map((addr) => {
-        return `"${addr.address}","${addr.type}","${addr.spendType}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
+        return `"${addr.address}","${addr.type}","${addr.spendType}",${addr.used},${Math.round(addr.received)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
       }),
     ].join('\n');
 
@@ -240,7 +241,7 @@ const result = await window.api.taker.getTransactions(200, 0);
           </div>
           <div class="bg-surface rounded-lg p-6">
             <p class="text-sm text-gray-400 mb-2">Total Received</p>
-            <p class="text-2xl font-mono text-cyan-400">${(stats.totalReceived / 100000000).toFixed(8)} BTC</p>
+            <p class="text-2xl font-mono text-cyan-400">${formatSats(stats.totalReceived)}</p>
           </div>
         </div>
 
@@ -354,7 +355,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                         </td>
                         <td class="py-3 px-4 text-sm text-gray-300 font-mono">${addr.used}</td>
                         <td class="py-3 px-4 text-sm font-mono ${addr.received > 0 ? 'text-green-400' : 'text-gray-500'}">
-                          ${(addr.received / 100000000).toFixed(8)}
+                          ${formatSats(addr.received)}
                         </td>
                         <td class="py-3 px-4 text-sm text-gray-400" title="${createdDate.toLocaleString()}">
                           ${createdDate.toLocaleDateString()}

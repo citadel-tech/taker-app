@@ -1,3 +1,5 @@
+import { formatSats } from '../../js/price.js';
+
 export function UtxoListComponent(container) {
   // State for UTXO selection and filtering
   let selectedUtxos = [];
@@ -32,10 +34,6 @@ export function UtxoListComponent(container) {
   }
 
   // Helper Functions
-  function satsToBtc(sats) {
-    return (sats / 100000000).toFixed(8);
-  }
-
   function truncateTxid(txid) {
     if (typeof txid === 'object' && txid.value) {
       txid = txid.value;
@@ -289,7 +287,7 @@ export function UtxoListComponent(container) {
         (sum, idx) => sum + filteredUtxos[idx].utxo.amount,
         0
       );
-      selectedValue.textContent = satsToBtc(totalSelected);
+      selectedValue.textContent = formatSats(totalSelected);
     } else {
       actionButtons.classList.add('hidden');
     }
@@ -369,9 +367,7 @@ export function UtxoListComponent(container) {
     const stats = calculateStats();
 
     content.querySelector('#total-utxos').textContent = stats.totalUtxos;
-    content.querySelector('#total-value').textContent = satsToBtc(
-      stats.totalValue
-    );
+    content.querySelector('#total-value').textContent = formatSats(stats.totalValue);
     content.querySelector('#confirmed-count').textContent = stats.confirmed;
     content.querySelector('#unconfirmed-count').textContent = stats.unconfirmed;
 
@@ -429,7 +425,9 @@ export function UtxoListComponent(container) {
           </td>
           <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-primary hover:underline transition-colors" 
               onclick="openTxOnMempool('${txid}')">${txidShort}:${utxo.vout}</td>
-          <td class="py-3 px-4 text-green-400 font-mono">${satsToBtc(utxo.amount)}</td>
+          <td class="py-3 px-4">
+            <div class="text-green-400 font-mono">${formatSats(utxo.amount)}</div>
+          </td>
           <td class="py-3 px-4 text-gray-300 ${utxo.confirmations === 0 ? 'text-yellow-400' : ''}">${utxo.confirmations}</td>
           <td class="py-3 px-4">
             <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${scriptColor}-500/20 text-${scriptColor}-400 border border-${scriptColor}-500/30">
@@ -478,7 +476,7 @@ export function UtxoListComponent(container) {
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Value</p>
-                <p id="total-value" class="text-2xl font-mono text-green-400">-- BTC</p>
+                <p id="total-value" class="text-2xl font-mono text-green-400">-- sats</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Confirmed</p>
@@ -528,7 +526,7 @@ export function UtxoListComponent(container) {
                 <!-- Selection Actions -->
                 <div id="utxo-actions" class="hidden flex items-center gap-3">
                     <span class="text-sm text-gray-400">
-                        <span id="selection-count">0</span> selected • <span id="selected-value">0</span> BTC
+                        <span id="selection-count">0</span> selected • <span id="selected-value">0 sats</span>
                     </span>
                     <button id="send-selected" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Send Selected
