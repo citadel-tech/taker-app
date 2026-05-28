@@ -571,14 +571,19 @@ export async function SwapComponent(container) {
   }
 
   function getNumberOfHops() {
-    if (useCustomHops) {
-      return customHopCount;
-    }
-    return numberOfHops;
+    return getNumberOfMakers() + 1;
   }
 
   function getNumberOfMakers() {
-    return getNumberOfHops() - 1;
+    if (makerSelectionMode === 'manual') {
+      return selectedMakerAddresses.length;
+    }
+
+    if (useCustomHops) {
+      return Math.max(1, customHopCount - 1);
+    }
+
+    return Math.max(1, numberOfHops - 1);
   }
 
   function getSelectedUtxosTotal() {
@@ -652,39 +657,51 @@ export async function SwapComponent(container) {
     };
   }
 
+  function readSwapAmountInput() {
+    const input = content.querySelector('#swap-amount-input');
+    const value = parseFloat(String(input?.value || '').replace(/,/g, '')) || 0;
+
+    if (amountUnit === 'sats') {
+      return Math.floor(value);
+    }
+
+    if (amountUnit === 'btc') {
+      return Math.floor(value * 100000000);
+    }
+
+    if (amountUnit === 'usd') {
+      return Math.floor((value / btcPrice) * 100000000);
+    }
+
+    return 0;
+  }
+
+  function writeSwapAmountInput(amountSats) {
+    const input = content.querySelector('#swap-amount-input');
+    if (!input || amountSats <= 0) return;
+
+    if (amountUnit === 'sats') {
+      input.value = amountSats;
+    } else if (amountUnit === 'btc') {
+      input.value = (amountSats / 100000000).toFixed(8);
+    } else if (amountUnit === 'usd') {
+      input.value = ((amountSats / 100000000) * btcPrice).toFixed(2);
+    }
+  }
+
+
   function updateSummary() {
     const selectedTotal = getSelectedUtxosTotal();
 
-    // In manual mode, calculate swap amount from UTXOs
-    if (selectionMode === 'manual' && selectedUtxos.length > 0) {
-      const inputAmount = selectedTotal;
+    swapAmount = readSwapAmountInput();
 
-      // Calculate what we can actually swap after fees
-      const estimatedFees = calculateFees(inputAmount);
-
-      // Available swap amount = UTXOs - fees - small buffer for fee variance
-      swapAmount = Math.max(0, inputAmount - estimatedFees.totalFeeSats - 1000);
-    } else if (selectionMode === 'auto') {
-      // In auto mode, read from input
-      const input = content.querySelector('#swap-amount-input');
-      const value = parseFloat(String(input?.value || '').replace(/,/g, '')) || 0;
-
-      if (amountUnit === 'sats') {
-        swapAmount = Math.floor(value);
-      } else if (amountUnit === 'btc') {
-        swapAmount = Math.floor(value * 100000000);
-      } else if (amountUnit === 'usd') {
-        swapAmount = Math.floor((value / btcPrice) * 100000000);
-      }
-
-      const inputConversions = content.querySelector(
-        '#amount-input-conversions'
-      );
-      if (inputConversions && selectionMode === 'auto') {
-        const btcAmount = (swapAmount / 100000000).toFixed(8);
-        const usdAmount = ((swapAmount / 100000000) * btcPrice).toFixed(2);
-        inputConversions.textContent = `≈ ${btcAmount} BTC • $${usdAmount} USD`;
-      }
+    const inputConversions = content.querySelector(
+      '#amount-input-conversions'
+    );
+    if (inputConversions) {
+      const btcAmount = (swapAmount / 100000000).toFixed(8);
+      const usdAmount = ((swapAmount / 100000000) * btcPrice).toFixed(2);
+      inputConversions.textContent = `≈ ${btcAmount} BTC • $${usdAmount} USD`;
     }
 
     const details = calculateSwapDetails();
@@ -706,7 +723,7 @@ export async function SwapComponent(container) {
     if (selectedUtxosDisplay) {
       if (selectionMode === 'manual' && selectedUtxos.length > 0) {
         selectedUtxosDisplay.textContent =
-          selectedTotal.toLocaleString() + ' sats';
+          `${selectedUtxos.length} selected · ${selectedTotal.toLocaleString()} sats`;
       } else {
         selectedUtxosDisplay.textContent =
           `${selectedUtxos.length || getNumberOfHops()} UTXOs · ${Math.max(selectedTotal, swapAmount).toLocaleString()} sats`;
@@ -725,7 +742,7 @@ export async function SwapComponent(container) {
         `${makerSelectionMode === 'manual' ? selectedMakerAddresses.length : details.makers} selected`;
     }
     content.querySelector('#num-hops-display').textContent =
-      details.hops + ' hop' + (details.hops !== 1 ? 's' : '');
+      details.makers + ' maker' + (details.makers !== 1 ? 's' : '');
     content.querySelector('#estimated-time').textContent =
       formatEstimatedTime(details.timeSeconds);
 
@@ -736,9 +753,10 @@ export async function SwapComponent(container) {
     // Update makers label and display based on selection mode
     const makersLabelEl = content.querySelector('#makers-label');
     let selectedMakersText;
-    if (makerSelectionMode === 'manual' && selectedMakerAddresses.length > 0) {
+    if (makerSelectionMode === 'manual') {
       selectedMakersText =
-        selectedMakerAddresses.map((addr) => formatTorEndpoint(addr)).join(', ');
+        selectedMakerAddresses.map((addr) => formatTorEndpoint(addr)).join(', ') ||
+        'None selected';
       if (makersLabelEl) makersLabelEl.textContent = 'Selected Makers';
     } else {
       selectedMakersText =
@@ -788,11 +806,22 @@ export async function SwapComponent(container) {
 
     let warnings = [];
     const makersNeeded = getNumberOfMakers();
+    const selectedTotal = getSelectedUtxosTotal();
 
     // Check swap amount
+    if (swapAmount <= 0) {
+      warnings.push('Enter a swap amount');
+    }
+
     if (selectionMode === 'manual') {
       if (selectedUtxos.length === 0) {
         warnings.push('Select at least one UTXO');
+      }
+
+      if (selectedUtxos.length > 0 && selectedTotal < swapAmount) {
+        warnings.push(
+          `Selected UTXOs only cover ${selectedTotal.toLocaleString()} sats`
+        );
       }
 
       // Check if receive amount is too small after fees
@@ -800,15 +829,10 @@ export async function SwapComponent(container) {
       const receiveAmount = swapAmount - details.totalFeeSats;
       if (selectedUtxos.length > 0 && receiveAmount < 10000) {
         warnings.push(
-          'Receive amount too small after fees. Select more UTXOs or fewer hops.'
+          'Receive amount too small after fees. Select more UTXOs or fewer makers.'
         );
       }
     } else {
-      // Auto mode validations
-      if (swapAmount <= 0) {
-        warnings.push('Enter a swap amount');
-      }
-
       // Check if amount exceeds balance
       if (balancesLoaded && swapAmount > maxSwappableAmount) {
         warnings.push(
@@ -824,20 +848,13 @@ export async function SwapComponent(container) {
     // Check if enough makers available
     if (availableMakers.length > 0 && makersNeeded > availableMakers.length) {
       warnings.push(
-        `Need ${makersNeeded} makers for ${getNumberOfHops()} hops, but only ${availableMakers.length} available`
+        `Need ${makersNeeded} makers, but only ${availableMakers.length} available`
       );
     }
 
     // Manual maker mode: check enough makers selected
-    if (makerSelectionMode === 'manual' && selectedMakerAddresses.length < makersNeeded) {
-      warnings.push(
-        `Need ${makersNeeded} maker${makersNeeded !== 1 ? 's' : ''} for this swap, but only ${selectedMakerAddresses.length} selected`
-      );
-    }
-
-    // Check custom hops validity
-    if (useCustomHops && customHopCount < 2) {
-      warnings.push('Minimum 2 hops required (1 maker)');
+    if (makerSelectionMode === 'manual' && selectedMakerAddresses.length === 0) {
+      warnings.push('Select at least one maker');
     }
 
     // Check maker liquidity limits
@@ -904,6 +921,8 @@ export async function SwapComponent(container) {
       content
         .querySelector('#custom-hop-input-container')
         .classList.remove('hidden');
+      const customInput = content.querySelector('#custom-hop-input');
+      if (customInput) customInput.value = Math.max(1, customHopCount - 1);
     } else {
       content.querySelector('#hop-' + count)?.classList.add('is-active');
       content
@@ -914,6 +933,48 @@ export async function SwapComponent(container) {
     updateSummary();
   }
 
+  function setMakerCount(count) {
+    if (count === 'custom') {
+      setHopCount('custom');
+      return;
+    }
+
+    setHopCount(count + 1);
+  }
+
+  function updateSelectionModeUI() {
+    const utxoAutoNote = content.querySelector('#utxo-auto-note');
+    const utxoSelectionSection = content.querySelector('#utxo-selection-section');
+    const makerCountHint = content.querySelector('#maker-count-hint');
+    const makerAutoControls = content.querySelector('#maker-auto-controls');
+    const makerAutoNote = content.querySelector('#maker-auto-note');
+    const makerSelectionSection = content.querySelector('#maker-selection-section');
+
+    if (utxoAutoNote) {
+      utxoAutoNote.classList.toggle('hidden', selectionMode !== 'auto');
+    }
+
+    if (utxoSelectionSection) {
+      utxoSelectionSection.classList.toggle('hidden', selectionMode !== 'manual');
+    }
+
+    if (makerCountHint) {
+      makerCountHint.classList.toggle('hidden', makerSelectionMode !== 'auto');
+    }
+
+    if (makerAutoControls) {
+      makerAutoControls.classList.toggle('hidden', makerSelectionMode !== 'auto');
+    }
+
+    if (makerAutoNote) {
+      makerAutoNote.classList.toggle('hidden', makerSelectionMode !== 'auto');
+    }
+
+    if (makerSelectionSection) {
+      makerSelectionSection.classList.toggle('hidden', makerSelectionMode !== 'manual');
+    }
+  }
+
   function toggleSelectionMode(mode) {
     selectionMode = mode;
 
@@ -921,6 +982,7 @@ export async function SwapComponent(container) {
       btn.classList.toggle('is-active', btn.id === 'mode-' + mode);
     });
 
+    updateSelectionModeUI();
     updateSummary();
   }
 
@@ -931,6 +993,7 @@ export async function SwapComponent(container) {
       btn.classList.toggle('is-active', btn.id === 'maker-mode-' + mode);
     });
 
+    updateSelectionModeUI();
     updateSummary();
   }
 
@@ -1001,11 +1064,11 @@ export async function SwapComponent(container) {
   }
 
   function setMaxAmount() {
-    if (selectionMode === 'manual') {
-      return; // In manual mode, amount is from UTXOs
-    }
-
-    swapAmount = Math.max(0, maxSwappableAmount);
+    const selectedTotal = getSelectedUtxosTotal();
+    swapAmount =
+      selectionMode === 'manual' && selectedTotal > 0
+        ? selectedTotal
+        : Math.max(0, maxSwappableAmount);
 
     // Also check maker max size
     if (availableMakers.length > 0) {
@@ -1077,25 +1140,20 @@ export async function SwapComponent(container) {
           <div class="swap-section">
             <div class="swap-section-head">
               <h3>Select UTXOs</h3>
-              <span>Auto · <strong id="selected-utxos-count">0</strong> selected</span>
+              <span><strong id="selected-utxos-count">0</strong> selected</span>
             </div>
             <div class="swap-segment">
-              <button id="mode-auto" class="mode-btn is-active">Select UTXOs <small>auto</small></button>
-              <button id="mode-manual" class="mode-btn">Select UTXOs <small>manual</small></button>
+              <button id="mode-auto" class="mode-btn is-active">Auto select</button>
+              <button id="mode-manual" class="mode-btn">Manual select</button>
             </div>
-            <div class="swap-mode-row">
-              <button class="swap-inline-tab is-active" type="button">Auto select</button>
-              <span></span>
-              <button class="swap-inline-tab muted" type="button">Manual select</button>
-            </div>
-            <div class="swap-auto-note">
+            <div id="utxo-auto-note" class="swap-auto-note">
               <span>Wallet picks UTXOs to minimize change</span>
               <strong><span id="selected-utxos-total">0 sats</span></strong>
             </div>
             <div id="utxo-warning" class="hidden swap-warning-note">
               ${icons.alertTriangle(15)} <span>Mixing Regular and Swap UTXOs in the same transaction can compromise privacy.</span>
             </div>
-            <div id="utxo-selection-section" class="swap-picker">
+            <div id="utxo-selection-section" class="hidden swap-picker">
               <div class="swap-picker-head">
                 <span>Pick UTXOs to fund the swap</span>
                 <strong>Total <span id="utxo-picker-total">0 sats</span></strong>
@@ -1107,20 +1165,39 @@ export async function SwapComponent(container) {
           </div>
 
           <div class="swap-section">
-            <div class="swap-mode-row">
-              <button class="swap-inline-tab is-active" type="button">Auto select</button>
-              <span></span>
-              <button class="swap-inline-tab muted" type="button">Manual select</button>
-            </div>
-            <div class="swap-auto-note">
-              <span>Wallet picks good makers from the market</span>
-              <strong><span id="required-makers-count">2</span> makers from <span id="available-makers-count">${availableMakers.length}</span> candidates</strong>
+            <div class="swap-section-head">
+              <h3>Select Makers</h3>
+              <span id="maker-count-hint"><strong id="required-makers-count">2</strong> from <strong id="available-makers-count">${availableMakers.length}</strong> available</span>
             </div>
             <div class="swap-segment maker">
-              <button id="maker-mode-auto" class="maker-mode-btn is-active">Select Makers <small>auto</small></button>
-              <button id="maker-mode-manual" class="maker-mode-btn">Select Makers <small>manual</small></button>
+              <button id="maker-mode-auto" class="maker-mode-btn is-active">Auto select</button>
+              <button id="maker-mode-manual" class="maker-mode-btn">Manual select</button>
             </div>
-            <div id="maker-selection-section" class="swap-picker">
+            <div id="maker-auto-note" class="swap-auto-note">
+              <span>Wallet picks good makers from the market</span>
+              <strong><span id="num-makers-display">2 makers</span></strong>
+            </div>
+            <div id="maker-auto-controls">
+              <div class="swap-section-head swap-subsection-head">
+                <h3>Number Of Makers</h3>
+                <span>Recommended minimum 2</span>
+              </div>
+              <div class="swap-warning-note">
+                ${icons.alertTriangle(16)} <span>Warning: If you swap with only one maker, that maker can deanonymize you. Recommended minimum makers = 2.</span>
+              </div>
+              <div class="swap-hop-grid">
+                <button id="hop-2" class="hop-count-btn"><strong>1</strong><span>Maker</span></button>
+                <button id="hop-3" class="hop-count-btn is-active"><strong>2</strong><span>Makers</span></button>
+                <button id="hop-4" class="hop-count-btn"><strong>3</strong><span>Makers</span></button>
+                <button id="hop-5" class="hop-count-btn"><strong>4</strong><span>Makers</span></button>
+                <button id="hop-custom" class="hop-count-btn"><strong>5+</strong><span>Custom</span></button>
+              </div>
+              <div id="custom-hop-input-container" class="hidden swap-custom-hop">
+                <input id="custom-hop-input" type="number" min="5" max="20" value="5" />
+                <span>makers</span>
+              </div>
+            </div>
+            <div id="maker-selection-section" class="hidden swap-picker">
               <div class="swap-picker-head">
                 <span>Pick makers to route the swap</span>
                 <strong>Selected <span id="selected-makers-count">0</span> makers</strong>
@@ -1129,28 +1206,6 @@ export async function SwapComponent(container) {
                 <p class="swap-empty-row">Loading makers...</p>
               </div>
             </div>
-          </div>
-
-          <div class="swap-section">
-            <div class="swap-section-head">
-              <h3>Number Of Hops</h3>
-              <span><strong id="num-makers-display">2 makers</strong> required</span>
-            </div>
-            <div class="swap-warning-note">
-              ${icons.alertTriangle(16)} <span>Warning: If swap with only one maker, the maker can deanonymize you. Recommended minimum hop = 2.</span>
-            </div>
-            <div class="swap-hop-grid">
-              <button id="hop-2" class="hop-count-btn"><strong>2</strong><span>Hops</span></button>
-              <button id="hop-3" class="hop-count-btn is-active"><strong>3</strong><span>Hops</span></button>
-              <button id="hop-4" class="hop-count-btn"><strong>4</strong><span>Hops</span></button>
-              <button id="hop-5" class="hop-count-btn"><strong>5</strong><span>Hops</span></button>
-              <button id="hop-custom" class="hop-count-btn"><strong>6+</strong><span>Custom</span></button>
-            </div>
-            <div id="custom-hop-input-container" class="hidden swap-custom-hop">
-              <input id="custom-hop-input" type="number" min="2" max="20" value="6" />
-              <span>hops = <strong id="custom-makers-display">5</strong> makers</span>
-            </div>
-            <p class="swap-help">More hops = better privacy, higher fees.</p>
           </div>
 
           <div id="validation-warning" class="hidden swap-validation"></div>
@@ -1170,7 +1225,7 @@ export async function SwapComponent(container) {
             <div class="swap-summary-lines">
               <div><span>Swap amount</span><strong id="swap-amount-display">0 sats</strong></div>
               <p id="swap-amount-conversions">0.00000000 BTC</p>
-              <div><span>Number of hops</span><strong id="num-hops-display">3 hops</strong></div>
+              <div><span>Number of makers</span><strong id="num-hops-display">2 makers</strong></div>
               <div><span>Makers</span><strong id="maker-count-summary">0 selected</strong></div>
               <div class="maker-candidates"><span id="makers-label">Top maker candidates</span><strong id="selected-makers-display" title="None selected">None selected</strong></div>
               <div><span>Funding transactions</span><strong id="funding-txs-count">3</strong></div>
@@ -1202,6 +1257,8 @@ export async function SwapComponent(container) {
   `;
 
   container.appendChild(content);
+  writeSwapAmountInput(swapAmount);
+  updateSelectionModeUI();
 
   function updateBalanceUI() {
     const balanceEl = content.querySelector('#available-balance-sats');
@@ -1226,9 +1283,6 @@ export async function SwapComponent(container) {
   content
     .querySelector('#swap-amount-input')
     .addEventListener('input', async () => {
-      if (selectionMode !== 'auto') {
-        toggleSelectionMode('auto');
-      }
       updateSummary();
       await saveCurrentSelections();
     });
@@ -1251,19 +1305,19 @@ export async function SwapComponent(container) {
   });
 
   content.querySelector('#hop-2').addEventListener('click', () => {
-    setHopCount(2);
+    setMakerCount(1);
     saveCurrentSelections();
   });
   content.querySelector('#hop-3').addEventListener('click', () => {
-    setHopCount(3);
+    setMakerCount(2);
     saveCurrentSelections();
   });
   content.querySelector('#hop-4').addEventListener('click', () => {
-    setHopCount(4);
+    setMakerCount(3);
     saveCurrentSelections();
   });
   content.querySelector('#hop-5').addEventListener('click', () => {
-    setHopCount(5);
+    setMakerCount(4);
     saveCurrentSelections();
   });
   content.querySelector('#hop-custom').addEventListener('click', () => {
@@ -1273,10 +1327,9 @@ export async function SwapComponent(container) {
 
   // Custom hop input
   content.querySelector('#custom-hop-input').addEventListener('input', (e) => {
-    let value = parseInt(e.target.value) || 2;
-    value = Math.max(2, Math.min(20, value));
-    customHopCount = value;
-    content.querySelector('#custom-makers-display').textContent = value - 1;
+    let value = parseInt(e.target.value) || 5;
+    value = Math.max(5, Math.min(20, value));
+    customHopCount = value + 1;
     updateSummary();
     saveCurrentSelections();
   });
@@ -1315,6 +1368,11 @@ export async function SwapComponent(container) {
         return;
       }
 
+      if (makerSelectionMode === 'manual' && selectedMakerAddresses.length === 0) {
+        alert('Please select at least one maker');
+        return;
+      }
+
       // ✅ ADD THIS PROTOCOL CHECK
       let protocol = 'v1';
       let protocolName = 'Legacy';
@@ -1343,7 +1401,7 @@ export async function SwapComponent(container) {
 
           if (compatibleMakers.length < makersNeeded) {
             alert(
-              `❌ Not enough ${protocolName} makers available!\n\nYour wallet: ${protocolName}\nCompatible makers available: ${compatibleMakers.length}\nMakers needed: ${makersNeeded}\n\nPlease sync market data or reduce number of hops.`
+              `❌ Not enough ${protocolName} makers available!\n\nYour wallet: ${protocolName}\nCompatible makers available: ${compatibleMakers.length}\nMakers needed: ${makersNeeded}\n\nPlease sync market data or reduce the number of makers.`
             );
             return;
           }
@@ -1456,9 +1514,7 @@ export async function SwapComponent(container) {
     setHopCount('custom');
     const customInput = content.querySelector('#custom-hop-input');
     if (customInput) {
-      customInput.value = customHopCount;
-      content.querySelector('#custom-makers-display').textContent =
-        customHopCount - 1;
+      customInput.value = Math.max(1, customHopCount - 1);
     }
   } else if (numberOfHops !== 3) {
     setHopCount(numberOfHops);
@@ -1498,7 +1554,7 @@ export async function SwapComponent(container) {
       }
 
       // Restore amount input
-      if (swapAmount > 0 && selectionMode === 'auto') {
+      if (swapAmount > 0) {
         const input = content.querySelector('#swap-amount-input');
         if (amountUnit === 'sats') {
           input.value = swapAmount;
@@ -1536,7 +1592,7 @@ export async function SwapComponent(container) {
     }
 
     // Restore amount input
-    if (swapAmount > 0 && selectionMode === 'auto') {
+    if (swapAmount > 0) {
       const input = content.querySelector('#swap-amount-input');
       if (amountUnit === 'sats') {
         input.value = swapAmount;

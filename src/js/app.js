@@ -152,6 +152,7 @@ function startTakerInitWithConfig(config) {
       console.log('⏭️ Taker initialization skipped');
     } else {
       console.log('✅ Taker initialized');
+      startBackgroundOfferbookSync();
     }
     startMainApp();
   });
@@ -267,8 +268,21 @@ async function showPasswordPrompt(config) {
   });
 }
 
+let offerbookSyncPromise = null;
+
 async function startBackgroundOfferbookSync() {
+  if (offerbookSyncPromise) return offerbookSyncPromise;
+
+  offerbookSyncPromise = runBackgroundOfferbookSync().finally(() => {
+    offerbookSyncPromise = null;
+  });
+
+  return offerbookSyncPromise;
+}
+
+async function runBackgroundOfferbookSync() {
   try {
+    console.log('🔄 Starting background offerbook sync...');
     const syncResult = await window.api.taker.syncOfferbookAndWait();
     if (!syncResult.success) {
       console.warn(

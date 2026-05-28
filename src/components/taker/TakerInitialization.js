@@ -3,89 +3,94 @@ import { icons } from '../../js/icons.js';
 export function TakerInitializationComponent(container, config, onInitialized) {
   const initDiv = document.createElement('div');
   initDiv.id = 'taker-initialization';
-  initDiv.className =
-    'fixed inset-0 bg-app-bg flex items-center justify-center z-50';
+  initDiv.className = 'app-loader-screen';
 
   initDiv.innerHTML = `
-        <div class="bg-surface rounded-lg max-w-md w-full mx-4 p-8">
-            <div class="text-center mb-8">
-                <div class="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="animate-spin">${icons.loader(40)}</span>
+        <div class="app-loader-card">
+            <div class="app-loader-head">
+                <div class="app-loader-orb">
+                    ${icons.loader(34)}
                 </div>
-                <h2 class="text-2xl font-bold text-white mb-2">Initializing Taker</h2>
-                <p id="taker-status-text" class="text-gray-400 text-sm">Setting up coinswap functionality...</p>
+                <span class="app-loader-kicker">Wallet runtime</span>
+                <h2>Initializing Taker</h2>
+                <p id="taker-status-text">Setting up coinswap functionality...</p>
             </div>
 
-            <div class="mb-6">
-                <div class="space-y-3">
-                    <div id="step-tor" class="flex items-center space-x-3">
-                        <div id="step-tor-icon" class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                            <span class="text-xs text-white">1</span>
-                        </div>
-                        <span id="step-tor-text" class="text-gray-400 text-sm">Checking Tor connection</span>
+            <div class="app-loader-steps">
+                <div id="step-tor" class="app-loader-step">
+                    <div id="step-tor-icon" class="app-loader-step-icon">
+                        <span>1</span>
                     </div>
-                    <div id="step-taker" class="flex items-center space-x-3">
-                        <div id="step-taker-icon" class="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center">
-                            <span class="text-xs text-white">2</span>
-                        </div>
-                        <span id="step-taker-text" class="text-gray-400 text-sm">Initializing taker (creates wallet)</span>
+                    <div>
+                        <span>Network</span>
+                        <strong id="step-tor-text">Checking Tor connection</strong>
                     </div>
                 </div>
-            </div>
-
-            <div class="mb-6">
-                <div class="bg-gray-700 rounded-full h-2">
-                    <div id="progress-bar" class="bg-primary h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                <div id="step-taker" class="app-loader-step">
+                    <div id="step-taker-icon" class="app-loader-step-icon">
+                        <span>2</span>
+                    </div>
+                    <div>
+                        <span>Wallet</span>
+                        <strong id="step-taker-text">Initializing taker</strong>
+                    </div>
                 </div>
-                <p id="progress-text" class="text-xs text-gray-400 mt-2 text-center">Initializing...</p>
             </div>
 
-            <!-- Password Prompt (hidden by default) -->
-            <div id="password-prompt" class="hidden mb-6">
-                <label class="block text-sm text-gray-400 mb-2">Wallet Password</label>
+            <div class="app-loader-progress">
+                <div class="app-loader-progress-track">
+                    <div id="progress-bar" class="app-loader-progress-fill" style="width: 0%"></div>
+                </div>
+                <p id="progress-text">Initializing...</p>
+            </div>
+
+            <div id="password-prompt" class="app-loader-form hidden">
+                <label for="unlock-password-input">Wallet Password</label>
                 <input 
                     type="password" 
                     id="unlock-password-input"
                     placeholder="Enter wallet password"
-                    class="w-full bg-app-bg border border-gray-700 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-primary transition-colors"
                 />
-                <div id="password-error" class="hidden mt-2 bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-                    <p class="text-xs text-red-400"></p>
+                <div id="password-error" class="app-loader-message error compact hidden">
+                    <p></p>
                 </div>
-                <button id="unlock-submit-btn" class="w-full mt-4 bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-3 px-4 rounded-lg transition-colors">
+                <button id="unlock-submit-btn" class="app-loader-action primary">
                     Unlock Wallet
                 </button>
-                <div class="mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                    <p class="text-xs text-blue-400">
-                        ${icons.lightbulb(16, 'mr-1')} <strong>Tip:</strong> This is the password you set when creating your wallet.
-                    </p>
+                <div class="app-loader-message info compact">
+                    <div>
+                        ${icons.lightbulb(17)}
+                        <p>This is the password you set when creating your wallet.</p>
+                    </div>
                 </div>
             </div>
 
-            <div id="taker-error" class="hidden mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                <div class="flex items-start">
-                    <span class="text-red-400 mr-2">${icons.alertTriangle(16)}</span>
+            <div id="taker-error" class="app-loader-message error hidden">
+                <div>
+                    ${icons.alertTriangle(18)}
                     <div>
-                        <p class="text-sm font-medium text-red-400">Initialization Failed</p>
-                        <p id="error-message" class="text-xs text-red-300 mt-1"></p>
+                        <strong>Initialization failed</strong>
+                        <p id="error-message"></p>
                     </div>
                 </div>
-                <div class="mt-3 space-y-2">
-                    <button id="retry-taker" class="w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm">
+                <div class="app-loader-actions">
+                    <button id="retry-taker" class="app-loader-action danger">
                         Retry
                     </button>
-                    <button id="skip-taker" class="w-full bg-secondary hover:bg-secondary-hover text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-gray-600">
+                    <button id="skip-taker" class="app-loader-action secondary">
                         Skip Setup
                     </button>
                 </div>
             </div>
 
-            <div id="tor-setup" class="hidden mt-4 bg-blue-500/10 border border-blue-500/30 rounded-lg p-4">
-                <p class="text-xs text-blue-400 mb-3">
-                    ${icons.lightbulb(16, 'mr-1')} <strong>Tor Not Running:</strong>
-                </p>
-                <div class="bg-app-bg rounded p-3 font-mono text-xs text-gray-300">
-                    sudo systemctl start tor@coinswap
+            <div id="tor-setup" class="app-loader-message info hidden">
+                <div>
+                    ${icons.lightbulb(18)}
+                    <div>
+                        <strong>Tor not running</strong>
+                        <p>Start the Coinswap Tor service and try again.</p>
+                        <code>sudo systemctl start tor@coinswap</code>
+                    </div>
                 </div>
             </div>
         </div>
@@ -99,32 +104,31 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
     if (!icon || !textEl) return;
 
-    icon.className = 'w-6 h-6 rounded-full flex items-center justify-center';
+    icon.className = 'app-loader-step-icon';
+    textEl.className = '';
 
     switch (status) {
       case 'active':
-        icon.className += ' bg-primary animate-pulse';
-        icon.innerHTML = '<div class="w-2 h-2 bg-white rounded-full"></div>';
+        icon.classList.add('is-active');
+        icon.innerHTML = '<span></span>';
         if (text) textEl.textContent = text;
-        textEl.className = 'text-white text-sm font-medium';
+        textEl.classList.add('is-active');
         break;
       case 'complete':
-        icon.className += ' bg-green-500';
-        icon.innerHTML = '<span class="text-xs text-white">✓</span>';
+        icon.classList.add('is-success');
+        icon.innerHTML = `<span>${icons.check(13)}</span>`;
         if (text) textEl.textContent = text;
-        textEl.className = 'text-green-400 text-sm';
+        textEl.classList.add('is-success');
         break;
       case 'error':
-        icon.className += ' bg-red-500';
-        icon.innerHTML = '<span class="text-xs text-white">✗</span>';
+        icon.classList.add('is-error');
+        icon.innerHTML = `<span>${icons.xCircle(13)}</span>`;
         if (text) textEl.textContent = text;
-        textEl.className = 'text-red-400 text-sm';
+        textEl.classList.add('is-error');
         break;
       default:
-        icon.className += ' bg-gray-600';
         const num = stepId.includes('tor') ? '1' : stepId.includes('taker') ? '2' : '3';
-        icon.innerHTML = `<span class="text-xs text-white">${num}</span>`;
-        textEl.className = 'text-gray-400 text-sm';
+        icon.innerHTML = `<span>${num}</span>`;
     }
   }
 

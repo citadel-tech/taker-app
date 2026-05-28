@@ -162,6 +162,17 @@ export async function WalletComponent(container) {
     });
   }
 
+  function renderSatsAmount(selector, sats) {
+    const target = content.querySelector(selector);
+    if (!target) return;
+
+    target.innerHTML =
+      `<span class="app-card-amount-number">${Math.round(
+        Number(sats || 0)
+      ).toLocaleString()}</span>` +
+      '<span class="app-card-amount-unit">sats</span>';
+  }
+
   function calculateUtxoStats() {
     const regular = allUtxos.filter(
       (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Regular'
@@ -373,18 +384,10 @@ export async function WalletComponent(container) {
       Number(balance.contract || 0);
     const share = total > 0 ? Math.min(100, (spendable / total) * 100) : 0;
 
-    content.querySelector('#spendable-balance').textContent = formatSats(
-      balance.spendable
-    );
-    content.querySelector('#swap-balance').textContent = formatSats(
-      balance.swap
-    );
-    content.querySelector('#regular-balance').textContent = formatSats(
-      balance.regular
-    );
-    content.querySelector('#contract-balance').textContent = formatSats(
-      balance.contract
-    );
+    renderSatsAmount('#spendable-balance', balance.spendable);
+    renderSatsAmount('#swap-balance', balance.swap);
+    renderSatsAmount('#regular-balance', balance.regular);
+    renderSatsAmount('#contract-balance', balance.contract);
     content.querySelector('#balance-share').textContent =
       `${share.toFixed(1)}%`;
     content.querySelector('#balance-share-bar').style.width = `${share}%`;
@@ -503,7 +506,8 @@ export async function WalletComponent(container) {
       <article class="app-balance-card hero">
         <span class="app-accent"></span>
         <span class="app-card-label">Balance</span>
-        <div class="app-card-value"><span id="spendable-balance">0 sats</span></div>
+        <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <p>Total available</p>
         <div class="app-share">
           <span id="balance-share">0.0%</span>
           <span class="app-share-track"><span id="balance-share-bar"></span></span>
@@ -513,17 +517,20 @@ export async function WalletComponent(container) {
       <article class="app-balance-card info">
         <span class="app-accent"></span>
         <span class="app-card-label">Swaps</span>
-        <div class="app-card-value"><span id="swap-balance">0 sats</span></div>
+        <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <p>Reserved for swaps</p>
       </article>
       <article class="app-balance-card wallet">
         <span class="app-accent"></span>
         <span class="app-card-label">Wallet</span>
-        <div class="app-card-value"><span id="regular-balance">0 sats</span></div>
+        <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <p>Regular wallet coins</p>
       </article>
       <article class="app-balance-card warning">
         <span class="app-accent"></span>
         <span class="app-card-label">Contracts</span>
-        <div class="app-card-value"><span id="contract-balance">0 sats</span></div>
+        <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <p>In active contracts</p>
       </article>
     </section>
 
