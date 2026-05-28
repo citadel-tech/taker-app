@@ -14,6 +14,7 @@ import { ConnectionStatusComponent } from '../components/connection/ConnectionSt
 import { bitcoindConnection } from '../components/connection/BitcoindConnection.js';
 import { TakerInitializationComponent } from '../components/taker/TakerInitialization.js';
 import { refreshBtcPriceUsd } from './price.js';
+import { icons } from './icons.js';
 
 // Component map
 const components = {
@@ -148,6 +149,16 @@ async function checkBitcoindConnection(config) {
 function startTakerInitWithConfig(config) {
   const appContainer = document.querySelector('body');
   TakerInitializationComponent(appContainer, config, (result) => {
+    if (result && result.resetSetup) {
+      console.warn(
+        'Wallet initialization failed, returning to setup:',
+        result.error
+      );
+      localStorage.removeItem('coinswap_config');
+      showSetupModal();
+      return;
+    }
+
     if (result && result.skipped) {
       console.log('⏭️ Taker initialization skipped');
     } else {
@@ -174,12 +185,24 @@ async function showPasswordPrompt(config) {
         Please enter your password to unlock it.
       </p>
       
-      <input 
-        type="password" 
-        id="wallet-password-input"
-        placeholder="Enter wallet password"
-        class="w-full bg-app-bg border border-gray-600 rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-primary"
-      />
+      <div class="relative mb-4">
+        <input 
+          type="password" 
+          id="wallet-password-input"
+          placeholder="Enter wallet password"
+          class="w-full bg-app-bg border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-primary"
+        />
+        <button
+          type="button"
+          id="toggle-wallet-password"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+          aria-label="Show password"
+          title="Show password"
+        >
+          <span class="password-show-icon">${icons.eye(18)}</span>
+          <span class="password-hide-icon hidden">${icons.eyeOff(18)}</span>
+        </button>
+      </div>
       
       <div id="password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded p-3 mb-4">
         <p class="text-sm text-red-400"></p>
@@ -201,6 +224,7 @@ async function showPasswordPrompt(config) {
   const passwordInput = modal.querySelector('#wallet-password-input');
   const submitBtn = modal.querySelector('#submit-password-btn');
   const cancelBtn = modal.querySelector('#cancel-password-btn');
+  const togglePasswordBtn = modal.querySelector('#toggle-wallet-password');
   const errorDiv = modal.querySelector('#password-error');
 
   passwordInput.focus();
@@ -264,6 +288,22 @@ async function showPasswordPrompt(config) {
     cancelBtn.addEventListener('click', () => {
       modal.remove();
       resolve(false);
+    });
+
+    togglePasswordBtn.addEventListener('click', () => {
+      const isHidden = passwordInput.type === 'password';
+      passwordInput.type = isHidden ? 'text' : 'password';
+      togglePasswordBtn
+        .querySelector('.password-show-icon')
+        ?.classList.toggle('hidden', isHidden);
+      togglePasswordBtn
+        .querySelector('.password-hide-icon')
+        ?.classList.toggle('hidden', !isHidden);
+
+      const label = isHidden ? 'Hide password' : 'Show password';
+      togglePasswordBtn.setAttribute('aria-label', label);
+      togglePasswordBtn.setAttribute('title', label);
+      passwordInput.focus();
     });
   });
 }
@@ -357,6 +397,18 @@ function initiateAppStart(config) {
   }, 1500);
 }
 
+function showSetupModal() {
+  const appContainer = document.querySelector('body');
+  FirstTimeSetupModal(appContainer, (config) => {
+    console.log('Setup completed:', config);
+
+    localStorage.setItem('coinswap_config', JSON.stringify(config));
+
+    initiateAppStart(config);
+    showSetupSuccess();
+  });
+}
+
 // Initialize app
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
@@ -381,15 +433,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!saved) {
     // First-time setup ONLY ONCE
     console.log('🔧 Showing setup modal...');
-    FirstTimeSetupModal(appContainer, (config) => {
-      console.log('Setup completed:', config);
-
-      // save config
-      localStorage.setItem('coinswap_config', JSON.stringify(config));
-
-      initiateAppStart(config);
-      showSetupSuccess();
-    });
+    showSetupModal();
   } else {
     // Config exists → skip setup
     const config = JSON.parse(saved);

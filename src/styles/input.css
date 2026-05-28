@@ -1875,6 +1875,36 @@
   font-family: var(--app-font-mono);
 }
 
+.app-loader-password-field {
+  position: relative;
+}
+
+.app-loader-password-field input {
+  padding-right: 48px;
+}
+
+.app-loader-password-toggle {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-subtle);
+  cursor: pointer;
+}
+
+.app-loader-password-toggle:hover,
+.app-loader-password-toggle:focus-visible {
+  color: var(--color-foreground);
+  outline: 0;
+}
+
 .app-loader-form input:focus {
   border-color: rgba(81, 141, 239, 0.6);
   box-shadow: 0 0 0 1px rgba(81, 141, 239, 0.14);

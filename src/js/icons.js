@@ -48,6 +48,8 @@ import {
   Lightbulb,
   PlusCircle,
   PauseCircle,
+  Eye,
+  EyeOff,
 } from '../../node_modules/lucide/dist/esm/lucide.js';
 
 function nodeToString([tag, attrs, children]) {
@@ -142,4 +144,8 @@ export const icons = {
   plusCircle:     (size = 16, cls = '') => toSvg(PlusCircle,     size, cls),
   /** ⏸️ unresponsive / paused */
   pauseCircle:    (size = 16, cls = '') => toSvg(PauseCircle,    size, cls),
+  /** show password */
+  eye:            (size = 16, cls = '') => toSvg(Eye,            size, cls),
+  /** hide password */
+  eyeOff:         (size = 16, cls = '') => toSvg(EyeOff,         size, cls),
 };

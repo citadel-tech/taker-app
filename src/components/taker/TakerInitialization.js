@@ -46,11 +46,23 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
             <div id="password-prompt" class="app-loader-form hidden">
                 <label for="unlock-password-input">Wallet Password</label>
-                <input 
-                    type="password" 
-                    id="unlock-password-input"
-                    placeholder="Enter wallet password"
-                />
+                <div class="app-loader-password-field">
+                    <input 
+                        type="password" 
+                        id="unlock-password-input"
+                        placeholder="Enter wallet password"
+                    />
+                    <button
+                        type="button"
+                        id="toggle-unlock-password"
+                        class="app-loader-password-toggle"
+                        aria-label="Show password"
+                        title="Show password"
+                    >
+                        <span class="password-show-icon">${icons.eye(18)}</span>
+                        <span class="password-hide-icon hidden">${icons.eyeOff(18)}</span>
+                    </button>
+                </div>
                 <div id="password-error" class="app-loader-message error compact hidden">
                     <p></p>
                 </div>
@@ -77,8 +89,8 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                     <button id="retry-taker" class="app-loader-action danger">
                         Retry
                     </button>
-                    <button id="skip-taker" class="app-loader-action secondary">
-                        Skip Setup
+                    <button id="reset-wallet-setup" class="app-loader-action secondary">
+                        Back to Wallet Setup
                     </button>
                 </div>
             </div>
@@ -127,7 +139,11 @@ export function TakerInitializationComponent(container, config, onInitialized) {
         textEl.classList.add('is-error');
         break;
       default:
-        const num = stepId.includes('tor') ? '1' : stepId.includes('taker') ? '2' : '3';
+        const num = stepId.includes('tor')
+          ? '1'
+          : stepId.includes('taker')
+            ? '2'
+            : '3';
         icon.innerHTML = `<span>${num}</span>`;
     }
   }
@@ -137,11 +153,32 @@ export function TakerInitializationComponent(container, config, onInitialized) {
     document.getElementById('progress-text').textContent = text;
   }
 
-  function showError(message, showTorSetup = false) {
+  function isWalletSetupError(resultOrError) {
+    const message =
+      resultOrError?.error ||
+      resultOrError?.message ||
+      String(resultOrError || '');
+    const lowerMessage = message.toLowerCase();
+
+    return Boolean(
+      resultOrError?.walletLoadFailed ||
+      resultOrError?.wrongPassword ||
+      resultOrError?.needsPassword ||
+      lowerMessage.includes('incorrect password') ||
+      lowerMessage.includes('wallet password') ||
+      lowerMessage.includes('unable to open this wallet') ||
+      lowerMessage.includes('not encrypted')
+    );
+  }
+
+  function showError(message, showTorSetup = false, walletSetupError = false) {
     document.getElementById('taker-status-text').textContent =
       'Initialization failed';
     document.getElementById('error-message').textContent = message;
     document.getElementById('taker-error').classList.remove('hidden');
+    document
+      .getElementById('reset-wallet-setup')
+      .classList.toggle('hidden', !walletSetupError);
     if (showTorSetup) {
       document.getElementById('tor-setup').classList.remove('hidden');
     }
@@ -184,10 +221,17 @@ export function TakerInitializationComponent(container, config, onInitialized) {
     startTakerInitialization();
   });
 
-  document.getElementById('skip-taker')?.addEventListener('click', () => {
-    initDiv.remove();
-    if (onInitialized) onInitialized({ skipped: true });
-  });
+  document
+    .getElementById('reset-wallet-setup')
+    ?.addEventListener('click', () => {
+      initDiv.remove();
+      if (onInitialized) {
+        onInitialized({
+          resetSetup: true,
+          error: document.getElementById('error-message')?.textContent || '',
+        });
+      }
+    });
 
   document
     .getElementById('unlock-submit-btn')
@@ -200,6 +244,32 @@ export function TakerInitializationComponent(container, config, onInitialized) {
       hidePasswordError();
       hidePasswordPrompt();
       startTakerInitialization(password);
+    });
+
+  document
+    .getElementById('toggle-unlock-password')
+    ?.addEventListener('click', () => {
+      const passwordInput = document.getElementById('unlock-password-input');
+      const showIcon = document.querySelector(
+        '#toggle-unlock-password .password-show-icon'
+      );
+      const hideIcon = document.querySelector(
+        '#toggle-unlock-password .password-hide-icon'
+      );
+      const isHidden = passwordInput.type === 'password';
+
+      passwordInput.type = isHidden ? 'text' : 'password';
+      showIcon?.classList.toggle('hidden', isHidden);
+      hideIcon?.classList.toggle('hidden', !isHidden);
+
+      const label = isHidden ? 'Hide password' : 'Show password';
+      document
+        .getElementById('toggle-unlock-password')
+        ?.setAttribute('aria-label', label);
+      document
+        .getElementById('toggle-unlock-password')
+        ?.setAttribute('title', label);
+      passwordInput.focus();
     });
 
   document
@@ -242,7 +312,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
       if (!result.success) {
         // Check if password is required
-        if (result.needsPassword) {
+        if (result.needsPassword || result.wrongPassword) {
           updateStep(
             'step-taker',
             'active',
@@ -252,14 +322,19 @@ export function TakerInitializationComponent(container, config, onInitialized) {
           document.getElementById('taker-status-text').textContent =
             'Password Required';
 
-          // If it's INCORRECT_PASSWORD, show error in the prompt
-          if (result.error === 'INCORRECT_PASSWORD') {
-            showPasswordPrompt();
-            showPasswordError('Incorrect password. Please try again.');
-            return;
-          }
-
           showPasswordPrompt();
+          if (result.wrongPassword) {
+            showPasswordError(
+              result.error || 'Incorrect password. Please try again.'
+            );
+          }
+          return;
+        }
+
+        if (isWalletSetupError(result)) {
+          updateStep('step-taker', 'error');
+          updateProgress(50, 'Wallet could not be opened');
+          showError(result.error || 'Wallet could not be opened.', false, true);
           return;
         }
 
@@ -274,6 +349,8 @@ export function TakerInitializationComponent(container, config, onInitialized) {
 
       let errorMessage = error.message;
       let showTorSetup = false;
+
+      const walletSetupError = isWalletSetupError(error);
 
       if (
         error.message.includes('TorError') ||
@@ -291,11 +368,13 @@ export function TakerInitializationComponent(container, config, onInitialized) {
         showPasswordPrompt();
         showPasswordError(errorMessage);
         return;
+      } else if (walletSetupError) {
+        updateStep('step-taker', 'error');
       } else {
         updateStep('step-taker', 'error');
       }
 
-      showError(errorMessage, showTorSetup);
+      showError(errorMessage, showTorSetup, walletSetupError);
     }
   }
 
