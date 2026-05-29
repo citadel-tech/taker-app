@@ -150,8 +150,14 @@ export function Market(container) {
   async function fetchMakers() {
     try {
       console.log('📡 [market] Fetching makers from API...');
-      isLoading = true;
-      updateUI();
+      // Only show the full-page "Loading..." takeover on the very first load.
+      // For refreshes (re-mount, incremental sync polls, periodic refresh),
+      // keep the existing rows on screen and let them update in place.
+      const isInitialLoad = makers.length === 0;
+      if (isInitialLoad) {
+        isLoading = true;
+        updateUI();
+      }
 
       const data = await window.api.taker.getOffers();
       console.log('📡 [market] Raw getOffers response', {
@@ -244,6 +250,7 @@ export function Market(container) {
       localStorage.setItem('active_sync_id', syncId);
 
       // Poll for completion and update progress
+      let tickFetchInFlight = false;
       return new Promise((resolve, reject) => {
         const pollInterval = setInterval(async () => {
           try {
@@ -279,6 +286,17 @@ export function Market(container) {
             }
 
             updateUI();
+
+            // Incremental refresh: pull the latest offerbook mid-sync so makers
+            // appear one-by-one as the backend persists them. Skip if a prior
+            // tick's fetch is still in flight to avoid overlapping reads.
+            if (sync.status === 'syncing' && !tickFetchInFlight) {
+              tickFetchInFlight = true;
+              fetchMakers()
+                .then(() => updateUI())
+                .catch((e) => console.warn('Incremental fetchMakers failed:', e))
+                .finally(() => { tickFetchInFlight = false; });
+            }
 
             if (sync.status === 'completed') {
               clearInterval(pollInterval);
@@ -340,6 +358,7 @@ export function Market(container) {
       }
 
       const syncId = result.syncId;
+      let tickFetchInFlight = false;
       await new Promise((resolve, reject) => {
         const poll = setInterval(async () => {
           try {
@@ -352,6 +371,16 @@ export function Market(container) {
               offerbook: status.sync?.offerbook,
             });
             if (!status.success) { clearInterval(poll); reject(new Error('Failed to get sync status')); return; }
+
+            // Incremental refresh while syncing — makers appear as they're polled.
+            if (status.sync.status === 'syncing' && !tickFetchInFlight) {
+              tickFetchInFlight = true;
+              fetchMakers()
+                .then(() => updateUI())
+                .catch((e) => console.warn('Incremental fetchMakers failed:', e))
+                .finally(() => { tickFetchInFlight = false; });
+            }
+
             if (status.sync.status === 'completed') { clearInterval(poll); resolve(); }
             else if (status.sync.status === 'failed') { clearInterval(poll); reject(new Error(status.sync.error || 'Sync failed')); }
           } catch (err) { clearInterval(poll); reject(err); }
@@ -384,16 +413,22 @@ export function Market(container) {
     // Keep protocol fetch to preserve existing initialization flow.
     await window.api.taker.getProtocol();
 
+    // Always render whatever's already on disk first so re-mounting the page
+    // mid-sync doesn't blank out the table. fetchMakers() will then update
+    // in place if a sync is in progress.
+    await fetchMakers();
+    isLoading = false;
+
     // Check if app-level sync is currently running.
     try {
       const syncingResult = await window.api.taker.getCurrentSyncState();
 
       if (syncingResult.success && syncingResult.isRunning) {
-        console.log('⏳ Background sync in progress, waiting...');
-        isLoading = true;
+        console.log('⏳ Background sync in progress, monitoring...');
+        syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
         updateUI();
         await monitorExistingSync();
-        return; // Exit - monitorExistingSync will fetch when done
+        return;
       }
     } catch (err) {
       console.error('Failed to check if syncing:', err);
@@ -416,7 +451,7 @@ export function Market(container) {
               '<span class="animate-pulse">Refreshing...</span>';
           }
 
-          isLoading = true;
+          syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
           updateUI();
           await monitorExistingSync();
           return;
@@ -428,9 +463,8 @@ export function Market(container) {
       }
     }
 
-    // ✅ Safe to fetch - no sync running
-    await fetchMakers();
-    isLoading = false;
+    // No sync in progress — initial fetchMakers() at the top of this function
+    // already populated the table. Just make sure the UI reflects it.
     updateUI();
 
     // Refresh offerbook data every 15 minutes. The Rust backend keeps
@@ -456,11 +490,10 @@ export function Market(container) {
   async function monitorExistingSync() {
     console.log('🔍 Monitoring existing offerbook sync...');
 
-    // Show loading state
-    isLoading = true;
-    updateUI();
+    // Don't blank the table — caller already rendered cached makers and set
+    // syncProgress for the header spinner. We just poll and refresh in place.
 
-    // Poll app sync state until sync is done.
+    let tickFetchInFlight = false;
     let isSyncing = true;
     while (isSyncing) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -469,8 +502,17 @@ export function Market(container) {
         const result = await window.api.taker.getCurrentSyncState();
         if (result.success) {
           isSyncing = result.isRunning;
-          if (isSyncing) {
-            console.log('⏳ Still syncing...');
+
+          // Incremental refresh: pull latest offerbook each tick so newly-polled
+          // makers appear without waiting for the sync to finish.
+          if (isSyncing && !tickFetchInFlight) {
+            tickFetchInFlight = true;
+            fetchMakers()
+              .then(() => updateUI())
+              .catch((e) => console.warn('Incremental fetchMakers failed:', e))
+              .finally(() => { tickFetchInFlight = false; });
+          } else if (isSyncing) {
+            console.log('⏳ Still syncing (prior tick fetch in flight)...');
           }
         }
       } catch (error) {
@@ -479,13 +521,9 @@ export function Market(container) {
       }
     }
 
-    // ✅ CHANGE THIS: Wait 10 seconds (same as handleRefresh)
-    console.log('✅ Offerbook sync completed - waiting for file write...');
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // ✅ NOW fetch makers
-    console.log('✅ Now fetching makers...');
-    await fetchMakers(); // This sets isLoading = false
+    console.log('✅ Offerbook sync completed - final refresh');
+    syncProgress = null;
+    await fetchMakers();
     updateUI();
   }
 
@@ -763,7 +801,7 @@ export function Market(container) {
             .map(
               (maker) => {
                 return `
-          <div class="grid gap-4 p-4 hover:bg-[#242d3d] transition-colors" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr">
+          <div class="grid gap-4 p-4 hover:bg-[#242d3d] transition-colors items-center" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
 
             <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
             <div class="text-green-400">${maker.baseFee}</div>
@@ -773,6 +811,14 @@ export function Market(container) {
 <div class="text-yellow-400">${maker.maxSize < 1000000 ? maker.maxSize.toLocaleString() : (maker.maxSize / 1000000).toFixed(1) + 'M'}</div>
             <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
               ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
+            </div>
+            <div class="flex gap-2">
+              <button data-maker-poll="${maker.address}" class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors" title="Re-poll this maker now">
+                Poll
+              </button>
+              <button data-maker-remove="${maker.address}" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors" title="Remove this maker from the offerbook">
+                Remove
+              </button>
             </div>
           </div>
         `;
@@ -864,7 +910,7 @@ export function Market(container) {
 
       
 
-      <div class="grid gap-4 bg-[#FF6B35] p-4 text-xs" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr">
+      <div class="grid gap-4 bg-[#FF6B35] p-4 text-xs" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
         <div class="font-semibold">Tor Address</div>
         <div class="font-semibold">Base Fee</div>
         <div class="font-semibold">% Fee Rate</div>
@@ -872,6 +918,7 @@ export function Market(container) {
         <div class="font-semibold">Min Swap Size</div>
         <div class="font-semibold">Max Swap Size</div>
         <div class="font-semibold">Fidelity Bond</div>
+        <div class="font-semibold">Actions</div>
       </div>
 
       <div id="maker-table-body" class="divide-y divide-gray-700">
@@ -929,6 +976,54 @@ export function Market(container) {
   content
     .querySelector('#tab-unresponsive')
     .addEventListener('click', () => switchTab('unresponsive'));
+
+  // Delegated handlers for per-maker Poll / Remove buttons. The table body is
+  // re-rendered on every updateUI() call, so attaching at the container avoids
+  // having to re-wire individual buttons.
+  content.addEventListener('click', async (event) => {
+    const pollBtn = event.target.closest('[data-maker-poll]');
+    const removeBtn = event.target.closest('[data-maker-remove]');
+
+    if (pollBtn) {
+      const address = pollBtn.dataset.makerPoll;
+      const original = pollBtn.innerHTML;
+      pollBtn.disabled = true;
+      pollBtn.innerHTML = 'Polling…';
+      try {
+        const res = await window.api.taker.pollMaker(address);
+        if (!res.success) throw new Error(res.error || 'Poll failed');
+        console.log('🎯 Poll result:', res.maker);
+        await fetchMakers();
+        updateUI();
+      } catch (err) {
+        console.error('Poll failed:', err);
+        showError(`Poll failed: ${err.message}`);
+        pollBtn.disabled = false;
+        pollBtn.innerHTML = original;
+      }
+      return;
+    }
+
+    if (removeBtn) {
+      const address = removeBtn.dataset.makerRemove;
+      if (!confirm(`Remove maker ${address} from the offerbook?`)) return;
+      const original = removeBtn.innerHTML;
+      removeBtn.disabled = true;
+      removeBtn.innerHTML = 'Removing…';
+      try {
+        const res = await window.api.taker.removeMaker(address);
+        if (!res.success) throw new Error(res.error || 'Remove failed');
+        if (!res.removed) console.warn(`Maker ${address} not found in offerbook`);
+        await fetchMakers();
+        updateUI();
+      } catch (err) {
+        console.error('Remove failed:', err);
+        showError(`Remove failed: ${err.message}`);
+        removeBtn.disabled = false;
+        removeBtn.innerHTML = original;
+      }
+    }
+  });
 
   initialize();
   startSyncStateMonitor();

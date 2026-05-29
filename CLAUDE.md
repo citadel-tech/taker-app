@@ -63,7 +63,7 @@ The app integrates with Bitcoin Core via:
 - **package.json** - Dependencies and build scripts
 
 ### Workers
-- **offerbook-worker.js** - Offloads blocking offerbook sync to separate thread
+- **coinswap-worker.js** - Runs swap execution in a separate thread
 
 ### Data Directory Structure
 ```

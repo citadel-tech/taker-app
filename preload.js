@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld('api', {
     sync: () => ipcRenderer.invoke('taker:sync'),
     syncOfferbookAndWait: () =>
       ipcRenderer.invoke('taker:syncOfferbookAndWait'),
+    pollMaker: (address) => ipcRenderer.invoke('taker:pollMaker', address),
+    removeMaker: (address) => ipcRenderer.invoke('taker:removeMaker', address),
     getSyncStatus: (syncId) =>
       ipcRenderer.invoke('taker:getSyncStatus', syncId),
     getOffers: () => ipcRenderer.invoke('taker:getOffers'),
