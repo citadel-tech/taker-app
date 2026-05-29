@@ -29,6 +29,35 @@ export function Market(container) {
     return `${host.slice(0, start)}...${host.slice(-end)}`;
   }
 
+  function formatSatsNumber(sats) {
+    return Math.round(Number(sats || 0)).toLocaleString();
+  }
+
+  function parseSatsInput(value) {
+    const parsed = Number.parseFloat(String(value || '').replace(/,/g, ''));
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Math.round(parsed);
+  }
+
+  function calculateMakerFee(maker, amountSats, makerPosition) {
+    const liquidityRate = Number(maker.volumeFee || 0);
+    const timeRate = Number(maker.timeFee || 0);
+    const refundLocktime = 20 * (makerPosition + 1);
+    const baseFee = Number(maker.baseFee || 0);
+    const liquidityFee = amountSats * liquidityRate;
+    const timeFee = refundLocktime * amountSats * timeRate;
+
+    return {
+      baseFee,
+      liquidityFee,
+      timeFee,
+      totalFee: baseFee + liquidityFee + timeFee,
+      refundLocktime,
+      liquidityRate,
+      timeRate,
+    };
+  }
+
   function startSyncStateMonitor() {
     if (syncCheckInterval) return;
 
@@ -437,6 +466,158 @@ export function Market(container) {
     document.body.appendChild(modal);
   };
 
+  window.openMakerFeeCalculator = (makerIndex) => {
+    const maker = makers.find((m) => m.index === makerIndex);
+    if (!maker) {
+      showError('Maker data is not available');
+      return;
+    }
+
+    const defaultAmountSats =
+      maker.minSize > 0
+        ? maker.minSize
+        : Math.min(10000000, maker.maxSize || 10000000);
+    const modal = document.createElement('div');
+    modal.className = 'market-modal-backdrop';
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+
+    modal.innerHTML = `
+      <div class="market-modal market-fee-modal" onclick="event.stopPropagation()">
+        <div class="market-fee-head">
+          <div>
+            <span>Fee Calculator</span>
+            <h3>Estimate swap cost</h3>
+            <p title="${maker.address}">${formatTorEndpoint(maker.address, 22, 12)}</p>
+          </div>
+          <button class="market-modal-close" type="button" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="market-fee-body">
+          <label class="market-fee-field">
+            <span>Swap Amount</span>
+            <input id="market-fee-amount" type="number" min="0" step="1" value="${Math.round(defaultAmountSats)}">
+          </label>
+          <div class="market-fee-range">
+            <span>Maker range</span>
+            <strong>${formatSats(maker.minSize)} - ${formatSats(maker.maxSize)}</strong>
+          </div>
+
+          <label class="market-fee-field">
+            <span>Maker Position in Circuit (n)</span>
+            <div class="market-fee-index-field">
+              <input id="market-fee-position" type="number" min="1" step="1" placeholder="1">
+              <strong>Position</strong>
+            </div>
+          </label>
+          <div class="market-fee-range">
+            <span>Refund locktime = 20 x (n + 1)</span>
+            <strong id="market-fee-locktime">Enter position</strong>
+          </div>
+          <p id="market-fee-position-error" class="market-fee-validation">Enter a positive maker position to calculate the fee.</p>
+
+          <div class="market-fee-formula">
+            <span>Formula</span>
+            <strong>Total Fee</strong> = Base Fee + (Swap Amount x Liquidity Fee) +<br>
+            (Refund Locktime x Swap Amount x Time Rate)
+          </div>
+
+          <div class="market-fee-results">
+            <div>
+              <span>Base Fee</span>
+              <strong><span id="market-fee-base">0</span> sats</strong>
+              <small>Fixed maker fee</small>
+            </div>
+            <div>
+              <span>Liquidity Fee</span>
+              <strong><span id="market-fee-liquidity">0</span> sats</strong>
+              <small id="market-fee-liquidity-detail">0 sats x 0 fee rate</small>
+            </div>
+            <div>
+              <span>Time Fee</span>
+              <strong><span id="market-fee-time">0</span> sats</strong>
+              <small id="market-fee-time-detail">20 x 0 sats x 0 time rate</small>
+            </div>
+            <div class="total">
+              <span>Total Fee</span>
+              <strong><span id="market-fee-total">0</span> sats</strong>
+              <small id="market-fee-percent">0.0000% of swap amount</small>
+            </div>
+          </div>
+
+          <p class="market-fee-note">Estimates exclude on-chain miner fees.</p>
+        </div>
+      </div>
+    `;
+
+    const amountInput = modal.querySelector('#market-fee-amount');
+    const positionInput = modal.querySelector('#market-fee-position');
+    const closeBtn = modal.querySelector('.market-modal-close');
+
+    const updateEstimate = () => {
+      const amountSats = parseSatsInput(amountInput.value);
+      const rawMakerPosition = Number.parseFloat(positionInput.value);
+      const makerPosition =
+        Number.isInteger(rawMakerPosition) && rawMakerPosition > 0
+          ? rawMakerPosition
+          : null;
+
+      if (makerPosition === null) {
+        modal.querySelector('#market-fee-locktime').textContent =
+          'Enter position';
+        modal.querySelector('#market-fee-base').textContent = '0';
+        modal.querySelector('#market-fee-liquidity').textContent = '0';
+        modal.querySelector('#market-fee-liquidity-detail').textContent =
+          `${formatSats(amountSats)} x ${Number(maker.volumeFee || 0).toFixed(4)} fee rate`;
+        modal.querySelector('#market-fee-time').textContent = '0';
+        modal.querySelector('#market-fee-time-detail').textContent =
+          'Enter position to calculate time fee';
+        modal.querySelector('#market-fee-total').textContent = '0';
+        modal.querySelector('#market-fee-percent').textContent =
+          'Enter position to calculate total fee';
+        modal
+          .querySelector('#market-fee-position-error')
+          .classList.remove('hidden');
+        return;
+      }
+
+      modal.querySelector('#market-fee-position-error').classList.add('hidden');
+
+      const estimate = calculateMakerFee(maker, amountSats, makerPosition);
+      const totalPercent =
+        amountSats > 0 ? (estimate.totalFee / amountSats) * 100 : 0;
+
+      modal.querySelector('#market-fee-locktime').textContent =
+        `${estimate.refundLocktime} blocks`;
+      modal.querySelector('#market-fee-base').textContent = formatSatsNumber(
+        estimate.baseFee
+      );
+      modal.querySelector('#market-fee-liquidity').textContent =
+        formatSatsNumber(estimate.liquidityFee);
+      modal.querySelector('#market-fee-liquidity-detail').textContent =
+        `${formatSats(amountSats)} x ${estimate.liquidityRate.toFixed(4)} fee rate`;
+      modal.querySelector('#market-fee-time').textContent = formatSatsNumber(
+        estimate.timeFee
+      );
+      modal.querySelector('#market-fee-time-detail').textContent =
+        `${estimate.refundLocktime} x ${formatSats(amountSats)} x ${estimate.timeRate.toFixed(6)} time rate`;
+      modal.querySelector('#market-fee-total').textContent = formatSatsNumber(
+        estimate.totalFee
+      );
+      modal.querySelector('#market-fee-percent').textContent =
+        `${totalPercent.toFixed(4)}% of swap amount`;
+    };
+
+    amountInput.addEventListener('input', updateEstimate);
+    positionInput.addEventListener('input', updateEstimate);
+    closeBtn.addEventListener('click', () => modal.remove());
+    updateEstimate();
+
+    document.body.appendChild(modal);
+    positionInput.focus();
+  };
+
   function updateUI() {
     const stats = calculateStats();
     const tableBody = content.querySelector('#maker-table-body');
@@ -541,24 +722,19 @@ export function Market(container) {
           .map((maker) => {
             return `
               <div class="market-row">
-                <label class="market-check" title="Select maker">
-                  <input type="checkbox" disabled>
-                  <span></span>
-                </label>
                 <div class="market-address" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
                 <div class="market-number primary">${formatSats(maker.baseFee)}</div>
                 <div class="market-number">${maker.volumeFee}</div>
                 <div class="market-number">${maker.timeFee}</div>
                 <div class="market-number muted">${formatSats(maker.minSize)}</div>
                 <div class="market-number muted">${formatSats(maker.maxSize)}</div>
-                <button onclick="window.viewFidelityBond('${maker.address}')" class="market-bond" title="View fidelity bond">
-                  ${maker.bond > 0 ? formatSats(maker.bond) : 'N/A'} ${icons.externalLink(12)}
-                </button>
-                ${
-                  maker.status === 'good'
-                    ? '<button class="market-calc" disabled>Calculate</button>'
-                    : '<div></div>'
-                }
+                <div class="market-bond">
+                  <span>${maker.bond > 0 ? formatSats(maker.bond) : 'N/A'}</span>
+                  <button onclick="window.viewFidelityBond('${maker.address}')" class="market-bond-action" title="View fidelity bond">
+                    ${icons.externalLink(12)}
+                  </button>
+                </div>
+                <button class="market-calc" onclick="window.openMakerFeeCalculator(${maker.index})">Calculate</button>
                 <div class="market-actions">
                   <button data-maker-poll="${maker.address}" title="Re-poll this maker now">Poll</button>
                   <button data-maker-remove="${maker.address}" title="Remove this maker from the offerbook">Remove</button>
@@ -580,9 +756,7 @@ export function Market(container) {
       });
 
       footer.innerHTML = `
-        <span>0 selected</span>
         <span>Showing ${displayedMakers.length} ${currentMakerStatus} offers &middot; ${timeStr}</span>
-        <button disabled>Swap with selected makers</button>
       `;
     }
   }
@@ -614,10 +788,9 @@ export function Market(container) {
         </div>
 
         <div class="market-table-header">
-          <div></div>
           <div>Tor Address</div>
           <div>Base Fee</div>
-          <div>Fee Rate</div>
+          <div>Liquidity Fee</div>
           <div>Time Rate</div>
           <div>Min Swap</div>
           <div>Max Swap</div>

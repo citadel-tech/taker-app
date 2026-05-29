@@ -255,10 +255,8 @@ export async function WalletComponent(container) {
               <span class="app-mono app-id">${compactId(txid, 12, 4)}:${utxo.vout ?? 0}</span>
               <span class="app-amount positive">${formatSats(utxo.amount)}</span>
             </span>
-            <span class="app-pill-stack">
-              <span class="app-pill ${scriptType}">${scriptType === 'taproot' ? 'Taproot' : 'SegWit'}</span>
-              <span class="app-pill ${type.toLowerCase()}">${type}</span>
-            </span>
+            <span class="app-pill ${scriptType}">${scriptType === 'taproot' ? 'Taproot' : 'SegWit'}</span>
+            <span class="app-pill ${type.toLowerCase()}">${type}</span>
             <span class="app-address">
               ${compactId(utxo.address || 'No address', 10, 6)}
             </span>
@@ -557,14 +555,14 @@ export async function WalletComponent(container) {
           </div>
           <div class="app-utxo-head">
             <span>Txid . Amount</span>
-            <span>Script . Type</span>
+            <span>Script</span>
+            <span>Type</span>
             <span>Address</span>
             <span></span>
           </div>
           <div class="app-list" id="app-utxo-list"></div>
         </div>
         <footer class="app-panel-foot">
-          <button id="view-all-utxos" type="button">View all UTXOs -></button>
           <span id="utxo-updated">Last updated just now</span>
         </footer>
       </article>
@@ -592,7 +590,6 @@ export async function WalletComponent(container) {
           <div class="app-list tx" id="app-tx-list"></div>
         </div>
         <footer class="app-panel-foot">
-          <button id="view-all-transactions" type="button">View all transactions -></button>
           <span>Live wallet</span>
         </footer>
       </article>
@@ -647,22 +644,6 @@ export async function WalletComponent(container) {
     const row = event.target.closest('[data-txid]');
     if (row?.dataset.txid) openMempool(row.dataset.txid);
   });
-
-  content.querySelector('#view-all-utxos').addEventListener('click', () => {
-    import('./UtxoList.js').then((module) => {
-      container.innerHTML = '';
-      module.UtxoListComponent(container);
-    });
-  });
-
-  content
-    .querySelector('#view-all-transactions')
-    .addEventListener('click', () => {
-      import('./TransactionsList.js').then((module) => {
-        container.innerHTML = '';
-        module.TransactionsListComponent(container);
-      });
-    });
 
   try {
     await syncWalletState();

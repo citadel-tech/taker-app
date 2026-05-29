@@ -611,6 +611,17 @@ export async function SwapComponent(container) {
     return `${mins}m ${secs}s`;
   }
 
+  function renderMakerCandidates(addresses) {
+    if (!addresses.length) return 'None selected';
+
+    return addresses
+      .map((address) => {
+        const displayAddress = formatTorEndpoint(address, 10, 11);
+        return `<span title="${escapeHtml(address)}">${escapeHtml(displayAddress)}</span>`;
+      })
+      .join('');
+  }
+
   // Estimate fees from the top candidate makers shown in the UI.
   function calculateFees(amount) {
     const hops = getNumberOfHops();
@@ -753,20 +764,25 @@ export async function SwapComponent(container) {
     // Update makers label and display based on selection mode
     const makersLabelEl = content.querySelector('#makers-label');
     let selectedMakersText;
+    let selectedMakerAddressesForDisplay;
     if (makerSelectionMode === 'manual') {
-      selectedMakersText =
-        selectedMakerAddresses.map((addr) => formatTorEndpoint(addr)).join(', ') ||
-        'None selected';
+      selectedMakerAddressesForDisplay = selectedMakerAddresses;
+      selectedMakersText = selectedMakerAddresses.join('\n') || 'None selected';
       if (makersLabelEl) makersLabelEl.textContent = 'Selected Makers';
     } else {
+      selectedMakerAddressesForDisplay = getTopCandidateMakers().map(
+        (maker) => maker.address
+      );
       selectedMakersText =
         getTopCandidateMakers()
-          .map((maker) => formatTorEndpoint(maker.address))
-          .join(', ') || 'None selected';
+          .map((maker) => maker.address)
+          .join('\n') || 'None selected';
       if (makersLabelEl) makersLabelEl.textContent = 'Top Maker Candidates';
     }
     const selectedMakersEl = content.querySelector('#selected-makers-display');
-    selectedMakersEl.textContent = selectedMakersText;
+    selectedMakersEl.innerHTML = renderMakerCandidates(
+      selectedMakerAddressesForDisplay
+    );
     selectedMakersEl.title = selectedMakersText;
     content.querySelector('#maker-fee-percent').textContent =
       details.makerFeePercent + '%';

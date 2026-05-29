@@ -1493,27 +1493,42 @@ function registerTakerHandlers() {
       }
 
       const rawUtxos = api1State.takerInstance.listAllUtxoSpendInfo();
+      const historicalSwapOutputs = getHistoricalSwapOutputMap();
 
-      const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => ({
-        utxo: {
-          txid: utxoEntry.txid.value,
-          vout: utxoEntry.vout,
-          amount: utxoEntry.amount.sats,
-          confirmations: utxoEntry.confirmations,
-          address: utxoEntry.address,
-          scriptPubKey: utxoEntry.scriptPubKey,
-          spendable: utxoEntry.spendable,
-          solvable: utxoEntry.solvable,
-          safe: utxoEntry.safe,
-        },
-        spendInfo: {
-          spendType: spendInfo.spendType,
-          path: spendInfo.path,
-          multisigRedeemscript: spendInfo.multisigRedeemscript,
-          inputValue: spendInfo.inputValue,
-          index: spendInfo.index,
-        },
-      }));
+      const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => {
+        const historicalSwapAmount = historicalSwapOutputs.get(
+          utxoEntry.address
+        );
+        const isHistoricalSwapOutput =
+          historicalSwapAmount !== undefined &&
+          historicalSwapAmount === toNumber(utxoEntry.amount?.sats, 0);
+        const spendType = isHistoricalSwapOutput
+          ? 'SwapCoin'
+          : spendInfo.spendType;
+
+        return {
+          utxo: {
+            txid: utxoEntry.txid.value,
+            vout: utxoEntry.vout,
+            amount: utxoEntry.amount.sats,
+            confirmations: utxoEntry.confirmations,
+            address: utxoEntry.address,
+            scriptPubKey: utxoEntry.scriptPubKey,
+            spendable: utxoEntry.spendable,
+            solvable: utxoEntry.solvable,
+            safe: utxoEntry.safe,
+          },
+          spendInfo: {
+            spendType,
+            originalSpendType: spendInfo.spendType,
+            swapOrigin: isHistoricalSwapOutput ? 'historical-report' : null,
+            path: spendInfo.path,
+            multisigRedeemscript: spendInfo.multisigRedeemscript,
+            inputValue: spendInfo.inputValue,
+            index: spendInfo.index,
+          },
+        };
+      });
 
       return { success: true, utxos: transformedUtxos || [] };
     } catch (error) {

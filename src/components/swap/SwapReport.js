@@ -373,76 +373,64 @@ export function SwapReportComponent(container, swapReport) {
     if (existingPopup) existingPopup.remove();
 
     const overlay = document.createElement('div');
-    overlay.className =
-      'maker-popup-overlay fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+    overlay.className = 'maker-popup-overlay';
     overlay.innerHTML = `
-      <div class="maker-popup bg-surface border-2 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform animate-popup"
-           style="border-color: ${color};">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xl"
-                 style="background: ${color}20; color: ${color};">
-              M${makerIndex + 1}
-            </div>
+      <div class="maker-popup" style="--maker-color: ${color};">
+        <div class="maker-popup-head">
+          <div class="maker-popup-title">
+            <div class="maker-popup-token">M${makerIndex + 1}</div>
             <div>
-              <h3 class="text-xl font-bold text-white">Maker ${makerIndex + 1}</h3>
-              <p class="text-xs text-gray-400">Swap Partner</p>
+              <h3>Maker ${makerIndex + 1}</h3>
+              <p>Swap Partner</p>
             </div>
           </div>
-          <button class="close-popup text-gray-400 hover:text-white text-2xl">&times;</button>
+          <button class="close-popup maker-popup-close" type="button" aria-label="Close">&times;</button>
         </div>
         
-        <div class="space-y-4">
-          <!-- Address -->
-          <div class="bg-app-bg rounded-lg p-4">
-            <p class="text-xs text-gray-400 mb-1">Onion Address</p>
-            <div class="flex items-center gap-2">
-              <p class="font-mono text-sm text-white break-all flex-1">${makerAddr}</p>
-              <button class="copy-addr-btn text-gray-400 hover:text-primary transition-colors" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
+        <div class="maker-popup-body">
+          <section class="maker-popup-card maker-popup-address">
+            <span>Onion Address</span>
+            <div>
+              <strong>${makerAddr}</strong>
+              <button class="copy-addr-btn maker-popup-icon-btn" type="button" title="Copy address">${icons.clipboardCopy(15)}</button>
             </div>
-          </div>
+          </section>
           
-          <!-- Fee Info -->
-          <div class="bg-app-bg rounded-lg p-4">
-            <p class="text-xs text-gray-400 mb-2">Fee Information</p>
-            <div class="grid grid-cols-2 gap-3">
+          <section class="maker-popup-card">
+            <span>Fee Information</span>
+            <div class="maker-popup-metrics">
               <div>
-                <p class="text-xs text-gray-500">Fee Paid</p>
-                  <p class="font-mono text-sm" style="color: ${color};">${formatNumber(feePaid)} sats</p>
+                <small>Fee Paid</small>
+                <strong>${formatNumber(feePaid)} sats</strong>
               </div>
               <div>
-                <p class="text-xs text-gray-500">Fee Rate</p>
-                  <p class="font-mono text-sm" style="color: ${color};">${feeRate.toFixed(2)}%</p>
+                <small>Fee Rate</small>
+                <strong>${feeRate.toFixed(2)}%</strong>
               </div>
             </div>
-          </div>
+          </section>
           
-          <!-- Hop Position -->
-          <div class="bg-app-bg rounded-lg p-4">
-            <p class="text-xs text-gray-400 mb-2">Swap Position</p>
-            <div class="flex items-center gap-2">
-              <span class="px-3 py-1 rounded-full text-xs font-bold" style="background: ${color}20; color: ${color};">
-                Hop ${makerIndex + 1} of ${report.makersCount}
-              </span>
-              <span class="text-xs text-gray-500">
+          <section class="maker-popup-card">
+            <span>Swap Position</span>
+            <div class="maker-popup-position">
+              <b>Hop ${makerIndex + 1} of ${report.makersCount}</b>
+              <small>
                 ${makerIndex === 0 ? '(First maker in chain)' : makerIndex === report.makersCount - 1 ? '(Last maker in chain)' : '(Middle of chain)'}
-              </span>
+              </small>
             </div>
-          </div>
+          </section>
           
-          <!-- Privacy Contribution -->
-          <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-            <p class="text-xs text-green-400 mb-1">${icons.shieldCheck(16, 'mr-2')} Privacy Contribution</p>
-            <p class="text-xs text-gray-300">This maker broke the transaction link between hop ${makerIndex} and hop ${makerIndex + 2}, making it impossible to trace the flow of funds.</p>
-          </div>
+          <section class="maker-popup-privacy">
+            <span>${icons.shieldCheck(16)} Privacy Contribution</span>
+            <p>This maker broke the transaction link between hop ${makerIndex} and hop ${makerIndex + 2}, making it impossible to trace the flow of funds.</p>
+          </section>
         </div>
         
-        <div class="mt-6 flex gap-3">
-          <button class="copy-addr-btn flex-1 bg-secondary hover:bg-secondary-hover text-white py-3 rounded-lg transition-colors">
-            ${icons.clipboardCopy(14, 'mr-1')} Copy Address
+        <div class="maker-popup-actions">
+          <button class="copy-addr-btn maker-popup-secondary" type="button">
+            ${icons.clipboardCopy(15)} Copy Address
           </button>
-          <button class="close-popup flex-1 text-white py-3 rounded-lg transition-colors"
-                  style="background: ${color};">
+          <button class="close-popup maker-popup-primary" type="button">
             Close
           </button>
         </div>

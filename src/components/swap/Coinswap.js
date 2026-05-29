@@ -1,6 +1,7 @@
 import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
+import { createSwapProgressAnimation } from './SwapProgressAnimation.js';
 
 export async function CoinswapComponent(container, swapConfig) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
@@ -31,6 +32,7 @@ export async function CoinswapComponent(container, swapConfig) {
   let logPollInterval = null;
   let lastLogLine = '';
   let processedLogs = new Set();
+  let progressAnimation = null;
 
   if (existingSwap && existingSwap.status === 'in_progress' && savedProgress) {
     actualSwapConfig = existingSwap;
@@ -65,6 +67,7 @@ export async function CoinswapComponent(container, swapConfig) {
     routeMakerAddresses.push(null);
   }
   const pendingMakerAddresses = Array.from({ length: swapData.makers }, () => null);
+  const contractDataReceivedMakers = new Set();
 
   if (swapData.transactions.length === 0) {
     if (isV2) {
@@ -171,6 +174,7 @@ export async function CoinswapComponent(container, swapConfig) {
     if (!resolvedAddress) return;
 
     routeMakerAddresses[makerIndex] = resolvedAddress;
+    progressAnimation?.setMakerAddress(makerIndex, resolvedAddress);
 
     const addressEl = content.querySelector(
       `#maker-${makerIndex} .route-address`
@@ -216,24 +220,45 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function updateStageFromRoute() {
+    if (
+      content.dataset.completed === 'true' ||
+      content.dataset.failed === 'true'
+    ) {
+      return;
+    }
+
     const connected = content.querySelectorAll('.route-node.connected').length;
     const connecting = content.querySelectorAll('.route-node.connecting').length;
+    const animationPhase = content.querySelector('.swap-animation')?.dataset.phase;
     const stepEl = content.querySelector('#swap-step-label');
     const titleEl = content.querySelector('#swap-page-title');
     const progressEl = content.querySelector('#swap-progress-fill');
-    const step = Math.min(5, Math.max(1, connected + (connecting > 0 ? 1 : 0)));
+    const routeStep = Math.min(
+      5,
+      Math.max(1, connected + (connecting > 0 ? 1 : 0))
+    );
+    const phaseHeader =
+      animationPhase === 'settlement'
+        ? { step: 4, title: 'Routing atomic swap' }
+        : animationPhase === 'contract'
+          ? { step: 3, title: 'Funding HTLC contracts' }
+          : null;
+    const step = phaseHeader ? Math.max(routeStep, phaseHeader.step) : routeStep;
 
     currentStep = Math.max(currentStep, step);
     if (stepEl) stepEl.textContent = `Step ${step} of 5 · Swap in progress`;
     if (titleEl) {
       titleEl.textContent =
-        step <= 1
+        phaseHeader?.title ||
+        (step <= 1
           ? 'Initiating'
-          : step <= 3
+          : step <= 2
             ? 'Establishing Tor circuits'
-            : step === 4
-              ? 'Routing atomic swap'
-              : 'Finalizing swap';
+            : step === 3
+              ? 'Funding HTLC contracts'
+              : step === 4
+                ? 'Routing atomic swap'
+                : 'Finalizing swap');
     }
     if (progressEl) {
       progressEl.style.width = `${Math.min(100, step * 20)}%`;
@@ -245,35 +270,35 @@ export async function CoinswapComponent(container, swapConfig) {
       .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const node = content.querySelector(`#maker-${hopIndex}`);
-    if (!node) return;
-    node.classList.remove('connected', 'connecting', 'awaiting', 'locked');
-    node.classList.add(color === 'green' ? 'connected' : color === 'orange' || color === 'yellow' ? 'connecting' : 'awaiting');
-    if (/lock/i.test(normalizedStatus)) node.classList.add('locked');
-    const badge = node.querySelector('.route-status');
-    if (badge) badge.textContent = normalizedStatus || 'Awaiting';
-    for (let i = 0; i <= hopIndex; i++) {
-      content.querySelector(`#route-line-${i}`)?.classList.add('is-active');
-    }
+    progressAnimation?.setMakerStatus(hopIndex, normalizedStatus, color);
     updateStageFromRoute();
   }
 
   function updateMakerVisibility(makerIndex, visible) {
-    const maker = content.querySelector(`#maker-${makerIndex}`);
-    if (maker) {
-      maker.classList.toggle('awaiting', !visible);
-      maker.style.opacity = visible ? '1' : '0.55';
-    }
+    progressAnimation?.setMakerVisible(makerIndex, visible);
   }
 
-  function markAllMakersComplete() {
+  function markAllMakersComplete({ final = false } = {}) {
+    if (final) {
+      progressAnimation?.setComplete();
+    }
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
       updateHopStatus(i, 'Complete', 'green');
     }
   }
 
+  function markContractsReceivedIfComplete() {
+    if (contractDataReceivedMakers.size < swapData.makers) return;
+
+    for (let i = 0; i < swapData.makers; i++) {
+      updateMakerVisibility(i, true);
+      updateHopStatus(i, 'Contracts received', 'green');
+    }
+  }
+
   function markAllMakersFailed() {
+    progressAnimation?.setFailed();
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
       updateHopStatus(i, 'Failed', 'orange');
@@ -281,23 +306,11 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function updateYouSend(active) {
-    const youSend = content.querySelector('#you-send');
-    if (youSend) {
-      youSend.classList.toggle('connected', active);
-      const badge = youSend.querySelector('.route-status');
-      if (badge) badge.textContent = active ? 'Connected' : 'Awaiting';
-    }
+    progressAnimation?.setWalletActive(active);
   }
 
   function updateYouReceive(active) {
-    const youReceive = content.querySelector('#you-receive');
-    if (youReceive) {
-      youReceive.classList.toggle('connected', active);
-      const badge = youReceive.querySelector('.route-status');
-      if (badge) badge.textContent = active ? 'Received' : 'Awaiting';
-      const lastLine = content.querySelector(`#route-line-${swapData.makers}`);
-      if (lastLine && active) lastLine.classList.add('is-active');
-    }
+    progressAnimation?.setReceiverActive(active);
   }
 
   function setTransactionTxid(hopIndex, txid) {
@@ -360,6 +373,17 @@ export async function CoinswapComponent(container, swapConfig) {
     const type =
       level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info';
 
+    const relevantModules = [
+      'coinswap::taker::api',
+      'coinswap::taker::taproot_swap',
+      'coinswap::taker::taproot_verification',
+      'coinswap::wallet::api',
+      'coinswap::wallet::spend',
+      'coinswap::wallet::swapcoin',
+      'coinswap::wallet::report',
+    ];
+    if (!relevantModules.includes(module)) return;
+
     // Add raw message to log
     addLog(message, type);
 
@@ -385,6 +409,18 @@ export async function CoinswapComponent(container, swapConfig) {
         Number(substituteMakerMatch[1]),
         substituteMakerMatch[2]
       );
+    }
+    const selectedMakersMatch = message.match(/Selected\s+\d+\s+makers[^:]*:\s+(.+)$/i);
+    if (selectedMakersMatch) {
+      selectedMakersMatch[1]
+        .split(/,\s*/)
+        .forEach((entry) => {
+          const match = entry.match(/#(\d+)\s+(\S+?\.onion)/i);
+          if (!match) return;
+          const makerIdx = Number(match[1]) - 1;
+          setPendingMakerAddress(makerIdx, match[2]);
+          revealMakerAddress(makerIdx, match[2]);
+        });
     }
 
     // Update UI based on message content (supports both V1 and V2 protocols)
@@ -418,6 +454,15 @@ export async function CoinswapComponent(container, swapConfig) {
         setTransactionTxid(0, txMatch[1]);
         updateHopStatus(0, 'Broadcasting...', 'orange');
         updateMakerVisibility(0, true); // Light up first maker
+      }
+    }
+    // Taproot: "Broadcast contract tx: <txid>"
+    else if (message.includes('Broadcast contract tx')) {
+      const txMatch = message.match(/([a-f0-9]{64})/i);
+      if (txMatch) {
+        setTransactionTxid(0, txMatch[1]);
+        updateHopStatus(0, 'Broadcasting...', 'orange');
+        updateMakerVisibility(0, true);
       }
     }
     // V2: "Persisted outgoing swapcoin to wallet store"
@@ -609,7 +654,9 @@ export async function CoinswapComponent(container, swapConfig) {
     ) {
       revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Contract received', 'blue');
+      contractDataReceivedMakers.add(makerIndex);
+      updateHopStatus(makerIndex, 'Contract received', 'yellow');
+      markContractsReceivedIfComplete();
     }
     // V2: "Verified Taproot contract data from maker N"
     else if (
@@ -656,7 +703,6 @@ export async function CoinswapComponent(container, swapConfig) {
     // V2: "Swap finalized successfully"
     else if (message.includes('Swap finalized successfully')) {
       markAllMakersComplete();
-      updateYouReceive(true);
     }
     // V2: "Sweeping N completed incoming swap coins"
     else if (
@@ -664,7 +710,6 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('completed incoming swap coins')
     ) {
       markAllMakersComplete();
-      updateYouReceive(true);
     }
     // V2: Recovery started
     else if (message.includes('Starting taproot swap recovery')) {
@@ -900,12 +945,14 @@ export async function CoinswapComponent(container, swapConfig) {
     addLog('Generating swap report...', 'success');
 
     updateHeaderState('completed');
-    markAllMakersComplete();
+    markAllMakersComplete({ final: true });
     updateYouReceive(true);
     content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
     content.querySelector('#swap-status-text').className =
       'text-2xl font-bold text-green-400';
-    content.querySelector('#complete-button').classList.remove('hidden');
+    const completeButton = content.querySelector('#complete-button');
+    completeButton.hidden = false;
+    completeButton.classList.remove('hidden');
 
     const transformedReport = transformSwapReport(report);
     transformedReport.protocol = swapProtocol;
@@ -1116,12 +1163,14 @@ export async function CoinswapComponent(container, swapConfig) {
     addLog('All operations completed!', 'success');
 
     updateHeaderState('completed');
-    markAllMakersComplete();
+    markAllMakersComplete({ final: true });
     updateYouReceive(true);
     content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
     content.querySelector('#swap-status-text').className =
       'text-2xl font-bold text-green-400';
-    content.querySelector('#complete-button').classList.remove('hidden');
+    const completeButton = content.querySelector('#complete-button');
+    completeButton.hidden = false;
+    completeButton.classList.remove('hidden');
 
     const defaultReport = getDefaultReport();
     await SwapStateManager.completeSwap(defaultReport);
@@ -1219,67 +1268,15 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function buildFlowDiagram() {
-    const makers = Array.from({ length: swapData.makers }, (_, i) => {
-      const displayedAddress = routeMakerAddresses[i]
-        ? compactEndpoint(routeMakerAddresses[i])
-        : 'Pending connection';
-      const addressTitle = routeMakerAddresses[i] || '';
-      const pendingClass = routeMakerAddresses[i] ? '' : ' is-pending';
-
-      return `
-      <div class="route-line" id="route-line-${i}"></div>
-      <article id="maker-${i}" class="route-node maker awaiting">
-        <div class="route-icon">${icons.circleDollarSign(22)}</div>
-        <span>Maker</span>
-        <h3>Maker ${String(i + 1).padStart(2, '0')}</h3>
-        <p class="route-address${pendingClass}" title="${escapeHtml(addressTitle)}">${escapeHtml(displayedAddress)}</p>
-        <b class="route-status">Awaiting</b>
-      </article>
-    `;
-    }).join('');
-
-    return `
-      <div class="swap-route-rail">
-        <article id="you-send" class="route-node taker awaiting">
-          <div class="route-icon">${icons.save(22)}</div>
-          <span>Taker</span>
-          <h3>Your wallet</h3>
-          <p>bcrt1q_x9p2</p>
-          <b class="route-status">Awaiting</b>
-        </article>
-        ${makers}
-        <div class="route-line" id="route-line-${swapData.makers}"></div>
-        <article id="you-receive" class="route-node output awaiting">
-          <div class="route-icon">${icons.receipt(22)}</div>
-          <span>Output</span>
-          <h3>Receiving</h3>
-          <p>bcrt1p_k7a3</p>
-          <b class="route-status">Awaiting</b>
-        </article>
-      </div>
-      <div class="swap-circuit-arc one"></div>
-      <div class="swap-circuit-arc two"></div>
-    `;
+    return '<div id="swap-animation-root"></div>';
   }
 
   function updateYouSend(active) {
-    const youSend = content.querySelector('#you-send');
-    if (youSend) {
-      youSend.classList.toggle('connected', active);
-      const badge = youSend.querySelector('.route-status');
-      if (badge) badge.textContent = active ? 'Connected' : 'Awaiting';
-    }
+    progressAnimation?.setWalletActive(active);
   }
 
   function updateYouReceive(active) {
-    const youReceive = content.querySelector('#you-receive');
-    if (youReceive) {
-      youReceive.classList.toggle('connected', active);
-      const badge = youReceive.querySelector('.route-status');
-      if (badge) badge.textContent = active ? 'Received' : 'Awaiting';
-      const lastLine = content.querySelector(`#route-line-${swapData.makers}`);
-      if (lastLine && active) lastLine.classList.add('is-active');
-    }
+    progressAnimation?.setReceiverActive(active);
   }
 
   function updateHeaderState(state) {
@@ -1333,25 +1330,35 @@ export async function CoinswapComponent(container, swapConfig) {
         ${buildFlowDiagram()}
       </section>
 
-      <section class="swap-terminal">
-        <div id="log-container"></div>
-      </section>
-
       <section class="swap-progress-stats">
         <div><span>Amount</span><strong>${formatSats(swapData.amount)}</strong></div>
         <div><span>Hops</span><strong>${swapData.hops}</strong></div>
         <div><span>Fee</span><strong>${formatSats((actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops))}</strong></div>
-        <div><span>You receive</span><strong class="pending-receive">—</strong><small>sats</small></div>
         <div><span>ETA</span><strong id="swap-eta">2m 40s</strong></div>
         <div class="hidden"><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
       </section>
 
+      <section class="swap-terminal">
+        <div id="log-container"></div>
+      </section>
+
       <div id="transaction-list" class="hidden"></div>
-      <button id="complete-button" class="hidden swap-complete-btn">View Swap Report</button>
+      <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>
     </div>
   `;
 
   container.appendChild(content);
+
+  progressAnimation = createSwapProgressAnimation(
+    content.querySelector('#swap-animation-root'),
+    {
+      amount: swapData.amount,
+      makers: swapData.makers,
+      hops: swapData.hops,
+      fee: (actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops),
+      makerAddresses: routeMakerAddresses,
+    }
+  );
 
   content.querySelector('#back-to-swap').addEventListener('click', () => {
     if (pollInterval) clearInterval(pollInterval);
