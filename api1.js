@@ -787,19 +787,18 @@ function registerTakerHandlers() {
   });
 
   /**
-   * Spawn a worker thread to run syncOfferbookAndWait().
+   * Trigger an offerbook sync via the napi async method.
    *
-   * The sync MUST run off the main thread — calling it on the main thread
-   * blocks Electron's entire event loop and triggers the OS "not responding"
-   * dialog. The worker creates its own Taker instance. At launch this matches
-   * the main Taker (both cold). Mid-session the worker's Tor circuits warm up
-   * quickly because the Tor daemon reuses circuits it already established for
-   * the main Taker.
+   * `syncOfferbookAndWaitAsync()` runs the blocking sync on libuv's worker pool
+   * and returns a Promise — the JS event loop is never blocked, and other
+   * Taker calls (getBalance, listUnspent, etc.) proceed in parallel because
+   * the napi binding uses a clone-able OfferSyncClient instead of locking the
+   * inner Taker Mutex.
    *
    * Returns { success, syncId } immediately. Caller polls getSyncStatus(syncId).
    */
   function startSyncWorker(source = 'manual') {
-    if (!api1State.takerInstance || !api1State.storedTakerConfig) {
+    if (!api1State.takerInstance) {
       return { success: false, error: 'Taker not initialized' };
     }
 
@@ -824,16 +823,6 @@ function registerTakerHandlers() {
       source,
     });
 
-    const workerConfig = buildTakerConfig({
-      ...api1State.storedTakerConfig,
-      walletName: api1State.currentWalletName || api1State.DEFAULT_WALLET_NAME,
-      protocol: api1State.protocolVersion || 'v1',
-    });
-
-    const worker = new Worker(path.join(__dirname, 'offerbook-worker.js'), {
-      workerData: { config: workerConfig },
-    });
-
     const finish = (status, extra = {}) => {
       const postSyncSnapshot = getOfferbookSnapshot();
       api1State.activeSyncs.set(syncId, {
@@ -852,20 +841,16 @@ function registerTakerHandlers() {
       api1State.syncState.currentSyncId = null;
     };
 
-    worker.on('message', (msg) => {
-      if (msg.type === 'completed') {
+    api1State.takerInstance
+      .syncOfferbookAndWaitAsync()
+      .then(() => {
         console.log(`✅ [${syncId}] Offerbook sync completed`);
         finish('completed');
-      } else if (msg.type === 'error') {
-        console.error(`❌ [${syncId}] Offerbook sync failed:`, msg.error);
-        finish('failed', { error: msg.error });
-      }
-    });
-
-    worker.on('error', (err) => {
-      console.error(`❌ [${syncId}] Offerbook worker error:`, err.message);
-      finish('failed', { error: err.message });
-    });
+      })
+      .catch((err) => {
+        console.error(`❌ [${syncId}] Offerbook sync failed:`, err.message);
+        finish('failed', { error: err.message });
+      });
 
     return { success: true, syncId };
   }
@@ -1269,6 +1254,49 @@ function registerTakerHandlers() {
 
   ipcMain.handle('taker:syncOfferbookAndWait', () => {
     return startSyncWorker('manual');
+  });
+
+  /**
+   * Poll a single maker on demand. Uses the napi async variant which routes
+   * through the cloned `OfferSyncClient` (no inner Mutex hold), so concurrent
+   * Taker calls remain unblocked. Returns the maker's final state.
+   */
+  ipcMain.handle('taker:pollMaker', async (_event, address) => {
+    try {
+      if (!api1State.takerInstance) {
+        return { success: false, error: 'Taker not initialized' };
+      }
+      if (!address || typeof address !== 'string') {
+        return { success: false, error: 'Address is required (string)' };
+      }
+      console.log(`🎯 [pollMaker] ${address}`);
+      const candidate = await api1State.takerInstance.pollMakerAsync(address);
+      return { success: true, maker: candidate };
+    } catch (error) {
+      console.error('❌ pollMaker failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  /**
+   * Remove a maker from the offerbook by address. Persists to disk.
+   * Returns { success, removed } where `removed` is true if the entry existed.
+   */
+  ipcMain.handle('taker:removeMaker', async (_event, address) => {
+    try {
+      if (!api1State.takerInstance) {
+        return { success: false, error: 'Taker not initialized' };
+      }
+      if (!address || typeof address !== 'string') {
+        return { success: false, error: 'Address is required (string)' };
+      }
+      console.log(`🗑️ [removeMaker] ${address}`);
+      const removed = api1State.takerInstance.removeMaker(address);
+      return { success: true, removed };
+    } catch (error) {
+      console.error('❌ removeMaker failed:', error);
+      return { success: false, error: error.message };
+    }
   });
 
   // Get sync status
