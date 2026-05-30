@@ -4,6 +4,7 @@ import { Market } from '../components/market/Market.js';
 import { SendComponent } from '../components/send/Send.js';
 import { ReceiveComponent } from '../components/receive/Receive.js';
 import { SwapComponent } from '../components/swap/Swap.js';
+import { SwapHistoryComponent } from '../components/swap/SwapHistory.js';
 import { RecoveryComponent } from '../components/recovery/Recovery.js';
 import { LogComponent } from '../components/log/Log.js';
 import { SettingsComponent } from '../components/settings/Settings.js';
@@ -23,6 +24,7 @@ const components = {
   send: SendComponent,
   receive: ReceiveComponent,
   swap: SwapComponent,
+  swapReports: SwapHistoryComponent,
   recovery: RecoveryComponent,
   log: LogComponent,
   settings: SettingsComponent,

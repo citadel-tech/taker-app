@@ -36,7 +36,7 @@ export function RecoveryComponent(container) {
       <article class="recovery-stat-card recovered">
         <span class="app-accent"></span>
         <span class="app-card-label">Total Recovered</span>
-        <div class="app-card-value"><span id="total-recovered">0 sats</span></div>
+        <div class="app-card-value"><span id="total-recovered">0 丰</span></div>
       </article>
       <article class="recovery-stat-card rate">
         <span class="app-accent"></span>

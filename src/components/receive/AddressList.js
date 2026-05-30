@@ -183,7 +183,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     }
 
     const csv = [
-      'Address,Type,Spend Type,Times Used,Received (sats),Created At,Last Used',
+      'Address,Type,Spend Type,Times Used,Received (丰),Created At,Last Used',
       ...allAddresses.map((addr) => {
         return `"${addr.address}","${addr.type}","${addr.spendType}",${addr.used},${Math.round(addr.received)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
       }),

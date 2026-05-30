@@ -507,7 +507,7 @@ export function Market(container) {
           <label class="market-fee-field">
             <span>Maker Position in Circuit (n)</span>
             <div class="market-fee-index-field">
-              <input id="market-fee-position" type="number" min="1" step="1" placeholder="1">
+              <input id="market-fee-position" type="number" min="1" step="1" value="1">
               <strong>Position</strong>
             </div>
           </label>
@@ -526,22 +526,22 @@ export function Market(container) {
           <div class="market-fee-results">
             <div>
               <span>Base Fee</span>
-              <strong><span id="market-fee-base">0</span> sats</strong>
+              <strong><span id="market-fee-base">0</span> 丰</strong>
               <small>Fixed maker fee</small>
             </div>
             <div>
               <span>Liquidity Fee</span>
-              <strong><span id="market-fee-liquidity">0</span> sats</strong>
-              <small id="market-fee-liquidity-detail">0 sats x 0 fee rate</small>
+              <strong><span id="market-fee-liquidity">0</span> 丰</strong>
+              <small id="market-fee-liquidity-detail">0 丰 x 0 fee rate</small>
             </div>
             <div>
               <span>Time Fee</span>
-              <strong><span id="market-fee-time">0</span> sats</strong>
-              <small id="market-fee-time-detail">20 x 0 sats x 0 time rate</small>
+              <strong><span id="market-fee-time">0</span> 丰</strong>
+              <small id="market-fee-time-detail">20 x 0 丰 x 0 time rate</small>
             </div>
             <div class="total">
               <span>Total Fee</span>
-              <strong><span id="market-fee-total">0</span> sats</strong>
+              <strong><span id="market-fee-total">0</span> 丰</strong>
               <small id="market-fee-percent">0.0000% of swap amount</small>
             </div>
           </div>

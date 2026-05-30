@@ -361,9 +361,9 @@ export function TransactionsListComponent(container) {
 
     // Update stats cards
     content.querySelector('#total-received').textContent =
-      `${totals.totalReceived.toLocaleString()} sats`;
+      `${totals.totalReceived.toLocaleString()} 丰`;
     content.querySelector('#total-sent').textContent =
-      `${totals.totalSent.toLocaleString()} sats`;
+      `${totals.totalSent.toLocaleString()} 丰`;
     content.querySelector('#total-swaps').textContent = totals.totalSwaps;
   }
 
@@ -389,11 +389,11 @@ export function TransactionsListComponent(container) {
         <div class="grid grid-cols-3 gap-4 mb-6">
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Received</p>
-                <p id="total-received" class="text-2xl font-mono text-green-400">-- sats</p>
+                <p id="total-received" class="text-2xl font-mono text-green-400">-- 丰</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Sent</p>
-                <p id="total-sent" class="text-2xl font-mono text-red-400">-- sats</p>
+                <p id="total-sent" class="text-2xl font-mono text-red-400">-- 丰</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Swaps</p>

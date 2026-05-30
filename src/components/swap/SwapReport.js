@@ -7,7 +7,7 @@ function satsToBtc(sats) {
     : '0.00000000';
 }
 
-export function SwapReportComponent(container, swapReport) {
+export function SwapReportComponent(container, swapReport, options = {}) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
     switch (value) {
       case 'v2':
@@ -64,6 +64,10 @@ export function SwapReportComponent(container, swapReport) {
   };
 
   const dedupeTxids = (value) => [...new Set(flattenTxidEntries(value))];
+  const toArray = (value) => {
+    if (Array.isArray(value)) return value.filter((entry) => entry != null);
+    return value == null ? [] : [value];
+  };
 
   const nestedReport = swapReport.report || {};
 
@@ -270,12 +274,26 @@ export function SwapReportComponent(container, swapReport) {
       nestedReport.output_regular_utxos ||
       nestedReport.outputChangeUtxos ||
       nestedReport.output_change_utxos ||
+      swapReport.outputChangeUtxos ||
+      swapReport.output_change_utxos ||
       [],
     outputSwapUtxos:
       swapReport.outputSwapUtxos ||
       swapReport.output_swap_utxos ||
       nestedReport.outputSwapUtxos ||
       nestedReport.output_swap_utxos ||
+      [],
+    outgoingContracts:
+      swapReport.outgoingContracts ||
+      swapReport.outgoing_contracts ||
+      nestedReport.outgoingContracts ||
+      nestedReport.outgoing_contracts ||
+      [],
+    incomingContracts:
+      swapReport.incomingContracts ||
+      swapReport.incoming_contracts ||
+      nestedReport.incomingContracts ||
+      nestedReport.incoming_contracts ||
       [],
     sweepTxid,
     protocol: hasExplicitProtocolMetadata ? protocol : null,
@@ -291,6 +309,24 @@ export function SwapReportComponent(container, swapReport) {
     incomingContractTxid,
     recoveryTxids,
   };
+  report.inputUtxos = toArray(report.inputUtxos);
+  report.outputRegularUtxos = toArray(report.outputRegularUtxos);
+  report.outputSwapUtxos = toArray(report.outputSwapUtxos);
+  report.outgoingContracts = toArray(report.outgoingContracts);
+  report.incomingContracts = toArray(report.incomingContracts);
+  report.changeAmount = toNumber(
+    swapReport.changeAmount ??
+      swapReport.change_amount ??
+      swapReport.outputChangeAmount ??
+      swapReport.output_change_amount ??
+      swapReport.output_change_amounts ??
+      nestedReport.changeAmount ??
+      nestedReport.change_amount ??
+      nestedReport.outputChangeAmount ??
+      nestedReport.output_change_amount ??
+      nestedReport.output_change_amounts,
+    NaN
+  );
 
   console.log('📊 Normalized report:', report);
 
@@ -305,6 +341,222 @@ export function SwapReportComponent(container, swapReport) {
   function formatNumber(num) {
     if (typeof num !== 'number' || isNaN(num)) return '0';
     return num.toLocaleString();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function getFirstField(source, keys, fallback = null) {
+    if (!source || typeof source !== 'object') return fallback;
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+        return source[key];
+      }
+    }
+    return fallback;
+  }
+
+  function getUtxoAmount(utxo) {
+    if (utxo && typeof utxo === 'object' && 'reportEntry' in utxo) {
+      return getUtxoAmount(utxo.reportEntry);
+    }
+    if (typeof utxo === 'number') return utxo;
+    if (Array.isArray(utxo)) {
+      const amount = utxo.find((entry) => Number.isFinite(Number(entry)));
+      return toNumber(amount, NaN);
+    }
+    if (!utxo || typeof utxo !== 'object') return NaN;
+    return toNumber(
+      getFirstField(utxo, [
+        'amount',
+        'value',
+        'sats',
+        'satoshis',
+        'amount_sats',
+        'amountSats',
+      ]),
+      NaN
+    );
+  }
+
+  function sumUtxos(utxos) {
+    return utxos.reduce((sum, utxo) => {
+      const amount = getUtxoAmount(utxo);
+      return Number.isFinite(amount) ? sum + amount : sum;
+    }, 0);
+  }
+
+  if (!Number.isFinite(report.changeAmount)) {
+    report.changeAmount = sumUtxos(report.outputRegularUtxos);
+  }
+
+  function getUtxoTitle(utxo, fallbackLabel, groupLabel = 'Report entry') {
+    if (utxo && typeof utxo === 'object' && 'reportEntry' in utxo) {
+      const entry = utxo.reportEntry;
+      if (typeof entry === 'number') return `${utxo.reportLabel} amount`;
+      return getUtxoTitle(entry, fallbackLabel, groupLabel);
+    }
+    if (typeof utxo === 'number') return `${fallbackLabel} amount`;
+    if (typeof utxo === 'string') return utxo;
+    if (Array.isArray(utxo)) {
+      const [first, second, third] = utxo;
+      const firstNumber = Number(first);
+      const secondNumber = Number(second);
+
+      if (typeof first === 'string' && Number.isFinite(secondNumber)) {
+        return `${first}:${second}`;
+      }
+
+      if (Number.isFinite(firstNumber) && typeof second === 'string') {
+        return second;
+      }
+
+      if (typeof second === 'string' && Number.isFinite(Number(third))) {
+        return `${second}:${third}`;
+      }
+
+      return utxo.map((entry) => String(entry)).join(' · ') || fallbackLabel;
+    }
+    if (!utxo || typeof utxo !== 'object') return fallbackLabel;
+    const outpoint =
+      getFirstField(utxo, ['outpoint', 'point']) ||
+      (getFirstField(utxo, ['txid', 'tx_id', 'txHash', 'tx_hash'])
+        ? `${getFirstField(utxo, ['txid', 'tx_id', 'txHash', 'tx_hash'])}:${getFirstField(utxo, ['vout', 'index', 'output_index'], '?')}`
+        : null);
+    return (
+      outpoint ||
+      getFirstField(utxo, ['address', 'script_pubkey', 'scriptPubkey', 'contract_txid', 'contractTxid']) ||
+      JSON.stringify(utxo)
+    );
+  }
+
+  function getUtxoMeta(utxo) {
+    if (utxo && typeof utxo === 'object' && 'reportEntry' in utxo) {
+      const meta = getUtxoMeta(utxo.reportEntry);
+      return [utxo.reportLabel, meta].filter(Boolean).join(' · ');
+    }
+    if (typeof utxo === 'number') return 'amount recorded in report';
+    if (Array.isArray(utxo)) {
+      const [first, second, third] = utxo;
+      const parts = [];
+      if (Number.isFinite(Number(first))) parts.push(`${formatNumber(Number(first))} 丰`);
+      if (typeof second === 'string' && Number.isFinite(Number(first))) {
+        parts.push('report output');
+      } else if (third != null) {
+        parts.push(String(third));
+      }
+      return parts.join(' · ');
+    }
+    if (!utxo || typeof utxo !== 'object') return '';
+    const parts = [];
+    const type = getFirstField(utxo, ['type', 'spend_type', 'spendType', 'label']);
+    const address = getFirstField(utxo, ['address']);
+    const vout = getFirstField(utxo, ['vout', 'index', 'output_index']);
+    if (type) parts.push(String(type));
+    if (vout != null) parts.push(`vout ${vout}`);
+    if (address) parts.push(truncateAddress(String(address), 10, 8));
+    return parts.join(' · ');
+  }
+
+  function buildUtxoRowsHtml(utxos, emptyText, groupLabel = 'Report entry') {
+    if (!utxos.length) {
+      return emptyText ? `<p class="swap-report-empty">${emptyText}</p>` : '';
+    }
+
+    return utxos
+      .map((utxo, index) => {
+        const title = getUtxoTitle(utxo, `${groupLabel} ${index + 1}`, groupLabel);
+        const amount = getUtxoAmount(utxo);
+        const meta = getUtxoMeta(utxo);
+        return `
+          <div class="swap-report-utxo-row">
+            <div>
+              <strong>${escapeHtml(title)}</strong>
+              ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
+            </div>
+            ${Number.isFinite(amount) ? `<em>${formatNumber(amount)} 丰</em>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  function getMakerFeeParts(makerIndex) {
+    const makerFee = report.makerFeeInfo[makerIndex] || {};
+    const baseFee = toNumber(
+      getFirstField(makerFee, ['baseFee', 'base_fee', 'makerBaseFee', 'maker_base_fee']),
+      0
+    );
+    const amountFee = toNumber(
+      getFirstField(makerFee, [
+        'amountRelativeFee',
+        'amount_relative_fee',
+        'liquidityFee',
+        'liquidity_fee',
+        'volumeFee',
+        'volume_fee',
+      ]),
+      0
+    );
+    const timeFee = toNumber(
+      getFirstField(makerFee, ['timeRelativeFee', 'time_relative_fee', 'timeFee', 'time_fee']),
+      0
+    );
+    const explicitTotal = toNumber(
+      getFirstField(makerFee, ['totalFee', 'total_fee', 'feePaid', 'fee_paid', 'amount']),
+      NaN
+    );
+    const componentTotal = baseFee + amountFee + timeFee;
+    const totalFee = Number.isFinite(explicitTotal) ? explicitTotal : componentTotal;
+    const unattributed = Math.max(0, totalFee - componentTotal);
+    const fidelityTx =
+      getFirstField(makerFee, [
+        'fidelityTxid',
+        'fidelity_txid',
+        'fidelityBondTxid',
+        'fidelity_bond_txid',
+        'bondTxid',
+        'bond_txid',
+        'fidelityTransaction',
+        'fidelity_transaction',
+      ]) || null;
+
+    return {
+      baseFee,
+      amountFee,
+      timeFee,
+      unattributed,
+      totalFee,
+      hasComponents: componentTotal > 0,
+      fidelityTx,
+    };
+  }
+
+  function getMakerFeeDisplay(makerIndex) {
+    const parts = getMakerFeeParts(makerIndex);
+    return Number.isFinite(parts.totalFee) && parts.totalFee > 0
+      ? `${formatNumber(parts.totalFee)} 丰`
+      : 'Not itemized';
+  }
+
+  const itemizedMakerFeeTotal = report.makerFeeInfo.reduce((sum, _entry, index) => {
+    const totalFee = getMakerFeeParts(index).totalFee;
+    return Number.isFinite(totalFee) ? sum + totalFee : sum;
+  }, 0);
+
+  if (report.totalMakerFees <= 0 && itemizedMakerFeeTotal > 0) {
+    report.totalMakerFees = itemizedMakerFeeTotal;
+    if (report.totalFee <= report.miningFee) {
+      report.totalFee = report.totalMakerFees + report.miningFee;
+    }
+    report.feePercentage =
+      report.targetAmount > 0 ? (report.totalFee / report.targetAmount) * 100 : 0;
   }
 
   function truncateAddress(addr, start = 14, end = 16) {
@@ -355,18 +607,19 @@ export function SwapReportComponent(container, swapReport) {
   // Show maker popup
   function showMakerPopup(makerIndex) {
     const makerAddr = report.makerAddresses[makerIndex] || 'unknown';
-    const makerFee = report.makerFeeInfo[makerIndex] || {};
-    const feePaid =
-      makerFee.totalFee ||
-      makerFee.total_fee ||
-      makerFee.feePaid ||
-      makerFee.fee_paid ||
-      makerFee.amount ||
-      0;
-
+    const feeParts = getMakerFeeParts(makerIndex);
+    const feePaid = Number.isFinite(feeParts.totalFee) ? feeParts.totalFee : 0;
     const feeRate =
       report.targetAmount > 0 ? (feePaid / report.targetAmount) * 100 : 0;
     const color = makerColors[makerIndex % makerColors.length];
+    const feeRows = [
+      ['Base fee', feeParts.baseFee, 'Fixed maker fee'],
+      ['Liquidity fee', feeParts.amountFee, 'Amount-relative fee'],
+      ['Time fee', feeParts.timeFee, 'Refund locktime fee'],
+      ...(feeParts.unattributed > 0
+        ? [['Other maker fee', feeParts.unattributed, 'Included in report total']]
+        : []),
+    ];
 
     // Remove any existing popup
     const existingPopup = document.querySelector('.maker-popup-overlay');
@@ -391,7 +644,7 @@ export function SwapReportComponent(container, swapReport) {
           <section class="maker-popup-card maker-popup-address">
             <span>Onion Address</span>
             <div>
-              <strong>${makerAddr}</strong>
+              <strong>${escapeHtml(makerAddr)}</strong>
               <button class="copy-addr-btn maker-popup-icon-btn" type="button" title="Copy address">${icons.clipboardCopy(15)}</button>
             </div>
           </section>
@@ -401,7 +654,7 @@ export function SwapReportComponent(container, swapReport) {
             <div class="maker-popup-metrics">
               <div>
                 <small>Fee Paid</small>
-                <strong>${formatNumber(feePaid)} sats</strong>
+                <strong>${formatNumber(feePaid)} 丰</strong>
               </div>
               <div>
                 <small>Fee Rate</small>
@@ -409,6 +662,51 @@ export function SwapReportComponent(container, swapReport) {
               </div>
             </div>
           </section>
+
+          <section class="maker-popup-card">
+            <span>Fee Breakdown</span>
+            <div class="maker-popup-fee-breakdown">
+              ${feeRows
+                .map(
+                  ([label, amount, note]) => `
+                    <div>
+                      <span>
+                        <b>${label}</b>
+                        <small>${note}</small>
+                      </span>
+                      <strong>${formatNumber(amount)} 丰</strong>
+                    </div>
+                  `
+                )
+                .join('')}
+              <div class="maker-popup-fee-total">
+                <span>
+                  <b>Total maker fee</b>
+                  <small>Base + liquidity + time${feeParts.unattributed > 0 ? ' + other' : ''}</small>
+                </span>
+                <strong>${formatNumber(feePaid)} 丰</strong>
+              </div>
+              ${
+                feeParts.hasComponents
+                  ? ''
+                  : '<p>Component-level fee data was not included in this report.</p>'
+              }
+            </div>
+          </section>
+
+          ${
+            feeParts.fidelityTx
+              ? `
+                <section class="maker-popup-card maker-popup-address">
+                  <span>Fidelity Tx</span>
+                  <div>
+                    <strong>${escapeHtml(feeParts.fidelityTx)}</strong>
+                    <button class="copy-fidelity-btn maker-popup-icon-btn" type="button" title="Copy fidelity transaction">${icons.clipboardCopy(15)}</button>
+                  </div>
+                </section>
+              `
+              : ''
+          }
           
           <section class="maker-popup-card">
             <span>Swap Position</span>
@@ -418,11 +716,6 @@ export function SwapReportComponent(container, swapReport) {
                 ${makerIndex === 0 ? '(First maker in chain)' : makerIndex === report.makersCount - 1 ? '(Last maker in chain)' : '(Middle of chain)'}
               </small>
             </div>
-          </section>
-          
-          <section class="maker-popup-privacy">
-            <span>${icons.shieldCheck(16)} Privacy Contribution</span>
-            <p>This maker broke the transaction link between hop ${makerIndex} and hop ${makerIndex + 2}, making it impossible to trace the flow of funds.</p>
           </section>
         </div>
         
@@ -453,22 +746,40 @@ export function SwapReportComponent(container, swapReport) {
         copyToClipboard(makerAddr);
       });
     });
+
+    overlay.querySelectorAll('.copy-fidelity-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        copyToClipboard(feeParts.fidelityTx);
+      });
+    });
   }
 
   const makerColors = ['#518def', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const makeReportEntry = (reportLabel, reportEntry) => ({
+    reportLabel,
+    reportEntry,
+  });
   const transactionArtifacts = [
-    {
-      label: 'Outgoing Contract',
-      txid: report.outgoingContractTxid,
-      accent: '#f5c451',
-      description: 'Contract transaction recorded on the outgoing side.',
-    },
-    {
-      label: 'Incoming Contract',
-      txid: report.incomingContractTxid,
-      accent: '#518def',
-      description: 'Contract transaction recorded on the incoming side.',
-    },
+    ...(report.outgoingContractTxid
+      ? [
+          {
+            label: 'Outgoing Contract Tx',
+            txid: report.outgoingContractTxid,
+            accent: '#f5c451',
+            description: 'Outgoing contract transaction from the report.',
+          },
+        ]
+      : []),
+    ...(report.incomingContractTxid
+      ? [
+          {
+            label: 'Incoming Contract Tx',
+            txid: report.incomingContractTxid,
+            accent: '#518def',
+            description: 'Incoming contract transaction from the report.',
+          },
+        ]
+      : []),
     ...report.fundingTxids.map((txid, index) => ({
       label: `Funding Transaction ${index + 1}`,
       txid,
@@ -494,16 +805,57 @@ export function SwapReportComponent(container, swapReport) {
   ].filter((artifact) => artifact.txid);
   report.transactionArtifacts = transactionArtifacts;
   report.artifactsCount = transactionArtifacts.length;
+  const outgoingUtxos = report.inputUtxos.length
+    ? report.inputUtxos.map((entry, index) =>
+        makeReportEntry(`Input ${index + 1}`, entry)
+      )
+    : report.outgoingContracts.length
+      ? report.outgoingContracts.map((entry, index) =>
+          makeReportEntry(`Outgoing contract ${index + 1}`, entry)
+        )
+      : report.outgoingContractTxid
+        ? [makeReportEntry('Outgoing contract tx', report.outgoingContractTxid)]
+        : [];
+  const incomingUtxos =
+    report.outputRegularUtxos.length || report.outputSwapUtxos.length
+      ? [
+          ...report.outputRegularUtxos.map((entry, index) =>
+            makeReportEntry(`Change output ${index + 1}`, entry)
+          ),
+          ...report.outputSwapUtxos.map((entry, index) =>
+            makeReportEntry(`Swap output ${index + 1}`, entry)
+          ),
+        ]
+      : report.incomingContracts.length
+        ? report.incomingContracts.map((entry, index) =>
+            makeReportEntry(`Incoming contract ${index + 1}`, entry)
+          )
+        : report.incomingContractTxid
+          ? [makeReportEntry('Incoming contract tx', report.incomingContractTxid)]
+          : [];
+
+  function buildUtxoCollectionsHtml() {
+    return `
+      <div class="swap-report-utxo-group outgoing">
+        <div class="swap-report-utxo-head">
+          <span>Outgoing Inputs</span>
+          <strong>${outgoingUtxos.length}</strong>
+        </div>
+        ${buildUtxoRowsHtml(outgoingUtxos, '', 'Input')}
+      </div>
+      <div class="swap-report-utxo-group incoming">
+        <div class="swap-report-utxo-head">
+          <span>Incoming Outputs</span>
+          <strong>${incomingUtxos.length}</strong>
+        </div>
+        ${buildUtxoRowsHtml(incomingUtxos, '', 'Output')}
+      </div>
+    `;
+  }
 
   function buildTransactionArtifactsHtml() {
     if (!report.transactionArtifacts || report.transactionArtifacts.length === 0) {
-      return `
-        <div class="swap-report-empty">
-          <p>
-            No on-chain transaction IDs were saved with this swap report. Maker, fee, and UTXO details are still shown below.
-          </p>
-        </div>
-      `;
+      return '';
     }
 
     return report.transactionArtifacts
@@ -544,6 +896,42 @@ export function SwapReportComponent(container, swapReport) {
       `;
       })
       .join('');
+  }
+
+  function buildMakerFeeLinesHtml() {
+    const count = Math.max(makerCount, report.makerFeeInfo.length);
+    if (!count) return '';
+
+    return `
+      <div class="swap-report-maker-fees">
+        <span>Maker fee split</span>
+        ${Array.from({ length: count }, (_, idx) => {
+          const addr = report.makerAddresses[idx] || `Maker ${idx + 1}`;
+          return `
+            <button class="maker-fee-row" data-maker-index="${idx}" type="button">
+              <span>Maker ${idx + 1}</span>
+              <strong>${getMakerFeeDisplay(idx)}</strong>
+              <em>${escapeHtml(truncateAddress(addr, 10, 8))}</em>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function buildFeeDetailsHtml() {
+    const lines = [
+      `<div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <small>丰</small></strong></div>`,
+      `<div><span>Mining fees</span><strong>${formatNumber(report.miningFee)} <small>丰</small></strong></div>`,
+    ];
+
+    if (report.changeAmount > 0) {
+      lines.push(
+        `<div><span>Change amount</span><strong>${formatNumber(report.changeAmount)} <small>丰</small></strong></div>`
+      );
+    }
+
+    return lines.join('');
   }
 
   function getReportInfoLines() {
@@ -853,16 +1241,17 @@ export function SwapReportComponent(container, swapReport) {
   }
 
   const makerCount = report.makersCount || report.makerAddresses.length;
-  const statusSession = String(report.swapId || 'unknown').slice(0, 8).toUpperCase();
+  const displaySwapId = report.swapId || 'unknown';
   const displayAmount = report.totalOutputAmount || report.targetAmount;
 
   content.innerHTML = `
     <div class="swap-report-page">
       <header class="swap-report-head">
-        <div class="swap-report-check">${icons.check(36)}</div>
+        <button id="report-back-btn" class="swap-report-head-back" type="button" aria-label="Back to swap">
+          ${icons.arrowLeft(28)}
+        </button>
         <div>
           <h2>Swap <span>Completed</span></h2>
-          <p><strong>Settled</strong> · Session ${statusSession} · Block 824,517</p>
         </div>
       </header>
 
@@ -871,16 +1260,17 @@ export function SwapReportComponent(container, swapReport) {
           <h3>Swap Summary</h3>
           <div class="swap-report-hero">
             <span>Amount Swapped</span>
-            <strong>${formatNumber(displayAmount)} <small>SATS</small></strong>
+            <strong>${formatNumber(displayAmount)} <small>丰</small></strong>
             <p>≈ ${satsToBtc(displayAmount)} BTC</p>
             <b>${icons.timer(15)} Duration ${formatDuration(report.swapDurationSeconds)}</b>
           </div>
 
           <div class="swap-report-block">
             <div class="swap-report-block-head">
-              <span>Transaction Artifacts</span>
+              <span>UTXOs and Transactions</span>
             </div>
             <div class="swap-report-artifacts">
+              ${buildUtxoCollectionsHtml()}
               ${buildTransactionArtifactsHtml()}
             </div>
           </div>
@@ -904,12 +1294,12 @@ export function SwapReportComponent(container, swapReport) {
           <section class="swap-report-fees">
             <h3>Fee Details</h3>
             <div class="swap-report-fee-lines">
-              <div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <small>SATS</small></strong></div>
-              <div><span>Mining fees</span><strong>${formatNumber(report.miningFee)} <small>SATS</small></strong></div>
+              ${buildFeeDetailsHtml()}
             </div>
+            ${buildMakerFeeLinesHtml()}
             <div class="swap-report-total-fee">
               <span>Total fee</span>
-              <strong>${formatNumber(report.totalFee)} <small>SATS</small></strong>
+              <strong>${formatNumber(report.totalFee)} <small>丰</small></strong>
               <p>${satsToBtc(report.totalFee)} BTC</p>
             </div>
             <div class="swap-report-percent">
@@ -917,8 +1307,6 @@ export function SwapReportComponent(container, swapReport) {
               <strong>${report.feePercentage.toFixed(3)}%</strong>
             </div>
           </section>
-
-          <button id="done-btn" class="swap-report-back">Back to Swap</button>
         </aside>
       </div>
     </div>
@@ -929,6 +1317,12 @@ export function SwapReportComponent(container, swapReport) {
   content.querySelectorAll('.maker-card').forEach((card) => {
     card.addEventListener('click', () => {
       showMakerPopup(parseInt(card.dataset.makerIndex));
+    });
+  });
+
+  content.querySelectorAll('.maker-fee-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      showMakerPopup(parseInt(row.dataset.makerIndex));
     });
   });
 
@@ -956,9 +1350,9 @@ export function SwapReportComponent(container, swapReport) {
     showNotification('Report exported!');
   });
 
-  content.querySelector('#done-btn').addEventListener('click', () => {
+  content.querySelector('#report-back-btn').addEventListener('click', () => {
     if (window.appManager) {
-      window.appManager.renderComponent('swap');
+      window.appManager.renderComponent(options.backTarget || 'swap');
     }
   });
 
@@ -1056,9 +1450,6 @@ export function SwapReportComponent(container, swapReport) {
               <p class="text-gray-400 text-sm mt-1">View Detailed Swap Data.</p>
             </div>
           </div>
-          <button id="back-to-wallet" class="bg-secondary hover:bg-secondary-hover text-white px-6 py-3 rounded-lg transition-all hover:scale-105">
-            ← Back to Swaps
-          </button>
         </div>
         
         <div class="flex items-center gap-4">
@@ -1122,7 +1513,7 @@ export function SwapReportComponent(container, swapReport) {
             <p class="text-sm text-white">Swap Amount</p>
             <span>${icons.circleDollarSign(16, 'mr-2')}</span>
           </div>
-          <p class="text-2xl font-bold text-primary">${formatNumber(report.targetAmount)} sats</p>
+          <p class="text-2xl font-bold text-primary">${formatNumber(report.targetAmount)} 丰</p>
           <p class="text-xs text-gray-400 mt-1">${satsToBtc(report.targetAmount)} BTC</p>
         </div>
 
@@ -1163,7 +1554,7 @@ export function SwapReportComponent(container, swapReport) {
             <span>${icons.receipt(16, 'mr-2')}</span>
           </div>
           <p class="text-2xl font-bold text-yellow-400">${report.feePercentage.toFixed(2)}%</p>
-          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.totalFee)} sats</p>
+          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.totalFee)} 丰</p>
         </div>
       </div>
 
@@ -1248,9 +1639,6 @@ export function SwapReportComponent(container, swapReport) {
         <button id="export-report" class="flex-1 bg-secondary hover:bg-secondary-hover text-white font-semibold text-lg py-4 rounded-lg transition-all hover:scale-105">
           ${icons.arrowDownCircle(16, 'mr-1')} Export Report
         </button>
-        <button id="done-btn" class="flex-1 bg-primary hover:bg-primary-hover text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
-          Back to Swaps
-        </button>
       </div>
     </div>
   `;
@@ -1303,17 +1691,4 @@ export function SwapReportComponent(container, swapReport) {
     showNotification('Report exported!');
   });
 
-  // Back to wallet
-  content.querySelector('#back-to-wallet').addEventListener('click', () => {
-    if (window.appManager) {
-      window.appManager.renderComponent('swap');
-    }
-  });
-
-  // Done button
-  content.querySelector('#done-btn').addEventListener('click', () => {
-    if (window.appManager) {
-      window.appManager.renderComponent('swap');
-    }
-  });
 }

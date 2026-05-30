@@ -66,14 +66,14 @@ export function ReceiveComponent(container) {
             <div class="receive-request-row">
               <span>Request specific amount</span>
               <div class="receive-unit-toggle">
-                <button class="active" type="button">Sats</button>
+                <button class="active" type="button">丰</button>
                 <button type="button">BTC</button>
               </div>
             </div>
 
             <label class="receive-input-wrap">
               <input id="request-amount" type="number" min="0" step="1" placeholder="0">
-              <span>Sats</span>
+              <span>丰</span>
             </label>
 
             <div class="receive-note-row">

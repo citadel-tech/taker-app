@@ -24,6 +24,28 @@ export function SendComponent(container, preSelectedUtxos = null) {
   let availableUtxos = [];
   let availableBalance = 0;
 
+  function getAmountUnitLabel(unit = amountUnit) {
+    if (unit === 'sats') return '丰';
+    return unit.toUpperCase();
+  }
+
+  function getAmountConversionLabels(amountSats, selectedUnit = amountUnit) {
+    const labels = [];
+    const btcAmount = amountSats / 100000000;
+
+    if (selectedUnit !== 'sats') {
+      labels.push(`= ${Math.round(amountSats || 0).toLocaleString()} 丰`);
+    }
+    if (selectedUnit !== 'btc') {
+      labels.push(`= ${btcAmount.toFixed(8)} BTC`);
+    }
+    if (selectedUnit !== 'usd') {
+      labels.push(`$${(btcAmount * btcPrice).toFixed(2)} USD`);
+    }
+
+    return labels;
+  }
+
   // Fetch real UTXOs from API
   async function fetchUtxosFromAPI() {
     try {
@@ -120,7 +142,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       // Selected UTXOs must cover fee (we'll send UTXO total minus fee)
       if (availableForSpending < estimatedFee) {
         errors.push(
-          `Selected UTXOs (${availableForSpending} sats) can't cover fee (${estimatedFee} sats)`
+          `Selected UTXOs (${availableForSpending} 丰) can't cover fee (${estimatedFee} 丰)`
         );
       }
     } else {
@@ -128,7 +150,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       const total = totalAmount + estimatedFee;
       if (total > availableForSpending) {
         const shortfall = total - availableForSpending;
-        errors.push(`Need ${shortfall.toLocaleString()} more sats`);
+        errors.push(`Need ${shortfall.toLocaleString()} more 丰`);
       }
     }
 
@@ -183,6 +205,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
       btn.classList.toggle('active', btn.dataset.unit === unit);
     });
 
+    content.querySelectorAll('.recipient-amount-unit').forEach((unitEl) => {
+      unitEl.textContent = getAmountUnitLabel(unit);
+    });
+
     recipients.forEach((_, index) => {
       const input = content.querySelector(
         `.recipient-amount[data-index="${index}"]`
@@ -212,15 +238,12 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
   function updateRecipientConversions(index) {
     const amountSats = recipients[index].amount || 0;
-    const btcEl = content.querySelector(`#recipient-${index}-btc`);
-    const usdEl = content.querySelector(`#recipient-${index}-usd`);
+    const primaryEl = content.querySelector(`#recipient-${index}-conversion-primary`);
+    const secondaryEl = content.querySelector(`#recipient-${index}-conversion-secondary`);
+    const [primary, secondary] = getAmountConversionLabels(amountSats);
 
-    if (btcEl && usdEl) {
-      const btcAmount = (amountSats / 100000000).toFixed(8);
-      const usdAmount = ((amountSats / 100000000) * btcPrice).toFixed(2);
-      btcEl.textContent = '= ' + btcAmount + ' BTC';
-      usdEl.textContent = '$' + usdAmount + ' USD';
-    }
+    if (primaryEl) primaryEl.textContent = primary;
+    if (secondaryEl) secondaryEl.textContent = secondary;
   }
 
   function setAmountToUtxoMinusFees(index) {
@@ -315,7 +338,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <label>Amount</label>
             <div class="send-unit-toggle">
               <button type="button" class="unit-btn ${amountUnit === 'sats' ? 'active' : ''}" data-unit="sats" data-recipient="${index}">
-                Sats
+                丰
               </button>
               <button type="button" class="unit-btn ${amountUnit === 'btc' ? 'active' : ''}" data-unit="btc" data-recipient="${index}">
                 BTC
@@ -335,11 +358,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
               class="recipient-amount"
               data-index="${index}"
             />
-            <span>${amountUnit}</span>
+            <span class="recipient-amount-unit">${getAmountUnitLabel()}</span>
           </label>
           <div class="send-conversion-row">
-            <span id="recipient-${index}-btc">= 0.00000000 BTC</span>
-            <span id="recipient-${index}-usd">$0.00 USD</span>
+            <span id="recipient-${index}-conversion-primary">= 0.00000000 BTC</span>
+            <span id="recipient-${index}-conversion-secondary">$0.00 USD</span>
           </div>
         </div>
         `
@@ -352,7 +375,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             </button>
           </div>
           <div class="send-static-amount">
-            <strong>${getSelectedUtxosTotal().toLocaleString()} sats</strong>
+            <strong>${getSelectedUtxosTotal().toLocaleString()} 丰</strong>
             <div>
               <span>= ${(getSelectedUtxosTotal() / 100000000).toFixed(8)} BTC</span>
               <span>$${((getSelectedUtxosTotal() / 100000000) * btcPrice).toFixed(2)} USD</span>
@@ -385,7 +408,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           e.target.value = 0;
         }
 
-        // Convert to sats based on current unit
+        // Convert to satoshis based on current unit.
         if (amountUnit === 'btc') {
           value = value * 100000000;
         } else if (amountUnit === 'usd') {
@@ -484,7 +507,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         (sum, index) => sum + availableUtxos[index].amount,
         0
       );
-      valueEl.textContent = totalValue.toLocaleString() + ' sats';
+      valueEl.textContent = totalValue.toLocaleString() + ' 丰';
       valueEl.title =
         (totalValue / 100000000).toFixed(8) +
         ' BTC - $' +
@@ -547,10 +570,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <span></span>
           <div>
             <strong>${utxo.txid.substring(0, 16)}...${utxo.txid.substring(utxo.txid.length - 8)}:${utxo.vout}</strong>
-            <small>${utxo.amount.toLocaleString()} sats - ${utxo.type}</small>
+            <small>${utxo.amount.toLocaleString()} 丰 - ${utxo.type}</small>
           </div>
           <div>
-            <strong>${utxo.amount.toLocaleString()} sats</strong>
+            <strong>${utxo.amount.toLocaleString()} 丰</strong>
             <small>${btcAmount} BTC - $${usdAmount}</small>
           </div>
         </label>
@@ -644,15 +667,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
     if (summaryAmount)
       summaryAmount.textContent =
         Math.floor(amountSats).toLocaleString() +
-        ' sats' +
+        ' 丰' +
         (signedTx ? '' : ' (est)');
     if (summaryFeeRate) summaryFeeRate.textContent = selectedFeeRate;
     if (summaryFee)
       summaryFee.textContent =
-        (signedTx ? '' : '~') + displayFee.toLocaleString() + ' sats';
+        (signedTx ? '' : '~') + displayFee.toLocaleString() + ' 丰';
     if (summaryTotal)
       summaryTotal.textContent =
-        Math.floor(displayTotal).toLocaleString() + ' sats';
+        Math.floor(displayTotal).toLocaleString() + ' 丰';
     if (summaryTotalUsd)
       summaryTotalUsd.textContent =
         '= $' + ((displayTotal * btcPrice) / 100000000).toFixed(2);
@@ -672,7 +695,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     // Show change amount in red if negative
     if (changeAmountEl) {
-      changeAmountEl.textContent = displayRemaining.toLocaleString() + ' sats';
+      changeAmountEl.textContent = displayRemaining.toLocaleString() + ' 丰';
       if (displayRemaining < 0) {
         changeAmountEl.classList.add('text-red-400');
         changeAmountEl.classList.remove('text-purple-400');
@@ -687,7 +710,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     if (summaryRemaining)
       summaryRemaining.textContent =
-        Math.floor(displayRemaining).toLocaleString() + ' sats';
+        Math.floor(displayRemaining).toLocaleString() + ' 丰';
     const remainingBtc = displayRemaining / 100000000;
     const remainingUsd = remainingBtc * btcPrice;
     if (summaryRemainingDetail) {
@@ -702,7 +725,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     );
     if (availableBalanceEl && availableBalanceBtcEl) {
       availableBalanceEl.textContent =
-        availableForSpending.toLocaleString() + ' sats';
+        availableForSpending.toLocaleString() + ' 丰';
       availableBalanceBtcEl.textContent = (
         availableForSpending / 100000000
       ).toFixed(8);
@@ -945,7 +968,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <div id="manual-selection-section" class="${selectionMode === 'manual' ? '' : 'hidden'} send-manual-section">
                 <div class="send-section-label">
                   <span>Select UTXOs</span>
-                  <small><span id="selected-utxos-value">0 sats</span> selected</small>
+                  <small><span id="selected-utxos-value">0 丰</span> selected</small>
                 </div>
                 <div id="utxo-warning" class="hidden send-utxo-warning">
                   ${icons.alertTriangle(16)}
@@ -966,15 +989,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <div class="send-fee-grid">
                 <button id="fee-low" class="fee-btn" data-level="low" type="button">
                   <strong>Low</strong>
-                  <span>1 sat/vB - ~60 min</span>
+                  <span>1 丰/vB - ~60 min</span>
                 </button>
                 <button id="fee-medium" class="fee-btn active" data-level="medium" type="button">
                   <strong>Medium</strong>
-                  <span>2 sat/vB - ~20 min</span>
+                  <span>2 丰/vB - ~20 min</span>
                 </button>
                 <button id="fee-high" class="fee-btn" data-level="high" type="button">
                   <strong>High</strong>
-                  <span>4 sat/vB - ~10 min</span>
+                  <span>4 丰/vB - ~10 min</span>
                 </button>
               </div>
 
@@ -1004,7 +1027,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <section class="send-balance-card">
             <span class="app-accent"></span>
             <div class="app-card-label">Available Balance</div>
-            <div class="send-balance-value"><span id="available-balance-sats">0 sats</span></div>
+            <div class="send-balance-value"><span id="available-balance-sats">0 丰</span></div>
             <p><span id="available-balance-btc">0.00000000</span> BTC - $0.00</p>
           </section>
 
@@ -1016,15 +1039,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <div class="send-summary-body">
               <div class="send-summary-line">
                 <span>Amount</span>
-                <strong id="summary-amount">0 sats</strong>
+                <strong id="summary-amount">0 丰</strong>
               </div>
               <div class="send-summary-line">
-                <span>Network Fee (<b id="summary-fee-rate">2</b> sat/vB)</span>
-                <strong id="summary-fee">~280 sats</strong>
+                <span>Network Fee (<b id="summary-fee-rate">2</b> 丰/vB)</span>
+                <strong id="summary-fee">~280 丰</strong>
               </div>
               <div class="send-summary-line total">
                 <span>Total Sent</span>
-                <strong id="summary-total">280 sats</strong>
+                <strong id="summary-total">280 丰</strong>
               </div>
               <p id="summary-total-usd" class="send-summary-usd">= $0.00 USD</p>
             </div>
@@ -1038,11 +1061,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
             </div>
             <div class="send-change-row">
               <span>Change Amount</span>
-              <strong id="change-amount">0 sats</strong>
+              <strong id="change-amount">0 丰</strong>
             </div>
             <div class="send-remaining">
               <span>Remaining Balance</span>
-              <strong id="summary-remaining">0 sats</strong>
+              <strong id="summary-remaining">0 丰</strong>
               <small id="summary-remaining-detail">0.00000000 BTC - $0.00</small>
             </div>
           </section>

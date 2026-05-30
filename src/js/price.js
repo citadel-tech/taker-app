@@ -92,5 +92,5 @@ export async function refreshBtcPriceUsd({ force = false } = {}) {
 }
 
 export function formatSats(sats = 0) {
-  return `${Math.round(Number(sats || 0)).toLocaleString()} sats`;
+  return `${Math.round(Number(sats || 0)).toLocaleString()} 丰`;
 }

@@ -170,7 +170,7 @@ export async function WalletComponent(container) {
       `<span class="app-card-amount-number">${Math.round(
         Number(sats || 0)
       ).toLocaleString()}</span>` +
-      '<span class="app-card-amount-unit">sats</span>';
+      '<span class="app-card-amount-unit">丰</span>';
   }
 
   function calculateUtxoStats() {
@@ -221,17 +221,12 @@ export async function WalletComponent(container) {
   function renderUtxos() {
     const stats = calculateUtxoStats();
     content.querySelector('#utxo-count').textContent = `${stats.total} unspent`;
-    content.querySelector('#utxo-total').textContent = stats.total;
-    content.querySelector('#utxo-confirmed').textContent = stats.confirmed;
-    content.querySelector('#utxo-unconfirmed').textContent = stats.unconfirmed;
     content.querySelector('[data-utxo-count="all"]').textContent = stats.total;
     content.querySelector('[data-utxo-count="regular"]').textContent =
       stats.regular;
     content.querySelector('[data-utxo-count="contract"]').textContent =
       stats.contract;
     content.querySelector('[data-utxo-count="swap"]').textContent = stats.swap;
-    content.querySelector('[data-utxo-count="spendable"]').textContent =
-      stats.spendable;
 
     const list = content.querySelector('#app-utxo-list');
     const rows = getFilteredUtxos().slice(0, 7);
@@ -492,7 +487,6 @@ export async function WalletComponent(container) {
         </div>
       </div>
       <div class="app-actions">
-        <button id="lock-wallet-btn" class="app-button ghost" type="button">Lock</button>
         <button id="refresh-all-btn" class="app-button primary" type="button">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 8M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.3L4 16M4 20v-4h4"/></svg>
           <span>Refresh</span>
@@ -504,7 +498,7 @@ export async function WalletComponent(container) {
       <article class="app-balance-card hero">
         <span class="app-accent"></span>
         <span class="app-card-label">Balance</span>
-        <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
         <p>Total available</p>
         <div class="app-share">
           <span id="balance-share">0.0%</span>
@@ -515,19 +509,19 @@ export async function WalletComponent(container) {
       <article class="app-balance-card info">
         <span class="app-accent"></span>
         <span class="app-card-label">Swaps</span>
-        <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
         <p>Reserved for swaps</p>
       </article>
       <article class="app-balance-card wallet">
         <span class="app-accent"></span>
         <span class="app-card-label">Wallet</span>
-        <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
         <p>Regular wallet coins</p>
       </article>
       <article class="app-balance-card warning">
         <span class="app-accent"></span>
         <span class="app-card-label">Contracts</span>
-        <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">sats</span></span></div>
+        <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
         <p>In active contracts</p>
       </article>
     </section>
@@ -541,17 +535,11 @@ export async function WalletComponent(container) {
           </div>
         </header>
         <div class="app-panel-body">
-          <div class="app-metrics">
-            <div><span>Total UTXOs</span><strong id="utxo-total">0</strong></div>
-            <div><span>Confirmed</span><strong id="utxo-confirmed" class="positive">0</strong></div>
-            <div><span>Unconfirmed</span><strong id="utxo-unconfirmed" class="warning">0</strong></div>
-          </div>
           <div class="app-tabs" id="utxo-tabs">
             <button class="active" data-filter="all" type="button">All <span data-utxo-count="all">0</span></button>
             <button data-filter="regular" type="button">Regular <span data-utxo-count="regular">0</span></button>
             <button data-filter="contract" type="button">Contract <span data-utxo-count="contract">0</span></button>
             <button data-filter="swap" type="button">Swap <span data-utxo-count="swap">0</span></button>
-            <button data-filter="spendable" type="button">Spendable <span data-utxo-count="spendable">0</span></button>
           </div>
           <div class="app-utxo-head">
             <span>Txid . Amount</span>

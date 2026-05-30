@@ -1,12 +1,17 @@
-import {
-  SwapStateManager,
-  formatRelativeTime,
-  formatElapsedTime,
-} from './SwapStateManager.js';
+import { formatRelativeTime } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
 
 let swapHistory = [];
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 function normalizeTimestamp(value, fallback = null) {
   if (value == null || value === '') return fallback;
@@ -56,12 +61,12 @@ function getProtocolLabel(report) {
 
 function getProtocolBadgeClasses(protocolLabel) {
   if (protocolLabel === 'Taproot') {
-    return 'bg-purple-500/20 text-purple-400';
+    return 'is-taproot';
   }
   if (protocolLabel === 'Unified') {
-    return 'bg-emerald-500/20 text-emerald-400';
+    return 'is-unified';
   }
-  return 'bg-blue-500/20 text-blue-400';
+  return 'is-legacy';
 }
 
 function normalizeSwapReport(report) {
@@ -199,6 +204,7 @@ export async function loadSwapHistory() {
             feePercentage: normalized.feePercentage,
             durationSeconds: normalized.durationSeconds,
             status: normalized.status,
+            protocol: normalized.protocol,
             report: normalized.report,
           };
         })
@@ -232,16 +238,16 @@ export function summarizeSwapHistory(history) {
 export function buildSwapHistoryMarkup(history) {
   if (history.length === 0) {
     return `
-      <div class="text-center py-16">
-        <div class="text-gray-500 mb-4 flex justify-center">${icons.refreshCw(64)}</div>
-        <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
-        <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
+      <div class="swap-reports-empty">
+        <div>${icons.fileText(42)}</div>
+        <h3>No swap reports</h3>
+        <p>Completed swap reports will appear here.</p>
       </div>
     `;
   }
 
   return `
-    <div class="space-y-4">
+    <div class="swap-reports-list">
       ${history
         .map((swap) => {
           const amount = Number(swap.amount) || 0;
@@ -257,54 +263,39 @@ export function buildSwapHistoryMarkup(history) {
           const duration = formatDuration(swap.durationSeconds);
 
           return `
-          <div class="swap-history-row bg-surface hover:bg-secondary rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-primary/30" data-swap-id="${swap.id}">
-            <div class="flex items-center gap-4">
-              <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                <span class="text-green-400">${icons.check(24)}</span>
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-3 mb-1">
-                  <span class="text-white font-semibold text-lg">Coinswap</span>
-                  <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">Completed</span>
-                  <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">${swap.hops} hops</span>
-                  <span class="px-2 py-0.5 ${protocolClasses} text-xs rounded-full">${protocolLabel}</span>
-                </div>
-                <div class="flex items-center gap-4 text-sm">
-                  <span class="text-gray-500">${timeAgo}</span>
-                  <span class="text-gray-600">•</span>
-                  <span class="text-gray-500">${dateStr}</span>
-                  <span class="text-gray-600">•</span>
-                  <span class="text-gray-500">${duration}</span>
-                </div>
-              </div>
-              <div class="text-right flex-shrink-0">
-                <div class="text-lg font-mono text-green-400">${formatSats(amount)}</div>
-              </div>
-              <div class="text-gray-600 flex-shrink-0">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
+          <button class="swap-report-list-row" data-swap-id="${escapeHtml(swap.id)}" type="button">
+            <div class="swap-report-row-main">
+              <span class="swap-report-row-icon">${icons.fileText(20)}</span>
+              <div>
+                <strong>Swap ${escapeHtml(String(swap.id).slice(0, 10))}</strong>
+                <p>${timeAgo} · ${dateStr} · ${duration}</p>
               </div>
             </div>
-            <div class="mt-4 pt-4 border-t border-gray-800 grid grid-cols-4 gap-4 text-sm">
+            <div class="swap-report-row-badges">
+              <span>Completed</span>
+              <span>${swap.hops} hops</span>
+              <span class="${protocolClasses}">${protocolLabel}</span>
+            </div>
+            <div class="swap-report-row-details">
               <div>
-                <span class="text-gray-500">Makers</span>
-                <p class="text-white font-mono">${swap.makersCount}</p>
+                <span>Amount</span>
+                <strong>${formatSats(amount)}</strong>
               </div>
               <div>
-                <span class="text-gray-500">Fee</span>
-                <p class="text-yellow-400 font-mono">${feePercentage.toFixed(2)}%</p>
+                <span>Makers</span>
+                <strong>${swap.makersCount}</strong>
               </div>
               <div>
-                <span class="text-gray-500">Total Fee</span>
-                <p class="text-yellow-400 font-mono">${totalFee.toLocaleString()} sats</p>
+                <span>Total fee</span>
+                <strong>${totalFee.toLocaleString()} 丰</strong>
               </div>
               <div>
-                <span class="text-gray-500">Output</span>
-                <p class="text-green-400 font-mono">${formatSats(totalOutputAmount)}</p>
+                <span>Output</span>
+                <strong>${formatSats(totalOutputAmount)}</strong>
               </div>
             </div>
-          </div>
+            <em>${icons.externalLink(16)}</em>
+          </button>
         `;
         })
         .join('')}
@@ -319,46 +310,33 @@ export async function SwapHistoryComponent(container) {
   }
 
   console.log('📜 SwapHistoryComponent loading...');
-  await loadSwapHistory();
+  let loadError = null;
+  try {
+    await loadSwapHistory();
+  } catch (error) {
+    loadError = error;
+  }
 
   const content = document.createElement('div');
   content.id = 'swap-history-content';
 
-  function formatDuration(seconds) {
-    if (typeof seconds !== 'number' || isNaN(seconds)) return '0m 0s';
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}m ${secs}s`;
-  }
-
-  function formatDate(timestamp) {
-    if (!Number.isFinite(timestamp)) return 'Unknown date';
-    const date = new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  }
-
   async function viewSwapReport(swapId) {
     try {
       const result = await window.api.swapReports.get(swapId);
-      console.log('📋 Raw result from API:', result); // ← ADD THIS
-      console.log('📋 Report from result:', result.report.report); // ← ADD THIS
 
       if (result.success && result.report) {
         import('./SwapReport.js').then((module) => {
           container.innerHTML = '';
           const fullReport = {
+            ...result.report,
             ...result.report.report,
             protocol: result.report.protocol ?? 'v1',
             isTaproot: result.report.isTaproot ?? false,
             protocolVersion: result.report.protocolVersion ?? 1,
           };
-          module.SwapReportComponent(container, fullReport);
+          module.SwapReportComponent(container, fullReport, {
+            backTarget: 'swapReports',
+          });
         });
       } else {
         console.error('Swap report not found for ID:', swapId);
@@ -368,94 +346,6 @@ export async function SwapHistoryComponent(container) {
       console.error('Failed to load swap report:', error);
       alert('Failed to load swap report: ' + error.message);
     }
-  }
-
-  function buildSwapHistoryList() {
-    if (swapHistory.length === 0) {
-      return `
-        <div class="text-center py-16">
-          <div class="text-gray-500 mb-4 flex justify-center">${icons.refreshCw(64)}</div>
-          <h3 class="text-xl text-gray-300 mb-2">No Swap History</h3>
-          <p class="text-gray-500 mb-6">You haven't completed any coinswaps yet.</p>
-          <button id="start-first-swap" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg px-6 py-3 rounded-lg transition-colors">
-            Start Your First Swap →
-          </button>
-        </div>
-      `;
-    }
-
-    return `
-      <div class="space-y-4">
-        ${swapHistory
-          .map((swap, index) => {
-            const timeAgo = Number.isFinite(swap.completedAt)
-              ? formatRelativeTime(swap.completedAt)
-              : 'Unknown time';
-            const dateStr = formatDate(swap.completedAt);
-            const duration = formatDuration(swap.durationSeconds);
-
-            return `
-            <div class="swap-history-row bg-surface hover:bg-secondary rounded-lg p-5 cursor-pointer transition-all hover:scale-[1.01] hover:shadow-lg border border-transparent hover:border-primary/30" data-swap-id="${swap.id}">
-              <div class="flex items-center gap-4">
-                <!-- Status Icon -->
-                <div class="w-14 h-14 rounded-xl bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                  <span class="text-green-400">${icons.check(24)}</span>
-                </div>
-                
-                <!-- Main Info -->
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-3 mb-1">
-                    <span class="text-white font-semibold text-lg">Coinswap</span>
-                    <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full">Completed</span>
-                    <span class="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded-full">${swap.hops} hops</span>
-                  </div>
-                  <div class="flex items-center gap-4 text-sm">
-                    <span class="text-gray-500">${timeAgo}</span>
-                    <span class="text-gray-600">•</span>
-                    <span class="text-gray-500">${dateStr}</span>
-                    <span class="text-gray-600">•</span>
-                    <span class="text-gray-500">${duration}</span>
-                  </div>
-                </div>
-                
-                <!-- Amount -->
-                <div class="text-right flex-shrink-0">
-                  <div class="text-lg font-mono text-green-400">${formatSats(swap.amount)}</div>
-                </div>
-                
-                <!-- Arrow -->
-                <div class="text-gray-600 flex-shrink-0">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                  </svg>
-                </div>
-              </div>
-              
-              <!-- Details Row -->
-              <div class="mt-4 pt-4 border-t border-gray-800 grid grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span class="text-gray-500">Makers</span>
-                  <p class="text-white font-mono">${swap.makersCount}</p>
-                </div>
-                <div>
-                  <span class="text-gray-500">Fee</span>
-                  <p class="text-yellow-400 font-mono">${swap.feePercentage?.toFixed(2) || '0.00'}%</p>
-                </div>
-                <div>
-                  <span class="text-gray-500">Total Fee</span>
-                  <p class="text-yellow-400 font-mono">${(swap.totalFee || 0).toLocaleString()} sats</p>
-                </div>
-                <div>
-                  <span class="text-gray-500">Output</span>
-                  <p class="text-green-400 font-mono">${formatSats(swap.totalOutputAmount)}</p>
-                </div>
-              </div>
-            </div>
-          `;
-          })
-          .join('')}
-      </div>
-    `;
   }
 
   // Calculate stats
@@ -470,62 +360,55 @@ export async function SwapHistoryComponent(container) {
       : 0;
 
   content.innerHTML = `
-    <div class="max-w-5xl mx-auto">
-      <!-- Header -->
-      <div class="mb-8">
-        <button id="back-to-swap" class="text-gray-400 hover:text-white mb-4 flex items-center gap-2 transition-colors">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
-          </svg>
-          Back to Swap
-        </button>
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-3xl font-bold text-primary mb-2">Swap History</h2>
-            <p class="text-gray-400">View all your completed coinswap transactions</p>
-          </div>
-          ${
-            totalSwaps > 0
-              ? `
-            <button id="clear-history" class="bg-red-500/20 hover:bg-red-500/30 text-red-400 px-4 py-2 rounded-lg text-sm transition-colors">
-              Clear History
-            </button>
-          `
-              : ''
-          }
+    <div class="swap-reports-page">
+      <header class="swap-reports-head">
+        <div>
+          <h2>Swap Reports</h2>
+          <p>Review completed coinswap reports and fee details.</p>
         </div>
-      </div>
+        <button id="back-to-swap" class="swap-reports-back" type="button">
+          ${icons.arrowLeft(17)} Back
+        </button>
+      </header>
 
-      <!-- Stats Cards -->
       ${
         totalSwaps > 0
           ? `
-        <div class="grid grid-cols-4 gap-4 mb-8">
-          <div class="bg-surface rounded-lg p-4">
-            <p class="text-sm text-gray-400 mb-1">Total Swaps</p>
-            <p class="text-2xl font-bold text-primary">${totalSwaps}</p>
+        <section class="swap-reports-stats">
+          <div>
+            <span>Total reports</span>
+            <strong>${totalSwaps}</strong>
           </div>
-          <div class="bg-surface rounded-lg p-4">
-            <p class="text-sm text-gray-400 mb-1">Total Volume</p>
-            <p class="text-2xl font-bold text-green-400">${formatSats(totalVolume)}</p>
+          <div>
+            <span>Total volume</span>
+            <strong>${formatSats(totalVolume)}</strong>
           </div>
-          <div class="bg-surface rounded-lg p-4">
-            <p class="text-sm text-gray-400 mb-1">Total Fees Paid</p>
-            <p class="text-2xl font-bold text-yellow-400">${totalFees.toLocaleString()} sats</p>
+          <div>
+            <span>Total fees</span>
+            <strong>${totalFees.toLocaleString()} 丰</strong>
           </div>
-          <div class="bg-surface rounded-lg p-4">
-            <p class="text-sm text-gray-400 mb-1">Avg. Hops</p>
-            <p class="text-2xl font-bold text-cyan-400">${avgHops}</p>
+          <div>
+            <span>Avg hops</span>
+            <strong>${avgHops}</strong>
           </div>
-        </div>
+        </section>
       `
           : ''
       }
 
-      <!-- Swap List -->
-      <div id="swap-list-container">
-        ${buildSwapHistoryList()}
-      </div>
+      <section class="swap-reports-panel">
+        ${
+          loadError
+            ? `
+              <div class="swap-reports-empty error">
+                <div>${icons.alertTriangle(42)}</div>
+                <h3>Unable to load reports</h3>
+                <p>${escapeHtml(loadError.message || 'Please try again.')}</p>
+              </div>
+            `
+            : buildSwapHistoryMarkup(swapHistory)
+        }
+      </section>
     </div>
   `;
 
@@ -533,34 +416,13 @@ export async function SwapHistoryComponent(container) {
 
   // Event Listeners
   content.querySelector('#back-to-swap')?.addEventListener('click', () => {
-    import('./Swap.js').then((module) => {
-      container.innerHTML = '';
-      module.SwapComponent(container);
-    });
-  });
-
-  content.querySelector('#start-first-swap')?.addEventListener('click', () => {
-    import('./Swap.js').then((module) => {
-      container.innerHTML = '';
-      module.SwapComponent(container);
-    });
-  });
-
-  content.querySelector('#clear-history')?.addEventListener('click', async () => {
-    if (
-      confirm(
-        'Are you sure you want to clear all swap history? This cannot be undone.'
-      )
-    ) {
-      await SwapStateManager.clearSwapHistory();
-      // Re-render the component
-      container.innerHTML = '';
-      SwapHistoryComponent(container);
+    if (window.appManager) {
+      window.appManager.renderComponent('swap');
     }
   });
 
   // Click handlers for swap rows
-  content.querySelectorAll('.swap-history-row').forEach((row) => {
+  content.querySelectorAll('.swap-report-list-row').forEach((row) => {
     row.addEventListener('click', () => {
       const swapId = row.dataset.swapId;
       viewSwapReport(swapId);

@@ -1549,7 +1549,7 @@ function registerTakerHandlers() {
           return { success: false, error: 'Invalid address or amount' };
         }
 
-        console.log(`📤 Sending ${amount} sats to ${address}...`);
+        console.log(`📤 Sending ${amount} 丰 to ${address}...`);
 
         const txidObj = api1State.takerInstance.sendToAddress(
           address,
@@ -1946,7 +1946,7 @@ function registerCoinswapHandlers() {
         const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
         const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         console.log(
-          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} sats, ${makerCount} makers`
+          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} 丰, ${makerCount} makers`
         );
 
         // WAIT FOR OFFERBOOK SYNC TO COMPLETE

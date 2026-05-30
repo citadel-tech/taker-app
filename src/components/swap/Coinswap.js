@@ -190,13 +190,50 @@ export async function CoinswapComponent(container, swapConfig) {
   function updateLogs() {
     const logContainer = content.querySelector('#log-container');
     if (!logContainer) return;
+    const logCount = content.querySelector('#swap-log-count');
+    if (logCount) logCount.textContent = logMessages.length;
+    const formatLogLevel = (type) => {
+      if (type === 'error') return 'ERROR';
+      if (type === 'warn') return 'WARNING';
+      return 'INFO';
+    };
+    const getLogHighlight = (message) => {
+      const text = String(message || '').toLowerCase();
+      if (text.includes('fidelity')) return 'is-fidelity';
+      if (text.includes('funding tx') || text.includes('funding transaction')) {
+        return 'is-funding';
+      }
+      if (
+        text.includes('contract tx') ||
+        text.includes('contract data') ||
+        text.includes('registered watcher') ||
+        text.includes('broadcast contract') ||
+        text.includes('incoming contract') ||
+        text.includes('outgoing contract')
+      ) {
+        return 'is-contract';
+      }
+      if (
+        text.includes('recovery') ||
+        text.includes('recovered') ||
+        text.includes('hashlock') ||
+        text.includes('timelock')
+      ) {
+        return 'is-recovery';
+      }
+      if (text.includes('swap report') || text.includes('generating swap report')) {
+        return 'is-report';
+      }
+      if (text.includes('txid') || text.includes('broadcast')) return 'is-tx';
+      return '';
+    };
     logContainer.innerHTML = logMessages
       .slice(0, 50)
       .map(
         (log, index) => `
-      <div class="swap-log-line ${log.type}">
+      <div class="swap-log-line ${log.type} ${getLogHighlight(log.message)}">
         <span>${String(index + 1).padStart(2, '0')}.${String(index * 5).padStart(2, '0')}</span>
-        <b>[${log.type === 'error' ? 'ERR' : log.type === 'success' ? 'OK' : log.type === 'warn' ? 'WARN' : 'HOP'}]</b>
+        <b>[${formatLogLevel(log.type)}]</b>
         <strong>${log.message}</strong>
       </div>
     `
@@ -1077,6 +1114,16 @@ export async function CoinswapComponent(container, swapConfig) {
         info.amount_relative_fee ?? info.amountRelativeFee ?? 0;
       const timeRelativeFee =
         info.time_relative_fee ?? info.timeRelativeFee ?? 0;
+      const fidelityTxid =
+        info.fidelity_txid ??
+        info.fidelityTxid ??
+        info.fidelity_bond_txid ??
+        info.fidelityBondTxid ??
+        info.bond_txid ??
+        info.bondTxid ??
+        info.fidelity_transaction ??
+        info.fidelityTransaction ??
+        null;
       const feeTotal = baseFee + amountRelativeFee + timeRelativeFee;
       totalMakerFees += feeTotal;
 
@@ -1087,6 +1134,7 @@ export async function CoinswapComponent(container, swapConfig) {
         amountRelativeFee,
         timeRelativeFee,
         totalFee: feeTotal,
+        fidelityTxid,
       };
     });
 
@@ -1255,7 +1303,7 @@ export async function CoinswapComponent(container, swapConfig) {
           </div>
           <div class="font-mono text-gray-300">${tx.txid ? tx.txid.substring(0, 12) + '...' : 'Pending'}</div>
           <div class="text-gray-500 mt-1">
-            ${tx.fee ? `Fee: ${tx.fee} sats` : ''} 
+            ${tx.fee ? `Fee: ${tx.fee} 丰` : ''}
             ${tx.size ? `| ${tx.size} vB` : ''}
           </div>
         </div>
@@ -1323,7 +1371,10 @@ export async function CoinswapComponent(container, swapConfig) {
           <div class="swap-progress-bar"><i id="swap-progress-fill"></i></div>
           <p id="swap-status-text">Executing swap through ${swapData.makers} makers...</p>
         </div>
-        <div class="swap-net-badge"><i></i> Mainnet · v0.4.2</div>
+        <div class="swap-progress-actions">
+          <div class="swap-net-badge"><i></i> Mainnet · v0.4.2</div>
+          <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>
+        </div>
       </header>
 
       <section class="swap-route-stage">
@@ -1338,12 +1389,15 @@ export async function CoinswapComponent(container, swapConfig) {
         <div class="hidden"><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
       </section>
 
-      <section class="swap-terminal">
-        <div id="log-container"></div>
+      <section class="swap-terminal is-collapsed" id="swap-log-panel">
+        <button id="swap-log-toggle" class="swap-terminal-toggle" type="button" aria-expanded="false">
+          <span>Swap log</span>
+          <strong id="swap-log-count">${logMessages.length}</strong>
+        </button>
+        <div id="log-container" class="swap-terminal-body" hidden></div>
       </section>
 
       <div id="transaction-list" class="hidden"></div>
-      <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>
     </div>
   `;
 
@@ -1372,6 +1426,16 @@ export async function CoinswapComponent(container, swapConfig) {
   content
     .querySelector('#complete-button')
     .addEventListener('click', viewSwapReport);
+  content.querySelector('#swap-log-toggle').addEventListener('click', () => {
+    const panel = content.querySelector('#swap-log-panel');
+    const body = content.querySelector('#log-container');
+    const toggle = content.querySelector('#swap-log-toggle');
+    const shouldExpand = body.hidden;
+
+    body.hidden = !shouldExpand;
+    toggle.setAttribute('aria-expanded', String(shouldExpand));
+    panel.classList.toggle('is-collapsed', !shouldExpand);
+  });
 
   // Initialize UI
   updateTxList();

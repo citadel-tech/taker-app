@@ -476,7 +476,7 @@ export function UtxoListComponent(container) {
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Value</p>
-                <p id="total-value" class="text-2xl font-mono text-green-400">-- sats</p>
+                <p id="total-value" class="text-2xl font-mono text-green-400">-- 丰</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Confirmed</p>
@@ -526,7 +526,7 @@ export function UtxoListComponent(container) {
                 <!-- Selection Actions -->
                 <div id="utxo-actions" class="hidden flex items-center gap-3">
                     <span class="text-sm text-gray-400">
-                        <span id="selection-count">0</span> selected • <span id="selected-value">0 sats</span>
+                        <span id="selection-count">0</span> selected • <span id="selected-value">0 丰</span>
                     </span>
                     <button id="send-selected" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Send Selected

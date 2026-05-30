@@ -50,6 +50,7 @@ import {
   PauseCircle,
   Eye,
   EyeOff,
+  ArrowLeft,
 } from '../../node_modules/lucide/dist/esm/lucide.js';
 
 function nodeToString([tag, attrs, children]) {
@@ -148,4 +149,6 @@ export const icons = {
   eye:            (size = 16, cls = '') => toSvg(Eye,            size, cls),
   /** hide password */
   eyeOff:         (size = 16, cls = '') => toSvg(EyeOff,         size, cls),
+  /** back / previous */
+  arrowLeft:      (size = 16, cls = '') => toSvg(ArrowLeft,      size, cls),
 };
