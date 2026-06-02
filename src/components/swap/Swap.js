@@ -1154,31 +1154,6 @@ export async function SwapComponent(container) {
           </div>
 
           <div class="swap-section">
-            <div class="send-section-label">
-              <span>Network Fee Rate</span>
-              <small>Mainnet - live estimates</small>
-            </div>
-            <div class="send-fee-grid">
-              <button id="swap-fee-low" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.low ? 'active' : ''}" data-level="low" type="button">
-                <strong>Low</strong>
-                <span>${networkFeeRates.low} 丰/vB - ~60 min</span>
-              </button>
-              <button id="swap-fee-medium" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.medium ? 'active' : ''}" data-level="medium" type="button">
-                <strong>Medium</strong>
-                <span>${networkFeeRates.medium} 丰/vB - ~20 min</span>
-              </button>
-              <button id="swap-fee-high" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.high ? 'active' : ''}" data-level="high" type="button">
-                <strong>High</strong>
-                <span>${networkFeeRates.high} 丰/vB - ~10 min</span>
-              </button>
-            </div>
-            <label class="send-custom-fee">
-              <input id="swap-custom-fee" type="number" min="1" placeholder="Custom" value="${Object.values(networkFeeRates).includes(networkFeeRate) ? '' : networkFeeRate}">
-              <span>丰 / vbyte</span>
-            </label>
-          </div>
-
-          <div class="swap-section">
             <div class="swap-section-head">
               <h3>Select Makers</h3>
               <span id="maker-count-hint"><strong id="required-makers-count">2</strong> from <strong id="available-makers-count">${availableMakers.length}</strong> available</span>
@@ -1216,6 +1191,31 @@ export async function SwapComponent(container) {
                 <p class="swap-empty-row">Loading makers...</p>
               </div>
             </div>
+          </div>
+
+          <div class="swap-section">
+            <div class="send-section-label">
+              <span>Network Fee Rate</span>
+              <small>Mainnet - live estimates</small>
+            </div>
+            <div class="send-fee-grid">
+              <button id="swap-fee-low" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.low ? 'active' : ''}" data-level="low" type="button">
+                <strong>Low</strong>
+                <span>${networkFeeRates.low} 丰/vB - ~60 min</span>
+              </button>
+              <button id="swap-fee-medium" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.medium ? 'active' : ''}" data-level="medium" type="button">
+                <strong>Medium</strong>
+                <span>${networkFeeRates.medium} 丰/vB - ~20 min</span>
+              </button>
+              <button id="swap-fee-high" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.high ? 'active' : ''}" data-level="high" type="button">
+                <strong>High</strong>
+                <span>${networkFeeRates.high} 丰/vB - ~10 min</span>
+              </button>
+            </div>
+            <label class="send-custom-fee">
+              <input id="swap-custom-fee" type="number" min="1" placeholder="Custom" value="${Object.values(networkFeeRates).includes(networkFeeRate) ? '' : networkFeeRate}">
+              <span>丰 / vbyte</span>
+            </label>
           </div>
 
           <div id="validation-warning" class="hidden swap-validation"></div>

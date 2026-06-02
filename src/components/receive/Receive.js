@@ -1,6 +1,15 @@
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
 
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 export function ReceiveComponent(container) {
   const content = document.createElement('div');
   content.id = 'receive-content';
@@ -45,6 +54,9 @@ export function ReceiveComponent(container) {
                   <span>Generate a receive address below.</span>
                 </div>
               </div>
+              <button id="open-qr-popup" class="receive-qr-expand" type="button" disabled>
+                ${icons.search(14)} View QR
+              </button>
             </div>
 
             <div class="receive-address-strip">
@@ -130,6 +142,7 @@ export function ReceiveComponent(container) {
   const generateText = content.querySelector('.generate-text');
   const generateLoading = content.querySelector('.generate-loading');
   const qrContainer = content.querySelector('#qr-container');
+  const openQrPopupButton = content.querySelector('#open-qr-popup');
   const generationTime = content.querySelector('#generation-time');
   const usageCount = content.querySelector('#usage-count');
   const totalReceived = content.querySelector('#total-received');
@@ -146,17 +159,79 @@ export function ReceiveComponent(container) {
     return await window.api.taker.getNextAddress();
   }
 
+  function qrUrl(text, size = 340) {
+    return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000&margin=12`;
+  }
+
   function generateQR(text) {
-    const size = 340;
-    const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(text)}&bgcolor=ffffff&color=000000&margin=12`;
+    const qrApiUrl = qrUrl(text);
 
     qrContainer.innerHTML = `
       <img
         src="${qrApiUrl}"
-        alt="QR Code for ${text}"
-        onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'receive-empty-qr\\'><strong>QR generation failed</strong><span>${text.substring(0, 22)}...</span></div>'"
+        alt="QR Code for ${escapeHtml(text)}"
+        onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'receive-empty-qr\\'><strong>QR generation failed</strong><span>${escapeHtml(text.substring(0, 22))}...</span></div>'"
       />
     `;
+  }
+
+  function closeQrPopup() {
+    document.querySelector('.receive-qr-modal-backdrop')?.remove();
+    window.removeEventListener('keydown', handleQrPopupKeydown);
+  }
+
+  function handleQrPopupKeydown(event) {
+    if (event.key === 'Escape') closeQrPopup();
+  }
+
+  function showQrPopup() {
+    if (!currentAddress) return;
+
+    closeQrPopup();
+
+    const modal = document.createElement('div');
+    modal.className = 'receive-qr-modal-backdrop';
+    modal.innerHTML = `
+      <div class="receive-qr-modal" role="dialog" aria-modal="true" aria-label="Receive QR code">
+        <div class="receive-qr-modal-head">
+          <div>
+            <span>Receive request</span>
+            <h3>Scan QR Code</h3>
+          </div>
+          <button class="receive-qr-modal-close" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="receive-qr-modal-body">
+          <div class="receive-qr-modal-frame">
+            <img
+              src="${qrUrl(currentAddress, 460)}"
+              alt="QR Code for ${escapeHtml(currentAddress)}"
+            />
+          </div>
+          <div class="receive-qr-modal-address">
+            <span>${escapeHtml(currentAddress)}</span>
+            <button id="copy-qr-address" type="button">${icons.copy(15)} Copy</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeQrPopup();
+    });
+    modal
+      .querySelector('.receive-qr-modal-close')
+      ?.addEventListener('click', closeQrPopup);
+    modal.querySelector('#copy-qr-address')?.addEventListener('click', () => {
+      copyToClipboard(currentAddress);
+      const button = modal.querySelector('#copy-qr-address');
+      if (button) {
+        button.innerHTML = `${icons.check(15)} Copied`;
+        button.classList.add('copied');
+      }
+    });
+
+    document.body.appendChild(modal);
+    window.addEventListener('keydown', handleQrPopupKeydown);
   }
 
   function detectAddressType(address, fallbackSpendType = '') {
@@ -374,6 +449,7 @@ export function ReceiveComponent(container) {
     currentAddressEl.textContent = addressString;
     copyButton.disabled = false;
     viewMempoolButton.disabled = false;
+    openQrPopupButton.disabled = false;
     generateQR(addressString);
 
     const addresses = await getAddressesFromTransactions();
@@ -430,12 +506,14 @@ export function ReceiveComponent(container) {
       currentAddressEl.textContent = addressString;
       copyButton.disabled = false;
       viewMempoolButton.disabled = false;
+      openQrPopupButton.disabled = false;
       generateQR(addressString);
       updateAddressStatus(addressData);
       updateRecentAddresses();
     } catch (error) {
       console.error('Address generation failed:', error);
       currentAddressEl.textContent = `Error: ${error.message}`;
+      openQrPopupButton.disabled = true;
       qrContainer.innerHTML = `
         <div class="receive-empty-qr error">
           ${icons.xCircle(42)}
@@ -486,6 +564,8 @@ export function ReceiveComponent(container) {
       window.open(`https://mempool.space/address/${currentAddress}`, '_blank');
     }
   });
+
+  openQrPopupButton.addEventListener('click', showQrPopup);
 
   generateButton.addEventListener('click', generateNewAddress);
 
