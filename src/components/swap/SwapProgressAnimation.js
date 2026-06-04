@@ -10,11 +10,16 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function compactEndpoint(value, left = 11, right = 7) {
+function endpointSuffix(value, right = 12) {
   const text = String(value || '').trim();
   if (!text) return '';
-  if (text.length <= left + right + 3) return text;
-  return `${text.slice(0, left)}...${text.slice(-right)}`;
+  const host = text
+    .replace(/^https?:\/\//i, '')
+    .split('/')[0]
+    .split(':')[0]
+    .replace(/\.onion$/i, '');
+  if (host.length <= right) return host;
+  return `...${host.slice(-right)}`;
 }
 
 function normalizeTone(color) {
@@ -93,7 +98,7 @@ function positionStyle(point, width, height) {
 
 function buildMakerNode(index, angle, cx, cy, radius, address, width, height) {
   const { x, y } = nodeXY(angle, cx, cy, radius);
-  const displayAddress = address ? compactEndpoint(address) : 'Pending connection';
+  const displayAddress = address ? endpointSuffix(address) : 'Pending';
   const pendingClass = address ? '' : ' is-pending';
 
   return `
@@ -104,7 +109,6 @@ function buildMakerNode(index, angle, cx, cy, radius, address, width, height) {
       style="${positionStyle({ x, y }, width, height)}"
     >
       <div class="route-icon">${icons.globe(22)}</div>
-      <span>Maker</span>
       <h3>Maker ${String(index + 1).padStart(2, '0')}</h3>
       <p class="route-address${pendingClass}" title="${escapeHtml(address || '')}">${escapeHtml(displayAddress)}</p>
       <b class="route-status">Awaiting</b>
@@ -173,22 +177,15 @@ export function createSwapProgressAnimation(stage, options = {}) {
 
       <article id="you-send" class="route-node taker awaiting" style="${positionStyle(wallet, width, height)}">
         <div class="route-icon">${icons.save(22)}</div>
-        <span>Taker</span>
         <h3>Your wallet</h3>
-        <p>Origin · Receiver</p>
         <b class="route-status">Awaiting</b>
       </article>
 
       ${makersMarkup}
       <div class="swap-center-copy">
         <strong id="swap-animation-phase">Handshake</strong>
-        <span id="swap-animation-caption">Establishing Tor connections with makers</span>
       </div>
 
-      <div class="swap-animation-complete" hidden>
-        <i>${icons.check(28)}</i>
-        <span>Received ${formatSats(receiveAmount || 0)}</span>
-      </div>
     </div>
   `;
 
@@ -196,8 +193,6 @@ export function createSwapProgressAnimation(stage, options = {}) {
   const packet = stage.querySelector('.swap-packet');
   const packetGlow = stage.querySelector('.swap-packet-glow');
   const phaseEl = stage.querySelector('#swap-animation-phase');
-  const captionEl = stage.querySelector('#swap-animation-caption');
-  const completeEl = stage.querySelector('.swap-animation-complete');
   const state = {
     phase: 'handshake',
     phaseRank: 1,
@@ -232,14 +227,6 @@ export function createSwapProgressAnimation(stage, options = {}) {
     state.phase = next.phase;
     stage.querySelector('.swap-animation')?.setAttribute('data-phase', next.phase);
     if (phaseEl) phaseEl.textContent = next.title;
-    if (captionEl) {
-      captionEl.textContent =
-        next.phase === 'settlement'
-          ? 'Routing the settlement packet back to your wallet'
-          : next.phase === 'contract'
-            ? 'Locking contracts and exchanging swap data'
-            : 'Establishing Tor connections with makers';
-    }
   }
 
   function updateProgress(progress) {
@@ -273,7 +260,7 @@ export function createSwapProgressAnimation(stage, options = {}) {
       const node = stage.querySelector(`#maker-${index}`);
       const addressEl = node?.querySelector('.route-address');
       if (!addressEl || !address) return;
-      addressEl.textContent = compactEndpoint(address);
+      addressEl.textContent = endpointSuffix(address);
       addressEl.title = address;
       addressEl.classList.remove('is-pending');
     },
@@ -311,13 +298,11 @@ export function createSwapProgressAnimation(stage, options = {}) {
     },
 
     setStats({ amount: nextAmount, fee: nextFee, receiveAmount: nextReceiveAmount } = {}) {
-      const completeText = completeEl?.querySelector('span');
-      if (!completeText) return;
       const value =
         Number.isFinite(Number(nextReceiveAmount))
           ? Number(nextReceiveAmount)
           : Math.max(0, Number(nextAmount ?? amount) - Number(nextFee ?? fee));
-      completeText.textContent = `Received ${formatSats(value)}`;
+      return formatSats(value);
     },
 
     setComplete() {
@@ -329,7 +314,6 @@ export function createSwapProgressAnimation(stage, options = {}) {
       setNodeState(stage.querySelector('#you-send'), 'Received', 'settled', 'wallet');
       for (let i = 0; i < makerCount; i += 1) setRouteLine(i, true);
       updateProgress(1);
-      if (completeEl) completeEl.hidden = false;
     },
 
     setFailed() {
@@ -337,7 +321,6 @@ export function createSwapProgressAnimation(stage, options = {}) {
       state.phaseRank = phaseRank('failed');
       stage.querySelector('.swap-animation')?.setAttribute('data-phase', 'failed');
       if (phaseEl) phaseEl.textContent = 'Swap Failed';
-      if (captionEl) captionEl.textContent = 'Recovery has started automatically';
       stage.querySelectorAll('.route-node.maker').forEach((node, index) => {
         setNodeState(node, 'Failed', 'failed', `maker-${index}`);
       });

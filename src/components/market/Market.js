@@ -734,10 +734,10 @@ export function Market(container) {
                     ${icons.externalLink(12)}
                   </button>
                 </div>
-                <button class="market-calc" onclick="window.openMakerFeeCalculator(${maker.index})">Calculate</button>
                 <div class="market-actions">
-                  <button data-maker-poll="${maker.address}" title="Re-poll this maker now">Poll</button>
-                  <button data-maker-remove="${maker.address}" title="Remove this maker from the offerbook">Remove</button>
+                  <button class="market-action-btn" onclick="window.openMakerFeeCalculator(${maker.index})" data-tooltip="Calculate the estimated maker fee for this maker using your amount and hop position.">Calculate</button>
+                  <button class="market-action-btn" data-maker-poll="${maker.address}" data-tooltip="Ask this maker for a fresh offer now and update its availability and fee data.">Poll</button>
+                  <button class="market-action-btn danger" data-maker-remove="${maker.address}" data-tooltip="Remove this maker from your local offerbook so it no longer appears in market results.">Remove</button>
                 </div>
               </div>
             `;
@@ -795,7 +795,6 @@ export function Market(container) {
           <div>Min Swap</div>
           <div>Max Swap</div>
           <div>Fidelity Bond</div>
-          <div>Fee</div>
           <div>Actions</div>
         </div>
 

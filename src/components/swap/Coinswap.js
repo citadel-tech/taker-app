@@ -1372,7 +1372,6 @@ export async function CoinswapComponent(container, swapConfig) {
           <p id="swap-status-text">Executing swap through ${swapData.makers} makers...</p>
         </div>
         <div class="swap-progress-actions">
-          <div class="swap-net-badge"><i></i> Mainnet · v0.4.2</div>
           <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>
         </div>
       </header>

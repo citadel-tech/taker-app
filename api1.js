@@ -672,6 +672,8 @@ function buildSwapReportRecord(filePath, rawReport, meta = {}) {
   const rawCompletedAt =
     rawReport.completedAt ||
     rawReport.completed_at ||
+    rawReport.endTimestamp ||
+    rawReport.end_timestamp ||
     rawReport.report?.completedAt ||
     rawReport.report?.completed_at ||
     rawReport.report?.endTimestamp ||
@@ -681,6 +683,8 @@ function buildSwapReportRecord(filePath, rawReport, meta = {}) {
   const startedAt = normalizeTimestamp(
     rawReport.startedAt ||
       rawReport.started_at ||
+      rawReport.startTimestamp ||
+      rawReport.start_timestamp ||
       rawReport.report?.startedAt ||
       rawReport.report?.started_at ||
       rawReport.report?.startTimestamp ||

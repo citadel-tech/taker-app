@@ -584,6 +584,78 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     return `${txid.substring(0, start)}...${txid.substring(txid.length - end)}`;
   }
 
+  function getOutputAddress(output) {
+    if (Array.isArray(output)) {
+      return output.find((entry) => typeof entry === 'string' && entry.trim()) || '';
+    }
+    if (!output || typeof output !== 'object') return '';
+    return String(
+      getFirstField(output, [
+        'address',
+        'script_pubkey',
+        'scriptPubkey',
+        'destination',
+      ], '')
+    );
+  }
+
+  function buildOutputRowsHtml(outputs, label) {
+    if (!outputs.length) return '';
+
+    return outputs
+      .map((output, index) => {
+        const amount = getUtxoAmount(output);
+        const address = getOutputAddress(output);
+        return `
+          <div class="swap-report-output-row">
+            <div>
+              <span>${label} ${index + 1}</span>
+              <strong title="${escapeHtml(address)}">${escapeHtml(address || 'Address not included')}</strong>
+            </div>
+            <em>${Number.isFinite(amount) ? `${formatNumber(amount)} 丰` : 'Amount not included'}</em>
+            ${address ? `<button class="copy-output-btn" data-copy-text="${escapeHtml(address)}" title="Copy address">${icons.clipboardCopy(16)}</button>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  function buildWalletOutputsHtml() {
+    const inputAmounts = report.inputUtxos
+      .map(getUtxoAmount)
+      .filter((amount) => Number.isFinite(amount));
+    const inputSummary = inputAmounts.length
+      ? `
+        <div class="swap-report-input-summary">
+          <span>Input amounts recorded</span>
+          <strong>${inputAmounts.map((amount) => `${formatNumber(amount)} 丰`).join(' + ')}</strong>
+        </div>
+      `
+      : '';
+    const changeRows = buildOutputRowsHtml(report.outputRegularUtxos, 'Change output');
+    const swapRows = buildOutputRowsHtml(report.outputSwapUtxos, 'Swap output');
+
+    if (!inputSummary && !changeRows && !swapRows) return '';
+
+    return `
+      <div class="swap-report-output-group">
+        ${inputSummary}
+        ${changeRows ? `
+          <div class="swap-report-output-subgroup">
+            <h4>Change UTXOs</h4>
+            ${changeRows}
+          </div>
+        ` : ''}
+        ${swapRows ? `
+          <div class="swap-report-output-subgroup">
+            <h4>Incoming Swap UTXOs</h4>
+            ${swapRows}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
   function copyToClipboard(text) {
     navigator.clipboard
       .writeText(text)
@@ -805,54 +877,6 @@ export function SwapReportComponent(container, swapReport, options = {}) {
   ].filter((artifact) => artifact.txid);
   report.transactionArtifacts = transactionArtifacts;
   report.artifactsCount = transactionArtifacts.length;
-  const outgoingUtxos = report.inputUtxos.length
-    ? report.inputUtxos.map((entry, index) =>
-        makeReportEntry(`Input ${index + 1}`, entry)
-      )
-    : report.outgoingContracts.length
-      ? report.outgoingContracts.map((entry, index) =>
-          makeReportEntry(`Outgoing contract ${index + 1}`, entry)
-        )
-      : report.outgoingContractTxid
-        ? [makeReportEntry('Outgoing contract tx', report.outgoingContractTxid)]
-        : [];
-  const incomingUtxos =
-    report.outputRegularUtxos.length || report.outputSwapUtxos.length
-      ? [
-          ...report.outputRegularUtxos.map((entry, index) =>
-            makeReportEntry(`Change output ${index + 1}`, entry)
-          ),
-          ...report.outputSwapUtxos.map((entry, index) =>
-            makeReportEntry(`Swap output ${index + 1}`, entry)
-          ),
-        ]
-      : report.incomingContracts.length
-        ? report.incomingContracts.map((entry, index) =>
-            makeReportEntry(`Incoming contract ${index + 1}`, entry)
-          )
-        : report.incomingContractTxid
-          ? [makeReportEntry('Incoming contract tx', report.incomingContractTxid)]
-          : [];
-
-  function buildUtxoCollectionsHtml() {
-    return `
-      <div class="swap-report-utxo-group outgoing">
-        <div class="swap-report-utxo-head">
-          <span>Outgoing Inputs</span>
-          <strong>${outgoingUtxos.length}</strong>
-        </div>
-        ${buildUtxoRowsHtml(outgoingUtxos, '', 'Input')}
-      </div>
-      <div class="swap-report-utxo-group incoming">
-        <div class="swap-report-utxo-head">
-          <span>Incoming Outputs</span>
-          <strong>${incomingUtxos.length}</strong>
-        </div>
-        ${buildUtxoRowsHtml(incomingUtxos, '', 'Output')}
-      </div>
-    `;
-  }
-
   function buildTransactionArtifactsHtml() {
     if (!report.transactionArtifacts || report.transactionArtifacts.length === 0) {
       return '';
@@ -1267,11 +1291,11 @@ export function SwapReportComponent(container, swapReport, options = {}) {
 
           <div class="swap-report-block">
             <div class="swap-report-block-head">
-              <span>UTXOs and Transactions</span>
+              <span>Transactions</span>
             </div>
             <div class="swap-report-artifacts">
-              ${buildUtxoCollectionsHtml()}
               ${buildTransactionArtifactsHtml()}
+              ${buildWalletOutputsHtml()}
             </div>
           </div>
 
@@ -1329,6 +1353,12 @@ export function SwapReportComponent(container, swapReport, options = {}) {
   content.querySelectorAll('.copy-txid-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       copyToClipboard(btn.dataset.txid);
+    });
+  });
+
+  content.querySelectorAll('.copy-output-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      copyToClipboard(btn.dataset.copyText);
     });
   });
 

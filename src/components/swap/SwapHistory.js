@@ -3,6 +3,7 @@ import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
 
 let swapHistory = [];
+let currentSort = 'newest';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -78,6 +79,8 @@ function normalizeSwapReport(report) {
   const startedAt = normalizeTimestamp(
     report.startedAt ||
       report.started_at ||
+      report.startTimestamp ||
+      report.start_timestamp ||
       nested.startedAt ||
       nested.started_at,
     null
@@ -87,6 +90,8 @@ function normalizeSwapReport(report) {
       report.completed_at ||
       report.failedAt ||
       report.failed_at ||
+      report.endTimestamp ||
+      report.end_timestamp ||
       nested.completedAt ||
       nested.completed_at ||
       nested.endTimestamp ||
@@ -183,6 +188,17 @@ function normalizeSwapReport(report) {
       (report.isTaproot ? 'Taproot' : nested.isTaproot ? 'Taproot' : 'v1'),
     report: nested,
   };
+}
+
+function getSortedSwapHistory(history, sort = currentSort) {
+  const sorted = [...history];
+  sorted.sort((a, b) => {
+    if (sort === 'oldest') return (a.completedAt || 0) - (b.completedAt || 0);
+    if (sort === 'amount-high') return (Number(b.amount) || 0) - (Number(a.amount) || 0);
+    if (sort === 'amount-low') return (Number(a.amount) || 0) - (Number(b.amount) || 0);
+    return (b.completedAt || 0) - (a.completedAt || 0);
+  });
+  return sorted;
 }
 
 export async function loadSwapHistory() {
@@ -406,7 +422,22 @@ export async function SwapHistoryComponent(container) {
                 <p>${escapeHtml(loadError.message || 'Please try again.')}</p>
               </div>
             `
-            : buildSwapHistoryMarkup(swapHistory)
+            : `
+              <div class="swap-reports-toolbar">
+                <label>
+                  <span>Sort</span>
+                  <select id="swap-history-sort">
+                    <option value="newest" ${currentSort === 'newest' ? 'selected' : ''}>Newest first</option>
+                    <option value="oldest" ${currentSort === 'oldest' ? 'selected' : ''}>Oldest first</option>
+                    <option value="amount-high" ${currentSort === 'amount-high' ? 'selected' : ''}>Amount high to low</option>
+                    <option value="amount-low" ${currentSort === 'amount-low' ? 'selected' : ''}>Amount low to high</option>
+                  </select>
+                </label>
+              </div>
+              <div id="swap-reports-list-container">
+                ${buildSwapHistoryMarkup(getSortedSwapHistory(swapHistory))}
+              </div>
+            `
         }
       </section>
     </div>
@@ -421,11 +452,25 @@ export async function SwapHistoryComponent(container) {
     }
   });
 
-  // Click handlers for swap rows
-  content.querySelectorAll('.swap-report-list-row').forEach((row) => {
-    row.addEventListener('click', () => {
-      const swapId = row.dataset.swapId;
-      viewSwapReport(swapId);
-    });
+  content.querySelector('#swap-history-sort')?.addEventListener('change', (event) => {
+    currentSort = event.target.value;
+    const listContainer = content.querySelector('#swap-reports-list-container');
+    if (!listContainer) return;
+    listContainer.innerHTML = buildSwapHistoryMarkup(
+      getSortedSwapHistory(swapHistory, currentSort)
+    );
+    bindSwapReportRows();
   });
+
+  // Click handlers for swap rows
+  function bindSwapReportRows() {
+    content.querySelectorAll('.swap-report-list-row').forEach((row) => {
+      row.addEventListener('click', () => {
+        const swapId = row.dataset.swapId;
+        viewSwapReport(swapId);
+      });
+    });
+  }
+
+  bindSwapReportRows();
 }

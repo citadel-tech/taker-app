@@ -912,12 +912,17 @@ export async function SwapComponent(container) {
 
   function updateSelectionModeUI() {
     const utxoSelectionSection = content.querySelector('#utxo-selection-section');
+    const utxoWarning = content.querySelector('#utxo-warning');
     const makerCountHint = content.querySelector('#maker-count-hint');
     const makerAutoControls = content.querySelector('#maker-auto-controls');
     const makerSelectionSection = content.querySelector('#maker-selection-section');
 
     if (utxoSelectionSection) {
       utxoSelectionSection.classList.toggle('hidden', selectionMode !== 'manual');
+    }
+
+    if (utxoWarning && selectionMode !== 'manual') {
+      utxoWarning.classList.add('hidden');
     }
 
     if (makerCountHint) {
@@ -1001,6 +1006,11 @@ export async function SwapComponent(container) {
   function checkUtxoTypeWarning() {
     const warningEl = content.querySelector('#utxo-warning');
     if (!warningEl) return;
+
+    if (selectionMode !== 'manual') {
+      warningEl.classList.add('hidden');
+      return;
+    }
 
     if (selectedUtxos.length < 2) {
       warningEl.classList.add('hidden');
@@ -1135,10 +1145,10 @@ export async function SwapComponent(container) {
               <button id="mode-auto" class="mode-btn is-active">Auto select</button>
               <button id="mode-manual" class="mode-btn">Manual select</button>
             </div>
-            <div id="utxo-warning" class="hidden swap-warning-note">
-              ${icons.alertTriangle(15)} <span>Mixing Regular and Swap UTXOs in the same transaction can compromise privacy.</span>
-            </div>
             <div id="utxo-selection-section" class="hidden swap-picker">
+              <div id="utxo-warning" class="hidden swap-warning-note">
+                ${icons.alertTriangle(15)} <span>Mixing Regular and Swap UTXOs in the same transaction can compromise privacy.</span>
+              </div>
               <div class="swap-picker-head">
                 <span>Pick UTXOs to fund the swap</span>
                 <strong>Total <span id="utxo-picker-total">0 丰</span></strong>
@@ -1196,7 +1206,7 @@ export async function SwapComponent(container) {
           <div class="swap-section">
             <div class="send-section-label">
               <span>Network Fee Rate</span>
-              <small>Mainnet - live estimates</small>
+              <small>Fee estimate</small>
             </div>
             <div class="send-fee-grid">
               <button id="swap-fee-low" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.low ? 'active' : ''}" data-level="low" type="button">
