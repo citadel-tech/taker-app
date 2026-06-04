@@ -129,7 +129,7 @@ export async function SwapComponent(container) {
   let networkFeeRate = 2;
   const networkFeeRates = { low: 1, medium: 2, high: 4 };
   let userSelectedNetworkFeeRate = false;
-  let currentProtocol = 'v1';
+  let currentProtocol = 'v2';
   let currentNetwork = 'signet';
   let walletBalances = {
     spendable: 0,
@@ -157,8 +157,10 @@ export async function SwapComponent(container) {
     if (selectedUnit !== 'btc') {
       labels.push(`= ${btcAmount.toFixed(8)} BTC`);
     }
-    if (selectedUnit !== 'usd') {
+    if (selectedUnit !== 'usd' && hasUsdPrice()) {
       labels.push(`$${(btcAmount * btcPrice).toFixed(2)} USD`);
+    } else if (selectedUnit !== 'usd') {
+      labels.push('USD price unavailable');
     }
 
     return labels;
@@ -187,6 +189,10 @@ export async function SwapComponent(container) {
     return getSelectedUtxoKinds().size > 1;
   }
 
+  function normalizeProtocolValue(protocol) {
+    return protocol === 'v1' || protocol === 'Legacy' ? 'v1' : 'v2';
+  }
+
   try {
     const config = JSON.parse(localStorage.getItem('coinswap_config') || '{}');
     currentNetwork = config.network || currentNetwork;
@@ -208,6 +214,9 @@ export async function SwapComponent(container) {
     utxoFilter = savedSelections.utxoFilter || 'regular';
     makerSelectionMode = savedSelections.makerSelectionMode || 'auto';
     selectedMakerAddresses = savedSelections.selectedMakerAddresses || [];
+    currentProtocol = normalizeProtocolValue(
+      savedSelections.protocol || savedSelections.currentProtocol || currentProtocol
+    );
     useCustomHops = savedSelections.useCustomHops || false;
     customHopCount = savedSelections.customHopCount || 6;
     if (savedSelections.networkFeeRate) {
@@ -223,8 +232,16 @@ export async function SwapComponent(container) {
   let totalBalance = 0;
   const btcPrice = getBtcPriceUsd();
 
+  function hasUsdPrice() {
+    return Number.isFinite(Number(btcPrice)) && Number(btcPrice) > 0;
+  }
+
   function getMakerProtocol(makerOrItem, offer = makerOrItem?.offer) {
     return makerOrItem?.protocol || (offer?.tweakablePoint ? 'Taproot' : 'Legacy');
+  }
+
+  function getProtocolName(protocol = currentProtocol) {
+    return protocol === 'v2' ? 'Taproot' : 'Legacy';
   }
 
   function filterMakersByProtocol(makers) {
@@ -243,13 +260,6 @@ export async function SwapComponent(container) {
     if (makersCountEl) {
       makersCountEl.textContent = availableMakers.length;
     }
-  }
-
-  try {
-    const protocolResult = await window.api.taker.getProtocol();
-    currentProtocol = protocolResult.protocol || currentProtocol;
-  } catch (error) {
-    console.error('Failed to get authoritative protocol:', error);
   }
 
   // ✅ LOAD FROM CACHE IMMEDIATELY IF AVAILABLE
@@ -654,7 +664,7 @@ export async function SwapComponent(container) {
       return Math.floor(value * 100000000);
     }
 
-    if (amountUnit === 'usd') {
+    if (amountUnit === 'usd' && hasUsdPrice()) {
       return Math.floor((value / btcPrice) * 100000000);
     }
 
@@ -674,8 +684,10 @@ export async function SwapComponent(container) {
       input.value = amountSats;
     } else if (amountUnit === 'btc') {
       input.value = (amountSats / 100000000).toFixed(8);
-    } else if (amountUnit === 'usd') {
+    } else if (amountUnit === 'usd' && hasUsdPrice()) {
       input.value = ((amountSats / 100000000) * btcPrice).toFixed(2);
+    } else if (amountUnit === 'usd') {
+      input.value = '';
     }
   }
 
@@ -704,9 +716,12 @@ export async function SwapComponent(container) {
       swapAmount.toLocaleString() + ' 丰';
 
     const swapBtc = swapAmount / 100000000;
-    const swapUsd = swapBtc * btcPrice;
+    const swapUsd = hasUsdPrice() ? swapBtc * btcPrice : null;
     content.querySelector('#swap-amount-conversions').textContent =
-      '≈ ' + swapBtc.toFixed(8) + ' BTC • $' + swapUsd.toFixed(2) + ' USD';
+      '≈ ' +
+      swapBtc.toFixed(8) +
+      ' BTC' +
+      (swapUsd == null ? '' : ' • $' + swapUsd.toFixed(2) + ' USD');
 
     const utxoPickerTotal = content.querySelector('#utxo-picker-total');
     if (utxoPickerTotal) {
@@ -979,6 +994,21 @@ export async function SwapComponent(container) {
     updateSummary();
   }
 
+  async function setSwapProtocol(protocol) {
+    currentProtocol = normalizeProtocolValue(protocol);
+
+    content.querySelectorAll('.protocol-btn').forEach((btn) => {
+      btn.classList.toggle('is-active', btn.id === 'protocol-' + currentProtocol);
+    });
+
+    const labelEl = content.querySelector('#swap-protocol-label');
+    if (labelEl) labelEl.textContent = getProtocolName();
+
+    await fetchMakers(false);
+    renderMakerList();
+    updateSummary();
+  }
+
   function toggleMakerSelection(address) {
     const addrIndex = selectedMakerAddresses.indexOf(address);
     if (addrIndex > -1) {
@@ -1073,6 +1103,7 @@ export async function SwapComponent(container) {
       utxoFilter,
       makerSelectionMode,
       selectedMakerAddresses,
+      protocol: currentProtocol,
       useCustomHops,
       customHopCount,
       networkFeeRate,
@@ -1228,6 +1259,18 @@ export async function SwapComponent(container) {
             </label>
           </div>
 
+          <div class="swap-section">
+            <div class="swap-section-head">
+              <h3>Protocol</h3>
+              <span id="swap-protocol-label">${getProtocolName()}</span>
+            </div>
+            <div class="swap-segment">
+              <button id="protocol-v2" class="protocol-btn ${currentProtocol === 'v2' ? 'is-active' : ''}" type="button">Taproot</button>
+              <button id="protocol-v1" class="protocol-btn ${currentProtocol === 'v1' ? 'is-active' : ''}" type="button">Legacy</button>
+            </div>
+            <p class="swap-help">Taproot uses the v2 swap path with compatible makers. Legacy uses the v1/P2WSH path for makers that do not support Taproot.</p>
+          </div>
+
           <div id="validation-warning" class="hidden swap-validation"></div>
           <button id="start-coinswap-btn" class="swap-start-btn">Start Swap</button>
         </section>
@@ -1359,6 +1402,14 @@ export async function SwapComponent(container) {
     toggleSelectionMode('manual');
     saveCurrentSelections();
   });
+  content.querySelector('#protocol-v2').addEventListener('click', async () => {
+    await setSwapProtocol('v2');
+    await saveCurrentSelections();
+  });
+  content.querySelector('#protocol-v1').addEventListener('click', async () => {
+    await setSwapProtocol('v1');
+    await saveCurrentSelections();
+  });
   content.querySelector('#utxo-filter-regular').addEventListener('click', () => {
     setUtxoFilter('regular');
     saveCurrentSelections();
@@ -1424,15 +1475,10 @@ export async function SwapComponent(container) {
         return;
       }
 
-      // ✅ ADD THIS PROTOCOL CHECK
-      let protocol = 'v1';
-      let protocolName = 'Legacy';
+      const protocol = currentProtocol;
+      const protocolName = getProtocolName(protocol);
 
       try {
-        const protocolResult = await window.api.taker.getProtocol();
-        protocol = protocolResult.protocol || 'v1';
-        protocolName = protocolResult.protocolName;
-
         // Check if we have compatible makers
         const data = await window.api.taker.getOffers();
         if (data.success && data.offerbook) {
@@ -1452,7 +1498,7 @@ export async function SwapComponent(container) {
 
           if (compatibleMakers.length < makersNeeded) {
             alert(
-              `❌ Not enough ${protocolName} makers available!\n\nYour wallet: ${protocolName}\nCompatible makers available: ${compatibleMakers.length}\nMakers needed: ${makersNeeded}\n\nPlease sync market data or reduce the number of makers.`
+              `❌ Not enough ${protocolName} makers available!\n\nSelected protocol: ${protocolName}\nCompatible makers available: ${compatibleMakers.length}\nMakers needed: ${makersNeeded}\n\nPlease sync market data or reduce the number of makers.`
             );
             return;
           }
@@ -1507,6 +1553,7 @@ export async function SwapComponent(container) {
             makerSelectionMode === 'manual' && selectedMakerAddresses.length > 0
               ? selectedMakerAddresses
               : undefined,
+          protocol: swapConfig.protocol,
           password: localStorage.getItem('coinswap_config')
             ? JSON.parse(localStorage.getItem('coinswap_config')).wallet
                 ?.password || ''
@@ -1639,20 +1686,6 @@ export async function SwapComponent(container) {
   }
 
   fetchNetworkFees();
-  (async () => {
-    try {
-      const protocolResult = await window.api.taker.getProtocol();
-      const nextProtocol = protocolResult.protocol || 'v1';
-      if (nextProtocol !== currentProtocol) {
-        currentProtocol = nextProtocol;
-        await fetchMakers(false);
-        updateSummary();
-      }
-    } catch (error) {
-      console.error('Failed to get protocol:', error);
-    }
-  })();
-
   (async () => {
     try {
       await ensureBalancesLoaded();

@@ -1,12 +1,12 @@
 const PRICE_CACHE_KEY = 'btc_usd_price_cache';
 const PRICE_CACHE_TTL_MS = 5 * 60 * 1000;
-const FALLBACK_BTC_USD = 50000;
-const MEMPOOL_PRICE_URL = 'https://mempool.space/api/v1/prices';
+const COINBASE_SPOT_PRICE_URL =
+  'https://api.coinbase.com/v2/prices/BTC-USD/spot';
 
-let btcPriceUsd = loadCachedPrice() || FALLBACK_BTC_USD;
+let btcPriceUsd = loadCachedPrice() || null;
 let inFlightRefresh = null;
 
-function loadCachedPrice() {
+function loadCachedPrice({ allowStale = false } = {}) {
   try {
     if (typeof localStorage === 'undefined') return null;
     const cached = JSON.parse(localStorage.getItem(PRICE_CACHE_KEY) || 'null');
@@ -18,7 +18,7 @@ function loadCachedPrice() {
       return null;
     }
 
-    if (Date.now() - timestamp > PRICE_CACHE_TTL_MS) return null;
+    if (!allowStale && Date.now() - timestamp > PRICE_CACHE_TTL_MS) return null;
     return price;
   } catch (error) {
     console.warn('Failed to load BTC price cache:', error);
@@ -45,6 +45,10 @@ export function getBtcPriceUsd() {
   return btcPriceUsd;
 }
 
+export function hasBtcPriceUsd() {
+  return Number.isFinite(btcPriceUsd) && btcPriceUsd > 0;
+}
+
 export async function refreshBtcPriceUsd({ force = false } = {}) {
   if (!force) {
     const cachedPrice = loadCachedPrice();
@@ -57,19 +61,19 @@ export async function refreshBtcPriceUsd({ force = false } = {}) {
   if (inFlightRefresh) return inFlightRefresh;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 3000);
+  const timeout = setTimeout(() => controller.abort(), 5000);
 
-  inFlightRefresh = fetch(MEMPOOL_PRICE_URL, { signal: controller.signal })
+  inFlightRefresh = fetch(COINBASE_SPOT_PRICE_URL, { signal: controller.signal })
     .then((response) => {
       if (!response.ok) {
-        throw new Error(`mempool price request failed: ${response.status}`);
+        throw new Error(`Coinbase price request failed: ${response.status}`);
       }
       return response.json();
     })
-    .then((prices) => {
-      const usd = Number(prices?.USD);
+    .then((data) => {
+      const usd = Number(data?.data?.amount);
       if (!Number.isFinite(usd) || usd <= 0) {
-        throw new Error('mempool price response did not include USD');
+        throw new Error('Coinbase price response did not include data.amount');
       }
 
       btcPriceUsd = usd;
@@ -80,7 +84,15 @@ export async function refreshBtcPriceUsd({ force = false } = {}) {
       return btcPriceUsd;
     })
     .catch((error) => {
-      console.warn('Using fallback BTC/USD price:', error);
+      const stalePrice = loadCachedPrice({ allowStale: true });
+      if (stalePrice) {
+        btcPriceUsd = stalePrice;
+        console.warn('Using stale cached BTC/USD price:', error);
+        return btcPriceUsd;
+      }
+
+      btcPriceUsd = null;
+      console.warn('BTC/USD price unavailable:', error);
       return btcPriceUsd;
     })
     .finally(() => {

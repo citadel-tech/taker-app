@@ -12,7 +12,12 @@ export function SendComponent(container, preSelectedUtxos = null) {
   let selectionMode =
     preSelectedUtxos && preSelectedUtxos.length > 0 ? 'manual' : 'auto';
   let selectedUtxos = preSelectedUtxos || [];
+  let utxoFilter = 'regular';
   const btcPrice = getBtcPriceUsd();
+
+  function hasUsdPrice() {
+    return Number.isFinite(Number(btcPrice)) && Number(btcPrice) > 0;
+  }
 
   // New state for multi-address and signed tx
   let recipients = [{ address: '', amount: 0 }];
@@ -23,6 +28,16 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
   let availableUtxos = [];
   let availableBalance = 0;
+
+  function getUtxoKind(utxo) {
+    return String(utxo?.type || '').toLowerCase().includes('swap')
+      ? 'swap'
+      : 'regular';
+  }
+
+  function getUtxoKindLabel(utxo) {
+    return getUtxoKind(utxo) === 'swap' ? 'Swap' : 'Regular';
+  }
 
   function getAmountUnitLabel(unit = amountUnit) {
     if (unit === 'sats') return '丰';
@@ -39,8 +54,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
     if (selectedUnit !== 'btc') {
       labels.push(`= ${btcAmount.toFixed(8)} BTC`);
     }
-    if (selectedUnit !== 'usd') {
+    if (selectedUnit !== 'usd' && hasUsdPrice()) {
       labels.push(`$${(btcAmount * btcPrice).toFixed(2)} USD`);
+    } else if (selectedUnit !== 'usd') {
+      labels.push('USD price unavailable');
     }
 
     return labels;
@@ -71,6 +88,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
           (sum, utxo) => sum + utxo.amount,
           0
         );
+        if (selectedUtxos.length > 0 && availableUtxos[selectedUtxos[0]]) {
+          utxoFilter = getUtxoKind(availableUtxos[selectedUtxos[0]]);
+        }
         console.log(
           'Loaded',
           availableUtxos.length,
@@ -224,12 +244,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
           input.placeholder = '0.00000000';
           input.value =
             amountSats > 0 ? (amountSats / 100000000).toFixed(8) : '';
-        } else if (unit === 'usd') {
+        } else if (unit === 'usd' && hasUsdPrice()) {
           input.placeholder = '0.00';
           input.value =
             amountSats > 0
               ? ((amountSats / 100000000) * btcPrice).toFixed(2)
               : '';
+        } else if (unit === 'usd') {
+          input.placeholder = 'Price unavailable';
+          input.value = '';
         }
       }
       updateRecipientConversions(index);
@@ -266,8 +289,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
         input.value = amountToSend;
       } else if (amountUnit === 'btc') {
         input.value = (amountToSend / 100000000).toFixed(8);
-      } else if (amountUnit === 'usd') {
+      } else if (amountUnit === 'usd' && hasUsdPrice()) {
         input.value = ((amountToSend / 100000000) * btcPrice).toFixed(2);
+      } else if (amountUnit === 'usd') {
+        input.value = '';
       }
     }
 
@@ -295,6 +320,24 @@ export function SendComponent(container, preSelectedUtxos = null) {
             normalizedAddress.startsWith('n'))
             ? 'Legacy'
             : 'Segwit';
+        const amountPlaceholder =
+          amountUnit === 'sats'
+            ? '0'
+            : amountUnit === 'btc'
+              ? '0.00000000'
+              : hasUsdPrice()
+                ? '0.00'
+                : 'Price unavailable';
+        const amountValue =
+          recipient.amount && recipient.amount > 0
+            ? amountUnit === 'sats'
+              ? recipient.amount
+              : amountUnit === 'btc'
+                ? (recipient.amount / 100000000).toFixed(8)
+                : hasUsdPrice()
+                  ? ((recipient.amount / 100000000) * btcPrice).toFixed(2)
+                  : ''
+            : '';
 
         return `
       <div class="send-recipient-card recipient-row">
@@ -353,8 +396,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
               type="number" 
               min="0"
               step="any"
-              placeholder="${amountUnit === 'sats' ? '0' : amountUnit === 'btc' ? '0.00000000' : '0.00'}"
-              value="${recipient.amount && recipient.amount > 0 ? (amountUnit === 'sats' ? recipient.amount : amountUnit === 'btc' ? (recipient.amount / 100000000).toFixed(8) : ((recipient.amount / 100000000) * btcPrice).toFixed(2)) : ''}"
+              placeholder="${amountPlaceholder}"
+              value="${amountValue}"
               class="recipient-amount"
               data-index="${index}"
             />
@@ -378,7 +421,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <strong>${getSelectedUtxosTotal().toLocaleString()} 丰</strong>
             <div>
               <span>= ${(getSelectedUtxosTotal() / 100000000).toFixed(8)} BTC</span>
-              <span>$${((getSelectedUtxosTotal() / 100000000) * btcPrice).toFixed(2)} USD</span>
+              <span>${hasUsdPrice() ? `$${((getSelectedUtxosTotal() / 100000000) * btcPrice).toFixed(2)} USD` : 'USD price unavailable'}</span>
             </div>
           </div>
         </div>
@@ -411,8 +454,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
         // Convert to satoshis based on current unit.
         if (amountUnit === 'btc') {
           value = value * 100000000;
-        } else if (amountUnit === 'usd') {
+        } else if (amountUnit === 'usd' && hasUsdPrice()) {
           value = (value / btcPrice) * 100000000;
+        } else if (amountUnit === 'usd') {
+          value = 0;
         }
 
         updateRecipient(index, 'amount', value);
@@ -473,6 +518,23 @@ export function SendComponent(container, preSelectedUtxos = null) {
     updateSummary();
   }
 
+  function setUtxoFilter(filter) {
+    utxoFilter = filter === 'swap' ? 'swap' : 'regular';
+    selectedUtxos = selectedUtxos.filter(
+      (index) => getUtxoKind(availableUtxos[index]) === utxoFilter
+    );
+
+    content.querySelectorAll('.utxo-filter-btn').forEach((btn) => {
+      btn.classList.toggle('is-active', btn.dataset.filter === utxoFilter);
+    });
+
+    renderUtxoList();
+    updateSelectedUtxosDisplay();
+    checkUtxoTypeWarning();
+    renderRecipients();
+    updateSummary();
+  }
+
   function toggleUtxoSelection(index) {
     const utxoIndex = selectedUtxos.indexOf(index);
     if (utxoIndex > -1) {
@@ -510,8 +572,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
       valueEl.textContent = totalValue.toLocaleString() + ' 丰';
       valueEl.title =
         (totalValue / 100000000).toFixed(8) +
-        ' BTC - $' +
-        (((totalValue / 100000000) * btcPrice).toFixed(2));
+        ' BTC' +
+        (hasUsdPrice()
+          ? ' - $' + (((totalValue / 100000000) * btcPrice).toFixed(2))
+          : '');
     }
   }
 
@@ -532,9 +596,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
       return;
     }
 
-    const types = selectedUtxos.map((index) => availableUtxos[index].type);
-    const hasRegular = types.includes('Regular');
-    const hasSwap = types.includes('Swap');
+    const types = selectedUtxos.map((index) => getUtxoKind(availableUtxos[index]));
+    const hasRegular = types.includes('regular');
+    const hasSwap = types.includes('swap');
 
     if (hasRegular && hasSwap) {
       warningEl.classList.remove('hidden');
@@ -558,30 +622,49 @@ export function SendComponent(container, preSelectedUtxos = null) {
       return;
     }
 
-    utxoContainer.innerHTML = availableUtxos
+    const filteredUtxos = availableUtxos.filter(
+      (utxo) => getUtxoKind(utxo) === utxoFilter
+    );
+
+    if (filteredUtxos.length === 0) {
+      utxoContainer.innerHTML = `
+        <div class="send-empty">
+          ${icons.inbox(36)}
+          <strong>No ${utxoFilter === 'swap' ? 'Swap' : 'Regular'} UTXOs</strong>
+          <span>Switch the filter or refresh wallet data</span>
+        </div>
+      `;
+      return;
+    }
+
+    utxoContainer.innerHTML = filteredUtxos
       .map((utxo, index) => {
+        const originalIndex = utxo.index;
         const btcAmount = (utxo.amount / 100000000).toFixed(8);
-        const usdAmount = ((utxo.amount / 100000000) * btcPrice).toFixed(2);
-        const isSelected = selectedUtxos.includes(index);
+        const usdAmount = hasUsdPrice()
+          ? ((utxo.amount / 100000000) * btcPrice).toFixed(2)
+          : null;
+        const isSelected = selectedUtxos.includes(originalIndex);
 
         return `
         <label class="send-utxo-item ${isSelected ? 'selected' : ''}">
-          <input type="checkbox" id="utxo-${index}" ${isSelected ? 'checked' : ''} />
+          <input type="checkbox" id="utxo-${originalIndex}" ${isSelected ? 'checked' : ''} />
           <span></span>
           <div>
             <strong>${utxo.txid.substring(0, 16)}...${utxo.txid.substring(utxo.txid.length - 8)}:${utxo.vout}</strong>
-            <small>${utxo.amount.toLocaleString()} 丰 - ${utxo.type}</small>
+            <small>${utxo.amount.toLocaleString()} 丰 - ${getUtxoKindLabel(utxo)}</small>
           </div>
           <div>
             <strong>${utxo.amount.toLocaleString()} 丰</strong>
-            <small>${btcAmount} BTC - $${usdAmount}</small>
+            <small>${btcAmount} BTC${usdAmount == null ? '' : ' - $' + usdAmount}</small>
           </div>
         </label>
       `;
       })
       .join('');
 
-    availableUtxos.forEach((_, index) => {
+    filteredUtxos.forEach((utxo) => {
+      const index = utxo.index;
       const checkbox = content.querySelector('#utxo-' + index);
       if (checkbox) {
         checkbox.addEventListener('change', () => toggleUtxoSelection(index));
@@ -677,8 +760,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
       summaryTotal.textContent =
         Math.floor(displayTotal).toLocaleString() + ' 丰';
     if (summaryTotalUsd)
-      summaryTotalUsd.textContent =
-        '= $' + ((displayTotal * btcPrice) / 100000000).toFixed(2);
+      summaryTotalUsd.textContent = hasUsdPrice()
+        ? '= $' + ((displayTotal * btcPrice) / 100000000).toFixed(2)
+        : 'USD price unavailable';
 
     // Technical details
     const txSizeEl = content.querySelector('#tx-size');
@@ -712,10 +796,12 @@ export function SendComponent(container, preSelectedUtxos = null) {
       summaryRemaining.textContent =
         Math.floor(displayRemaining).toLocaleString() + ' 丰';
     const remainingBtc = displayRemaining / 100000000;
-    const remainingUsd = remainingBtc * btcPrice;
+    const remainingUsd = hasUsdPrice() ? remainingBtc * btcPrice : null;
     if (summaryRemainingDetail) {
       summaryRemainingDetail.textContent =
-        remainingBtc.toFixed(8) + ' BTC - $' + remainingUsd.toFixed(2);
+        remainingBtc.toFixed(8) +
+        ' BTC' +
+        (remainingUsd == null ? '' : ' - $' + remainingUsd.toFixed(2));
     }
 
     // Update available balance
@@ -970,6 +1056,14 @@ export function SendComponent(container, preSelectedUtxos = null) {
                   <span>Select UTXOs</span>
                   <small><span id="selected-utxos-value">0 丰</span> selected</small>
                 </div>
+                <div class="utxo-filter-toggle">
+                  <button class="utxo-filter-btn ${utxoFilter === 'regular' ? 'is-active' : ''}" data-filter="regular" type="button">
+                    Regular
+                  </button>
+                  <button class="utxo-filter-btn ${utxoFilter === 'swap' ? 'is-active' : ''}" data-filter="swap" type="button">
+                    Swap
+                  </button>
+                </div>
                 <div id="utxo-warning" class="hidden send-utxo-warning">
                   ${icons.alertTriangle(16)}
                   <span>Privacy warning: selected Regular and Swap UTXOs together.</span>
@@ -1088,6 +1182,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
   content
     .querySelector('#mode-manual')
     .addEventListener('click', () => toggleSelectionMode('manual'));
+  content.querySelectorAll('.utxo-filter-btn').forEach((btn) => {
+    btn.addEventListener('click', () => setUtxoFilter(btn.dataset.filter));
+  });
   content
     .querySelector('#fee-low')
     .addEventListener('click', () => selectFee('low'));

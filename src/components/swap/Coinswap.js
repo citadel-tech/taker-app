@@ -316,9 +316,15 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function markAllMakersComplete({ final = false } = {}) {
-    if (final) {
-      progressAnimation?.setComplete();
+    if (!final) {
+      for (let i = 0; i < swapData.makers; i++) {
+        updateMakerVisibility(i, true);
+        updateHopStatus(i, 'Settling...', 'orange');
+      }
+      return;
     }
+
+    progressAnimation?.setComplete();
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
       updateHopStatus(i, 'Complete', 'green');
@@ -624,30 +630,16 @@ export async function CoinswapComponent(container, swapConfig) {
     }
     // V1: "Swaps settled successfully"
     else if (message.includes('Swaps settled successfully')) {
-      for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, 'Complete', 'green');
-      }
+      markAllMakersComplete();
     }
     // V2: "Taker sweep completed successfully"
     else if (message.includes('Taker sweep completed successfully')) {
-      for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, 'Complete', 'green');
-      }
-      // Make sure all makers are visible
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-      }
+      markAllMakersComplete();
       updateYouReceive(true);
     }
     // V2: "Successfully Completed Taproot Coinswap"
     else if (message.includes('Successfully Completed Taproot Coinswap')) {
-      for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, 'Complete', 'green');
-      }
-      // Make sure all makers are visible
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-      }
+      markAllMakersComplete();
       updateYouReceive(true);
     }
     // V1: "Successfully swept incoming swap coin"

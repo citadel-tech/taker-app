@@ -370,14 +370,16 @@ export async function WalletComponent(container) {
 
   async function updateBalance() {
     const balance = await fetchBalance();
-    const spendable = Number(balance.spendable || 0);
+    const regular = Number(balance.regular || 0);
+    const swap = Number(balance.swap || 0);
+    const swappable = Math.max(regular, swap);
     const total =
-      Number(balance.regular || 0) +
-      Number(balance.swap || 0) +
+      regular +
+      swap +
       Number(balance.contract || 0);
-    const share = total > 0 ? Math.min(100, (spendable / total) * 100) : 0;
+    const share = total > 0 ? Math.min(100, (swappable / total) * 100) : 0;
 
-    renderSatsAmount('#spendable-balance', balance.spendable);
+    renderSatsAmount('#spendable-balance', swappable);
     renderSatsAmount('#swap-balance', balance.swap);
     renderSatsAmount('#regular-balance', balance.regular);
     renderSatsAmount('#contract-balance', balance.contract);
@@ -497,9 +499,9 @@ export async function WalletComponent(container) {
     <section class="app-balances" aria-label="Wallet balances">
       <article class="app-balance-card hero">
         <span class="app-accent"></span>
-        <span class="app-card-label">Balance</span>
+        <span class="app-card-label">Swappable</span>
         <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
-        <p>Total available</p>
+        <p>Highest Regular/Swap bucket</p>
         <div class="app-share">
           <span id="balance-share">0.0%</span>
           <span class="app-share-track"><span id="balance-share-bar"></span></span>
@@ -514,9 +516,9 @@ export async function WalletComponent(container) {
       </article>
       <article class="app-balance-card wallet">
         <span class="app-accent"></span>
-        <span class="app-card-label">Wallet</span>
+        <span class="app-card-label">Regular</span>
         <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
-        <p>Regular wallet coins</p>
+        <p>Regular coins</p>
       </article>
       <article class="app-balance-card warning">
         <span class="app-accent"></span>

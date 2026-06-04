@@ -234,6 +234,7 @@
 .unit-btn,
 .mode-btn,
 .maker-mode-btn,
+.protocol-btn,
 .hop-count-btn,
 .swap-start-btn,
 .swap-amount-meta button {
@@ -256,6 +257,7 @@
 .unit-btn.is-active,
 .mode-btn.is-active,
 .maker-mode-btn.is-active,
+.protocol-btn.is-active,
 .hop-count-btn.is-active {
   background: var(--color-primary);
   color: white;
@@ -314,7 +316,8 @@
 }
 
 .mode-btn,
-.maker-mode-btn {
+.maker-mode-btn,
+.protocol-btn {
   min-height: 34px;
   border-radius: var(--app-radius-pill);
   background: transparent;
@@ -2758,8 +2761,11 @@
   justify-content: center;
   gap: 8px;
   color: var(--color-foreground);
+  font-family: var(--app-font-sans);
   font-size: 12.5px;
   font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1;
   cursor: pointer;
   transition:
     background 150ms ease,
@@ -5712,6 +5718,223 @@
 .receive-meta-row button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.address-list-page .app-head {
+  align-items: flex-start;
+}
+
+.address-list-page .app-head .app-button.sm {
+  margin-bottom: 14px;
+}
+
+.address-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.address-stats .app-card strong {
+  color: var(--color-foreground);
+  font-family: var(--app-font-mono);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.address-panel {
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.address-toolbar,
+.address-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.address-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.address-filter-group > span,
+.address-sort span,
+.address-panel-head span {
+  color: var(--color-subtle);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.address-filter-btn {
+  height: 31px;
+  padding: 0 12px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--app-radius-pill);
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  font-family: var(--app-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.address-filter-btn.is-active {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: white;
+}
+
+.address-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.address-sort select {
+  height: 34px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-surface-raised);
+  color: var(--color-foreground);
+  font-family: var(--app-font-sans);
+  font-size: 12px;
+  outline: 0;
+}
+
+.address-panel-head h3 {
+  margin: 0;
+  color: var(--color-foreground);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.address-table-wrap {
+  overflow-x: auto;
+}
+
+.address-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.address-table th,
+.address-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.address-table th {
+  color: var(--color-subtle);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.address-table td {
+  color: var(--color-muted);
+  font-family: var(--app-font-mono);
+  font-size: 12px;
+}
+
+.address-row:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.address-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.address-cell a {
+  max-width: 220px;
+  color: var(--color-primary-hover);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.address-cell a:hover {
+  color: var(--color-primary);
+}
+
+.address-cell .copy-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-surface-raised);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.address-cell .copy-btn:hover {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+}
+
+.address-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
+  border: 1px solid currentColor;
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.address-badge.is-green,
+.address-table .is-positive {
+  color: var(--color-success);
+}
+
+.address-badge.is-blue {
+  color: var(--color-primary);
+}
+
+.address-badge.is-purple {
+  color: #a855f7;
+}
+
+.address-badge.is-yellow {
+  color: var(--color-warning);
+}
+
+.address-badge.is-gray,
+.address-table .is-muted {
+  color: var(--color-subtle);
+}
+
+.address-empty {
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  padding: 52px 20px;
+  color: var(--color-subtle);
+  text-align: center;
+}
+
+.address-empty p {
+  margin: 0;
+  color: var(--color-muted);
 }
 
 .receive-request-row {

@@ -57,6 +57,27 @@ function isUsableMaker(maker) {
   return maker.offer != null;
 }
 
+function getMakerProtocolName(maker = {}) {
+  if (maker.protocol === 'Unified') return 'Unified';
+  if (maker.protocol === 'Taproot' || maker.protocol === 'v2') return 'Taproot';
+  if (maker.protocol === 'Legacy' || maker.protocol === 'v1') return 'Legacy';
+  return maker.offer?.tweakable_point || maker.offer?.tweakablePoint
+    ? 'Taproot'
+    : 'Legacy';
+}
+
+function isMakerCompatibleWithProtocol(maker, protocol) {
+  const makerProtocol = getMakerProtocolName(maker);
+  if (makerProtocol === 'Unified') return true;
+  return protocol === 'v2' ? makerProtocol === 'Taproot' : makerProtocol === 'Legacy';
+}
+
+function countUsableCompatibleMakers(makers, protocol) {
+  return makers.filter(
+    (maker) => isUsableMaker(maker) && isMakerCompatibleWithProtocol(maker, protocol)
+  ).length;
+}
+
 function getCurrentWalletName() {
   try {
     const configPath = path.join(api1State.DATA_DIR, 'config.toml');
@@ -753,6 +774,95 @@ function readSwapReportRecords(filePath, source) {
   return buildSwapReportRecords(filePath, readJsonFile(filePath), source);
 }
 
+function getSwapStateHistoryMetadata() {
+  const stateFile = path.join(api1State.DATA_DIR, 'swap_state.json');
+  const metadataById = new Map();
+
+  if (!fs.existsSync(stateFile)) return metadataById;
+
+  try {
+    const state = readJsonFile(stateFile);
+    const history = Array.isArray(state.swap_history) ? state.swap_history : [];
+
+    history.forEach((entry) => {
+      const report = entry.report || {};
+      const swapId =
+        entry.id ||
+        entry.swapId ||
+        entry.swap_id ||
+        report.swapId ||
+        report.swap_id ||
+        null;
+      if (!swapId) return;
+
+      const protocol = entry.protocol || report.protocol || null;
+      const hasIsTaproot =
+        typeof entry.isTaproot === 'boolean' ||
+        typeof report.isTaproot === 'boolean';
+      const isTaproot =
+        typeof entry.isTaproot === 'boolean'
+          ? entry.isTaproot
+          : typeof report.isTaproot === 'boolean'
+            ? report.isTaproot
+            : null;
+      const protocolVersion =
+        entry.protocolVersion ||
+        entry.protocol_version ||
+        report.protocolVersion ||
+        report.protocol_version ||
+        null;
+
+      if (protocol || hasIsTaproot || protocolVersion) {
+        metadataById.set(String(swapId), {
+          protocol,
+          isTaproot,
+          protocolVersion,
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Failed to read swap state protocol metadata:', error);
+  }
+
+  return metadataById;
+}
+
+function getSwapLogProtocolMetadata() {
+  const logPath = path.join(api1State.DATA_DIR, 'debug.log');
+  const metadataById = new Map();
+
+  if (!fs.existsSync(logPath)) return metadataById;
+
+  try {
+    const lines = fs.readFileSync(logPath, 'utf8').split(/\r?\n/);
+    let pendingProtocol = null;
+
+    lines.forEach((line) => {
+      const prepareMatch = line.match(
+        /Preparing coinswap:\s+amount=.*protocol=(Taproot|Legacy)/i
+      );
+      if (prepareMatch) {
+        pendingProtocol = normalizeSwapProtocol(prepareMatch[1], false);
+        return;
+      }
+
+      const idMatch = line.match(/Preparing coinswap with id:\s+([a-f0-9]+)/i);
+      if (!idMatch || !pendingProtocol) return;
+
+      metadataById.set(idMatch[1], {
+        protocol: pendingProtocol,
+        isTaproot: pendingProtocol === 'Taproot',
+        protocolVersion: pendingProtocol === 'Taproot' ? 2 : 1,
+      });
+      pendingProtocol = null;
+    });
+  } catch (error) {
+    console.error('Failed to read swap log protocol metadata:', error);
+  }
+
+  return metadataById;
+}
+
 function getPreferredSwapReports() {
   const records = [];
   const seen = new Set();
@@ -771,6 +881,36 @@ function getPreferredSwapReports() {
       console.error(`Failed to read wallet swap report ${filePath}:`, error);
     }
   }
+
+  const localMetadata = getSwapStateHistoryMetadata();
+  const logMetadata = getSwapLogProtocolMetadata();
+  records.forEach((record) => {
+    const metadata =
+      localMetadata.get(String(record.swapId || '')) ||
+      localMetadata.get(String(record.nativeSwapId || '')) ||
+      localMetadata.get(String(record.appSwapId || '')) ||
+      logMetadata.get(String(record.swapId || '')) ||
+      logMetadata.get(String(record.nativeSwapId || '')) ||
+      logMetadata.get(String(record.appSwapId || ''));
+    if (!metadata) return;
+
+    const fallbackIsTaproot =
+      typeof metadata.isTaproot === 'boolean'
+        ? metadata.isTaproot
+        : record.isTaproot;
+    const protocol = normalizeSwapProtocol(metadata.protocol, fallbackIsTaproot);
+
+    record.protocol = protocol;
+    record.isTaproot = protocol === 'Taproot';
+    record.protocolVersion =
+      metadata.protocolVersion || (protocol === 'Taproot' ? 2 : 1);
+    record.report = {
+      ...record.report,
+      protocol,
+      isTaproot: record.isTaproot,
+      protocolVersion: record.protocolVersion,
+    };
+  });
 
   return records.sort((a, b) => {
     const aTime = Number(a.completedAt || 0);
@@ -1927,7 +2067,7 @@ function registerCoinswapHandlers() {
   // Start coinswap
   ipcMain.handle(
     'coinswap:start',
-    async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses }) => {
+    async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses, protocol: requestedProtocol }) => {
       try {
         if (!api1State.takerInstance) {
           return { success: false, error: 'Taker not initialized' };
@@ -1946,7 +2086,17 @@ function registerCoinswapHandlers() {
           return { success: false, error: 'Invalid selectedMakerAddresses: must be an array of non-empty strings' };
         }
 
-        const protocol = api1State.protocolVersion || 'v1';
+        const protocol =
+          requestedProtocol === 'v1' ||
+          requestedProtocol === 'v2' ||
+          requestedProtocol === 'Legacy' ||
+          requestedProtocol === 'Taproot'
+            ? requestedProtocol === 'Legacy'
+              ? 'v1'
+              : requestedProtocol === 'Taproot'
+                ? 'v2'
+                : requestedProtocol
+            : 'v2';
         const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
         const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         console.log(
@@ -1974,11 +2124,11 @@ function registerCoinswapHandlers() {
                 const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
                 const offerbook = JSON.parse(offerbookData);
                 const makers = offerbook.makers || [];
-                const goodMakersCount = makers.filter(isUsableMaker).length;
+                const goodMakersCount = countUsableCompatibleMakers(makers, protocol);
 
                 if (goodMakersCount >= makerCount) {
                   console.log(
-                    `✅ Offerbook ready with ${goodMakersCount} good makers`
+                    `✅ Offerbook ready with ${goodMakersCount} ${protocolName} makers`
                   );
                   break;
                 }
@@ -2005,20 +2155,20 @@ function registerCoinswapHandlers() {
             const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
             const offerbook = JSON.parse(offerbookData);
             const makers = offerbook.makers || [];
-            const goodMakersCount = makers.filter(isUsableMaker).length;
+            const goodMakersCount = countUsableCompatibleMakers(makers, protocol);
 
             if (goodMakersCount < makerCount) {
               console.error(
-                `❌ Not enough makers available: ${goodMakersCount}/${makerCount}`
+                `❌ Not enough ${protocolName} makers available: ${goodMakersCount}/${makerCount}`
               );
               return {
                 success: false,
-                error: `Not enough makers available. Found ${goodMakersCount}, need ${makerCount}. Please sync market data first.`,
+                error: `Not enough ${protocolName} makers available. Found ${goodMakersCount}, need ${makerCount}. Please sync market data first.`,
               };
             }
 
             console.log(
-              `✅ Ready to start swap with ${goodMakersCount} makers`
+              `✅ Ready to start ${protocolName} swap with ${goodMakersCount} makers`
             );
           } else {
             return {
