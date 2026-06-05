@@ -11,14 +11,13 @@ function loadSwapDataFromCache() {
   try {
     const cached = localStorage.getItem(SWAP_DATA_CACHE_KEY);
     if (cached) {
-      const { utxos, makers, balance, timestamp } = JSON.parse(cached);
+      const { utxos, balance, timestamp } = JSON.parse(cached);
       const age = Date.now() - timestamp;
 
       console.log(`📦 Swap data cache age: ${Math.floor(age / 1000)}s`);
 
       return {
         utxos,
-        makers,
         balance,
         timestamp,
         isStale: age > CACHE_DURATION,
@@ -30,13 +29,12 @@ function loadSwapDataFromCache() {
   return null;
 }
 
-function saveSwapDataToCache(utxos, makers, balance) {
+function saveSwapDataToCache(utxos, balance) {
   try {
     localStorage.setItem(
       SWAP_DATA_CACHE_KEY,
       JSON.stringify({
         utxos,
-        makers,
         balance,
         timestamp: Date.now(),
       })
@@ -266,11 +264,7 @@ export async function SwapComponent(container) {
   if (cached && !cached.isStale) {
     console.log('⚡ Using cached swap data (still fresh)');
     availableUtxos = cached.utxos || [];
-    availableMakers = filterMakersByProtocol(cached.makers || []);
     totalBalance = cached.balance || 0;
-
-    // Update makers count immediately since we have the data
-    updateAvailableMakersCount();
   }
 
   // Fetch real UTXOs from API
@@ -309,16 +303,8 @@ export async function SwapComponent(container) {
     return [];
   }
 
-  // Fetch real makers from API (to check availability)
-  async function fetchMakers(useCache = false) {
-    // ✅ USE CACHE IF REQUESTED
-    if (useCache && cached && cached.makers) {
-      availableMakers = filterMakersByProtocol(cached.makers);
-      console.log('✅ Loaded', availableMakers.length, 'makers from cache');
-      updateAvailableMakersCount();
-      return availableMakers;
-    }
-
+  // Read current good makers from the backend offerbook.
+  async function fetchMakers() {
     try {
       const data = await window.api.taker.getOffers();
 
@@ -360,6 +346,7 @@ export async function SwapComponent(container) {
     } catch (error) {
       console.error('Failed to fetch makers:', error);
       availableMakers = [];
+      updateAvailableMakersCount();
     }
     return [];
   }
@@ -609,12 +596,14 @@ export async function SwapComponent(container) {
   // Estimate fees from the top candidate makers shown in the UI.
   function calculateFees(amount) {
     const hops = getNumberOfHops();
+    const totalMakers = getNumberOfMakers();
     const topCandidateMakers = getTopCandidateMakers();
     const avgFundingTxSize = 300;
     const fundingTxs = hops;
     const networkFee = fundingTxs * avgFundingTxSize * networkFeeRate;
     const makerFee = topCandidateMakers.reduce((sum, maker, index) => {
-      const refundLocktime = 20 * (index + 1);
+      const makerPosition = index + 1;
+      const refundLocktime = 20 * (totalMakers - makerPosition + 1);
       const volumeFee = amount * ((maker.volumeFeePct || 0) / 100);
       const timeFee =
         refundLocktime * amount * ((maker.timeFeePct || 0) / 100);
@@ -1004,7 +993,7 @@ export async function SwapComponent(container) {
     const labelEl = content.querySelector('#swap-protocol-label');
     if (labelEl) labelEl.textContent = getProtocolName();
 
-    await fetchMakers(false);
+    await fetchMakers();
     renderMakerList();
     updateSummary();
   }
@@ -1059,6 +1048,13 @@ export async function SwapComponent(container) {
     if (utxoIndex > -1) {
       selectedUtxos.splice(utxoIndex, 1);
     } else {
+      const nextKind = getUtxoKind(availableUtxos[index]);
+      selectedUtxos = selectedUtxos.filter(
+        (selectedIndex) => getUtxoKind(availableUtxos[selectedIndex]) === nextKind
+      );
+      if (utxoFilter !== nextKind) {
+        utxoFilter = nextKind;
+      }
       selectedUtxos.push(index);
     }
 
@@ -1146,7 +1142,7 @@ export async function SwapComponent(container) {
             <div class="swap-section-head">
               <h3>Amount To Swap</h3>
             </div>
-            <p class="swap-help">Enter the amount you want to send through the swap.</p>
+            <p class="swap-help">Enter the amount to swap.</p>
             <div id="amount-input-section">
               <div class="swap-field-row">
                 <label>Amount</label>
@@ -1178,7 +1174,7 @@ export async function SwapComponent(container) {
             </div>
             <div id="utxo-selection-section" class="hidden swap-picker">
               <div id="utxo-warning" class="hidden swap-warning-note">
-                ${icons.alertTriangle(15)} <span>Mixing Regular and Swap UTXOs in the same transaction can compromise privacy.</span>
+                ${icons.alertTriangle(15)} <span>Regular and Swap UTXOs cannot be mixed together in a swap. You can only choose one type.</span>
               </div>
               <div class="swap-picker-head">
                 <span>Pick UTXOs to fund the swap</span>
@@ -1209,7 +1205,7 @@ export async function SwapComponent(container) {
                 <span>Recommended minimum 2</span>
               </div>
               <div class="swap-warning-note">
-                ${icons.alertTriangle(16)} <span>Warning: If you swap with only one maker, that maker can deanonymize you. Recommended minimum makers = 2.</span>
+                ${icons.alertTriangle(16)} <span>Warning: Swapping with only one maker is not private, as they can deanonimize you. Recommended minimum makers is 2.</span>
               </div>
               <div class="swap-hop-grid">
                 <button id="hop-2" class="hop-count-btn"><strong>1</strong><span>Maker</span></button>
@@ -1268,7 +1264,7 @@ export async function SwapComponent(container) {
               <button id="protocol-v2" class="protocol-btn ${currentProtocol === 'v2' ? 'is-active' : ''}" type="button">Taproot</button>
               <button id="protocol-v1" class="protocol-btn ${currentProtocol === 'v1' ? 'is-active' : ''}" type="button">Legacy</button>
             </div>
-            <p class="swap-help">Taproot uses the v2 swap path with compatible makers. Legacy uses the v1/P2WSH path for makers that do not support Taproot.</p>
+            <p class="swap-help">Taproot uses the new Taproot+Musig2 based swap protocol. Legacy uses the old P2WSH based swap protocol.</p>
           </div>
 
           <div id="validation-warning" class="hidden swap-validation"></div>
@@ -1623,13 +1619,13 @@ export async function SwapComponent(container) {
     // Fetch fresh data
     Promise.all([
       fetchUtxos(false),
-      fetchMakers(false),
+      fetchMakers(),
       fetchBalance(false),
     ]).then(async ([utxos, makers, balance]) => {
       await fetchSwapLiquidity();
 
       // Save to cache
-      saveSwapDataToCache(utxos, makers, balance);
+      saveSwapDataToCache(utxos, balance);
 
       updateBalanceUI();
 
@@ -1661,7 +1657,10 @@ export async function SwapComponent(container) {
     // Just use cache - render immediately
     renderUtxoList();
     setUtxoFilter(utxoFilter);
-    renderMakerList();
+    fetchMakers().then(() => {
+      renderMakerList();
+      updateSummary();
+    });
     ensureBalancesLoaded().then(() => fetchSwapLiquidity()).then(() => {
       updateBalanceUI();
       updateSummary();

@@ -61,19 +61,19 @@ export function RecoveryComponent(container) {
         <div class="app-panel-body recovery-flow">
           <div class="recovery-step">
             <span>01</span>
-            <p>Detect failed swaps and unspent contract outputs in the wallet.</p>
+            <p>The app automatically detects failed swaps and attempts to recover via the timelock script.</p>
           </div>
           <div class="recovery-step">
             <span>02</span>
-            <p>Wait for the HTLC timelock to expire before spending the refund path.</p>
+            <p>It waits for the HTLC timelock to expire, then create and broadcast the recovery transaction.</p>
           </div>
           <div class="recovery-step">
             <span>03</span>
-            <p>Create and broadcast the recovery transaction back to your wallet.</p>
+            <p>All recoverable funds appear in the wallet's Contract Balance.</p>
           </div>
           <div class="recovery-step">
             <span>04</span>
-            <p>Resume recovery on restart if the app was closed while waiting.</p>
+            <p>It automatically resumes recovery at every restart if the previous recovery didn't complete.</p>
           </div>
         </div>
       </article>
@@ -88,7 +88,7 @@ export function RecoveryComponent(container) {
         <div class="app-panel-body">
           <div class="recovery-manual-copy">
             ${icons.shieldCheck(28)}
-            <p>If automatic recovery has not completed, run a manual recovery check. The app will scan recoverable swap contracts and attempt safe refunds.</p>
+            <p>Use this only when automatic recovery doesn't work for some reason. This will force the recovery process to begin again.</p>
           </div>
           <div id="recovery-status" class="recovery-status hidden"></div>
         </div>
@@ -108,7 +108,7 @@ export function RecoveryComponent(container) {
     btn.classList.add('loading');
 
     statusDiv.className = 'recovery-status info';
-    statusDiv.innerHTML = `${icons.loader(16, 'animate-spin')} <span>Running recovery process...</span>`;
+    statusDiv.innerHTML = `${icons.loader(16, 'animate-spin')} <span>Recovery has started. Once completed the wallet will reflect recovered balance.</span>`;
 
     const result = await triggerRecovery();
 

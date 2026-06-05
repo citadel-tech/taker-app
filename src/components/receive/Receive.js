@@ -103,7 +103,7 @@ export function ReceiveComponent(container) {
         <aside class="receive-side">
           <div class="receive-privacy">
             ${icons.alertTriangle(17)}
-            <p><strong>Privacy:</strong> Reusing addresses links transactions on-chain. Generate a fresh address for each payer to preserve anonymity.</p>
+            <p><strong>Address reuse is dangerous for your privacy!</strong> Strongly recommended to generate a fresh address for each new payments.</p>
           </div>
 
           <section class="receive-panel">

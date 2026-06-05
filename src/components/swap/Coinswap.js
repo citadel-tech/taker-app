@@ -270,35 +270,45 @@ export async function CoinswapComponent(container, swapConfig) {
     const stepEl = content.querySelector('#swap-step-label');
     const titleEl = content.querySelector('#swap-page-title');
     const progressEl = content.querySelector('#swap-progress-fill');
+    const routeStatuses = Array.from(
+      content.querySelectorAll('.route-node .route-status')
+    ).map((node) => String(node.textContent || '').toLowerCase());
+    const isSweeping =
+      routeStatuses.some((status) =>
+        /sweep|complete|settled/.test(status) || status === 'received'
+      );
+    const isKeyHandover = routeStatuses.some((status) =>
+      /key|exchange|final|receiving/.test(status)
+    );
     const routeStep = Math.min(
-      5,
+      4,
       Math.max(1, connected + (connecting > 0 ? 1 : 0))
     );
     const phaseHeader =
-      animationPhase === 'settlement'
-        ? { step: 4, title: 'Routing atomic swap' }
+      isSweeping
+        ? { step: 4, title: 'Sweeping the Contract' }
+        : isKeyHandover
+          ? { step: 3, title: 'Handing Over Key Materials' }
         : animationPhase === 'contract'
-          ? { step: 3, title: 'Funding HTLC contracts' }
+          ? { step: 2, title: 'Establishing Contract Txs' }
           : null;
     const step = phaseHeader ? Math.max(routeStep, phaseHeader.step) : routeStep;
 
     currentStep = Math.max(currentStep, step);
-    if (stepEl) stepEl.textContent = `Step ${step} of 5 · Swap in progress`;
+    if (stepEl) stepEl.textContent = `Step ${step} of 4 · Swap in progress`;
     if (titleEl) {
       titleEl.textContent =
         phaseHeader?.title ||
         (step <= 1
-          ? 'Initiating'
-          : step <= 2
-            ? 'Establishing Tor circuits'
+          ? 'Handshake'
+          : step === 2
+            ? 'Establishing Contract Txs'
             : step === 3
-              ? 'Funding HTLC contracts'
-              : step === 4
-                ? 'Routing atomic swap'
-                : 'Finalizing swap');
+              ? 'Handing Over Key Materials'
+              : 'Sweeping the Contract');
     }
     if (progressEl) {
-      progressEl.style.width = `${Math.min(100, step * 20)}%`;
+      progressEl.style.width = `${Math.min(100, step * 25)}%`;
     }
   }
 
@@ -317,10 +327,6 @@ export async function CoinswapComponent(container, swapConfig) {
 
   function markAllMakersComplete({ final = false } = {}) {
     if (!final) {
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-        updateHopStatus(i, 'Settling...', 'orange');
-      }
       return;
     }
 
@@ -336,7 +342,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
-      updateHopStatus(i, 'Contracts received', 'green');
+      updateHopStatus(i, 'Contract received', 'green');
     }
   }
 
@@ -483,7 +489,7 @@ export async function CoinswapComponent(container, swapConfig) {
         const emptySlot = swapData.transactions.findIndex((tx) => !tx.txid);
         if (emptySlot !== -1) {
           setTransactionTxid(emptySlot, txMatch[1]);
-          updateHopStatus(emptySlot, 'Confirming...', 'orange');
+          updateHopStatus(emptySlot, 'In mempool...', 'orange');
         }
       }
     }
@@ -510,7 +516,7 @@ export async function CoinswapComponent(container, swapConfig) {
     }
     // V2: "Persisted outgoing swapcoin to wallet store"
     else if (message.includes('Persisted outgoing swapcoin to wallet store')) {
-      updateHopStatus(0, 'Confirming...', 'orange');
+      updateHopStatus(0, 'In mempool...', 'orange');
     }
     // V1: "Tx [txid] | Confirmed at"
     else if (message.match(/Tx [a-f0-9]+ \| Confirmed at/i)) {
@@ -599,9 +605,9 @@ export async function CoinswapComponent(container, swapConfig) {
     else if (
       message.includes('All makers have responded with their outgoing keys')
     ) {
-      // Mark all intermediate hops as "Keys received"
+      // Mark all intermediate hops as "Key received"
       for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, 'Keys received', 'green');
+        updateHopStatus(i, 'Key received', 'green');
       }
     }
     // V2: "Registered watcher for taker's incoming contract"
@@ -625,7 +631,7 @@ export async function CoinswapComponent(container, swapConfig) {
       const txMatch = message.match(/([a-f0-9]{64})/i);
       if (txMatch) {
         const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, 'Swept', 'green');
+        updateHopStatus(lastHop, 'Received', 'green');
       }
     }
     // V1: "Swaps settled successfully"
@@ -887,10 +893,6 @@ export async function CoinswapComponent(container, swapConfig) {
           addLog('Swap failed: ' + swap.error, 'error');
           updateHeaderState('failed');
           markAllMakersFailed();
-          content.querySelector('#swap-status-text').textContent =
-            'Swap Failed';
-          content.querySelector('#swap-status-text').className =
-            'text-2xl font-bold text-red-400';
 
           await SwapStateManager.saveSwapProgress({
             ...(await SwapStateManager.getSwapProgress()),
@@ -911,50 +913,45 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function showFailureModal(errorMessage) {
-    // Create modal overlay
     const modal = document.createElement('div');
-    modal.className =
-      'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+    modal.className = 'swap-failure-overlay';
     modal.innerHTML = `
-    <div class="bg-surface rounded-lg p-6 max-w-md mx-4 border border-red-500/30">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mr-4">
-          <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+    <section class="swap-failure-dialog" role="dialog" aria-modal="true" aria-labelledby="swap-failure-title">
+      <header class="swap-failure-head">
+        <div class="swap-failure-icon">${icons.xCircle(24)}</div>
+        <div>
+          <span>Swap failed</span>
+          <h3 id="swap-failure-title">Recovery Started</h3>
         </div>
-        <h3 class="text-xl font-bold text-red-400">Swap Failed</h3>
+      </header>
+
+      <p class="swap-failure-copy">
+        The coinswap could not be completed. Your funds are safe and recovery has been initiated. Check your wallet for returned funds.
+      </p>
+
+      <div class="swap-failure-recovery">
+        ${icons.shieldCheck(18)}
+        <span>Recovery has started. Once completed the wallet will reflect recovered balance.</span>
       </div>
-      
-      <div class="mb-6">
-        <p class="text-gray-300 mb-3">The coinswap could not be completed. Your funds are safe and recovery has been initiated.</p>
-        
-        <div class="bg-app-bg rounded p-3 mb-3">
-          <p class="text-xs text-gray-400 mb-1">Error Details:</p>
-          <p class="text-sm text-red-300 font-mono break-words">${errorMessage || 'Unknown error'}</p>
-        </div>
-        
-        <div class="bg-blue-500/10 border border-blue-500/30 rounded p-3 text-xs text-blue-300">
-          <p class="font-semibold mb-1">${icons.shieldCheck(16, 'mr-2')} Your funds are protected</p>
-          <p>Recovery process has started automatically. Check your wallet for returned funds.</p>
-        </div>
-      </div>
-      
-      <button id="modal-to-swap" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 px-4 rounded-lg transition-colors">
+
+      <details class="swap-failure-details">
+        <summary>Error details</summary>
+        <pre>${escapeHtml(errorMessage || 'Unknown error')}</pre>
+      </details>
+
+      <button id="modal-to-swap" class="swap-failure-primary" type="button">
         Back to Swap Page
       </button>
-    </div>
+    </section>
   `;
 
     document.body.appendChild(modal);
 
-    // Add event listener
     modal.querySelector('#modal-to-swap').addEventListener('click', () => {
       modal.remove();
       if (pollInterval) clearInterval(pollInterval);
       if (logPollInterval) clearInterval(logPollInterval);
 
-      // Navigate back to Swap page
       import('./Swap.js').then((module) => {
         container.innerHTML = '';
         module.SwapComponent(container);
@@ -976,9 +973,6 @@ export async function CoinswapComponent(container, swapConfig) {
     updateHeaderState('completed');
     markAllMakersComplete({ final: true });
     updateYouReceive(true);
-    content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
-    content.querySelector('#swap-status-text').className =
-      'text-2xl font-bold text-green-400';
     const completeButton = content.querySelector('#complete-button');
     completeButton.hidden = false;
     completeButton.classList.remove('hidden');
@@ -1205,9 +1199,6 @@ export async function CoinswapComponent(container, swapConfig) {
     updateHeaderState('completed');
     markAllMakersComplete({ final: true });
     updateYouReceive(true);
-    content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
-    content.querySelector('#swap-status-text').className =
-      'text-2xl font-bold text-green-400';
     const completeButton = content.querySelector('#complete-button');
     completeButton.hidden = false;
     completeButton.classList.remove('hidden');
@@ -1331,7 +1322,7 @@ export async function CoinswapComponent(container, swapConfig) {
       titleEl.textContent = 'Swap Complete';
       const stepLabel = content.querySelector('#swap-step-label');
       const progressFill = content.querySelector('#swap-progress-fill');
-      if (stepLabel) stepLabel.textContent = 'Step 5 of 5 · Swap complete';
+      if (stepLabel) stepLabel.textContent = 'Step 4 of 4 · Swap complete';
       if (progressFill) progressFill.style.width = '100%';
       if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
@@ -1358,10 +1349,9 @@ export async function CoinswapComponent(container, swapConfig) {
       <header class="swap-progress-top">
         <button id="back-to-swap" class="swap-progress-back" title="Back to swap">${icons.refreshCw(16)}</button>
         <div>
-          <span id="swap-step-label">Step 1 of 5 · Swap in progress</span>
-          <h2 id="swap-page-title">Initiating</h2>
+          <span id="swap-step-label">Step 1 of 4 · Swap in progress</span>
+          <h2 id="swap-page-title">Handshake</h2>
           <div class="swap-progress-bar"><i id="swap-progress-fill"></i></div>
-          <p id="swap-status-text">Executing swap through ${swapData.makers} makers...</p>
         </div>
         <div class="swap-progress-actions">
           <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>

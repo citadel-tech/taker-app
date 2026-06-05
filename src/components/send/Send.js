@@ -19,6 +19,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
     return Number.isFinite(Number(btcPrice)) && Number(btcPrice) > 0;
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   // New state for multi-address and signed tx
   let recipients = [{ address: '', amount: 0 }];
   let signedTx = null;
@@ -715,8 +724,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
         : selectedFeeRate >= 2
           ? '~20 min'
           : '~60+ min';
-    const priority =
-      selectedFeeRate >= 4 ? 'High' : selectedFeeRate >= 2 ? 'Medium' : 'Low';
 
     const displayFee = signedTx ? actualFee : estimatedFee;
     const displayTxSize = signedTx ? actualTxSize : estimatedTxSize;
@@ -769,13 +776,13 @@ export function SendComponent(container, preSelectedUtxos = null) {
     const txInputsEl = content.querySelector('#tx-inputs');
     const txOutputsEl = content.querySelector('#tx-outputs');
     const changeAmountEl = content.querySelector('#change-amount');
-    const confTimeEl = content.querySelector('#conf-time');
-    const priorityLevelEl = content.querySelector('#priority-level');
+    const summaryEtaEl = content.querySelector('#summary-eta');
 
     if (txSizeEl)
       txSizeEl.textContent = displayTxSize + ' vB' + (signedTx ? '' : ' (est)');
     if (txInputsEl) txInputsEl.textContent = numInputs;
     if (txOutputsEl) txOutputsEl.textContent = numOutputs;
+    if (summaryEtaEl) summaryEtaEl.textContent = `ETA ${confTime}`;
 
     // Show change amount in red if negative
     if (changeAmountEl) {
@@ -788,9 +795,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
         changeAmountEl.classList.remove('text-red-400');
       }
     }
-
-    if (confTimeEl) confTimeEl.textContent = confTime;
-    if (priorityLevelEl) priorityLevelEl.textContent = priority;
 
     if (summaryRemaining)
       summaryRemaining.textContent =
@@ -958,37 +962,42 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
   function showSuccessPopup(txids) {
     const popup = document.createElement('div');
-    popup.className =
-      'fixed inset-0 bg-black/80 flex items-center justify-center z-50';
+    popup.className = 'send-success-overlay';
 
     popup.innerHTML = `
-      <div class="bg-surface rounded-lg p-8 max-w-2xl w-full mx-4 border border-green-500/50">
-        <div class="text-center mb-6">
-          <div class="flex justify-center mb-4">${icons.checkCircle(64, 'text-green-400')}</div>
-          <h2 class="text-2xl font-bold text-green-400 mb-2">Transaction Broadcast Successfully!</h2>
-          <p class="text-gray-400">Your transaction(s) have been sent to the Bitcoin network</p>
+      <div class="send-success-dialog">
+        <div class="send-success-head">
+          <div class="send-success-icon">${icons.checkCircle(30)}</div>
+          <div>
+            <h2>Transaction Broadcast Successfully!</h2>
+            <p>Your transaction has been sent to the Bitcoin network.</p>
+          </div>
         </div>
         
-        <div class="space-y-4 mb-6">
+        <div class="send-success-list">
           ${txids
             .map(
-              ({ address, txid }) => `
-            <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
-              <p class="text-xs text-gray-400 mb-2">Recipient: ${address}</p>
-              <div class="flex items-center gap-2">
-                <span class="text-xs text-gray-400">TXID:</span>
-                <a href="http://170.75.166.88:8080/tx/${txid}" target="_blank"
-                   class="text-sm font-mono text-blue-400 hover:text-blue-300 underline flex-1 truncate">
-                  ${txid}
+              ({ address, txid }) => {
+                const safeAddress = escapeHtml(address);
+                const safeTxid = escapeHtml(txid);
+                return `
+            <div class="send-success-row">
+              <span>Recipient</span>
+              <p>${safeAddress}</p>
+              <span>TXID</span>
+              <div>
+                <a href="http://170.75.166.88:8080/tx/${encodeURIComponent(txid)}" target="_blank" rel="noreferrer">
+                  ${safeTxid}
                 </a>
               </div>
             </div>
-          `
+          `;
+              }
             )
             .join('')}
         </div>
         
-        <button id="close-success-popup" class="w-full bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-lg transition-colors">
+        <button id="close-success-popup" class="send-success-primary" type="button">
           Close
         </button>
       </div>
@@ -1022,7 +1031,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
       <div class="send-warning">
         ${icons.alertTriangle(17)}
-        <span><strong>Privacy:</strong> You've sent to this address before. Reusing an address links transactions and reduces anonymity. Ask the recipient for a fresh address.</span>
+        <span><strong>You've sent to this address before!</strong> Reusing addresses reduces privacy. Ask the recipient for a fresh address.</span>
       </div>
 
       <div class="send-layout">
@@ -1128,7 +1137,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <section class="send-summary-card">
             <div class="send-summary-head">
               <h3>Transaction Summary</h3>
-              <span>ETA 20 min</span>
+              <span id="summary-eta">ETA ~20 min</span>
             </div>
             <div class="send-summary-body">
               <div class="send-summary-line">
@@ -1149,9 +1158,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <div><span>TX Size</span><strong id="tx-size">140 vB</strong></div>
               <div><span>Inputs</span><strong id="tx-inputs">1</strong></div>
               <div><span>Outputs</span><strong id="tx-outputs">1</strong></div>
-              <div><span>Priority</span><strong id="priority-level">Medium</strong></div>
-              <div><span>Est. Time</span><strong id="conf-time">~20 min</strong></div>
-              <div><span>RBF</span><strong>Enabled</strong></div>
             </div>
             <div class="send-change-row">
               <span>Change Amount</span>

@@ -20,8 +20,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   `;
   const modal = document.createElement('div');
   modal.id = 'setup-modal';
-  modal.className =
-    'setup-modal-root fixed inset-0 flex items-center justify-center z-50';
+  modal.className = 'setup-modal-root';
 
   let currentStep = 1;
   const totalSteps = 2;
@@ -43,6 +42,12 @@ export function FirstTimeSetupModal(container, onComplete) {
         --setup-primary-hover: #6fa2ff;
         --setup-green: #2fbf71;
         --setup-red: #ff4d5a;
+        position: fixed;
+        inset: 0;
+        z-index: 50;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         background: var(--setup-bg);
         color: var(--setup-text);
         padding: 24px;

@@ -28,13 +28,12 @@ export function SettingsComponent(container) {
             WALLET BACKUP
           </div>
           <p class="settings-section-desc">
-            Export your wallet to an encrypted file. Can be restored on any coinswap client and includes all swap history data. Always use a strong password.
+            Export your wallet to an encrypted backup file. This is useful for recovering the wallet or migrating it to other Coinswap clients.
           </p>
           <ul class="settings-backup-info">
-            <li>Wallet Backup is an encrypted JSON file that restores your coinswap wallet in any client app.</li>
-            <li>The backup file contains all data related to swaps to restore swap histories.</li>
-            <li>The backup file can also be used to migrate your coinswap wallet from one client app to another.</li>
-            <li>Always use a strong password for the backup file, or else your seed phrase can be compromised.</li>
+            <li>Wallet Backup is an encrypted JSON file that contains all wallet data and swap histories.</li>
+            <li>Use it to recover this wallet or migrate it to another Coinswap client.</li>
+            <li>Recommended to use a strong password for the backup file.</li>
             <li>Use the same password while restoring wallet from backup.</li>
           </ul>
           <button id="init-backup-btn" class="app-button primary settings-full-btn">${icons.save(15)} Create Backup</button>
@@ -49,10 +48,6 @@ export function SettingsComponent(container) {
                 <input type="password" id="backup-password-confirm-input" placeholder="Re-enter password" />
               </div>
             </div>
-            <label class="settings-checkbox-row">
-              <input type="checkbox" id="skip-backup-encryption" />
-              Skip encryption (not recommended)
-            </label>
             <div id="backup-password-error" class="settings-error" style="display:none"><p></p></div>
             <button id="confirm-backup-btn" class="app-button secondary settings-full-btn">${icons.check(14)} Confirm &amp; Create Backup</button>
           </div>
@@ -307,29 +302,18 @@ export function SettingsComponent(container) {
     }
   });
 
-  // Backup: skip encryption toggle
-  content.querySelector('#skip-backup-encryption').addEventListener('change', (e) => {
-    content.querySelectorAll('#backup-password-input, #backup-password-confirm-input').forEach((input) => {
-      input.disabled = e.target.checked;
-      if (e.target.checked) input.value = '';
-    });
-  });
-
   // Backup: confirm
   content.querySelector('#confirm-backup-btn').addEventListener('click', async () => {
     const password = content.querySelector('#backup-password-input').value;
     const confirmPassword = content.querySelector('#backup-password-confirm-input').value;
-    const skipEncryption = content.querySelector('#skip-backup-encryption').checked;
 
     content.querySelector('#backup-password-error').style.display = 'none';
 
-    if (!skipEncryption) {
-      if (!password) { showBackupError('Please enter a password or check "Skip encryption"'); return; }
-      if (password !== confirmPassword) { showBackupError('Passwords do not match'); return; }
-      if (password.length < 8) { showBackupError('Password must be at least 8 characters'); return; }
-    }
+    if (!password) { showBackupError('Please enter a backup password'); return; }
+    if (password !== confirmPassword) { showBackupError('Passwords do not match'); return; }
+    if (password.length < 8) { showBackupError('Password must be at least 8 characters'); return; }
 
-    await performBackup(skipEncryption ? '' : password);
+    await performBackup(password);
   });
 
   // ZMQ preview: update on input changes

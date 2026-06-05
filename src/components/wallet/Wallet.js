@@ -481,9 +481,9 @@ export async function WalletComponent(container) {
       <div>
         <h2>Wallet</h2>
         <div class="app-meta">
-          <span>${walletInfo.walletName || 'Native SegWit'}</span>
+          <span id="wallet-name"></span>
           <span>.</span>
-          <span>${walletInfo.walletPath || "m/84'/0'/0'"}</span>
+          <span id="wallet-path"></span>
           <span>.</span>
           <span id="last-updated">Synced just now</span>
         </div>
@@ -587,6 +587,11 @@ export async function WalletComponent(container) {
   `;
 
   container.appendChild(content);
+
+  content.querySelector('#wallet-name').textContent =
+    walletInfo.walletName || 'Native SegWit';
+  content.querySelector('#wallet-path').textContent =
+    walletInfo.walletPath || "m/84'/0'/0'";
 
   window.openTxOnMempool = openMempool;
   updateSortButtons();

@@ -53,13 +53,16 @@ function toneRank(tone) {
 function phaseForStatus(statusText, tone) {
   const status = String(statusText || '').toLowerCase();
   if (tone === 'failed') return { step: 3, title: 'Swap Failed', phase: 'failed' };
-  if (/contracts? received|contract ready|contract/.test(status)) {
+  if (/contracts? received|contract ready|contract|broadcast|mempool|confirm/.test(status)) {
     return { step: 2, title: 'Contract Establishment', phase: 'contract' };
   }
   if (tone === 'settled' || /complete|settled|received|swept/.test(status)) {
     return { step: 3, title: 'Settlement', phase: 'settlement' };
   }
-  if (tone === 'locked' || /lock|contract|confirm|sweep|final|exchange|mempool|key|ready/.test(status)) {
+  if (/key|final|exchange|sweep|receiving/.test(status)) {
+    return { step: 3, title: 'Settlement', phase: 'settlement' };
+  }
+  if (tone === 'locked' || /lock|contract|confirm|mempool|ready/.test(status)) {
     return { step: 2, title: 'Contract Establishment', phase: 'contract' };
   }
   if (tone === 'active' || /connect|handshake|negotiat|offer|initial|fetch/.test(status)) {
@@ -137,7 +140,7 @@ export function createSwapProgressAnimation(stage, options = {}) {
     (_, i) => ((i + 1) * 360) / (makerCount + 1)
   );
   const totalNodes = makerCount + 1;
-  const nodeGapDegrees = (Math.asin(58 / radius) * 180) / Math.PI;
+  const nodeGapDegrees = (Math.asin(44 / radius) * 180) / Math.PI;
   const routeAngles = [0, ...makerAngles, 360];
   const routeSegments = Array.from({ length: totalNodes }, (_, index) => {
     const startAngle = routeAngles[index] + nodeGapDegrees;
@@ -237,8 +240,8 @@ export function createSwapProgressAnimation(stage, options = {}) {
       segment.style.strokeDasharray = `${visible} 1`;
     });
 
-    const travelIndex = Math.min(makerCount, Math.round(state.progress * makerCount));
-    const angle = travelIndex >= makerCount ? 360 : makerAngles[travelIndex] || 0;
+    const travelIndex = Math.min(totalNodes, Math.round(segmentProgress));
+    const angle = routeAngles[travelIndex] ?? 360;
     const point = nodeXY(angle, cx, cy, radius);
     if (packet) {
       packet.setAttribute('cx', point.x);
@@ -277,8 +280,9 @@ export function createSwapProgressAnimation(stage, options = {}) {
       updatePhase(phaseForStatus(statusText, tone));
 
       if (tone !== 'awaiting') {
-        for (let i = 0; i <= index; i += 1) setRouteLine(i, true);
-        updateProgress((index + 1) / Math.max(1, makerCount));
+        const activeThrough = index === makerCount - 1 ? totalNodes - 1 : index;
+        for (let i = 0; i <= activeThrough; i += 1) setRouteLine(i, true);
+        updateProgress(index === makerCount - 1 ? 1 : (index + 1) / totalNodes);
       }
     },
 

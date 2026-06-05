@@ -39,10 +39,10 @@ export function Market(container) {
     return Math.round(parsed);
   }
 
-  function calculateMakerFee(maker, amountSats, makerPosition) {
+  function calculateMakerFee(maker, amountSats, makerPosition, totalMakers) {
     const liquidityRate = Number(maker.volumeFee || 0);
     const timeRate = Number(maker.timeFee || 0);
-    const refundLocktime = 20 * (makerPosition + 1);
+    const refundLocktime = 20 * (totalMakers - makerPosition + 1);
     const baseFee = Number(maker.baseFee || 0);
     const liquidityFee = amountSats * liquidityRate;
     const timeFee = refundLocktime * amountSats * timeRate;
@@ -511,11 +511,18 @@ export function Market(container) {
               <strong>Position</strong>
             </div>
           </label>
+          <label class="market-fee-field">
+            <span>Total Makers in Swap (m)</span>
+            <div class="market-fee-index-field">
+              <input id="market-fee-total-makers" type="number" min="1" step="1" value="2">
+              <strong>Makers</strong>
+            </div>
+          </label>
           <div class="market-fee-range">
-            <span>Refund locktime = 20 x (n + 1)</span>
+            <span>Refund locktime = 20 x (m - n + 1)</span>
             <strong id="market-fee-locktime">Enter position</strong>
           </div>
-          <p id="market-fee-position-error" class="market-fee-validation">Enter a positive maker position to calculate the fee.</p>
+          <p id="market-fee-position-error" class="market-fee-validation">Enter positive maker counts where n is not greater than m.</p>
 
           <div class="market-fee-formula">
             <span>Formula</span>
@@ -553,6 +560,7 @@ export function Market(container) {
 
     const amountInput = modal.querySelector('#market-fee-amount');
     const positionInput = modal.querySelector('#market-fee-position');
+    const totalMakersInput = modal.querySelector('#market-fee-total-makers');
     const closeBtn = modal.querySelector('.market-modal-close');
 
     const updateEstimate = () => {
@@ -562,8 +570,13 @@ export function Market(container) {
         Number.isInteger(rawMakerPosition) && rawMakerPosition > 0
           ? rawMakerPosition
           : null;
+      const rawTotalMakers = Number.parseFloat(totalMakersInput.value);
+      const totalMakers =
+        Number.isInteger(rawTotalMakers) && rawTotalMakers > 0
+          ? rawTotalMakers
+          : null;
 
-      if (makerPosition === null) {
+      if (makerPosition === null || totalMakers === null || makerPosition > totalMakers) {
         modal.querySelector('#market-fee-locktime').textContent =
           'Enter position';
         modal.querySelector('#market-fee-base').textContent = '0';
@@ -584,7 +597,7 @@ export function Market(container) {
 
       modal.querySelector('#market-fee-position-error').classList.add('hidden');
 
-      const estimate = calculateMakerFee(maker, amountSats, makerPosition);
+      const estimate = calculateMakerFee(maker, amountSats, makerPosition, totalMakers);
       const totalPercent =
         amountSats > 0 ? (estimate.totalFee / amountSats) * 100 : 0;
 
@@ -611,6 +624,7 @@ export function Market(container) {
 
     amountInput.addEventListener('input', updateEstimate);
     positionInput.addEventListener('input', updateEstimate);
+    totalMakersInput.addEventListener('input', updateEstimate);
     closeBtn.addEventListener('click', () => modal.remove());
     updateEstimate();
 
