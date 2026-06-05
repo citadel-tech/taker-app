@@ -1,6 +1,13 @@
 import { icons } from '../../js/icons.js';
 
-export function SwapReportComponent(container, swapReport) {
+function satsToBtc(sats) {
+  const normalized = Number(sats || 0);
+  return Number.isFinite(normalized)
+    ? (normalized / 100000000).toFixed(8)
+    : '0.00000000';
+}
+
+export function SwapReportComponent(container, swapReport, options = {}) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
     switch (value) {
       case 'v2':
@@ -29,7 +36,7 @@ export function SwapReportComponent(container, swapReport) {
     content.innerHTML = `
       <div class="text-center py-20">
         <p class="text-red-400 text-xl">Error: No swap report data available</p>
-        <button id="back-btn" class="mt-4 bg-[#FF6B35] text-white px-6 py-3 rounded-lg">Back to Swaps</button>
+        <button id="back-btn" class="mt-4 bg-primary text-white px-6 py-3 rounded-lg">Back to Swaps</button>
       </div>
     `;
     container.appendChild(content);
@@ -57,6 +64,10 @@ export function SwapReportComponent(container, swapReport) {
   };
 
   const dedupeTxids = (value) => [...new Set(flattenTxidEntries(value))];
+  const toArray = (value) => {
+    if (Array.isArray(value)) return value.filter((entry) => entry != null);
+    return value == null ? [] : [value];
+  };
 
   const nestedReport = swapReport.report || {};
 
@@ -263,12 +274,26 @@ export function SwapReportComponent(container, swapReport) {
       nestedReport.output_regular_utxos ||
       nestedReport.outputChangeUtxos ||
       nestedReport.output_change_utxos ||
+      swapReport.outputChangeUtxos ||
+      swapReport.output_change_utxos ||
       [],
     outputSwapUtxos:
       swapReport.outputSwapUtxos ||
       swapReport.output_swap_utxos ||
       nestedReport.outputSwapUtxos ||
       nestedReport.output_swap_utxos ||
+      [],
+    outgoingContracts:
+      swapReport.outgoingContracts ||
+      swapReport.outgoing_contracts ||
+      nestedReport.outgoingContracts ||
+      nestedReport.outgoing_contracts ||
+      [],
+    incomingContracts:
+      swapReport.incomingContracts ||
+      swapReport.incoming_contracts ||
+      nestedReport.incomingContracts ||
+      nestedReport.incoming_contracts ||
       [],
     sweepTxid,
     protocol: hasExplicitProtocolMetadata ? protocol : null,
@@ -284,15 +309,28 @@ export function SwapReportComponent(container, swapReport) {
     incomingContractTxid,
     recoveryTxids,
   };
+  report.inputUtxos = toArray(report.inputUtxos);
+  report.outputRegularUtxos = toArray(report.outputRegularUtxos);
+  report.outputSwapUtxos = toArray(report.outputSwapUtxos);
+  report.outgoingContracts = toArray(report.outgoingContracts);
+  report.incomingContracts = toArray(report.incomingContracts);
+  report.changeAmount = toNumber(
+    swapReport.changeAmount ??
+      swapReport.change_amount ??
+      swapReport.outputChangeAmount ??
+      swapReport.output_change_amount ??
+      swapReport.output_change_amounts ??
+      nestedReport.changeAmount ??
+      nestedReport.change_amount ??
+      nestedReport.outputChangeAmount ??
+      nestedReport.output_change_amount ??
+      nestedReport.output_change_amounts,
+    NaN
+  );
 
   console.log('📊 Normalized report:', report);
 
   // Helper functions
-  function satsToBtc(sats) {
-    if (typeof sats !== 'number' || isNaN(sats)) return '0.00000000';
-    return (sats / 100000000).toFixed(8);
-  }
-
   function formatDuration(seconds) {
     if (typeof seconds !== 'number' || isNaN(seconds)) return '0m 0s';
     const mins = Math.floor(seconds / 60);
@@ -303,6 +341,222 @@ export function SwapReportComponent(container, swapReport) {
   function formatNumber(num) {
     if (typeof num !== 'number' || isNaN(num)) return '0';
     return num.toLocaleString();
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function getFirstField(source, keys, fallback = null) {
+    if (!source || typeof source !== 'object') return fallback;
+    for (const key of keys) {
+      if (source[key] !== undefined && source[key] !== null && source[key] !== '') {
+        return source[key];
+      }
+    }
+    return fallback;
+  }
+
+  function getUtxoAmount(utxo) {
+    if (utxo && typeof utxo === 'object' && 'reportEntry' in utxo) {
+      return getUtxoAmount(utxo.reportEntry);
+    }
+    if (typeof utxo === 'number') return utxo;
+    if (Array.isArray(utxo)) {
+      const amount = utxo.find((entry) => Number.isFinite(Number(entry)));
+      return toNumber(amount, NaN);
+    }
+    if (!utxo || typeof utxo !== 'object') return NaN;
+    return toNumber(
+      getFirstField(utxo, [
+        'amount',
+        'value',
+        'sats',
+        'satoshis',
+        'amount_sats',
+        'amountSats',
+      ]),
+      NaN
+    );
+  }
+
+  function sumUtxos(utxos) {
+    return utxos.reduce((sum, utxo) => {
+      const amount = getUtxoAmount(utxo);
+      return Number.isFinite(amount) ? sum + amount : sum;
+    }, 0);
+  }
+
+  if (!Number.isFinite(report.changeAmount)) {
+    report.changeAmount = sumUtxos(report.outputRegularUtxos);
+  }
+
+  function getUtxoTitle(utxo, fallbackLabel, groupLabel = 'Report entry') {
+    if (utxo && typeof utxo === 'object' && 'reportEntry' in utxo) {
+      const entry = utxo.reportEntry;
+      if (typeof entry === 'number') return `${utxo.reportLabel} amount`;
+      return getUtxoTitle(entry, fallbackLabel, groupLabel);
+    }
+    if (typeof utxo === 'number') return `${fallbackLabel} amount`;
+    if (typeof utxo === 'string') return utxo;
+    if (Array.isArray(utxo)) {
+      const [first, second, third] = utxo;
+      const firstNumber = Number(first);
+      const secondNumber = Number(second);
+
+      if (typeof first === 'string' && Number.isFinite(secondNumber)) {
+        return `${first}:${second}`;
+      }
+
+      if (Number.isFinite(firstNumber) && typeof second === 'string') {
+        return second;
+      }
+
+      if (typeof second === 'string' && Number.isFinite(Number(third))) {
+        return `${second}:${third}`;
+      }
+
+      return utxo.map((entry) => String(entry)).join(' · ') || fallbackLabel;
+    }
+    if (!utxo || typeof utxo !== 'object') return fallbackLabel;
+    const outpoint =
+      getFirstField(utxo, ['outpoint', 'point']) ||
+      (getFirstField(utxo, ['txid', 'tx_id', 'txHash', 'tx_hash'])
+        ? `${getFirstField(utxo, ['txid', 'tx_id', 'txHash', 'tx_hash'])}:${getFirstField(utxo, ['vout', 'index', 'output_index'], '?')}`
+        : null);
+    return (
+      outpoint ||
+      getFirstField(utxo, ['address', 'script_pubkey', 'scriptPubkey', 'contract_txid', 'contractTxid']) ||
+      JSON.stringify(utxo)
+    );
+  }
+
+  function getUtxoMeta(utxo) {
+    if (utxo && typeof utxo === 'object' && 'reportEntry' in utxo) {
+      const meta = getUtxoMeta(utxo.reportEntry);
+      return [utxo.reportLabel, meta].filter(Boolean).join(' · ');
+    }
+    if (typeof utxo === 'number') return 'amount recorded in report';
+    if (Array.isArray(utxo)) {
+      const [first, second, third] = utxo;
+      const parts = [];
+      if (Number.isFinite(Number(first))) parts.push(`${formatNumber(Number(first))} 丰`);
+      if (typeof second === 'string' && Number.isFinite(Number(first))) {
+        parts.push('report output');
+      } else if (third != null) {
+        parts.push(String(third));
+      }
+      return parts.join(' · ');
+    }
+    if (!utxo || typeof utxo !== 'object') return '';
+    const parts = [];
+    const type = getFirstField(utxo, ['type', 'spend_type', 'spendType', 'label']);
+    const address = getFirstField(utxo, ['address']);
+    const vout = getFirstField(utxo, ['vout', 'index', 'output_index']);
+    if (type) parts.push(String(type));
+    if (vout != null) parts.push(`vout ${vout}`);
+    if (address) parts.push(truncateAddress(String(address), 10, 8));
+    return parts.join(' · ');
+  }
+
+  function buildUtxoRowsHtml(utxos, emptyText, groupLabel = 'Report entry') {
+    if (!utxos.length) {
+      return emptyText ? `<p class="swap-report-empty">${emptyText}</p>` : '';
+    }
+
+    return utxos
+      .map((utxo, index) => {
+        const title = getUtxoTitle(utxo, `${groupLabel} ${index + 1}`, groupLabel);
+        const amount = getUtxoAmount(utxo);
+        const meta = getUtxoMeta(utxo);
+        return `
+          <div class="swap-report-utxo-row">
+            <div>
+              <strong>${escapeHtml(title)}</strong>
+              ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
+            </div>
+            ${Number.isFinite(amount) ? `<em>${formatNumber(amount)} 丰</em>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  function getMakerFeeParts(makerIndex) {
+    const makerFee = report.makerFeeInfo[makerIndex] || {};
+    const baseFee = toNumber(
+      getFirstField(makerFee, ['baseFee', 'base_fee', 'makerBaseFee', 'maker_base_fee']),
+      0
+    );
+    const amountFee = toNumber(
+      getFirstField(makerFee, [
+        'amountRelativeFee',
+        'amount_relative_fee',
+        'liquidityFee',
+        'liquidity_fee',
+        'volumeFee',
+        'volume_fee',
+      ]),
+      0
+    );
+    const timeFee = toNumber(
+      getFirstField(makerFee, ['timeRelativeFee', 'time_relative_fee', 'timeFee', 'time_fee']),
+      0
+    );
+    const explicitTotal = toNumber(
+      getFirstField(makerFee, ['totalFee', 'total_fee', 'feePaid', 'fee_paid', 'amount']),
+      NaN
+    );
+    const componentTotal = baseFee + amountFee + timeFee;
+    const totalFee = Number.isFinite(explicitTotal) ? explicitTotal : componentTotal;
+    const unattributed = Math.max(0, totalFee - componentTotal);
+    const fidelityTx =
+      getFirstField(makerFee, [
+        'fidelityTxid',
+        'fidelity_txid',
+        'fidelityBondTxid',
+        'fidelity_bond_txid',
+        'bondTxid',
+        'bond_txid',
+        'fidelityTransaction',
+        'fidelity_transaction',
+      ]) || null;
+
+    return {
+      baseFee,
+      amountFee,
+      timeFee,
+      unattributed,
+      totalFee,
+      hasComponents: componentTotal > 0,
+      fidelityTx,
+    };
+  }
+
+  function getMakerFeeDisplay(makerIndex) {
+    const parts = getMakerFeeParts(makerIndex);
+    return Number.isFinite(parts.totalFee) && parts.totalFee > 0
+      ? `${formatNumber(parts.totalFee)} 丰`
+      : 'Not itemized';
+  }
+
+  const itemizedMakerFeeTotal = report.makerFeeInfo.reduce((sum, _entry, index) => {
+    const totalFee = getMakerFeeParts(index).totalFee;
+    return Number.isFinite(totalFee) ? sum + totalFee : sum;
+  }, 0);
+
+  if (report.totalMakerFees <= 0 && itemizedMakerFeeTotal > 0) {
+    report.totalMakerFees = itemizedMakerFeeTotal;
+    if (report.totalFee <= report.miningFee) {
+      report.totalFee = report.totalMakerFees + report.miningFee;
+    }
+    report.feePercentage =
+      report.targetAmount > 0 ? (report.totalFee / report.targetAmount) * 100 : 0;
   }
 
   function truncateAddress(addr, start = 14, end = 16) {
@@ -330,6 +584,66 @@ export function SwapReportComponent(container, swapReport) {
     return `${txid.substring(0, start)}...${txid.substring(txid.length - end)}`;
   }
 
+  function getOutputAddress(output) {
+    if (Array.isArray(output)) {
+      return output.find((entry) => typeof entry === 'string' && entry.trim()) || '';
+    }
+    if (!output || typeof output !== 'object') return '';
+    return String(
+      getFirstField(output, [
+        'address',
+        'script_pubkey',
+        'scriptPubkey',
+        'destination',
+      ], '')
+    );
+  }
+
+  function buildOutputRowsHtml(outputs, label) {
+    if (!outputs.length) return '';
+
+    return outputs
+      .map((output, index) => {
+        const amount = getUtxoAmount(output);
+        const address = getOutputAddress(output);
+        return `
+          <div class="swap-report-output-row">
+            <div>
+              <span>${label} ${index + 1}</span>
+              <strong title="${escapeHtml(address)}">${escapeHtml(address || 'Address not included')}</strong>
+            </div>
+            <em>${Number.isFinite(amount) ? `${formatNumber(amount)} 丰` : 'Amount not included'}</em>
+            ${address ? `<button class="copy-output-btn" data-copy-text="${escapeHtml(address)}" title="Copy address">${icons.clipboardCopy(16)}</button>` : ''}
+          </div>
+        `;
+      })
+      .join('');
+  }
+
+  function buildWalletOutputsHtml() {
+    const changeRows = buildOutputRowsHtml(report.outputRegularUtxos, 'Change output');
+    const swapRows = buildOutputRowsHtml(report.outputSwapUtxos, 'Swap output');
+
+    if (!changeRows && !swapRows) return '';
+
+    return `
+      <div class="swap-report-output-group">
+        ${changeRows ? `
+          <div class="swap-report-output-subgroup">
+            <h4>Change UTXOs</h4>
+            ${changeRows}
+          </div>
+        ` : ''}
+        ${swapRows ? `
+          <div class="swap-report-output-subgroup">
+            <h4>Incoming Swap UTXOs</h4>
+            ${swapRows}
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+
   function copyToClipboard(text) {
     navigator.clipboard
       .writeText(text)
@@ -353,94 +667,123 @@ export function SwapReportComponent(container, swapReport) {
   // Show maker popup
   function showMakerPopup(makerIndex) {
     const makerAddr = report.makerAddresses[makerIndex] || 'unknown';
-    const makerFee = report.makerFeeInfo[makerIndex] || {};
-    const feePaid =
-      makerFee.totalFee ||
-      makerFee.total_fee ||
-      makerFee.feePaid ||
-      makerFee.fee_paid ||
-      makerFee.amount ||
-      0;
-
+    const feeParts = getMakerFeeParts(makerIndex);
+    const feePaid = Number.isFinite(feeParts.totalFee) ? feeParts.totalFee : 0;
     const feeRate =
       report.targetAmount > 0 ? (feePaid / report.targetAmount) * 100 : 0;
     const color = makerColors[makerIndex % makerColors.length];
+    const feeRows = [
+      ['Base fee', feeParts.baseFee, 'Fixed maker fee'],
+      ['Liquidity fee', feeParts.amountFee, 'Amount-relative fee'],
+      ['Time fee', feeParts.timeFee, 'Refund locktime fee'],
+      ...(feeParts.unattributed > 0
+        ? [['Other maker fee', feeParts.unattributed, 'Included in report total']]
+        : []),
+    ];
 
     // Remove any existing popup
     const existingPopup = document.querySelector('.maker-popup-overlay');
     if (existingPopup) existingPopup.remove();
 
     const overlay = document.createElement('div');
-    overlay.className =
-      'maker-popup-overlay fixed inset-0 bg-black/60 flex items-center justify-center z-50';
+    overlay.className = 'maker-popup-overlay';
     overlay.innerHTML = `
-      <div class="maker-popup bg-[#1a2332] border-2 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl transform animate-popup"
-           style="border-color: ${color};">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-3">
-            <div class="w-12 h-12 rounded-lg flex items-center justify-center font-bold text-xl"
-                 style="background: ${color}20; color: ${color};">
-              M${makerIndex + 1}
-            </div>
+      <div class="maker-popup" style="--maker-color: ${color};">
+        <div class="maker-popup-head">
+          <div class="maker-popup-title">
+            <div class="maker-popup-token">M${makerIndex + 1}</div>
             <div>
-              <h3 class="text-xl font-bold text-white">Maker ${makerIndex + 1}</h3>
-              <p class="text-xs text-gray-400">Swap Partner</p>
+              <h3>Maker ${makerIndex + 1}</h3>
+              <p>Swap Partner</p>
             </div>
           </div>
-          <button class="close-popup text-gray-400 hover:text-white text-2xl">&times;</button>
+          <button class="close-popup maker-popup-close" type="button" aria-label="Close">&times;</button>
         </div>
         
-        <div class="space-y-4">
-          <!-- Address -->
-          <div class="bg-[#0f1419] rounded-lg p-4">
-            <p class="text-xs text-gray-400 mb-1">Onion Address</p>
-            <div class="flex items-center gap-2">
-              <p class="font-mono text-sm text-white break-all flex-1">${makerAddr}</p>
-              <button class="copy-addr-btn text-gray-400 hover:text-[#FF6B35] transition-colors" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
+        <div class="maker-popup-body">
+          <section class="maker-popup-card maker-popup-address">
+            <span>Onion Address</span>
+            <div>
+              <strong>${escapeHtml(makerAddr)}</strong>
+              <button class="copy-addr-btn maker-popup-icon-btn" type="button" title="Copy address">${icons.clipboardCopy(15)}</button>
             </div>
-          </div>
+          </section>
           
-          <!-- Fee Info -->
-          <div class="bg-[#0f1419] rounded-lg p-4">
-            <p class="text-xs text-gray-400 mb-2">Fee Information</p>
-            <div class="grid grid-cols-2 gap-3">
+          <section class="maker-popup-card">
+            <span>Fee Information</span>
+            <div class="maker-popup-metrics">
               <div>
-                <p class="text-xs text-gray-500">Fee Paid</p>
-                  <p class="font-mono text-sm" style="color: ${color};">${formatNumber(feePaid)} sats</p>
+                <small>Fee Paid</small>
+                <strong>${formatNumber(feePaid)} 丰</strong>
               </div>
               <div>
-                <p class="text-xs text-gray-500">Fee Rate</p>
-                  <p class="font-mono text-sm" style="color: ${color};">${feeRate.toFixed(2)}%</p>
+                <small>Fee Rate</small>
+                <strong>${feeRate.toFixed(2)}%</strong>
               </div>
             </div>
-          </div>
+          </section>
+
+          <section class="maker-popup-card">
+            <span>Fee Breakdown</span>
+            <div class="maker-popup-fee-breakdown">
+              ${feeRows
+                .map(
+                  ([label, amount, note]) => `
+                    <div>
+                      <span>
+                        <b>${label}</b>
+                        <small>${note}</small>
+                      </span>
+                      <strong>${formatNumber(amount)} 丰</strong>
+                    </div>
+                  `
+                )
+                .join('')}
+              <div class="maker-popup-fee-total">
+                <span>
+                  <b>Total maker fee</b>
+                  <small>Base + liquidity + time${feeParts.unattributed > 0 ? ' + other' : ''}</small>
+                </span>
+                <strong>${formatNumber(feePaid)} 丰</strong>
+              </div>
+              ${
+                feeParts.hasComponents
+                  ? ''
+                  : '<p>Component-level fee data was not included in this report.</p>'
+              }
+            </div>
+          </section>
+
+          ${
+            feeParts.fidelityTx
+              ? `
+                <section class="maker-popup-card maker-popup-address">
+                  <span>Fidelity Tx</span>
+                  <div>
+                    <strong>${escapeHtml(feeParts.fidelityTx)}</strong>
+                    <button class="copy-fidelity-btn maker-popup-icon-btn" type="button" title="Copy fidelity transaction">${icons.clipboardCopy(15)}</button>
+                  </div>
+                </section>
+              `
+              : ''
+          }
           
-          <!-- Hop Position -->
-          <div class="bg-[#0f1419] rounded-lg p-4">
-            <p class="text-xs text-gray-400 mb-2">Swap Position</p>
-            <div class="flex items-center gap-2">
-              <span class="px-3 py-1 rounded-full text-xs font-bold" style="background: ${color}20; color: ${color};">
-                Hop ${makerIndex + 1} of ${report.makersCount}
-              </span>
-              <span class="text-xs text-gray-500">
+          <section class="maker-popup-card">
+            <span>Swap Position</span>
+            <div class="maker-popup-position">
+              <b>Hop ${makerIndex + 1} of ${report.makersCount}</b>
+              <small>
                 ${makerIndex === 0 ? '(First maker in chain)' : makerIndex === report.makersCount - 1 ? '(Last maker in chain)' : '(Middle of chain)'}
-              </span>
+              </small>
             </div>
-          </div>
-          
-          <!-- Privacy Contribution -->
-          <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-            <p class="text-xs text-green-400 mb-1">${icons.shieldCheck(16, 'mr-2')} Privacy Contribution</p>
-            <p class="text-xs text-gray-300">This maker broke the transaction link between hop ${makerIndex} and hop ${makerIndex + 2}, making it impossible to trace the flow of funds.</p>
-          </div>
+          </section>
         </div>
         
-        <div class="mt-6 flex gap-3">
-          <button class="copy-addr-btn flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white py-3 rounded-lg transition-colors">
-            ${icons.clipboardCopy(14, 'mr-1')} Copy Address
+        <div class="maker-popup-actions">
+          <button class="copy-addr-btn maker-popup-secondary" type="button">
+            ${icons.clipboardCopy(15)} Copy Address
           </button>
-          <button class="close-popup flex-1 text-white py-3 rounded-lg transition-colors"
-                  style="background: ${color};">
+          <button class="close-popup maker-popup-primary" type="button">
             Close
           </button>
         </div>
@@ -463,22 +806,40 @@ export function SwapReportComponent(container, swapReport) {
         copyToClipboard(makerAddr);
       });
     });
+
+    overlay.querySelectorAll('.copy-fidelity-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        copyToClipboard(feeParts.fidelityTx);
+      });
+    });
   }
 
-  const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const makerColors = ['#518def', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const makeReportEntry = (reportLabel, reportEntry) => ({
+    reportLabel,
+    reportEntry,
+  });
   const transactionArtifacts = [
-    {
-      label: 'Outgoing Contract',
-      txid: report.outgoingContractTxid,
-      accent: '#FF6B35',
-      description: 'Contract transaction recorded on the outgoing side.',
-    },
-    {
-      label: 'Incoming Contract',
-      txid: report.incomingContractTxid,
-      accent: '#10B981',
-      description: 'Contract transaction recorded on the incoming side.',
-    },
+    ...(report.outgoingContractTxid
+      ? [
+          {
+            label: 'Outgoing Contract Tx',
+            txid: report.outgoingContractTxid,
+            accent: '#f5c451',
+            description: 'Outgoing contract transaction from the report.',
+          },
+        ]
+      : []),
+    ...(report.incomingContractTxid
+      ? [
+          {
+            label: 'Incoming Contract Tx',
+            txid: report.incomingContractTxid,
+            accent: '#518def',
+            description: 'Incoming contract transaction from the report.',
+          },
+        ]
+      : []),
     ...report.fundingTxids.map((txid, index) => ({
       label: `Funding Transaction ${index + 1}`,
       txid,
@@ -504,37 +865,26 @@ export function SwapReportComponent(container, swapReport) {
   ].filter((artifact) => artifact.txid);
   report.transactionArtifacts = transactionArtifacts;
   report.artifactsCount = transactionArtifacts.length;
-
   function buildTransactionArtifactsHtml() {
     if (!report.transactionArtifacts || report.transactionArtifacts.length === 0) {
-      return `
-        <div class="bg-[#0f1419] rounded-lg p-4 border border-gray-800">
-          <p class="text-gray-400 text-sm">
-            No on-chain transaction IDs were saved with this swap report. Maker, fee, and UTXO details are still shown below.
-          </p>
-        </div>
-      `;
+      return '';
     }
 
     return report.transactionArtifacts
       .map((artifact) => {
+        const directionIcon = artifact.label.toLowerCase().includes('incoming')
+          ? '↙'
+          : artifact.label.toLowerCase().includes('outgoing')
+            ? '↗'
+            : '→';
         return `
-          <div class="bg-[#0f1419] rounded-lg p-4 border-l-4" style="border-color: ${artifact.accent}">
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex-1 min-w-0">
-                <p class="text-sm font-semibold mb-1" style="color: ${artifact.accent}">
-                  ${artifact.label}
-                </p>
-                <p class="text-xs text-gray-500 mb-2">${artifact.description}</p>
-                <p class="font-mono text-xs text-gray-300 break-all">${artifact.txid}</p>
-              </div>
-              <div class="flex gap-2 shrink-0">
-                <button class="copy-txid-btn text-gray-400 hover:text-white text-sm transition-colors"
-                        data-txid="${artifact.txid}" title="Copy">${icons.clipboardCopy(14, 'mr-1')}</button>
-                <button class="view-txid-btn text-gray-400 hover:text-[#FF6B35] text-sm transition-colors"
-                        data-txid="${artifact.txid}" title="View on Explorer">${icons.externalLink(14, 'mr-1')}</button>
-              </div>
+          <div class="swap-report-artifact" style="--artifact-accent: ${artifact.accent}">
+            <div>
+              <h4><span>${directionIcon}</span>${artifact.label}</h4>
+              <p>${artifact.txid}</p>
             </div>
+            <button class="copy-txid-btn" data-txid="${artifact.txid}" title="Copy transaction">${icons.clipboardCopy(16)}</button>
+            <button class="view-txid-btn" data-txid="${artifact.txid}" title="View transaction">${icons.externalLink(16)}</button>
           </div>
         `;
       })
@@ -544,30 +894,56 @@ export function SwapReportComponent(container, swapReport) {
   // Build maker addresses HTML - Now clickable to show popup
   function buildMakersHtml() {
     if (!report.makerAddresses || report.makerAddresses.length === 0) {
-      return '<p class="text-gray-500 text-sm">No maker data available</p>';
+      return '<p class="swap-report-empty">No maker data available</p>';
     }
 
     return report.makerAddresses
       .map((addr, idx) => {
-        const color = makerColors[idx % makerColors.length];
         return `
-        <div class="maker-card bg-[#0f1419] rounded-lg p-4 border hover:border-[${color}] transition-all cursor-pointer hover:scale-102 hover:shadow-lg"
-             style="border-color: ${color}40;" data-maker-index="${idx}">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg flex items-center justify-center font-bold text-lg"
-                 style="background: ${color}20; color: ${color};">
-              M${idx + 1}
-            </div>
-            <div class="flex-1 min-w-0">
-              <p class="text-xs text-gray-400">Maker ${idx + 1}</p>
-              <p class="font-mono text-xs text-white truncate">${truncateAddress(addr)}</p>
-            </div>
-            <span class="text-gray-500 text-sm">→</span>
-          </div>
-        </div>
+        <button class="maker-card swap-report-maker-row" data-maker-index="${idx}">
+          <span>Maker ${String(idx + 1).padStart(2, '0')}</span>
+          <strong>${truncateAddress(addr, 20, 18)}</strong>
+          <em>View ${icons.externalLink(12)}</em>
+        </button>
       `;
       })
       .join('');
+  }
+
+  function buildMakerFeeLinesHtml() {
+    const count = Math.max(makerCount, report.makerFeeInfo.length);
+    if (!count) return '';
+
+    return `
+      <div class="swap-report-maker-fees">
+        <span>Maker fee split</span>
+        ${Array.from({ length: count }, (_, idx) => {
+          const addr = report.makerAddresses[idx] || `Maker ${idx + 1}`;
+          return `
+            <button class="maker-fee-row" data-maker-index="${idx}" type="button">
+              <span>Maker ${idx + 1}</span>
+              <strong>${getMakerFeeDisplay(idx)}</strong>
+              <em>${escapeHtml(truncateAddress(addr, 10, 8))}</em>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    `;
+  }
+
+  function buildFeeDetailsHtml() {
+    const lines = [
+      `<div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <small>丰</small></strong></div>`,
+      `<div><span>Mining fees</span><strong>${formatNumber(report.miningFee)} <small>丰</small></strong></div>`,
+    ];
+
+    if (report.changeAmount > 0) {
+      lines.push(
+        `<div><span>Change amount</span><strong>${formatNumber(report.changeAmount)} <small>丰</small></strong></div>`
+      );
+    }
+
+    return lines.join('');
   }
 
   function getReportInfoLines() {
@@ -786,7 +1162,7 @@ export function SwapReportComponent(container, swapReport) {
       });
 
       return `
-        <div class="bg-[#0f1419] rounded-lg p-5 border border-gray-800">
+        <div class="bg-app-bg rounded-lg p-5 border border-gray-800">
           <p class="text-gray-300 text-sm mb-3">Swap path visualization unavailable for this report.</p>
           <div class="space-y-2">
             <div class="text-[#10B981] font-semibold">You</div>
@@ -876,333 +1252,110 @@ export function SwapReportComponent(container, swapReport) {
     `;
   }
 
-  // UI
+  const makerCount = report.makersCount || report.makerAddresses.length;
+  const displaySwapId = report.swapId || 'unknown';
+  const displayAmount = report.totalOutputAmount || report.targetAmount;
+
   content.innerHTML = `
-    <style>
-      @keyframes fadeInUp {
-        from { opacity: 0; transform: translateY(30px); }
-        to { opacity: 1; transform: translateY(0); }
-      }
-      
-      @keyframes popup {
-        from { opacity: 0; transform: scale(0.9); }
-        to { opacity: 1; transform: scale(1); }
-      }
+    <div class="swap-report-page">
+      <header class="swap-report-head">
+        <button id="report-back-btn" class="swap-report-head-back" type="button" aria-label="Back to swap">
+          ${icons.arrowLeft(28)}
+        </button>
+        <div>
+          <h2>Swap <span>Completed</span></h2>
+        </div>
+      </header>
 
-      @keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
+      <div class="swap-report-layout">
+        <section class="swap-report-main">
+          <h3>Swap Summary</h3>
+          <div class="swap-report-hero">
+            <span>Amount Swapped</span>
+            <strong>${formatNumber(displayAmount)} <small>丰</small></strong>
+            <p>≈ ${satsToBtc(displayAmount)} BTC</p>
+            <b>${icons.timer(15)} Duration ${formatDuration(report.swapDurationSeconds)}</b>
+          </div>
 
-.maker-node {
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
-.maker-node:hover {
-  filter: brightness(1.08);
-}
-      
-      .animate-fade-in-up { animation: fadeInUp 0.6s ease-out forwards; }
-      .animate-popup { animation: popup 0.2s ease-out forwards; }
-      .stagger-1 { animation-delay: 0.1s; }
-      .stagger-2 { animation-delay: 0.2s; }
-      .stagger-3 { animation-delay: 0.3s; }
-      .stagger-4 { animation-delay: 0.4s; }
-      
-      .maker-card:hover {
-        transform: scale(1.02);
-      }
-      
-      /* Tooltip styles */
-      .tooltip-trigger {
-        position: relative;
-      }
-      
-      .tooltip-trigger:hover .tooltip-content {
-        opacity: 1;
-        visibility: visible;
-        transform: translateY(0);
-      }
-      
-      .tooltip-content {
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%) translateY(10px);
-        padding: 8px 12px;
-        background: #0f1419;
-        border: 1px solid #374151;
-        border-radius: 8px;
-        white-space: nowrap;
-        opacity: 0;
-        visibility: hidden;
-        transition: all 0.2s ease;
-        z-index: 50;
-        margin-bottom: 8px;
-      }
-      
-      .tooltip-content::after {
-        content: '';
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        border: 6px solid transparent;
-        border-top-color: #374151;
-      }
-    </style>
-
-    <div class="max-w-7xl mx-auto">
-      <!-- Header -->
-      <div class="mb-8 animate-fade-in-up">
-        <div class="flex items-center justify-between mb-6">
-          <div class="flex items-center gap-4">
-            <div class="w-16 h-16 bg-[#FF6B35] rounded-xl flex items-center justify-center shadow-lg">
-              <span>${icons.circleDollarSign(20, 'mr-2')}</span>
+          <div class="swap-report-block">
+            <div class="swap-report-block-head">
+              <span>Transactions</span>
             </div>
-            <div>
-              <h2 class="text-4xl font-bold text-[#FF6B35]">
-                Coinswap Report
-              </h2>
-              <p class="text-gray-400 text-sm mt-1">View Detailed Swap Data.</p>
-            </div>
-          </div>
-          <button id="back-to-wallet" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-6 py-3 rounded-lg transition-all hover:scale-105">
-            ← Back to Swaps
-          </button>
-        </div>
-        
-        <div class="flex items-center gap-4">
-          <div class="px-4 py-2 bg-green-500/20 border border-green-500/30 rounded-lg backdrop-blur-sm">
-            <span class="text-green-400 font-semibold text-lg flex items-center">${icons.checkCircle(20, 'mr-2')} SWAP COMPLETED SUCCESSFULLY</span>
-          </div>
-          <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
-            <span class="text-gray-400 text-sm">ID: </span>
-            <span class="font-mono text-white text-sm">${report.swapId}</span>
-          </div>
-          ${
-            report.nativeSwapId
-              ? `
-          <div class="px-4 py-2 bg-[#1a2332] rounded-lg">
-            <span class="text-gray-400 text-sm">Backend Swap ID: </span>
-            <span class="font-mono text-white text-sm">${report.nativeSwapId}</span>
-          </div>
-          `
-              : ''
-          }
-        </div>
-      </div>
-
-      <!-- Circular Flow Diagram -->
-      <div class="mb-8 animate-fade-in-up stagger-1">
-        <div class="bg-gradient-to-br from-[#1a2332] to-[#0f1419] rounded-xl p-8 border border-[#FF6B35]/20 shadow-2xl">
-          <h3 class="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-            <svg class="w-7 h-7 text-[#FF6B35]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="6" cy="6" r="2" stroke-width="2"></circle>
-              <circle cx="18" cy="6" r="2" stroke-width="2"></circle>
-              <circle cx="12" cy="18" r="2" stroke-width="2"></circle>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 6h8M7 7.5l4 8M17 7.5l-4 8"></path>
-            </svg>
-            Swap Circuit
-            <span class="text-sm font-normal text-gray-400">(Click on makers for details)</span>
-          </h3>
-          <p class="text-xs text-gray-500 mb-6">Your coins move across the swap circuit and come back with broken transaction links.</p>
-          
-          <!-- Circular Flow -->
-          <div class="flex justify-center">
-            ${buildCircularFlowHtml()}
-          </div>
-          
-        
-          
-          <div class="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-            <h4 class="text-sm font-bold text-blue-300 mb-2 flex items-center gap-2">
-              ${icons.info(16, 'mr-2')} Report Summary
-            </h4>
-            <div class="text-xs text-gray-300 grid grid-cols-1 md:grid-cols-2 gap-4">
-              ${getReportInfoLines()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Stats Grid -->
-      <div class="grid grid-cols-5 gap-4 mb-6">
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-1">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-sm text-white">Swap Amount</p>
-            <span>${icons.circleDollarSign(16, 'mr-2')}</span>
-          </div>
-          <p class="text-2xl font-bold text-[#FF6B35]">${satsToBtc(report.targetAmount)} BTC</p>
-          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.targetAmount)} sats</p>
-        </div>
-
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-2">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-sm text-white">Duration</p>
-            <span>${icons.timer(16, 'mr-2')}</span>
-          </div>
-          <p class="text-2xl font-bold text-cyan-400">${formatDuration(report.swapDurationSeconds)}</p>
-          <p class="text-xs text-gray-400 mt-1">${report.swapDurationSeconds.toFixed(1)}s total</p>
-        </div>
-
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-3">
-          <div class="flex items-center justify-between mb-2">
-<p class="text-sm text-white">On-Chain Artifacts</p>
-            <span>${icons.link(16, 'mr-2')}</span>
-          </div>
-         <p class="text-2xl font-bold text-purple-400">
-  ${report.artifactsCount}
-</p>
-<p class="text-xs text-gray-400 mt-1">
-  Transaction IDs extracted from this report
-</p>
-        </div>
-
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-sm text-white">Swap Partners</p>
-            <span>${icons.handshake(16, 'mr-2')}</span>
-          </div>
-          <p class="text-2xl font-bold text-yellow-400">${report.makersCount || report.makerAddresses.length}</p>
-          <p class="text-xs text-gray-400 mt-1">Makers recorded in the report</p>
-        </div>
-
-        <div class="bg-[#1a2332] rounded-lg p-6 hover:scale-105 transition-transform cursor-pointer animate-fade-in-up stagger-4">
-          <div class="flex items-center justify-between mb-2">
-            <p class="text-sm text-white">Total Fee</p>
-            <span>${icons.receipt(16, 'mr-2')}</span>
-          </div>
-          <p class="text-2xl font-bold text-yellow-400">${report.feePercentage.toFixed(2)}%</p>
-          <p class="text-xs text-gray-400 mt-1">${formatNumber(report.totalFee)} sats</p>
-        </div>
-      </div>
-
-      <!-- Details Grid -->
-      <div class="grid grid-cols-3 gap-6">
-        
-        <!-- Transactions & Makers -->
-        <div class="col-span-2 space-y-6">
-          
-          <!-- Transaction Artifacts -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
-            <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              ${icons.fileText(16, 'mr-2')} Transaction Artifacts
-            </h3>
-            <div class="space-y-3">
+            <div class="swap-report-artifacts">
               ${buildTransactionArtifactsHtml()}
+              ${buildWalletOutputsHtml()}
             </div>
           </div>
 
-          <!-- Swap Partners / Makers -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-3">
-            <h3 class="text-xl font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              ${icons.handshake(16, 'mr-2')} Swap Partners
-              <span class="text-xs text-gray-500 font-normal ml-2">(Click for details)</span>
-            </h3>
-            <div class="grid grid-cols-2 gap-3">
+          <div class="swap-report-block">
+            <div class="swap-report-block-head">
+              <span>Swap Partners</span>
+              <strong>${makerCount} maker${makerCount === 1 ? '' : 's'}</strong>
+            </div>
+            <div class="swap-report-makers">
               ${buildMakersHtml()}
             </div>
           </div>
 
-        </div>
-
-        <!-- Right Sidebar -->
-        <div class="space-y-6">
-          
-          <!-- Fee Breakdown -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-2">
-            <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              ${icons.circleDollarSign(16, 'mr-2')} Fee Details
-            </h3>
-            <div class="space-y-3">
-              <div class="flex justify-between items-center pb-3 border-b border-gray-700">
-                <span class="text-sm text-gray-400">Maker Fees</span>
-                <span class="font-mono text-sm text-yellow-400">${formatNumber(report.totalMakerFees)}</span>
-              </div>
-              <div class="flex justify-between items-center pb-3 border-b border-gray-700">
-                <span class="text-sm text-gray-400">Mining Fees</span>
-                <span class="font-mono text-sm text-cyan-400">${formatNumber(report.miningFee)}</span>
-              </div>
-              <div class="flex justify-between items-center pt-2">
-                <span class="text-sm font-semibold text-lg text-white">Total</span>
-                <div class="text-right">
-                  <p class="font-mono text-lg text-[#FF6B35] font-bold">${formatNumber(report.totalFee)}</p>
-                  <p class="text-xs text-gray-500">${satsToBtc(report.totalFee)} BTC</p>
-                </div>
-              </div>
-            </div>
+          <div class="swap-report-export-bar">
+            <button id="export-report">${icons.arrowDownCircle(18)} Export report</button>
           </div>
+        </section>
 
-          <!-- UTXO Summary with Tooltip -->
-          <div class="bg-[#1a2332] rounded-lg p-6 animate-fade-in-up stagger-4">
-            <h3 class="text-lg font-semibold text-lg text-white mb-4 flex items-center gap-2">
-              ${icons.package(16, 'mr-2')} UTXO Summary
-            </h3>
-            <div class="space-y-3 text-sm">
-              <div class="flex justify-between items-center">
-                <span class="text-gray-400">Outgoing Regular/Swap UTXOs</span>
-                <span class="font-mono text-white">${report.inputUtxos.length}</span>
-              </div>
-              <div class="flex justify-between items-center">
-                <span class="text-gray-400">Incoming Swap UTXOs</span>
-                <span class="font-mono text-blue-400">${report.outputSwapUtxos.length}</span>
-              </div>
+        <aside class="swap-report-side">
+          <section class="swap-report-fees">
+            <h3>Fee Details</h3>
+            <div class="swap-report-fee-lines">
+              ${buildFeeDetailsHtml()}
             </div>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="mt-8 flex gap-4 animate-fade-in-up stagger-4">
-        <button id="export-report" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white font-semibold text-lg py-4 rounded-lg transition-all hover:scale-105">
-          ${icons.arrowDownCircle(16, 'mr-1')} Export Report
-        </button>
-        <button id="done-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-4 rounded-lg transition-all hover:scale-105 shadow-lg">
-          Back to Swaps
-        </button>
+            ${buildMakerFeeLinesHtml()}
+            <div class="swap-report-total-fee">
+              <span>Total fee</span>
+              <strong>${formatNumber(report.totalFee)} <small>丰</small></strong>
+              <p>${satsToBtc(report.totalFee)} BTC</p>
+            </div>
+            <div class="swap-report-percent">
+              <span>Of swap amount</span>
+              <strong>${report.feePercentage.toFixed(3)}%</strong>
+            </div>
+          </section>
+        </aside>
       </div>
     </div>
   `;
 
   container.appendChild(content);
 
-  // EVENT LISTENERS
-
-  // Maker cards - show popup
   content.querySelectorAll('.maker-card').forEach((card) => {
     card.addEventListener('click', () => {
-      const index = parseInt(card.dataset.makerIndex);
-      showMakerPopup(index);
+      showMakerPopup(parseInt(card.dataset.makerIndex));
     });
   });
 
-  // Maker nodes in circular flow - show popup
-  content.querySelectorAll('.maker-node').forEach((node) => {
-    node.addEventListener('click', () => {
-      const index = parseInt(node.dataset.makerIndex);
-      showMakerPopup(index);
+  content.querySelectorAll('.maker-fee-row').forEach((row) => {
+    row.addEventListener('click', () => {
+      showMakerPopup(parseInt(row.dataset.makerIndex));
     });
   });
 
-  // Copy transaction IDs
   content.querySelectorAll('.copy-txid-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       copyToClipboard(btn.dataset.txid);
     });
   });
 
-  // View transaction in explorer
-  content.querySelectorAll('.view-txid-btn').forEach((btn) => {
+  content.querySelectorAll('.copy-output-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      const txid = btn.dataset.txid;
-      window.open(`https://mutinynet.com/tx/${txid}`, '_blank');
+      copyToClipboard(btn.dataset.copyText);
     });
   });
 
-  // Export report as JSON
+  content.querySelectorAll('.view-txid-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      window.open(`https://mutinynet.com/tx/${btn.dataset.txid}`, '_blank');
+    });
+  });
+
   content.querySelector('#export-report').addEventListener('click', () => {
     const reportJson = JSON.stringify(report, null, 2);
     const blob = new Blob([reportJson], { type: 'application/json' });
@@ -1215,17 +1368,10 @@ export function SwapReportComponent(container, swapReport) {
     showNotification('Report exported!');
   });
 
-  // Back to wallet
-  content.querySelector('#back-to-wallet').addEventListener('click', () => {
+  content.querySelector('#report-back-btn').addEventListener('click', () => {
     if (window.appManager) {
-      window.appManager.renderComponent('swap');
+      window.appManager.renderComponent(options.backTarget || 'swap');
     }
   });
 
-  // Done button
-  content.querySelector('#done-btn').addEventListener('click', () => {
-    if (window.appManager) {
-      window.appManager.renderComponent('swap');
-    }
-  });
 }

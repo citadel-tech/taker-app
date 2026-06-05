@@ -1,28 +1,6 @@
+import { formatSats } from '../../js/price.js';
+
 const WALLET_CACHE_KEY = 'wallet_data_cache';
-const CACHE_DURATION = 15 * 60 * 1000; // 15 minutes
-
-function loadWalletFromCache() {
-  try {
-    const cached = localStorage.getItem(WALLET_CACHE_KEY);
-    if (cached) {
-      const { balance, transactions, utxos, timestamp } = JSON.parse(cached);
-      const age = Date.now() - timestamp;
-
-      console.log(`📦 Cache age: ${Math.floor(age / 1000)}s`);
-
-      return {
-        balance,
-        transactions,
-        utxos,
-        timestamp,
-        isStale: age > CACHE_DURATION,
-      };
-    }
-  } catch (err) {
-    console.error('Failed to load wallet cache:', err);
-  }
-  return null;
-}
 
 function saveWalletToCache(balance, transactions, utxos) {
   try {
@@ -35,41 +13,33 @@ function saveWalletToCache(balance, transactions, utxos) {
         timestamp: Date.now(),
       })
     );
-    console.log('💾 Saved wallet to cache');
   } catch (err) {
     console.error('Failed to save wallet cache:', err);
   }
 }
 
 export async function WalletComponent(container) {
-  console.log('🔍 WalletComponent called at', new Date().toISOString());
+  let allTransactions = [];
+  let allUtxos = [];
+  let txFilter = 'all';
+  let txSort = 'newest';
+  const txSortDirection = {
+    newest: 'desc',
+    amount: 'desc',
+  };
+  let utxoFilter = 'all';
 
   async function fetchBalance() {
-    try {
-      const data = await window.api.taker.getBalance();
-      console.log('💳 Wallet balance API response:', data);
-
-      if (data.success) {
-        return data.balance;
-      } else {
-        throw new Error(data.error);
-      }
-    } catch (error) {
-      console.error('Failed to fetch balance:', error);
-      throw error;
-    }
+    const data = await window.api.taker.getBalance();
+    if (!data.success) throw new Error(data.error);
+    return data.balance;
   }
 
-  async function fetchTransactions() {
+  async function fetchTransactions(count = 50, skip = 0) {
     try {
-      const data = await window.api.taker.getTransactions(5, 0);
-      console.log('[REFRESH] raw getTransactions response:', JSON.stringify(data, null, 2));
-
-      if (data.success) {
-        return data.transactions || [];
-      } else {
-        throw new Error(data.error);
-      }
+      const data = await window.api.taker.getTransactions(count, skip);
+      if (data.success) return data.transactions || [];
+      throw new Error(data.error);
     } catch (error) {
       console.error('Failed to fetch transactions:', error);
       return [];
@@ -79,13 +49,8 @@ export async function WalletComponent(container) {
   async function fetchUtxos() {
     try {
       const data = await window.api.taker.getUtxos();
-      console.log('[REFRESH] raw getUtxos response:', JSON.stringify(data, null, 2));
-
-      if (data.success) {
-        return data.utxos || [];
-      } else {
-        throw new Error(data.error);
-      }
+      if (data.success) return data.utxos || [];
+      throw new Error(data.error);
     } catch (error) {
       console.error('Failed to fetch UTXOs:', error);
       return [];
@@ -97,15 +62,19 @@ export async function WalletComponent(container) {
     if (!result?.success) {
       throw new Error(result?.error || 'Wallet sync failed');
     }
-    console.log('✅ Wallet sync completed before refresh');
   }
 
-  // Helper Functions
-  function satsToBtc(sats) {
-    return (sats / 100000000).toFixed(8);
+  function compactId(value, left = 12, right = 8) {
+    const id =
+      typeof value === 'object' && value?.value
+        ? value.value
+        : String(value || '');
+    if (id.length <= left + right + 3) return id;
+    return `${id.substring(0, left)}...${id.substring(id.length - right)}`;
   }
 
   function formatDate(timestamp) {
+    if (!timestamp) return 'Unknown';
     const date = new Date(timestamp * 1000);
     const now = new Date();
     const diffMs = now - date;
@@ -114,245 +83,367 @@ export async function WalletComponent(container) {
     const diffDays = Math.floor(diffHours / 24);
 
     if (diffMinutes < 1) return 'Just now';
-    if (diffMinutes < 60)
-      return `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'} ago`;
-    if (diffHours < 24)
-      return `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'} ago`;
-    if (diffDays < 7)
-      return `${diffDays} ${diffDays === 1 ? 'day' : 'days'} ago`;
+    if (diffMinutes < 60) return `${diffMinutes} min ago`;
+    if (diffHours < 24) return `${diffHours} hr ago`;
+    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
     return date.toLocaleDateString();
   }
-  function truncateTxid(txid) {
-    if (typeof txid === 'object' && txid.value) {
-      txid = txid.value;
-    }
-    return `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
+
+  function getSpendTypeDisplay(spendType = '') {
+    const type = spendType.toLowerCase();
+    if (type.includes('seed') || type.includes('regular')) return 'Regular';
+    if (type.includes('swap')) return 'Swap';
+    if (type.includes('contract')) return 'Contract';
+    if (type.includes('fidelity')) return 'Fidelity';
+    return spendType || 'Unknown';
   }
 
-  function getUtxoTypeColor(spendType) {
-    switch (spendType.toLowerCase()) {
-      case 'regular':
-        return 'green';
-      case 'swap':
-        return 'blue';
-      case 'contract':
-        return 'yellow';
-      case 'fidelity':
-        return 'purple';
-      default:
-        return 'gray';
-    }
+  function getScriptType(utxoData) {
+    const utxo = utxoData.utxo || {};
+    const spendInfo = utxoData.spendInfo || {};
+    const scriptHex = utxo.script_pub_key?.hex || utxo.scriptPubKey?.hex || '';
+    const address = utxo.address || '';
+    const spendType = (spendInfo.spendType || '').toLowerCase();
+
+    if (scriptHex.startsWith('5120') && scriptHex.length === 68)
+      return 'taproot';
+    if (address.startsWith('bc1p') || address.startsWith('tb1p'))
+      return 'taproot';
+    if (scriptHex.startsWith('0014') || scriptHex.startsWith('0020'))
+      return 'segwit';
+    if (address.startsWith('bc1q') || address.startsWith('tb1q'))
+      return 'segwit';
+    if (spendType.includes('swap') || spendType.includes('contract'))
+      return 'segwit';
+    return 'segwit';
   }
 
-  // Add this function after the other helper functions
   function getTransactionType(transaction) {
-    const category = (transaction.detail.category || '').toLowerCase();
-    const label = (transaction.detail.label || '').toLowerCase();
+    const category = (transaction.detail?.category || '').toLowerCase();
+    const label = (transaction.detail?.label || '').toLowerCase();
 
-    // Check for swap indicators
     if (
       label.includes('swap') ||
       label.includes('swapcoin') ||
       label.includes('coinswap') ||
       label.includes('watchonly_swapcoin') ||
       label.includes('contract') ||
-      label.includes('htlc')
+      label.includes('htlc') ||
+      category.includes('swap')
     ) {
       return 'swap';
     }
 
-    if (category.includes('swap')) {
-      return 'swap';
-    }
-
-    // Standard transactions
-    return 'regular';
+    if (category.includes('receive')) return 'received';
+    if (category.includes('send')) return 'sent';
+    return (transaction.detail?.amount?.sats || 0) >= 0 ? 'received' : 'sent';
   }
 
-  // UI Update Functions
-  async function updateBalance() {
-    try {
-      const balance = await fetchBalance();
-      console.log('💳 Wallet balance used by UI:', balance);
-
-      content.querySelector('#regular-balance').textContent =
-        satsToBtc(balance.regular) + ' BTC';
-      content.querySelector('#swap-balance').textContent =
-        satsToBtc(balance.swap) + ' BTC';
-      content.querySelector('#contract-balance').textContent =
-        satsToBtc(balance.contract) + ' BTC';
-      content.querySelector('#spendable-balance').textContent =
-        satsToBtc(balance.spendable) + ' BTC';
-
-      console.log('✅ Balance updated from API');
-      return balance;
-    } catch (error) {
-      console.error('❌ Balance update failed:', error);
-    }
-  }
-
-  async function updateTransactions() {
-    const transactionsContainer = content.querySelector(
-      '#transactions-container'
-    );
-
-    // Helper to render transactions
-    const renderTransactions = (transactions) => {
-      if (transactions.length === 0) {
-        return '<div class="text-center py-4 text-gray-400">No transactions yet</div>';
+  function openMempool(txid) {
+    const url = `http://170.75.166.88:8080/tx/${txid}`;
+    if (typeof require !== 'undefined') {
+      try {
+        const { shell } = require('electron');
+        shell.openExternal(url);
+        return;
+      } catch (error) {
+        console.warn('Falling back to browser open:', error);
       }
-
-      const sortedTransactions = transactions.sort(
-        (a, b) => b.info.time - a.info.time
-      );
-
-      return sortedTransactions
-        .map((tx) => {
-          const isReceive = tx.detail.amount.sats > 0;
-          const txType = getTransactionType(tx);
-          const txid =
-            typeof tx.info.txid === 'object'
-              ? tx.info.txid.value
-              : tx.info.txid;
-          const txidShort = `${txid.substring(0, 8)}...${txid.substring(txid.length - 4)}`;
-
-          return `
-    <div class="flex items-center justify-between p-3 bg-[#242d3d] rounded">
-      <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 bg-${isReceive ? 'green' : 'red'}-500/20 rounded-full flex items-center justify-center">
-          <span class="text-${isReceive ? 'green' : 'red'}-400">${isReceive ? '↓' : '↑'}</span>
-        </div>
-        <div>
-          <div class="flex items-center gap-2">
-            <p class="text-white font-mono text-sm">${isReceive ? 'Received' : 'Sent'}</p>
-         
-          </div>
-          <p class="text-gray-400 text-xs cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
-             onclick="openTxOnMempool('${txid}')"
-             title="${txid}">
-            ${txidShort} • ${formatDate(tx.info.time)}
-          </p>
-        </div>
-      </div>
-      <div class="text-right">
-        <p class="text-${isReceive ? 'green' : 'red'}-400 font-mono">${isReceive ? '+' : ''}${satsToBtc(Math.abs(tx.detail.amount.sats))} BTC</p>
-        <p class="text-gray-400 text-xs">${tx.info.confirmations} confirmations</p>
-      </div>
-    </div>
-          `;
-        })
-        .join('');
-    };
-
-    try {
-      const transactions = await fetchTransactions();
-      transactionsContainer.innerHTML = renderTransactions(transactions);
-      console.log('✅ Transactions updated from API:', transactions.length);
-      return transactions;
-    } catch (error) {
-      console.error('❌ Transactions update failed:', error);
-      transactionsContainer.innerHTML =
-        '<div class="text-center py-4 text-gray-400">Error loading transactions</div>';
     }
+    window.open(url, '_blank');
+  }
+
+  function setButtonState(groupSelector, activeValue, dataName) {
+    content.querySelectorAll(groupSelector).forEach((button) => {
+      button.classList.toggle(
+        'active',
+        button.dataset[dataName] === activeValue
+      );
+    });
+  }
+
+  function renderSatsAmount(selector, sats) {
+    const target = content.querySelector(selector);
+    if (!target) return;
+
+    target.innerHTML =
+      `<span class="app-card-amount-number">${Math.round(
+        Number(sats || 0)
+      ).toLocaleString()}</span>` +
+      '<span class="app-card-amount-unit">丰</span>';
+  }
+
+  function calculateUtxoStats() {
+    const regular = allUtxos.filter(
+      (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Regular'
+    ).length;
+    const contract = allUtxos.filter(
+      (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Contract'
+    ).length;
+    const swap = allUtxos.filter(
+      (u) => getSpendTypeDisplay(u.spendInfo?.spendType) === 'Swap'
+    ).length;
+    const spendable = allUtxos.filter((u) =>
+      ['Regular', 'Swap'].includes(getSpendTypeDisplay(u.spendInfo?.spendType))
+    ).length;
+    const confirmed = allUtxos.filter(
+      (u) => (u.utxo?.confirmations || 0) > 0
+    ).length;
+
+    return {
+      total: allUtxos.length,
+      confirmed,
+      unconfirmed: allUtxos.length - confirmed,
+      regular,
+      contract,
+      swap,
+      spendable,
+    };
+  }
+
+  function getFilteredUtxos() {
+    if (utxoFilter === 'all') return [...allUtxos];
+    if (utxoFilter === 'spendable') {
+      return allUtxos.filter((utxo) =>
+        ['Regular', 'Swap'].includes(
+          getSpendTypeDisplay(utxo.spendInfo?.spendType)
+        )
+      );
+    }
+
+    return allUtxos.filter(
+      (utxo) =>
+        getSpendTypeDisplay(utxo.spendInfo?.spendType).toLowerCase() ===
+        utxoFilter
+    );
+  }
+
+  function renderUtxos() {
+    const stats = calculateUtxoStats();
+    content.querySelector('#utxo-count').textContent = `${stats.total} unspent`;
+    content.querySelector('[data-utxo-count="all"]').textContent = stats.total;
+    content.querySelector('[data-utxo-count="regular"]').textContent =
+      stats.regular;
+    content.querySelector('[data-utxo-count="contract"]').textContent =
+      stats.contract;
+    content.querySelector('[data-utxo-count="swap"]').textContent = stats.swap;
+
+    const list = content.querySelector('#app-utxo-list');
+    const rows = getFilteredUtxos().slice(0, 7);
+
+    if (!rows.length) {
+      list.innerHTML =
+        '<div class="app-empty">No UTXOs match this filter.</div>';
+      return;
+    }
+
+    list.innerHTML = rows
+      .map((utxoData) => {
+        const utxo = utxoData.utxo || {};
+        const txid =
+          typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
+        const type = getSpendTypeDisplay(utxoData.spendInfo?.spendType);
+        const scriptType = getScriptType(utxoData);
+        return `
+          <button class="app-utxo-row" data-txid="${txid || ''}" type="button">
+            <span class="app-utxo-main">
+              <span class="app-mono app-id">${compactId(txid, 12, 4)}:${utxo.vout ?? 0}</span>
+              <span class="app-amount positive">${formatSats(utxo.amount)}</span>
+            </span>
+            <span class="app-pill ${scriptType}">${scriptType === 'taproot' ? 'Taproot' : 'SegWit'}</span>
+            <span class="app-pill ${type.toLowerCase()}">${type}</span>
+            <span class="app-address">
+              ${compactId(utxo.address || 'No address', 10, 6)}
+            </span>
+            <span class="app-icon-action" aria-label="Open transaction">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 17L17 7M9 7h8v8" />
+              </svg>
+            </span>
+          </button>
+        `;
+      })
+      .join('');
+  }
+
+  function getFilteredTransactions() {
+    let rows = [...allTransactions];
+    if (txFilter !== 'all') {
+      rows = rows.filter((tx) => getTransactionType(tx) === txFilter);
+    }
+
+    if (txSort === 'amount') {
+      const direction = txSortDirection.amount === 'asc' ? 1 : -1;
+      return rows.sort(
+        (a, b) =>
+          (Math.abs(a.detail?.amount?.sats || 0) -
+            Math.abs(b.detail?.amount?.sats || 0)) *
+          direction
+      );
+    }
+
+    const direction = txSortDirection.newest === 'asc' ? 1 : -1;
+    return rows.sort((a, b) => {
+      const timeA = a.info?.time || a.info?.timereceived || 0;
+      const timeB = b.info?.time || b.info?.timereceived || 0;
+      return (timeA - timeB) * direction;
+    });
+  }
+
+  function renderTransactions() {
+    const list = content.querySelector('#app-tx-list');
+    const rows = getFilteredTransactions().slice(0, 7);
+    content.querySelector('#tx-count').textContent = `${rows.length} total`;
+
+    if (!rows.length) {
+      list.innerHTML =
+        '<div class="app-empty">No transactions match this filter.</div>';
+      return;
+    }
+
+    list.innerHTML = rows
+      .map((tx) => {
+        const type = getTransactionType(tx);
+        const isReceive = (tx.detail?.amount?.sats || 0) >= 0;
+        const txid =
+          typeof tx.info?.txid === 'object'
+            ? tx.info.txid.value
+            : tx.info?.txid;
+        const amount = tx.detail?.amount?.sats || 0;
+        const confirmations = tx.info?.confirmations || 0;
+        const timestamp = tx.info?.time || tx.info?.timereceived;
+        const directionClass = isReceive ? 'in' : 'out';
+        const amountPrefix = amount >= 0 ? '+' : '-';
+
+        return `
+          <button class="app-tx-row ${directionClass}" data-txid="${txid || ''}" type="button">
+            <span class="app-tx-icon">${isReceive ? '+' : '-'}</span>
+            <span class="app-tx-mid">
+              <span class="app-mono app-id">${compactId(txid, 16, 8)}</span>
+              <span class="app-tx-meta">
+                <span class="app-conf ${confirmations >= 6 ? 'full' : ''}">${Math.min(confirmations, 6)}/6 conf</span>
+                ${type === 'swap' ? '<span class="app-conf swap">Swap</span>' : ''}
+              </span>
+            </span>
+            <span class="app-tx-right">
+              <span class="app-amount ${isReceive ? 'positive' : 'negative'}">${amountPrefix}${formatSats(Math.abs(amount))}</span>
+              <span class="app-time">${formatDate(timestamp)}</span>
+            </span>
+            <span class="app-icon-action" aria-label="Open transaction">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M7 17L17 7M9 7h8v8" />
+              </svg>
+            </span>
+          </button>
+        `;
+      })
+      .join('');
+  }
+
+  function sortArrow(direction) {
+    const path =
+      direction === 'asc' ? 'M12 19V5M5 12l7-7 7 7' : 'M12 5v14M5 12l7 7 7-7';
+    return `
+      <span class="app-sort-arrow" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="${path}" /></svg>
+      </span>
+    `;
+  }
+
+  function updateSortButtons() {
+    content.querySelectorAll('#tx-sort-tabs button').forEach((button) => {
+      const sort = button.dataset.sort;
+      const isActive = sort === txSort;
+      button.classList.toggle('active', isActive);
+      button.innerHTML = `${sort === 'newest' ? 'Newest' : 'Amount'} ${sortArrow(txSortDirection[sort])}`;
+      const orderLabel =
+        sort === 'newest'
+          ? txSortDirection[sort] === 'desc'
+            ? 'newest to oldest'
+            : 'oldest to newest'
+          : txSortDirection[sort] === 'desc'
+            ? 'high to low'
+            : 'low to high';
+      button.setAttribute('aria-label', `Sort by ${sort}, ${orderLabel}`);
+    });
+  }
+
+  async function updateBalance() {
+    const balance = await fetchBalance();
+    const regular = Number(balance.regular || 0);
+    const swap = Number(balance.swap || 0);
+    const swappable = Math.max(regular, swap);
+    const total =
+      regular +
+      swap +
+      Number(balance.contract || 0);
+    const share = total > 0 ? Math.min(100, (swappable / total) * 100) : 0;
+
+    renderSatsAmount('#spendable-balance', swappable);
+    renderSatsAmount('#swap-balance', balance.swap);
+    renderSatsAmount('#regular-balance', balance.regular);
+    renderSatsAmount('#contract-balance', balance.contract);
+    content.querySelector('#balance-share').textContent =
+      `${share.toFixed(1)}%`;
+    content.querySelector('#balance-share-bar').style.width = `${share}%`;
+
+    return balance;
   }
 
   async function updateUtxos() {
-    const utxoTableBody = content.querySelector('#utxo-table-body');
-
-    // Build a txid→confirmations map from Bitcoin Core's listtransactions
-    // (getUtxos uses in-memory wallet state which stores stale confirmation counts)
     const txConfMap = new Map();
     try {
-      const txData = await window.api.taker.getTransactions(200, 0);
-      if (txData.success) {
-        for (const tx of txData.transactions || []) {
-          const txid = typeof tx.info.txid === 'object' ? tx.info.txid.value : tx.info.txid;
-          txConfMap.set(txid, tx.info.confirmations);
-        }
+      const txData = await fetchTransactions(200, 0);
+      for (const tx of txData || []) {
+        const txid =
+          typeof tx.info?.txid === 'object'
+            ? tx.info.txid.value
+            : tx.info?.txid;
+        txConfMap.set(txid, tx.info?.confirmations || 0);
       }
-      console.log('[UTXO] built tx confirmation map:', Object.fromEntries(txConfMap));
-    } catch (e) {
-      console.warn('[UTXO] could not build tx confirmation map, using raw values:', e.message);
-    }
-
-    // Helper to render UTXOs
-    const renderUtxos = (utxos) => {
-      if (utxos.length === 0) {
-        return '<tr><td colspan="4" class="text-center py-4 text-gray-400">No UTXOs found</td></tr>';
-      }
-
-      return utxos
-        .map((utxoData) => {
-          const utxo = utxoData.utxo;
-          const spendInfo = utxoData.spendInfo;
-          const txidShort = truncateTxid(utxo.txid);
-          const typeColor = getUtxoTypeColor(spendInfo.spendType);
-
-          return `
-        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
-              onclick="openTxOnMempool('${typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid}')">${txidShort}:${utxo.vout}</td>
-          <td class="py-3 px-4 text-green-400 font-mono">${satsToBtc(utxo.amount)}</td>
-          <td class="py-3 px-4 ${utxo.confirmations === 0 ? 'text-yellow-400' : 'text-gray-300'}">${utxo.confirmations}</td>
-          <td class="py-3 px-4">
-            <span class="px-2 py-1 rounded text-xs font-semibold bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
-              ${spendInfo.spendType}
-            </span>
-          </td>
-        </tr>
-      `;
-        })
-        .join('');
-    };
-
-    try {
-      const rawUtxos = await fetchUtxos();
-
-      // Enrich confirmation counts using the live tx data
-      const utxos = rawUtxos.map(u => {
-        const txid = typeof u.utxo.txid === 'object' ? u.utxo.txid.value : u.utxo.txid;
-        const liveConfs = txConfMap.get(txid);
-        if (liveConfs !== undefined && liveConfs !== u.utxo.confirmations) {
-          console.log(`[UTXO] enriching ${txid.slice(0, 8)}: ${u.utxo.confirmations} → ${liveConfs}`);
-          return { ...u, utxo: { ...u.utxo, confirmations: liveConfs } };
-        }
-        return u;
-      });
-
-      console.log('[REFRESH] UTXOs after enrichment:', utxos.map(u => ({
-        txid: typeof u.utxo.txid === 'object' ? u.utxo.txid.value : u.utxo.txid,
-        confirmations: u.utxo.confirmations,
-      })));
-
-      utxoTableBody.innerHTML = renderUtxos(utxos);
-      return utxos;
     } catch (error) {
-      console.error('❌ UTXO update failed:', error);
-      utxoTableBody.innerHTML = `
-        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
-          <td class="py-3 px-4 font-mono text-sm text-gray-300">No UTXOs</td>
-          <td class="py-3 px-4 text-gray-400 font-mono">--</td>
-          <td class="py-3 px-4 text-gray-400">--</td>
-          <td class="py-3 px-4 text-gray-400">--</td>
-        </tr>
-      `;
+      console.warn('Could not build transaction confirmation map:', error);
     }
+
+    const rawUtxos = await fetchUtxos();
+    allUtxos = rawUtxos.map((entry) => {
+      const txid =
+        typeof entry.utxo?.txid === 'object'
+          ? entry.utxo.txid.value
+          : entry.utxo?.txid;
+      const liveConfs = txConfMap.get(txid);
+      if (liveConfs !== undefined) {
+        return { ...entry, utxo: { ...entry.utxo, confirmations: liveConfs } };
+      }
+      return entry;
+    });
+
+    renderUtxos();
+    return allUtxos;
+  }
+
+  async function updateTransactions() {
+    allTransactions = await fetchTransactions(50, 0);
+    renderTransactions();
+    return allTransactions;
   }
 
   async function refreshAllData() {
     const refreshBtn = content.querySelector('#refresh-all-btn');
-    const originalText = refreshBtn.textContent;
-
-    refreshBtn.textContent = 'Refreshing...';
+    const refreshText = refreshBtn.querySelector('span');
     refreshBtn.disabled = true;
+    refreshBtn.classList.add('loading');
+    refreshText.textContent = 'Refreshing';
 
     try {
       localStorage.removeItem(WALLET_CACHE_KEY);
-
       try {
         await syncWalletState();
       } catch (syncErr) {
-        console.warn('⚠️ Wallet sync failed, refreshing data anyway:', syncErr.message);
+        console.warn(
+          'Wallet sync failed, refreshing data anyway:',
+          syncErr.message
+        );
       }
 
       const [balance, transactions, utxos] = await Promise.all([
@@ -362,168 +453,207 @@ export async function WalletComponent(container) {
       ]);
 
       if (balance) saveWalletToCache(balance, transactions, utxos);
-
-      console.log('[REFRESH] Complete summary:');
-      console.log('  balance:', balance);
-      console.log('  transactions confirmations:', transactions?.map(t => ({ txid: typeof t.info.txid === 'object' ? t.info.txid.value : t.info.txid, confirmations: t.info.confirmations })));
-      console.log('  utxo confirmations:', utxos?.map(u => ({ txid: typeof u.utxo.txid === 'object' ? u.utxo.txid.value : u.utxo.txid, confirmations: u.utxo.confirmations })));
-
-      refreshBtn.textContent = 'Refreshed!';
-      setTimeout(() => {
-        refreshBtn.textContent = originalText;
-        refreshBtn.disabled = false;
-      }, 2000);
+      content.querySelector('#last-updated').textContent =
+        'Last updated just now';
     } catch (error) {
-      refreshBtn.textContent = 'Refresh Failed';
-      setTimeout(() => {
-        refreshBtn.textContent = originalText;
-        refreshBtn.disabled = false;
-      }, 3000);
-      console.error('❌ Refresh failed:', error);
+      console.error('Refresh failed:', error);
+    } finally {
+      refreshText.textContent = 'Refresh';
+      refreshBtn.disabled = false;
+      refreshBtn.classList.remove('loading');
     }
   }
 
-  // Create and populate content
   const content = document.createElement('div');
   content.id = 'wallet-content';
+  content.className = 'app-page';
 
-  let walletInfo = { walletName: 'Loading...', walletPath: '...' };
+  let walletInfo = { walletName: 'Wallet', walletPath: "m/84'/0'/0'" };
   try {
     const info = await window.api.taker.getWalletInfo();
-    if (info.success) {
-      walletInfo = info;
-    }
+    if (info.success) walletInfo = info;
   } catch (error) {
     console.error('Failed to get wallet info:', error);
   }
 
   content.innerHTML = `
-        <div class="flex justify-between items-center mb-8">
-            <div>
-                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">${walletInfo.walletName}</h2>
-                <p class="text-gray-400 font-mono text-sm">${walletInfo.walletPath}</p>
-            </div>
-            <button id="refresh-all-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
-                Refresh
-            </button>
+    <header class="app-head">
+      <div>
+        <h2>Wallet</h2>
+        <div class="app-meta">
+          <span id="wallet-name"></span>
+          <span>.</span>
+          <span id="wallet-path"></span>
+          <span>.</span>
+          <span id="last-updated">Synced just now</span>
         </div>
+      </div>
+      <div class="app-actions">
+        <button id="refresh-all-btn" class="app-button primary" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3L20 8M20 4v4h-4"/><path d="M20 12a8 8 0 0 1-14 5.3L4 16M4 20v-4h4"/></svg>
+          <span>Refresh</span>
+        </button>
+      </div>
+    </header>
 
-        <!-- Balance Card -->
-        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-            <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">Balance</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                    <p class="text-sm text-gray-400 mb-1">Regular</p>
-                    <p id="regular-balance" class="text-2xl font-mono text-green-400">0.00000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">Regular wallet coins</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-400 mb-1">Swap</p>
-                    <p id="swap-balance" class="text-2xl font-mono text-blue-400">0.00000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">Received in swaps</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-400 mb-1">Contract</p>
-                    <p id="contract-balance" class="text-2xl font-mono text-yellow-400">0.00000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">In active contracts</p>
-                </div>
-                <div>
-                    <p class="text-sm text-gray-400 mb-1">Spendable</p>
-                    <p id="spendable-balance" class="text-2xl font-mono text-[#FF6B35]">0.00000000 BTC</p>
-                    <p class="text-xs text-gray-500 mt-1">Total available</p>
-                </div>
-            </div>
+    <section class="app-balances" aria-label="Wallet balances">
+      <article class="app-balance-card hero">
+        <span class="app-accent"></span>
+        <span class="app-card-label">Swappable</span>
+        <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <p>Highest Regular/Swap bucket</p>
+        <div class="app-share">
+          <span id="balance-share">0.0%</span>
+          <span class="app-share-track"><span id="balance-share-bar"></span></span>
+          <span>of total</span>
         </div>
+      </article>
+      <article class="app-balance-card info">
+        <span class="app-accent"></span>
+        <span class="app-card-label">Swaps</span>
+        <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <p>Reserved for swaps</p>
+      </article>
+      <article class="app-balance-card wallet">
+        <span class="app-accent"></span>
+        <span class="app-card-label">Regular</span>
+        <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <p>Regular coins</p>
+      </article>
+      <article class="app-balance-card warning">
+        <span class="app-accent"></span>
+        <span class="app-card-label">Contracts</span>
+        <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <p>In active contracts</p>
+      </article>
+    </section>
 
-       <!-- UTXOs Section -->
-        <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-            <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">UTXOs</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full">
-                    <thead>
-                        <tr class="border-b border-gray-700">
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Txid:Vout</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Amount</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Confirmations</th>
-                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Type</th>
-                        </tr>
-                    </thead>
-                    <tbody id="utxo-table-body">
-                        <!-- UTXOs will be populated here -->
-                    </tbody>
-                </table>
-                <button id="view-all-utxos" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
-                    View All UTXOs →
-                </button>
-            </div>
+    <section class="app-lower">
+      <article class="app-panel utxos">
+        <header class="app-panel-head">
+          <div>
+            <h3>UTXOs</h3>
+            <span id="utxo-count">0 unspent</span>
+          </div>
+        </header>
+        <div class="app-panel-body">
+          <div class="app-tabs" id="utxo-tabs">
+            <button class="active" data-filter="all" type="button">All <span data-utxo-count="all">0</span></button>
+            <button data-filter="regular" type="button">Regular <span data-utxo-count="regular">0</span></button>
+            <button data-filter="contract" type="button">Contract <span data-utxo-count="contract">0</span></button>
+            <button data-filter="swap" type="button">Swap <span data-utxo-count="swap">0</span></button>
+          </div>
+          <div class="app-utxo-head">
+            <span>Txid . Amount</span>
+            <span>Script</span>
+            <span>Type</span>
+            <span>Address</span>
+            <span></span>
+          </div>
+          <div class="app-list" id="app-utxo-list"></div>
         </div>
+        <footer class="app-panel-foot">
+          <span id="utxo-updated">Last updated just now</span>
+        </footer>
+      </article>
 
-        <!-- Recent Transactions -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
-            <h3 class="text-xl font-semibold text-lg mb-4 text-gray-300">Recent Transactions</h3>
-            <div id="transactions-container" class="space-y-3">
-                <!-- Transactions will be populated here -->
+      <article class="app-panel transactions">
+        <header class="app-panel-head compact">
+          <div>
+            <h3>Recent transactions</h3>
+            <span id="tx-count">0 total</span>
+          </div>
+          <div class="app-panel-controls">
+            <div class="app-tabs" id="tx-tabs">
+              <button class="active" data-filter="all" type="button">All</button>
+              <button data-filter="received" type="button">Received</button>
+              <button data-filter="sent" type="button">Sent</button>
+              <button data-filter="swap" type="button">Swaps</button>
             </div>
-            <button id="view-all-transactions" class="mt-4 text-[#FF6B35] hover:text-[#ff7d4d] text-sm font-semibold text-lg transition-colors">
-                View All Transactions →
-            </button>
+            <div class="app-tabs sort" id="tx-sort-tabs">
+              <button class="active" data-sort="newest" type="button">Newest ${sortArrow(txSortDirection.newest)}</button>
+              <button data-sort="amount" type="button">Amount ${sortArrow(txSortDirection.amount)}</button>
+            </div>
+          </div>
+        </header>
+        <div class="app-panel-body">
+          <div class="app-list tx" id="app-tx-list"></div>
         </div>
-    `;
+        <footer class="app-panel-foot">
+          <span>Live wallet</span>
+        </footer>
+      </article>
+    </section>
+  `;
 
   container.appendChild(content);
 
-  // Global function for opening transactions on mempool.space
-  window.openTxOnMempool = (txid) => {
-    const url = `http://170.75.166.88:8080/tx/${txid}`;
-    if (typeof require !== 'undefined') {
-      try {
-        const { shell } = require('electron');
-        shell.openExternal(url);
-      } catch (error) {
-        window.open(url, '_blank');
-      }
-    } else {
-      window.open(url, '_blank');
-    }
-  };
+  content.querySelector('#wallet-name').textContent =
+    walletInfo.walletName || 'Native SegWit';
+  content.querySelector('#wallet-path').textContent =
+    walletInfo.walletPath || "m/84'/0'/0'";
 
-  // Event handlers
+  window.openTxOnMempool = openMempool;
+  updateSortButtons();
+
   content
     .querySelector('#refresh-all-btn')
     .addEventListener('click', refreshAllData);
 
-  const viewAllButton = content.querySelector('#view-all-utxos');
-  if (viewAllButton) {
-    viewAllButton.addEventListener('click', () => {
-      import('./UtxoList.js').then((module) => {
-        container.innerHTML = '';
-        module.UtxoListComponent(container);
-      });
-    });
-  }
+  content.querySelector('#utxo-tabs').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-filter]');
+    if (!button) return;
+    utxoFilter = button.dataset.filter;
+    setButtonState('#utxo-tabs button', utxoFilter, 'filter');
+    renderUtxos();
+  });
 
-  const viewAllTransactionsButton = content.querySelector(
-    '#view-all-transactions'
-  );
-  if (viewAllTransactionsButton) {
-    viewAllTransactionsButton.addEventListener('click', () => {
-      import('./TransactionsList.js').then((module) => {
-        container.innerHTML = '';
-        module.TransactionsListComponent(container);
-      });
-    });
-  }
+  content.querySelector('#tx-tabs').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-filter]');
+    if (!button) return;
+    txFilter = button.dataset.filter;
+    setButtonState('#tx-tabs button', txFilter, 'filter');
+    renderTransactions();
+  });
 
-  console.log('🔄 Syncing and fetching fresh data...');
+  content.querySelector('#tx-sort-tabs').addEventListener('click', (event) => {
+    const button = event.target.closest('button[data-sort]');
+    if (!button) return;
+    const nextSort = button.dataset.sort;
+    if (txSort === nextSort) {
+      txSortDirection[nextSort] =
+        txSortDirection[nextSort] === 'desc' ? 'asc' : 'desc';
+    } else {
+      txSort = nextSort;
+    }
+    updateSortButtons();
+    renderTransactions();
+  });
+
+  content.querySelector('#app-utxo-list').addEventListener('click', (event) => {
+    const row = event.target.closest('[data-txid]');
+    if (row?.dataset.txid) openMempool(row.dataset.txid);
+  });
+
+  content.querySelector('#app-tx-list').addEventListener('click', (event) => {
+    const row = event.target.closest('[data-txid]');
+    if (row?.dataset.txid) openMempool(row.dataset.txid);
+  });
+
   try {
-    await window.api.taker.sync();
+    await syncWalletState();
   } catch (syncErr) {
-    console.warn('⚠️ Initial wallet sync failed, proceeding anyway:', syncErr.message);
+    console.warn(
+      'Initial wallet sync failed, proceeding anyway:',
+      syncErr.message
+    );
   }
+
   const [balance, transactions, utxos] = await Promise.all([
     updateBalance(),
     updateTransactions(),
     updateUtxos(),
   ]);
+
   if (balance) saveWalletToCache(balance, transactions, utxos);
 }

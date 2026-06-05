@@ -1,5 +1,7 @@
 import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
+import { createSwapProgressAnimation } from './SwapProgressAnimation.js';
 
 export async function CoinswapComponent(container, swapConfig) {
   function normalizeProtocol(value, fallbackIsTaproot = false) {
@@ -30,6 +32,7 @@ export async function CoinswapComponent(container, swapConfig) {
   let logPollInterval = null;
   let lastLogLine = '';
   let processedLogs = new Set();
+  let progressAnimation = null;
 
   if (existingSwap && existingSwap.status === 'in_progress' && savedProgress) {
     actualSwapConfig = existingSwap;
@@ -56,6 +59,15 @@ export async function CoinswapComponent(container, swapConfig) {
     hops: actualSwapConfig.hops,
     transactions: savedProgress?.transactions || [],
   };
+
+  const routeMakerAddresses = Array.isArray(savedProgress?.routeMakerAddresses)
+    ? savedProgress.routeMakerAddresses.slice(0, swapData.makers)
+    : Array.from({ length: swapData.makers }, () => null);
+  while (routeMakerAddresses.length < swapData.makers) {
+    routeMakerAddresses.push(null);
+  }
+  const pendingMakerAddresses = Array.from({ length: swapData.makers }, () => null);
+  const contractDataReceivedMakers = new Set();
 
   if (swapData.transactions.length === 0) {
     if (isV2) {
@@ -92,7 +104,7 @@ export async function CoinswapComponent(container, swapConfig) {
     }
   }
 
-  const makerColors = ['#FF6B35', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
+  const makerColors = ['#518def', '#3B82F6', '#A855F7', '#06B6D4', '#10B981'];
 
   function addLog(message, type = 'info') {
     // Avoid duplicate logs
@@ -112,20 +124,117 @@ export async function CoinswapComponent(container, swapConfig) {
       startTime,
       logMessages,
       transactions: swapData.transactions,
+      routeMakerAddresses,
       lastUpdated: Date.now(),
     });
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function compactEndpoint(value, left = 7, right = 5) {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    if (text.length <= left + right + 3) return text;
+    return `${text.slice(0, left)}...${text.slice(-right)}`;
+  }
+
+  function setPendingMakerAddress(makerIndex, address) {
+    if (
+      makerIndex === null ||
+      makerIndex < 0 ||
+      makerIndex >= swapData.makers ||
+      !address
+    ) {
+      return;
+    }
+
+    pendingMakerAddresses[makerIndex] = address;
+  }
+
+  function revealMakerAddress(makerIndex, address = null) {
+    if (
+      makerIndex === null ||
+      makerIndex < 0 ||
+      makerIndex >= swapData.makers
+    ) {
+      return;
+    }
+
+    const resolvedAddress =
+      address ||
+      routeMakerAddresses[makerIndex] ||
+      pendingMakerAddresses[makerIndex];
+    if (!resolvedAddress) return;
+
+    routeMakerAddresses[makerIndex] = resolvedAddress;
+    progressAnimation?.setMakerAddress(makerIndex, resolvedAddress);
+
+    const addressEl = content.querySelector(
+      `#maker-${makerIndex} .route-address`
+    );
+    if (addressEl) {
+      addressEl.textContent = compactEndpoint(resolvedAddress);
+      addressEl.title = resolvedAddress;
+      addressEl.classList.remove('is-pending');
+    }
+    saveProgress();
   }
 
   function updateLogs() {
     const logContainer = content.querySelector('#log-container');
     if (!logContainer) return;
+    const logCount = content.querySelector('#swap-log-count');
+    if (logCount) logCount.textContent = logMessages.length;
+    const formatLogLevel = (type) => {
+      if (type === 'error') return 'ERROR';
+      if (type === 'warn') return 'WARNING';
+      return 'INFO';
+    };
+    const getLogHighlight = (message) => {
+      const text = String(message || '').toLowerCase();
+      if (text.includes('fidelity')) return 'is-fidelity';
+      if (text.includes('funding tx') || text.includes('funding transaction')) {
+        return 'is-funding';
+      }
+      if (
+        text.includes('contract tx') ||
+        text.includes('contract data') ||
+        text.includes('registered watcher') ||
+        text.includes('broadcast contract') ||
+        text.includes('incoming contract') ||
+        text.includes('outgoing contract')
+      ) {
+        return 'is-contract';
+      }
+      if (
+        text.includes('recovery') ||
+        text.includes('recovered') ||
+        text.includes('hashlock') ||
+        text.includes('timelock')
+      ) {
+        return 'is-recovery';
+      }
+      if (text.includes('swap report') || text.includes('generating swap report')) {
+        return 'is-report';
+      }
+      if (text.includes('txid') || text.includes('broadcast')) return 'is-tx';
+      return '';
+    };
     logContainer.innerHTML = logMessages
       .slice(0, 50)
       .map(
-        (log) => `
-      <div class="text-xs font-mono mb-1">
-        <span class="text-gray-500">[${log.timestamp}]</span>
-        <span class="${log.type === 'error' ? 'text-red-400' : log.type === 'success' ? 'text-green-400' : log.type === 'warn' ? 'text-yellow-400' : 'text-gray-300'}">${log.message}</span>
+        (log, index) => `
+      <div class="swap-log-line ${log.type} ${getLogHighlight(log.message)}">
+        <span>${String(index + 1).padStart(2, '0')}.${String(index * 5).padStart(2, '0')}</span>
+        <b>[${formatLogLevel(log.type)}]</b>
+        <strong>${log.message}</strong>
       </div>
     `
       )
@@ -139,61 +248,106 @@ export async function CoinswapComponent(container, swapConfig) {
     const timeEl = content.querySelector('#elapsed-time');
     if (timeEl)
       timeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    const etaEl = content.querySelector('#swap-eta');
+    if (etaEl) {
+      const total = Math.max(30, (swapData.hops || 3) * 40);
+      const remaining = Math.max(0, total - elapsed);
+      etaEl.textContent = `${Math.floor(remaining / 60)}m ${String(remaining % 60).padStart(2, '0')}s`;
+    }
+  }
+
+  function updateStageFromRoute() {
+    if (
+      content.dataset.completed === 'true' ||
+      content.dataset.failed === 'true'
+    ) {
+      return;
+    }
+
+    const connected = content.querySelectorAll('.route-node.connected').length;
+    const connecting = content.querySelectorAll('.route-node.connecting').length;
+    const animationPhase = content.querySelector('.swap-animation')?.dataset.phase;
+    const stepEl = content.querySelector('#swap-step-label');
+    const titleEl = content.querySelector('#swap-page-title');
+    const progressEl = content.querySelector('#swap-progress-fill');
+    const routeStatuses = Array.from(
+      content.querySelectorAll('.route-node .route-status')
+    ).map((node) => String(node.textContent || '').toLowerCase());
+    const isSweeping =
+      routeStatuses.some((status) =>
+        /sweep|complete|settled/.test(status) || status === 'received'
+      );
+    const isKeyHandover = routeStatuses.some((status) =>
+      /key|exchange|final|receiving/.test(status)
+    );
+    const routeStep = Math.min(
+      4,
+      Math.max(1, connected + (connecting > 0 ? 1 : 0))
+    );
+    const phaseHeader =
+      isSweeping
+        ? { step: 4, title: 'Sweeping the Contract' }
+        : isKeyHandover
+          ? { step: 3, title: 'Handing Over Key Materials' }
+        : animationPhase === 'contract'
+          ? { step: 2, title: 'Establishing Contract Txs' }
+          : null;
+    const step = phaseHeader ? Math.max(routeStep, phaseHeader.step) : routeStep;
+
+    currentStep = Math.max(currentStep, step);
+    if (stepEl) stepEl.textContent = `Step ${step} of 4 · Swap in progress`;
+    if (titleEl) {
+      titleEl.textContent =
+        phaseHeader?.title ||
+        (step <= 1
+          ? 'Handshake'
+          : step === 2
+            ? 'Establishing Contract Txs'
+            : step === 3
+              ? 'Handing Over Key Materials'
+              : 'Sweeping the Contract');
+    }
+    if (progressEl) {
+      progressEl.style.width = `${Math.min(100, step * 25)}%`;
+    }
   }
 
   function updateHopStatus(hopIndex, statusText, color) {
-    const hop = content.querySelector(`#hop-${hopIndex}`);
-    if (!hop) return;
-
-    const hopStatus = hop.querySelector('.hop-status');
-    if (hopStatus) {
-      // Hop labels are SVG <text> nodes, so icon SVG markup must be stripped.
-      const normalizedStatus = String(statusText)
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-      const fillColor =
-        color === 'green'
-          ? '#4ADE80'
-          : color === 'yellow'
-            ? '#FACC15'
-            : color === 'orange'
-              ? '#FB923C'
-              : color === 'blue'
-                ? '#60A5FA'
-                : '#9CA3AF';
-
-      hopStatus.textContent = normalizedStatus;
-      hopStatus.setAttribute('fill', fillColor);
-
-      // ✅ FIX: Use setAttribute for SVG elements
-      hopStatus.setAttribute(
-        'class',
-        'hop-status text-xs font-bold'
-      );
-
-      if (color === 'yellow' || color === 'orange') {
-        hopStatus.classList.add('animate-pulse');
-      }
-    }
+    const normalizedStatus = String(statusText)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    progressAnimation?.setMakerStatus(hopIndex, normalizedStatus, color);
+    updateStageFromRoute();
   }
 
   function updateMakerVisibility(makerIndex, visible) {
-    const maker = content.querySelector(`#maker-${makerIndex}`);
-    if (maker) {
-      maker.style.opacity = visible ? '1' : '0.3';
-      maker.style.filter = visible ? 'blur(0)' : 'blur(4px)';
-    }
+    progressAnimation?.setMakerVisible(makerIndex, visible);
   }
 
-  function markAllMakersComplete() {
+  function markAllMakersComplete({ final = false } = {}) {
+    if (!final) {
+      return;
+    }
+
+    progressAnimation?.setComplete();
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
       updateHopStatus(i, 'Complete', 'green');
     }
   }
 
+  function markContractsReceivedIfComplete() {
+    if (contractDataReceivedMakers.size < swapData.makers) return;
+
+    for (let i = 0; i < swapData.makers; i++) {
+      updateMakerVisibility(i, true);
+      updateHopStatus(i, 'Contract received', 'green');
+    }
+  }
+
   function markAllMakersFailed() {
+    progressAnimation?.setFailed();
     for (let i = 0; i < swapData.makers; i++) {
       updateMakerVisibility(i, true);
       updateHopStatus(i, 'Failed', 'orange');
@@ -201,13 +355,11 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function updateYouSend(active) {
-    const youSend = content.querySelector('#you-send');
-    if (youSend) youSend.style.opacity = active ? '1' : '0.5';
+    progressAnimation?.setWalletActive(active);
   }
 
   function updateYouReceive(active) {
-    const youReceive = content.querySelector('#you-receive');
-    if (youReceive) youReceive.style.opacity = active ? '1' : '0.3';
+    progressAnimation?.setReceiverActive(active);
   }
 
   function setTransactionTxid(hopIndex, txid) {
@@ -270,6 +422,17 @@ export async function CoinswapComponent(container, swapConfig) {
     const type =
       level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info';
 
+    const relevantModules = [
+      'coinswap::taker::api',
+      'coinswap::taker::taproot_swap',
+      'coinswap::taker::taproot_verification',
+      'coinswap::wallet::api',
+      'coinswap::wallet::spend',
+      'coinswap::wallet::swapcoin',
+      'coinswap::wallet::report',
+    ];
+    if (!relevantModules.includes(module)) return;
+
     // Add raw message to log
     addLog(message, type);
 
@@ -278,6 +441,36 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndexMatch && Number.isFinite(Number(makerIndexMatch[1]))
         ? Number(makerIndexMatch[1])
         : null;
+    const connectingMakerMatch = message.match(
+      /Connecting to maker\s+(\d+)\s+at\s+(\S+)/i
+    );
+    if (connectingMakerMatch) {
+      setPendingMakerAddress(
+        Number(connectingMakerMatch[1]),
+        connectingMakerMatch[2]
+      );
+    }
+    const substituteMakerMatch = message.match(
+      /Substituting maker\s+(\d+)\s+with spare at\s+(\S+)/i
+    );
+    if (substituteMakerMatch) {
+      setPendingMakerAddress(
+        Number(substituteMakerMatch[1]),
+        substituteMakerMatch[2]
+      );
+    }
+    const selectedMakersMatch = message.match(/Selected\s+\d+\s+makers[^:]*:\s+(.+)$/i);
+    if (selectedMakersMatch) {
+      selectedMakersMatch[1]
+        .split(/,\s*/)
+        .forEach((entry) => {
+          const match = entry.match(/#(\d+)\s+(\S+?\.onion)/i);
+          if (!match) return;
+          const makerIdx = Number(match[1]) - 1;
+          setPendingMakerAddress(makerIdx, match[2]);
+          revealMakerAddress(makerIdx, match[2]);
+        });
+    }
 
     // Update UI based on message content (supports both V1 and V2 protocols)
 
@@ -296,7 +489,7 @@ export async function CoinswapComponent(container, swapConfig) {
         const emptySlot = swapData.transactions.findIndex((tx) => !tx.txid);
         if (emptySlot !== -1) {
           setTransactionTxid(emptySlot, txMatch[1]);
-          updateHopStatus(emptySlot, 'Confirming...', 'orange');
+          updateHopStatus(emptySlot, 'In mempool...', 'orange');
         }
       }
     }
@@ -312,9 +505,18 @@ export async function CoinswapComponent(container, swapConfig) {
         updateMakerVisibility(0, true); // Light up first maker
       }
     }
+    // Taproot: "Broadcast contract tx: <txid>"
+    else if (message.includes('Broadcast contract tx')) {
+      const txMatch = message.match(/([a-f0-9]{64})/i);
+      if (txMatch) {
+        setTransactionTxid(0, txMatch[1]);
+        updateHopStatus(0, 'Broadcasting...', 'orange');
+        updateMakerVisibility(0, true);
+      }
+    }
     // V2: "Persisted outgoing swapcoin to wallet store"
     else if (message.includes('Persisted outgoing swapcoin to wallet store')) {
-      updateHopStatus(0, 'Confirming...', 'orange');
+      updateHopStatus(0, 'In mempool...', 'orange');
     }
     // V1: "Tx [txid] | Confirmed at"
     else if (message.match(/Tx [a-f0-9]+ \| Confirmed at/i)) {
@@ -386,13 +588,26 @@ export async function CoinswapComponent(container, swapConfig) {
       // Mark first few hops as negotiating
       updateHopStatus(0, 'Negotiating...', 'yellow');
     }
+    // V1: Maker responded during negotiation. Only now reveal the address.
+    else if (
+      makerIndex !== null &&
+      (message.includes('Received offer from maker') ||
+        (message.includes('Maker') && message.includes('accepted swap')) ||
+        message.includes('Sending ProofOfFunding to maker') ||
+        (message.includes('Maker') &&
+          message.includes('processed successfully')))
+    ) {
+      revealMakerAddress(makerIndex);
+      updateMakerVisibility(makerIndex, true);
+      updateHopStatus(makerIndex, 'Connected', 'green');
+    }
     // V2: "All makers have responded with their outgoing keys"
     else if (
       message.includes('All makers have responded with their outgoing keys')
     ) {
-      // Mark all intermediate hops as "Keys received"
+      // Mark all intermediate hops as "Key received"
       for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, 'Keys received', 'green');
+        updateHopStatus(i, 'Key received', 'green');
       }
     }
     // V2: "Registered watcher for taker's incoming contract"
@@ -416,35 +631,21 @@ export async function CoinswapComponent(container, swapConfig) {
       const txMatch = message.match(/([a-f0-9]{64})/i);
       if (txMatch) {
         const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, 'Swept', 'green');
+        updateHopStatus(lastHop, 'Received', 'green');
       }
     }
     // V1: "Swaps settled successfully"
     else if (message.includes('Swaps settled successfully')) {
-      for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, 'Complete', 'green');
-      }
+      markAllMakersComplete();
     }
     // V2: "Taker sweep completed successfully"
     else if (message.includes('Taker sweep completed successfully')) {
-      for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, 'Complete', 'green');
-      }
-      // Make sure all makers are visible
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-      }
+      markAllMakersComplete();
       updateYouReceive(true);
     }
     // V2: "Successfully Completed Taproot Coinswap"
     else if (message.includes('Successfully Completed Taproot Coinswap')) {
-      for (let i = 0; i < swapData.hops; i++) {
-        updateHopStatus(i, 'Complete', 'green');
-      }
-      // Make sure all makers are visible
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-      }
+      markAllMakersComplete();
       updateYouReceive(true);
     }
     // V1: "Successfully swept incoming swap coin"
@@ -477,6 +678,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Sending contract data to maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Contracting...', 'yellow');
     }
@@ -485,14 +687,18 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Received Taproot contract data from maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Contract received', 'blue');
+      contractDataReceivedMakers.add(makerIndex);
+      updateHopStatus(makerIndex, 'Contract received', 'yellow');
+      markContractsReceivedIfComplete();
     }
     // V2: "Verified Taproot contract data from maker N"
     else if (
       makerIndex !== null &&
       message.includes('Verified Taproot contract data from maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Contract ready', 'green');
     }
@@ -501,6 +707,7 @@ export async function CoinswapComponent(container, swapConfig) {
       makerIndex !== null &&
       message.includes('Received private key from maker')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Key received', 'green');
     }
@@ -510,6 +717,7 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('Sending privkey to maker') &&
       message.includes('awaiting response')
     ) {
+      revealMakerAddress(makerIndex);
       updateMakerVisibility(makerIndex, true);
       updateHopStatus(makerIndex, 'Finalizing...', 'yellow');
     }
@@ -530,7 +738,6 @@ export async function CoinswapComponent(container, swapConfig) {
     // V2: "Swap finalized successfully"
     else if (message.includes('Swap finalized successfully')) {
       markAllMakersComplete();
-      updateYouReceive(true);
     }
     // V2: "Sweeping N completed incoming swap coins"
     else if (
@@ -538,7 +745,6 @@ export async function CoinswapComponent(container, swapConfig) {
       message.includes('completed incoming swap coins')
     ) {
       markAllMakersComplete();
-      updateYouReceive(true);
     }
     // V2: Recovery started
     else if (message.includes('Starting taproot swap recovery')) {
@@ -589,7 +795,7 @@ export async function CoinswapComponent(container, swapConfig) {
       if (actualSwapConfig.nativeSwapId) {
         addLog(`Backend Swap ID: ${actualSwapConfig.nativeSwapId}`, 'info');
       }
-      addLog(`Amount: ${(swapData.amount / 100000000).toFixed(8)} BTC`, 'info');
+      addLog(`Amount: ${formatSats(swapData.amount)}`, 'info');
       addLog(`Makers: ${swapData.makers}`, 'info');
 
       SwapStateManager.saveSwapProgress({
@@ -597,6 +803,7 @@ export async function CoinswapComponent(container, swapConfig) {
         startTime,
         logMessages,
         transactions: swapData.transactions,
+        routeMakerAddresses,
         status: 'in_progress',
       });
 
@@ -686,10 +893,6 @@ export async function CoinswapComponent(container, swapConfig) {
           addLog('Swap failed: ' + swap.error, 'error');
           updateHeaderState('failed');
           markAllMakersFailed();
-          content.querySelector('#swap-status-text').textContent =
-            'Swap Failed';
-          content.querySelector('#swap-status-text').className =
-            'text-2xl font-bold text-red-400';
 
           await SwapStateManager.saveSwapProgress({
             ...(await SwapStateManager.getSwapProgress()),
@@ -710,50 +913,45 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function showFailureModal(errorMessage) {
-    // Create modal overlay
     const modal = document.createElement('div');
-    modal.className =
-      'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50';
+    modal.className = 'swap-failure-overlay';
     modal.innerHTML = `
-    <div class="bg-[#1a2332] rounded-lg p-6 max-w-md mx-4 border border-red-500/30">
-      <div class="flex items-center mb-4">
-        <div class="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mr-4">
-          <svg class="w-6 h-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-          </svg>
+    <section class="swap-failure-dialog" role="dialog" aria-modal="true" aria-labelledby="swap-failure-title">
+      <header class="swap-failure-head">
+        <div class="swap-failure-icon">${icons.xCircle(24)}</div>
+        <div>
+          <span>Swap failed</span>
+          <h3 id="swap-failure-title">Recovery Started</h3>
         </div>
-        <h3 class="text-xl font-bold text-red-400">Swap Failed</h3>
+      </header>
+
+      <p class="swap-failure-copy">
+        The coinswap could not be completed. Your funds are safe and recovery has been initiated. Check your wallet for returned funds.
+      </p>
+
+      <div class="swap-failure-recovery">
+        ${icons.shieldCheck(18)}
+        <span>Recovery has started. Once completed the wallet will reflect recovered balance.</span>
       </div>
-      
-      <div class="mb-6">
-        <p class="text-gray-300 mb-3">The coinswap could not be completed. Your funds are safe and recovery has been initiated.</p>
-        
-        <div class="bg-[#0f1419] rounded p-3 mb-3">
-          <p class="text-xs text-gray-400 mb-1">Error Details:</p>
-          <p class="text-sm text-red-300 font-mono break-words">${errorMessage || 'Unknown error'}</p>
-        </div>
-        
-        <div class="bg-blue-500/10 border border-blue-500/30 rounded p-3 text-xs text-blue-300">
-          <p class="font-semibold mb-1">${icons.shieldCheck(16, 'mr-2')} Your funds are protected</p>
-          <p>Recovery process has started automatically. Check your wallet for returned funds.</p>
-        </div>
-      </div>
-      
-      <button id="modal-to-swap" class="w-full bg-[#FF6B35] hover:bg-[#FF8555] text-white font-bold py-3 px-4 rounded-lg transition-colors">
+
+      <details class="swap-failure-details">
+        <summary>Error details</summary>
+        <pre>${escapeHtml(errorMessage || 'Unknown error')}</pre>
+      </details>
+
+      <button id="modal-to-swap" class="swap-failure-primary" type="button">
         Back to Swap Page
       </button>
-    </div>
+    </section>
   `;
 
     document.body.appendChild(modal);
 
-    // Add event listener
     modal.querySelector('#modal-to-swap').addEventListener('click', () => {
       modal.remove();
       if (pollInterval) clearInterval(pollInterval);
       if (logPollInterval) clearInterval(logPollInterval);
 
-      // Navigate back to Swap page
       import('./Swap.js').then((module) => {
         container.innerHTML = '';
         module.SwapComponent(container);
@@ -773,12 +971,11 @@ export async function CoinswapComponent(container, swapConfig) {
     addLog('Generating swap report...', 'success');
 
     updateHeaderState('completed');
-    markAllMakersComplete();
+    markAllMakersComplete({ final: true });
     updateYouReceive(true);
-    content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
-    content.querySelector('#swap-status-text').className =
-      'text-2xl font-bold text-green-400';
-    content.querySelector('#complete-button').classList.remove('hidden');
+    const completeButton = content.querySelector('#complete-button');
+    completeButton.hidden = false;
+    completeButton.classList.remove('hidden');
 
     const transformedReport = transformSwapReport(report);
     transformedReport.protocol = swapProtocol;
@@ -903,6 +1100,16 @@ export async function CoinswapComponent(container, swapConfig) {
         info.amount_relative_fee ?? info.amountRelativeFee ?? 0;
       const timeRelativeFee =
         info.time_relative_fee ?? info.timeRelativeFee ?? 0;
+      const fidelityTxid =
+        info.fidelity_txid ??
+        info.fidelityTxid ??
+        info.fidelity_bond_txid ??
+        info.fidelityBondTxid ??
+        info.bond_txid ??
+        info.bondTxid ??
+        info.fidelity_transaction ??
+        info.fidelityTransaction ??
+        null;
       const feeTotal = baseFee + amountRelativeFee + timeRelativeFee;
       totalMakerFees += feeTotal;
 
@@ -913,6 +1120,7 @@ export async function CoinswapComponent(container, swapConfig) {
         amountRelativeFee,
         timeRelativeFee,
         totalFee: feeTotal,
+        fidelityTxid,
       };
     });
 
@@ -989,12 +1197,11 @@ export async function CoinswapComponent(container, swapConfig) {
     addLog('All operations completed!', 'success');
 
     updateHeaderState('completed');
-    markAllMakersComplete();
+    markAllMakersComplete({ final: true });
     updateYouReceive(true);
-    content.querySelector('#swap-status-text').textContent = 'Swap Complete!';
-    content.querySelector('#swap-status-text').className =
-      'text-2xl font-bold text-green-400';
-    content.querySelector('#complete-button').classList.remove('hidden');
+    const completeButton = content.querySelector('#complete-button');
+    completeButton.hidden = false;
+    completeButton.classList.remove('hidden');
 
     const defaultReport = getDefaultReport();
     await SwapStateManager.completeSwap(defaultReport);
@@ -1032,7 +1239,7 @@ export async function CoinswapComponent(container, swapConfig) {
       const [outgoing, incoming] = swapData.transactions;
       txList.innerHTML = `
       <div class="space-y-3">
-        <div class="bg-[#0f1419] rounded p-3">
+        <div class="bg-app-bg rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Locking Funds</span>
             <span class="${outgoing.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
@@ -1042,7 +1249,7 @@ export async function CoinswapComponent(container, swapConfig) {
           ${outgoing.txid ? `<div class="font-mono text-xs text-gray-400 break-all">${outgoing.txid}</div>` : '<div class="text-gray-500 text-xs">Waiting for broadcast...</div>'}
         </div>
 
-        <div class="bg-[#0f1419] rounded p-3">
+        <div class="bg-app-bg rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Receiving Funds</span>
             <span class="${incoming.status === 'confirmed' ? 'text-green-400' : 'text-gray-500'}">
@@ -1059,7 +1266,7 @@ export async function CoinswapComponent(container, swapConfig) {
           const hasData = tx.txid || tx.status !== 'pending';
           if (!hasData) {
             return `
-          <div class="bg-[#0f1419] rounded p-2 text-xs opacity-50">
+          <div class="bg-app-bg rounded p-2 text-xs opacity-50">
             <div class="flex justify-between mb-1">
               <span class="text-gray-400">Hop ${index + 1}</span>
               <span class="text-gray-500">⏳</span>
@@ -1070,7 +1277,7 @@ export async function CoinswapComponent(container, swapConfig) {
           }
 
           return `
-        <div class="bg-[#0f1419] rounded p-2 text-xs">
+        <div class="bg-app-bg rounded p-2 text-xs">
           <div class="flex justify-between mb-1">
             <span class="text-gray-400">Hop ${index + 1}</span>
             <span class="${tx.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
@@ -1079,7 +1286,7 @@ export async function CoinswapComponent(container, swapConfig) {
           </div>
           <div class="font-mono text-gray-300">${tx.txid ? tx.txid.substring(0, 12) + '...' : 'Pending'}</div>
           <div class="text-gray-500 mt-1">
-            ${tx.fee ? `Fee: ${tx.fee} sats` : ''} 
+            ${tx.fee ? `Fee: ${tx.fee} 丰` : ''}
             ${tx.size ? `| ${tx.size} vB` : ''}
           </div>
         </div>
@@ -1092,306 +1299,15 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function buildFlowDiagram() {
-    const actualMakers = swapData.makers; // Number of actual makers (e.g., 2)
-    const totalNodes = actualMakers + 1;
-
-    // Dynamic node sizing based on maker count
-    const youHalf = actualMakers <= 5 ? 38 : actualMakers <= 10 ? 30 : 22;
-    const makerHalf = actualMakers <= 5 ? 32 : actualMakers <= 10 ? 25 : 18;
-    const youFont = actualMakers <= 5 ? 22 : actualMakers <= 10 ? 16 : 13;
-    const makerFont = actualMakers <= 5 ? 20 : actualMakers <= 10 ? 14 : 10;
-    const youRx = actualMakers <= 5 ? 14 : 10;
-    const makerRx = actualMakers <= 5 ? 10 : 7;
-    const maxNodeHalf = Math.max(youHalf, makerHalf);
-    const labelPad = youHalf + 62;
-
-    function getRectPoint(distance, width, height) {
-      const halfW = width / 2;
-      const halfH = height / 2;
-      const top = width / 2;
-      const right = height;
-      const bottom = width;
-      const left = height;
-      const perimeter = top + right + bottom + left + top;
-      let remaining = ((distance % perimeter) + perimeter) % perimeter;
-
-      const linePoint = (x1, y1, x2, y2, travelled, segmentLength) => {
-        const ratio = segmentLength === 0 ? 0 : travelled / segmentLength;
-        return {
-          x: x1 + (x2 - x1) * ratio,
-          y: y1 + (y2 - y1) * ratio,
-        };
-      };
-
-      const segments = [
-        {
-          length: top,
-          point: (travelled) =>
-            linePoint(0, -halfH, halfW, -halfH, travelled, top),
-        },
-        {
-          length: right,
-          point: (travelled) =>
-            linePoint(halfW, -halfH, halfW, halfH, travelled, right),
-        },
-        {
-          length: bottom,
-          point: (travelled) =>
-            linePoint(halfW, halfH, -halfW, halfH, travelled, bottom),
-        },
-        {
-          length: left,
-          point: (travelled) =>
-            linePoint(-halfW, halfH, -halfW, -halfH, travelled, left),
-        },
-        {
-          length: top,
-          point: (travelled) =>
-            linePoint(-halfW, -halfH, 0, -halfH, travelled, top),
-        },
-      ];
-
-      for (const segment of segments) {
-        if (remaining <= segment.length) {
-          return segment.point(remaining);
-        }
-        remaining -= segment.length;
-      }
-
-      return { x: 0, y: -halfH };
-    }
-
-    function buildAdaptiveLayout() {
-      const gap = 14;
-
-      if (actualMakers <= 4) {
-        const minRadius = (maxNodeHalf + gap) / Math.sin(Math.PI / totalNodes);
-        const radius = Math.max(minRadius, 140);
-        const svgSize = Math.round((radius + labelPad) * 2);
-        const centerX = svgSize / 2;
-        const centerY = svgSize / 2;
-        const angleStep = (2 * Math.PI) / totalNodes;
-        const positions = Array.from({ length: totalNodes }, (_, i) => {
-          const angle = angleStep * i - Math.PI / 2;
-          return {
-            x: centerX + radius * Math.cos(angle),
-            y: centerY + radius * Math.sin(angle),
-          };
-        });
-
-        return {
-          centerX,
-          centerY,
-          svgWidth: svgSize,
-          svgHeight: svgSize,
-          positions,
-          guideMarkup: `<circle cx="${centerX}" cy="${centerY}" r="${radius}"
-                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.6"/>`,
-        };
-      }
-
-      if (actualMakers <= 11) {
-        const safeSin = Math.max(Math.sin(Math.PI / totalNodes), 0.22);
-        const minRadius =
-          (maxNodeHalf + gap + Math.max(0, actualMakers - 5) * 2) / safeSin;
-        const rx = Math.max(minRadius * 1.15, 190 + actualMakers * 10);
-        const ry = Math.max(minRadius * 0.72, 120 + actualMakers * 5);
-        const svgWidth = Math.round(rx * 2 + labelPad * 2 + 30);
-        const svgHeight = Math.round(ry * 2 + labelPad * 2);
-        const centerX = svgWidth / 2;
-        const centerY = svgHeight / 2;
-        const angleStep = (2 * Math.PI) / totalNodes;
-        const positions = Array.from({ length: totalNodes }, (_, i) => {
-          const angle = angleStep * i - Math.PI / 2;
-          return {
-            x: centerX + rx * Math.cos(angle),
-            y: centerY + ry * Math.sin(angle),
-          };
-        });
-
-        return {
-          centerX,
-          centerY,
-          svgWidth,
-          svgHeight,
-          positions,
-          guideMarkup: `<ellipse cx="${centerX}" cy="${centerY}" rx="${rx}" ry="${ry}"
-                fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="6 6" opacity="0.6"/>`,
-        };
-      }
-
-      const isSquareLayout = actualMakers <= 14;
-      const width = isSquareLayout
-        ? Math.max(420, 360 + actualMakers * 16)
-        : Math.max(640, 430 + actualMakers * 24);
-      const height = isSquareLayout
-        ? width
-        : Math.max(320, 250 + Math.min(actualMakers - 14, 8) * 18);
-      const halfW = width / 2;
-      const halfH = height / 2;
-      const perimeter = width * 2 + height * 2;
-      const svgWidth = Math.round(width + labelPad * 2);
-      const svgHeight = Math.round(height + labelPad * 2);
-      const centerX = svgWidth / 2;
-      const centerY = svgHeight / 2;
-      const step = perimeter / totalNodes;
-      const positions = Array.from({ length: totalNodes }, (_, i) => {
-        const point = getRectPoint(step * i, width, height);
-        return {
-          x: centerX + point.x,
-          y: centerY + point.y,
-        };
-      });
-
-      const x = centerX - halfW;
-      const y = centerY - halfH;
-      const guideMarkup = `<rect x="${x}" y="${y}" width="${width}" height="${height}"
-              fill="none" stroke="#1e293b" stroke-width="1.5" stroke-dasharray="7 7" opacity="0.6"/>`;
-
-      return {
-        centerX,
-        centerY,
-        svgWidth,
-        svgHeight,
-        positions,
-        guideMarkup,
-      };
-    }
-
-    const { centerX, centerY, svgWidth, svgHeight, positions, guideMarkup } =
-      buildAdaptiveLayout();
-
-    const statusW = Math.max(70, makerHalf * 3.5);
-    const statusHalfW = statusW / 2;
-
-    return `
-    <div class="flex items-center justify-center overflow-auto">
-      <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}" class="mx-auto max-w-full">
-        <defs>
-          ${Array.from({ length: totalNodes }, (_, i) => {
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-            return `<marker id="arrow-${i}" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
-              <polygon points="0 0, 8 3, 0 6" fill="${color}" opacity="0.85"/>
-            </marker>`;
-          }).join('')}
-          <filter id="glow-you" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="5" result="blur"/>
-            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-          </filter>
-        </defs>
-
-        <!-- Guide path -->
-        ${guideMarkup}
-
-        <!-- Arrows -->
-        ${positions
-          .map((pos, i) => {
-            const nextPos = positions[(i + 1) % positions.length];
-            const color =
-              i < actualMakers
-                ? makerColors[i % makerColors.length]
-                : '#10B981';
-            const fromHalf = i === 0 ? youHalf : makerHalf;
-            const toHalf =
-              (i + 1) % positions.length === 0 ? youHalf : makerHalf;
-            const dx = nextPos.x - pos.x;
-            const dy = nextPos.y - pos.y;
-            const len = Math.sqrt(dx * dx + dy * dy);
-            const sx = pos.x + (dx / len) * (fromHalf + 4);
-            const sy = pos.y + (dy / len) * (fromHalf + 4);
-            const ex = nextPos.x - (dx / len) * (toHalf + 10);
-            const ey = nextPos.y - (dy / len) * (toHalf + 10);
-            return `<a id="arrow-link-${i}" href="#" target="_blank" rel="noopener noreferrer" title="View transaction">
-            <line x1="${sx.toFixed(1)}" y1="${sy.toFixed(1)}" x2="${ex.toFixed(1)}" y2="${ey.toFixed(1)}"
-                  stroke="${color}" stroke-width="2" marker-end="url(#arrow-${i})" opacity="0.6" class="transition-opacity"/>
-          </a>`;
-          })
-          .join('')}
-
-        <!-- You node -->
-        <g id="you-node" style="transition: all 0.3s;">
-          <rect x="${(positions[0].x - youHalf).toFixed(1)}" y="${(positions[0].y - youHalf).toFixed(1)}"
-                width="${youHalf * 2}" height="${youHalf * 2}" rx="${youRx}"
-                fill="#FF6B35" id="you-rect" style="transition: fill 0.5s;" filter="url(#glow-you)"/>
-          <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youFont * 0.38).toFixed(1)}"
-                text-anchor="middle" fill="white" font-size="${youFont}" font-weight="bold">You</text>
-          <text id="you-state-text"
-                x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 17).toFixed(1)}"
-                text-anchor="middle" fill="#D1D5DB" font-size="${Math.max(8, youFont - 12)}">Send</text>
-          <text x="${positions[0].x.toFixed(1)}" y="${(positions[0].y + youHalf + 30).toFixed(1)}"
-                text-anchor="middle" fill="white" font-size="${Math.max(7, youFont - 14)}"
-                font-family="monospace">${(swapData.amount / 100000000).toFixed(4)}</text>
-        </g>
-
-        <!-- Makers -->
-        ${Array.from({ length: actualMakers }, (_, i) => {
-          const pos = positions[i + 1];
-          const color = makerColors[i % makerColors.length];
-          return `<g id="maker-${i}" style="opacity: ${i === 0 ? '1' : '0.3'}; filter: ${i === 0 ? 'none' : 'blur(2px)'}; transition: all 0.4s;">
-            <rect x="${(pos.x - makerHalf).toFixed(1)}" y="${(pos.y - makerHalf).toFixed(1)}"
-                  width="${makerHalf * 2}" height="${makerHalf * 2}" rx="${makerRx}" fill="${color}"/>
-            <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerFont * 0.38).toFixed(1)}"
-                  text-anchor="middle" fill="white" font-size="${makerFont}" font-weight="bold">M${i + 1}</text>
-            ${
-              actualMakers <= 12
-                ? `
-            <text x="${pos.x.toFixed(1)}" y="${(pos.y + makerHalf + 14).toFixed(1)}"
-                  text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(7, makerFont - 3)}">Maker ${i + 1}</text>
-            `
-                : ''
-            }
-            <g id="hop-${i}"
-              <rect x="${(pos.x - statusHalfW).toFixed(1)}" y="${(pos.y - makerHalf - 26).toFixed(1)}"
-                    width="${statusW.toFixed(1)}" height="20" rx="4"
-                    fill="#0f1419" stroke="#374151" stroke-width="1"/>
-              <text class="hop-status" x="${pos.x.toFixed(1)}" y="${(pos.y - makerHalf - 13).toFixed(1)}"
-                    text-anchor="middle" fill="#9CA3AF" font-size="${Math.max(8, makerFont - 1)}" font-weight="bold">Pending</text>
-            </g>
-          </g>`;
-        }).join('')}
-
-        ${
-          isV2
-            ? `
-          <text x="${centerX}" y="${centerY}" text-anchor="middle" fill="#6B7280" font-size="11" font-weight="bold">${swapProtocol}</text>
-          <text x="${centerX}" y="${centerY + 15}" text-anchor="middle" fill="#4B5563" font-size="9">MuSig2</text>
-        `
-            : ''
-        }
-      </svg>
-    </div>
-  `;
+    return '<div id="swap-animation-root"></div>';
   }
 
   function updateYouSend(active) {
-    const youNode = content.querySelector('#you-node');
-    const youRect = content.querySelector('#you-rect');
-    const youStateText = content.querySelector('#you-state-text');
-
-    if (youNode && active) {
-      youNode.style.opacity = '1';
-      if (youRect) youRect.setAttribute('fill', '#FF6B35');
-      if (youStateText) youStateText.textContent = 'Sending...';
-    }
+    progressAnimation?.setWalletActive(active);
   }
 
   function updateYouReceive(active) {
-    const youNode = content.querySelector('#you-node');
-    const youRect = content.querySelector('#you-rect');
-    const youStateText = content.querySelector('#you-state-text');
-
-    if (youNode && active) {
-      youNode.style.opacity = '1';
-      if (youRect) {
-        youRect.setAttribute('fill', '#10B981'); // Green color
-        // Add a subtle pulse animation
-        youRect.style.animation = 'pulse 2s ease-in-out infinite';
-      }
-      if (youStateText) youStateText.textContent = 'Received ✓';
-    }
+    progressAnimation?.setReceiverActive(active);
   }
 
   function updateHeaderState(state) {
@@ -1400,10 +1316,15 @@ export async function CoinswapComponent(container, swapConfig) {
     const badgeDotEl = content.querySelector('#swap-page-badge-dot');
     const badgeTextEl = content.querySelector('#swap-page-badge-text');
 
-    if (!titleEl || !badgeEl || !badgeDotEl || !badgeTextEl) return;
+    if (!titleEl) return;
 
     if (state === 'completed') {
-      titleEl.textContent = 'Coinswap Complete';
+      titleEl.textContent = 'Swap Complete';
+      const stepLabel = content.querySelector('#swap-step-label');
+      const progressFill = content.querySelector('#swap-progress-fill');
+      if (stepLabel) stepLabel.textContent = 'Step 4 of 4 · Swap complete';
+      if (progressFill) progressFill.style.width = '100%';
+      if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
         'flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/20 rounded-full';
       badgeDotEl.className = 'w-2 h-2 rounded-full bg-green-400';
@@ -1414,6 +1335,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
     if (state === 'failed') {
       titleEl.textContent = 'Coinswap Failed';
+      if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
         'flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-full';
       badgeDotEl.className = 'w-2 h-2 rounded-full bg-red-400';
@@ -1423,77 +1345,55 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   content.innerHTML = `
-    <!-- Header -->
-    <div class="mb-4">
-      <button id="back-to-swap" class="text-gray-500 hover:text-gray-300 text-sm flex items-center gap-1 mb-3 transition-colors">← Back</button>
-      <div class="flex items-center gap-3 mb-1">
-        <h2 id="swap-page-title" class="text-2xl font-bold text-[#FF6B35]">Coinswap in Progress</h2>
-        <span id="swap-page-badge" class="flex items-center gap-1.5 px-2.5 py-1 bg-orange-500/10 border border-orange-500/20 rounded-full">
-          <span id="swap-page-badge-dot" class="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
-          <span id="swap-page-badge-text" class="text-xs text-orange-400 font-medium">Active</span>
-        </span>
-      </div>
-      <p id="swap-status-text" class="text-gray-500 text-sm">Executing swap through ${swapData.makers} makers...</p>
-    </div>
-
-    <!-- Flow diagram -->
-    <div class="bg-[#1a2332] rounded-xl mb-4 overflow-hidden">
-      ${buildFlowDiagram()}
-    </div>
-
-    <!-- Stats row -->
-    <div class="grid grid-cols-${isV2 ? '2' : '3'} gap-3 mb-4">
-      <div class="bg-[#1a2332] rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-1">Amount</p>
-        <p class="font-mono text-white font-semibold">${(swapData.amount / 100000000).toFixed(8)} BTC</p>
-        ${
-          !isV2
-            ? `<p class="text-xs text-gray-500 mt-2">Hops: <span class="text-cyan-400">${swapData.hops}</span></p>`
-            : `<p class="text-xs text-cyan-400 mt-2">${swapProtocol} swap</p>`
-        }
-      </div>
-
-      ${
-        !isV2
-          ? `
-      <div class="bg-[#1a2332] rounded-xl p-4">
-        <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Hop Transactions</p>
-        <div id="transaction-list" class="space-y-1.5 max-h-28 overflow-y-auto"></div>
-      </div>
-      `
-          : ''
-      }
-
-      <div class="bg-[#1a2332] rounded-xl p-4">
-        <div class="flex items-center justify-between mb-3">
-          <p class="text-xs text-gray-500 uppercase tracking-wide">Elapsed</p>
-          <span id="elapsed-time" class="font-mono text-yellow-400 font-bold text-xl">0:00</span>
+    <div class="swap-progress-page">
+      <header class="swap-progress-top">
+        <button id="back-to-swap" class="swap-progress-back" title="Back to swap">${icons.refreshCw(16)}</button>
+        <div>
+          <span id="swap-step-label">Step 1 of 4 · Swap in progress</span>
+          <h2 id="swap-page-title">Handshake</h2>
+          <div class="swap-progress-bar"><i id="swap-progress-fill"></i></div>
         </div>
-        <div class="space-y-2">
-          <div class="flex items-center gap-2 text-xs">
-            <span class="w-2 h-2 rounded-full bg-blue-400 animate-pulse shrink-0"></span>
-            <span class="text-blue-400">Do not close window</span>
-          </div>
-          <div class="flex items-center gap-2 text-xs">
-            <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
-            <span class="text-purple-400">Funds protected by HTLCs</span>
-          </div>
+        <div class="swap-progress-actions">
+          <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>
         </div>
-      </div>
-    </div>
+      </header>
 
-    <!-- Activity log -->
-    <div class="bg-[#1a2332] rounded-xl p-4">
-      <p class="text-xs text-gray-500 uppercase tracking-wide mb-2">Activity Log</p>
-      <div id="log-container" class="bg-[#0a0f16] rounded-lg p-3 h-36 overflow-y-auto font-mono text-xs"></div>
-    </div>
+      <section class="swap-route-stage">
+        ${buildFlowDiagram()}
+      </section>
 
-    <button id="complete-button" class="hidden w-full mt-4 bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-xl transition-colors">
-      View Swap Report →
-    </button>
+      <section class="swap-progress-stats">
+        <div><span>Amount</span><strong>${formatSats(swapData.amount)}</strong></div>
+        <div><span>Hops</span><strong>${swapData.hops}</strong></div>
+        <div><span>Fee</span><strong>${formatSats((actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops))}</strong></div>
+        <div><span>ETA</span><strong id="swap-eta">2m 40s</strong></div>
+        <div class="hidden"><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
+      </section>
+
+      <section class="swap-terminal is-collapsed" id="swap-log-panel">
+        <button id="swap-log-toggle" class="swap-terminal-toggle" type="button" aria-expanded="false">
+          <span>Swap log</span>
+          <strong id="swap-log-count">${logMessages.length}</strong>
+        </button>
+        <div id="log-container" class="swap-terminal-body" hidden></div>
+      </section>
+
+      <div id="transaction-list" class="hidden"></div>
+    </div>
   `;
 
   container.appendChild(content);
+
+  progressAnimation = createSwapProgressAnimation(
+    content.querySelector('#swap-animation-root'),
+    {
+      amount: swapData.amount,
+      makers: swapData.makers,
+      hops: swapData.hops,
+      fee: (actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops),
+      makerAddresses: routeMakerAddresses,
+    }
+  );
 
   content.querySelector('#back-to-swap').addEventListener('click', () => {
     if (pollInterval) clearInterval(pollInterval);
@@ -1507,6 +1407,16 @@ export async function CoinswapComponent(container, swapConfig) {
   content
     .querySelector('#complete-button')
     .addEventListener('click', viewSwapReport);
+  content.querySelector('#swap-log-toggle').addEventListener('click', () => {
+    const panel = content.querySelector('#swap-log-panel');
+    const body = content.querySelector('#log-container');
+    const toggle = content.querySelector('#swap-log-toggle');
+    const shouldExpand = body.hidden;
+
+    body.hidden = !shouldExpand;
+    toggle.setAttribute('aria-expanded', String(shouldExpand));
+    panel.classList.toggle('is-collapsed', !shouldExpand);
+  });
 
   // Initialize UI
   updateTxList();

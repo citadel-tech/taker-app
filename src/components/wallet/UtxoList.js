@@ -1,3 +1,5 @@
+import { formatSats } from '../../js/price.js';
+
 export function UtxoListComponent(container) {
   // State for UTXO selection and filtering
   let selectedUtxos = [];
@@ -32,10 +34,6 @@ export function UtxoListComponent(container) {
   }
 
   // Helper Functions
-  function satsToBtc(sats) {
-    return (sats / 100000000).toFixed(8);
-  }
-
   function truncateTxid(txid) {
     if (typeof txid === 'object' && txid.value) {
       txid = txid.value;
@@ -214,10 +212,10 @@ export function UtxoListComponent(container) {
       if (btn) {
         if (filter === activeTypeFilter) {
           btn.className =
-            'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+            'filter-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
         } else {
           btn.className =
-            'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+            'filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
         }
       }
     });
@@ -230,10 +228,10 @@ export function UtxoListComponent(container) {
       if (btn) {
         if (sort === currentSort) {
           btn.className =
-            'sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+            'sort-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
         } else {
           btn.className =
-            'sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+            'sort-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
         }
       }
     });
@@ -289,7 +287,7 @@ export function UtxoListComponent(container) {
         (sum, idx) => sum + filteredUtxos[idx].utxo.amount,
         0
       );
-      selectedValue.textContent = satsToBtc(totalSelected);
+      selectedValue.textContent = formatSats(totalSelected);
     } else {
       actionButtons.classList.add('hidden');
     }
@@ -369,9 +367,7 @@ export function UtxoListComponent(container) {
     const stats = calculateStats();
 
     content.querySelector('#total-utxos').textContent = stats.totalUtxos;
-    content.querySelector('#total-value').textContent = satsToBtc(
-      stats.totalValue
-    );
+    content.querySelector('#total-value').textContent = formatSats(stats.totalValue);
     content.querySelector('#confirmed-count').textContent = stats.confirmed;
     content.querySelector('#unconfirmed-count').textContent = stats.unconfirmed;
 
@@ -423,13 +419,15 @@ export function UtxoListComponent(container) {
         const spendTypeDisplay = getSpendTypeDisplay(spendInfo.spendType);
 
         return `
-        <tr class="border-b border-gray-800 hover:bg-[#242d3d]">
+        <tr class="border-b border-gray-800 hover:bg-secondary">
           <td class="py-3 px-4">
-            <input type="checkbox" id="utxo-checkbox-${index}" class="w-4 h-4 accent-[#FF6B35]" />
+            <input type="checkbox" id="utxo-checkbox-${index}" class="w-4 h-4 accent-primary" />
           </td>
-          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors" 
+          <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-primary hover:underline transition-colors" 
               onclick="openTxOnMempool('${txid}')">${txidShort}:${utxo.vout}</td>
-          <td class="py-3 px-4 text-green-400 font-mono">${satsToBtc(utxo.amount)}</td>
+          <td class="py-3 px-4">
+            <div class="text-green-400 font-mono">${formatSats(utxo.amount)}</div>
+          </td>
           <td class="py-3 px-4 text-gray-300 ${utxo.confirmations === 0 ? 'text-yellow-400' : ''}">${utxo.confirmations}</td>
           <td class="py-3 px-4">
             <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${scriptColor}-500/20 text-${scriptColor}-400 border border-${scriptColor}-500/30">
@@ -462,59 +460,59 @@ export function UtxoListComponent(container) {
                 <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4">
                     ← Back to Wallet
                 </button>
-                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All UTXOs</h2>
+                <h2 class="text-3xl font-bold text-primary mb-2">All UTXOs</h2>
                 <p class="text-gray-400">Complete list of unspent transaction outputs with filtering and sorting</p>
             </div>
-            <button id="refresh-utxos-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
+            <button id="refresh-utxos-btn" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-2 px-4 rounded-lg transition-colors">
                 Refresh UTXOs
             </button>
         </div>
 
         <!-- UTXO Stats -->
         <div class="grid grid-cols-4 gap-4 mb-6">
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total UTXOs</p>
-                <p id="total-utxos" class="text-2xl font-mono text-[#FF6B35]">--</p>
+                <p id="total-utxos" class="text-2xl font-mono text-primary">--</p>
             </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Value</p>
-                <p id="total-value" class="text-2xl font-mono text-green-400">-- BTC</p>
+                <p id="total-value" class="text-2xl font-mono text-green-400">-- 丰</p>
             </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Confirmed</p>
                 <p id="confirmed-count" class="text-2xl font-mono text-blue-400">--</p>
             </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Unconfirmed</p>
                 <p id="unconfirmed-count" class="text-2xl font-mono text-yellow-400">--</p>
             </div>
         </div>
 
         <!-- UTXO Filters -->
-        <div class="bg-[#1a2332] rounded-lg p-4 mb-6">
+        <div class="bg-surface rounded-lg p-4 mb-6">
             <div class="flex items-center justify-between gap-4 flex-wrap">
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button id="filter-all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="filter-all" class="filter-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         All
                     </button>
-                    <button id="filter-regular" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="filter-regular" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Regular UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
-                    <button id="filter-contract" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="filter-contract" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Contract UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
-                    <button id="filter-swap" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="filter-swap" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Swap UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
-                    <button id="filter-spendable" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="filter-spendable" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Spendable UTXOs <span class="filter-count text-xs opacity-70">(0)</span>
                     </button>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button id="sort-newest" class="sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="sort-newest" class="sort-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Newest
                     </button>
-                    <button id="sort-amount" class="sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="sort-amount" class="sort-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Amount
                     </button>
                 </div>
@@ -522,15 +520,15 @@ export function UtxoListComponent(container) {
         </div>
 
         <!-- UTXO Table -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300">UTXO Details</h3>
                 <!-- Selection Actions -->
                 <div id="utxo-actions" class="hidden flex items-center gap-3">
                     <span class="text-sm text-gray-400">
-                        <span id="selection-count">0</span> selected • <span id="selected-value">0</span> BTC
+                        <span id="selection-count">0</span> selected • <span id="selected-value">0 丰</span>
                     </span>
-                    <button id="send-selected" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="send-selected" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Send Selected
                     </button>
                     <button id="swap-selected" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
@@ -544,7 +542,7 @@ export function UtxoListComponent(container) {
                     <thead>
                         <tr class="border-b border-gray-700">
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">
-                                <input type="checkbox" id="select-all-utxos" class="w-4 h-4 accent-[#FF6B35]" />
+                                <input type="checkbox" id="select-all-utxos" class="w-4 h-4 accent-primary" />
                             </th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Txid:Vout</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Amount</th>

@@ -4,6 +4,7 @@ import { Market } from '../components/market/Market.js';
 import { SendComponent } from '../components/send/Send.js';
 import { ReceiveComponent } from '../components/receive/Receive.js';
 import { SwapComponent } from '../components/swap/Swap.js';
+import { SwapHistoryComponent } from '../components/swap/SwapHistory.js';
 import { RecoveryComponent } from '../components/recovery/Recovery.js';
 import { LogComponent } from '../components/log/Log.js';
 import { SettingsComponent } from '../components/settings/Settings.js';
@@ -13,6 +14,8 @@ import { SwapStateManager } from '../components/swap/SwapStateManager.js';
 import { ConnectionStatusComponent } from '../components/connection/ConnectionStatus.js';
 import { bitcoindConnection } from '../components/connection/BitcoindConnection.js';
 import { TakerInitializationComponent } from '../components/taker/TakerInitialization.js';
+import { refreshBtcPriceUsd } from './price.js';
+import { icons } from './icons.js';
 
 // Component map
 const components = {
@@ -21,6 +24,7 @@ const components = {
   send: SendComponent,
   receive: ReceiveComponent,
   swap: SwapComponent,
+  swapReports: SwapHistoryComponent,
   recovery: RecoveryComponent,
   log: LogComponent,
   settings: SettingsComponent,
@@ -57,14 +61,14 @@ function stopBackgroundSwapManager() {
 // Render component
 async function renderComponent(name) {
   const contentContainer = document.querySelector('#content-area');
-  
+
   if (!contentContainer) {
     console.error('❌ Content container not found');
     return;
   }
 
   const parentNode = contentContainer.parentNode;
-  
+
   if (!parentNode) {
     console.error('❌ Content container has no parent');
     return;
@@ -74,7 +78,7 @@ async function renderComponent(name) {
   if (activeSwap && activeSwap.status === 'in_progress' && name === 'swap') {
     const newContainer = contentContainer.cloneNode(false);
     newContainer.id = 'content-area';
-    
+
     try {
       parentNode.replaceChild(newContainer, contentContainer);
     } catch (e) {
@@ -90,7 +94,7 @@ async function renderComponent(name) {
 
   const newContainer = contentContainer.cloneNode(false);
   newContainer.id = 'content-area';
-  
+
   try {
     parentNode.replaceChild(newContainer, contentContainer);
   } catch (e) {
@@ -118,12 +122,10 @@ function setupNavigation() {
       e.preventDefault();
 
       navItems.forEach((nav) => {
-        nav.classList.remove('bg-[#FF6B35]', 'text-white');
-        nav.classList.add('bg-[#242d3d]', 'text-gray-400');
+        nav.classList.remove('active');
       });
 
-      item.classList.remove('bg-[#242d3d]', 'text-gray-400');
-      item.classList.add('bg-[#FF6B35]', 'text-white');
+      item.classList.add('active');
 
       const navName = item.getAttribute('data-nav');
       await renderComponent(navName);
@@ -149,10 +151,21 @@ async function checkBitcoindConnection(config) {
 function startTakerInitWithConfig(config) {
   const appContainer = document.querySelector('body');
   TakerInitializationComponent(appContainer, config, (result) => {
+    if (result && result.resetSetup) {
+      console.warn(
+        'Wallet initialization failed, returning to setup:',
+        result.error
+      );
+      localStorage.removeItem('coinswap_config');
+      showSetupModal();
+      return;
+    }
+
     if (result && result.skipped) {
       console.log('⏭️ Taker initialization skipped');
     } else {
       console.log('✅ Taker initialized');
+      startBackgroundOfferbookSync();
     }
     startMainApp();
   });
@@ -167,29 +180,41 @@ async function showPasswordPrompt(config) {
   modal.className =
     'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
   modal.innerHTML = `
-    <div class="bg-[#1a2332] rounded-lg p-6 max-w-md w-full mx-4">
+    <div class="bg-surface rounded-lg p-6 max-w-md w-full mx-4">
       <h3 class="text-xl font-bold text-white mb-4">🔐 Wallet Password Required</h3>
       <p class="text-gray-400 text-sm mb-4">
-        Your wallet "<span class="font-mono text-[#FF6B35]">${walletName}</span>" is encrypted. 
+        Your wallet "<span class="font-mono text-primary">${walletName}</span>" is encrypted. 
         Please enter your password to unlock it.
       </p>
       
-      <input 
-        type="password" 
-        id="wallet-password-input"
-        placeholder="Enter wallet password"
-        class="w-full bg-[#0f1419] border border-gray-600 rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-[#FF6B35]"
-      />
+      <div class="relative mb-4">
+        <input 
+          type="password" 
+          id="wallet-password-input"
+          placeholder="Enter wallet password"
+          class="w-full bg-app-bg border border-gray-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-primary"
+        />
+        <button
+          type="button"
+          id="toggle-wallet-password"
+          class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+          aria-label="Show password"
+          title="Show password"
+        >
+          <span class="password-show-icon">${icons.eye(18)}</span>
+          <span class="password-hide-icon hidden">${icons.eyeOff(18)}</span>
+        </button>
+      </div>
       
       <div id="password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded p-3 mb-4">
         <p class="text-sm text-red-400"></p>
       </div>
       
       <div class="flex gap-3">
-        <button id="cancel-password-btn" class="flex-1 bg-[#242d3d] hover:bg-[#2d3748] text-white py-3 rounded-lg">
+        <button id="cancel-password-btn" class="flex-1 bg-secondary hover:bg-secondary-hover text-white py-3 rounded-lg">
           Cancel
         </button>
-        <button id="submit-password-btn" class="flex-1 bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-bold py-3 rounded-lg">
+        <button id="submit-password-btn" class="flex-1 bg-primary hover:bg-primary-hover text-white font-bold py-3 rounded-lg">
           Unlock Wallet
         </button>
       </div>
@@ -201,6 +226,7 @@ async function showPasswordPrompt(config) {
   const passwordInput = modal.querySelector('#wallet-password-input');
   const submitBtn = modal.querySelector('#submit-password-btn');
   const cancelBtn = modal.querySelector('#cancel-password-btn');
+  const togglePasswordBtn = modal.querySelector('#toggle-wallet-password');
   const errorDiv = modal.querySelector('#password-error');
 
   passwordInput.focus();
@@ -265,14 +291,46 @@ async function showPasswordPrompt(config) {
       modal.remove();
       resolve(false);
     });
+
+    togglePasswordBtn.addEventListener('click', () => {
+      const isHidden = passwordInput.type === 'password';
+      passwordInput.type = isHidden ? 'text' : 'password';
+      togglePasswordBtn
+        .querySelector('.password-show-icon')
+        ?.classList.toggle('hidden', isHidden);
+      togglePasswordBtn
+        .querySelector('.password-hide-icon')
+        ?.classList.toggle('hidden', !isHidden);
+
+      const label = isHidden ? 'Hide password' : 'Show password';
+      togglePasswordBtn.setAttribute('aria-label', label);
+      togglePasswordBtn.setAttribute('title', label);
+      passwordInput.focus();
+    });
   });
 }
 
+let offerbookSyncPromise = null;
+
 async function startBackgroundOfferbookSync() {
+  if (offerbookSyncPromise) return offerbookSyncPromise;
+
+  offerbookSyncPromise = runBackgroundOfferbookSync().finally(() => {
+    offerbookSyncPromise = null;
+  });
+
+  return offerbookSyncPromise;
+}
+
+async function runBackgroundOfferbookSync() {
   try {
+    console.log('🔄 Starting background offerbook sync...');
     const syncResult = await window.api.taker.syncOfferbookAndWait();
     if (!syncResult.success) {
-      console.warn('⚠️ Background offerbook sync failed to start:', syncResult.error);
+      console.warn(
+        '⚠️ Background offerbook sync failed to start:',
+        syncResult.error
+      );
       return;
     }
     const syncId = syncResult.syncId;
@@ -281,7 +339,11 @@ async function startBackgroundOfferbookSync() {
         try {
           const status = await window.api.taker.getSyncStatus(syncId);
           const syncStatus = (status.sync || {}).status || 'syncing';
-          if (!status.success || syncStatus === 'completed' || syncStatus === 'failed') {
+          if (
+            !status.success ||
+            syncStatus === 'completed' ||
+            syncStatus === 'failed'
+          ) {
             clearInterval(poll);
             resolve();
           }
@@ -297,7 +359,6 @@ async function startBackgroundOfferbookSync() {
     console.warn('⚠️ Background offerbook sync error:', err.message);
   }
 }
-
 
 // Start the main app after bitcoind connection is established
 async function startMainApp() {
@@ -315,13 +376,9 @@ async function startMainApp() {
       const swapNavItem = document.querySelector('[data-nav="swap"]');
       if (swapNavItem) {
         document.querySelectorAll('.nav-item').forEach((nav) => {
-          nav.classList.remove('bg-[#FF6B35]', 'text-white');
-          nav.classList.add('bg-[#242d3d]', 'text-gray-400');
+          nav.classList.remove('active');
         });
-        if (!swapNavItem.classList.contains('bg-orange-500')) {
-          swapNavItem.classList.remove('bg-[#242d3d]', 'text-gray-400');
-          swapNavItem.classList.add('bg-[#FF6B35]', 'text-white');
-        }
+        swapNavItem.classList.add('active');
       }
     }, 100);
   } else {
@@ -342,10 +399,23 @@ function initiateAppStart(config) {
   }, 1500);
 }
 
+function showSetupModal() {
+  const appContainer = document.querySelector('body');
+  FirstTimeSetupModal(appContainer, (config) => {
+    console.log('Setup completed:', config);
+
+    localStorage.setItem('coinswap_config', JSON.stringify(config));
+
+    initiateAppStart(config);
+    showSetupSuccess();
+  });
+}
+
 // Initialize app
 // Initialize app
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('App initializing...');
+  await refreshBtcPriceUsd();
 
   const navContainer = document.querySelector('#nav-container');
   if (navContainer) {
@@ -365,15 +435,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!saved) {
     // First-time setup ONLY ONCE
     console.log('🔧 Showing setup modal...');
-    FirstTimeSetupModal(appContainer, (config) => {
-      console.log('Setup completed:', config);
-
-      // save config
-      localStorage.setItem('coinswap_config', JSON.stringify(config));
-
-      initiateAppStart(config);
-      showSetupSuccess();
-    });
+    showSetupModal();
   } else {
     // Config exists → skip setup
     const config = JSON.parse(saved);

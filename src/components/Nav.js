@@ -3,120 +3,73 @@ import {
   formatElapsedTime,
 } from './swap/SwapStateManager.js';
 
-export async function NavComponent(container) {
-  const nav = document.createElement('div');
-  nav.className = 'w-64 bg-[#1a2332] flex flex-col h-screen';
+function navIcon(name) {
+  const paths = {
+    wallet:
+      '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M16 14h2"/>',
+    market: '<path d="M4 19V9M10 19V5M16 19v-7M22 19V8"/>',
+    send: '<path d="M7 17L17 7M9 7h8v8"/>',
+    receive: '<path d="M17 7L7 17M7 9v8h8"/>',
+    swap: '<path d="M17 4l4 4-4 4M21 8H8M7 20l-4-4 4-4M3 16h13"/>',
+    recovery:
+      '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="M9 12l2 2 4-4"/>',
+    log: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    settings:
+      '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1A2 2 0 0 1 3.4 17l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H2"/>',
+  };
 
-  const activeSwap = await SwapStateManager.getActiveSwap();
+  return `<svg class="app-sidebar-icon" viewBox="0 0 24 24" aria-hidden="true">${paths[name]}</svg>`;
+}
+
+export async function NavComponent(container) {
+  const nav = document.createElement('aside');
+  nav.className = 'app-sidebar';
+
   const hasActiveSwap = await SwapStateManager.hasActiveSwap();
+  const elapsed = hasActiveSwap
+    ? formatElapsedTime(await SwapStateManager.getElapsedTime())
+    : '';
+
+  const items = [
+    ['wallet', 'Wallet'],
+    ['market', 'Market'],
+    ['send', 'Send'],
+    ['receive', 'Receive'],
+    ['swap', 'Swap'],
+    ['recovery', 'Recovery'],
+    ['log', 'Log'],
+    ['settings', 'Settings'],
+  ];
 
   nav.innerHTML = `
-    <div class="p-4 border-b border-gray-700 flex-shrink-0">
-      <h1 class="text-2xl font-bold text-[#FF6B35]">Coinswap</h1>
-      <div class="flex justify-between items-center mt-1">
-        <p class="text-xs text-gray-400">Taker Wallet</p>
-        ${
-          hasActiveSwap
-            ? `
-          <div class="flex items-center gap-2">
-            <div class="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></div>
-            <span class="text-xs text-orange-400">Swap Active</span>
-          </div>
-        `
-            : ''
-        }
+    <div class="app-sidebar-brand">
+      <div class="app-sidebar-logo">C</div>
+      <div class="app-sidebar-title">
+        <h1>Coinswap</h1>
+        <p>Taker app</p>
       </div>
     </div>
-    
-    <nav class="flex-1 p-3 space-y-2 overflow-y-auto min-h-0">
-      <a href="#wallet" data-nav="wallet" class="nav-item active flex flex-col items-center justify-center p-4 rounded-lg bg-[#FF6B35] text-white hover:bg-[#ff7d4d] transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Wallet</span>
-      </a>
 
-      <a href="#market" data-nav="market" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Market</span>
-      </a>
-
-      <a href="#send" data-nav="send" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Send</span>
-      </a>
-
-      <a href="#receive" data-nav="receive" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8l-8 8-8-8"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Receive</span>
-      </a>
-
-      <a href="#swap" data-nav="swap" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg ${hasActiveSwap ? 'bg-orange-500 text-white border-2 border-orange-400 animate-pulse' : 'bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white'} transition-colors relative">
-        ${
-          hasActiveSwap
-            ? `
-          <div class="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-bounce"></div>
-        `
-            : ''
-        }
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Swap</span>
-        ${
-          hasActiveSwap
-            ? `
-          <span class="text-xs text-orange-200 mt-1 swap-elapsed-time">${formatElapsedTime(await SwapStateManager.getElapsedTime())}</span>
-        `
-            : ''
-        }
-      </a>
-
-      <a href="#recovery" data-nav="recovery" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Recovery</span>
-      </a>
-
-      <a href="#log" data-nav="log" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Log</span>
-      </a>
-
-      <a href="#settings" data-nav="settings" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">Settings</span>
-      </a>
-
-      <a href="#about" data-nav="about" class="nav-item flex flex-col items-center justify-center p-4 rounded-lg bg-[#242d3d] text-gray-400 hover:bg-[#2d3748] hover:text-white transition-colors">
-        <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-        </svg>
-        <span class="text-sm font-semibold text-lg">About</span>
-      </a>
+    <nav class="app-sidebar-nav" aria-label="Main navigation">
+      ${items
+        .map(
+          ([id, label]) => `
+            <a href="#${id}" data-nav="${id}" class="nav-item app-sidebar-item ${id === 'wallet' ? 'active' : ''} ${id === 'swap' && hasActiveSwap ? 'has-activity' : ''}">
+              ${navIcon(id)}
+              <span>${label}</span>
+              ${
+                id === 'swap' && hasActiveSwap
+                  ? `<span class="swap-elapsed-time">${elapsed}</span>`
+                  : ''
+              }
+            </a>
+          `
+        )
+        .join('')}
     </nav>
   `;
 
   container.appendChild(nav);
-
-  nav.querySelectorAll('.nav-item').forEach((item) => {
-    item.addEventListener('click', () => {
-      const page = item.getAttribute('data-nav');
-      window.appManager.renderComponent(page);
-    });
-  });
 
   if (hasActiveSwap) {
     const updateInterval = setInterval(async () => {
@@ -130,17 +83,8 @@ export async function NavComponent(container) {
 
         const swapItem = nav.querySelector('[data-nav="swap"]');
         if (swapItem) {
-          swapItem.classList.remove(
-            'bg-orange-500',
-            'text-white',
-            'border-2',
-            'border-orange-400',
-            'animate-pulse'
-          );
-          swapItem.classList.add('bg-[#242d3d]', 'text-gray-400');
-
-          const bubble = swapItem.querySelector('.swap-elapsed-time');
-          if (bubble) bubble.remove();
+          swapItem.classList.remove('has-activity');
+          swapItem.querySelector('.swap-elapsed-time')?.remove();
         }
 
         return;

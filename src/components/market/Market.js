@@ -1,90 +1,93 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function Market(container) {
   const content = document.createElement('div');
   content.id = 'market-content';
 
-  // STATE
   let makers = [];
   let isLoading = true;
   let syncProgress = null;
-  let currentMakerStatus = 'good'; // 'good', 'bad', or 'unresponsive'
+  let currentMakerStatus = 'good';
   let syncCheckInterval = null;
   let periodicRefreshInterval = null;
   let relayCount = null;
 
-  function getProtocolPresentation(protocol) {
-    switch (protocol) {
-      case 'Taproot':
-        return {
-          label: 'Taproot',
-          icon: icons.zap(14),
-          classes: 'bg-purple-500/20 text-purple-400',
-        };
-      case 'Unified':
-        return {
-          label: 'Unified',
-          icon: '◈',
-          classes: 'bg-emerald-500/20 text-emerald-400',
-        };
-      case 'Legacy':
-      case 'Legacy P2WSH':
-      default:
-        return {
-          label: 'Legacy',
-          icon: icons.lock(14),
-          classes: 'bg-blue-500/20 text-blue-400',
-        };
-    }
+  function refreshButtonContent(label = 'Refresh', spinning = false) {
+    return `${icons.refreshCw(16, spinning ? 'animate-spin' : '')} ${label}`;
   }
 
   function formatTorEndpoint(address, start = 8, end = 6) {
     if (!address || typeof address !== 'string') return 'unknown';
 
     const separatorIndex = address.lastIndexOf(':');
-    const host = (separatorIndex !== -1 ? address.slice(0, separatorIndex) : address).replace(/\.onion$/i, '');
+    const host = (
+      separatorIndex !== -1 ? address.slice(0, separatorIndex) : address
+    ).replace(/\.onion$/i, '');
 
     if (host.length <= start + end + 3) return host;
     return `${host.slice(0, start)}...${host.slice(-end)}`;
   }
 
-  // Check sync state every second
+  function formatSatsNumber(sats) {
+    return Math.round(Number(sats || 0)).toLocaleString();
+  }
+
+  function parseSatsInput(value) {
+    const parsed = Number.parseFloat(String(value || '').replace(/,/g, ''));
+    if (!Number.isFinite(parsed) || parsed < 0) return 0;
+    return Math.round(parsed);
+  }
+
+  function calculateMakerFee(maker, amountSats, makerPosition, totalMakers) {
+    const liquidityRate = Number(maker.volumeFee || 0);
+    const timeRate = Number(maker.timeFee || 0);
+    const refundLocktime = 20 * (totalMakers - makerPosition + 1);
+    const baseFee = Number(maker.baseFee || 0);
+    const liquidityFee = amountSats * liquidityRate;
+    const timeFee = refundLocktime * amountSats * timeRate;
+
+    return {
+      baseFee,
+      liquidityFee,
+      timeFee,
+      totalFee: baseFee + liquidityFee + timeFee,
+      refundLocktime,
+      liquidityRate,
+      timeRate,
+    };
+  }
+
   function startSyncStateMonitor() {
     if (syncCheckInterval) return;
 
     syncCheckInterval = setInterval(async () => {
       const state = await window.api.taker.getCurrentSyncState();
 
-      if (state.success) {
-        const refreshBtn = content.querySelector('#refresh-market-btn');
+      if (!state.success) return;
 
-        if (state.isRunning) {
-          // Sync is running - disable button
-          if (refreshBtn) {
-            refreshBtn.disabled = true;
-            refreshBtn.innerHTML =
-              '<span class="animate-pulse">Refreshing...</span>';
-          }
+      const refreshBtn = content.querySelector('#refresh-market-btn');
+      if (!refreshBtn) return;
 
-          // Monitor the current sync
-          if (state.currentSyncId && !localStorage.getItem('active_sync_id')) {
-            localStorage.setItem('active_sync_id', state.currentSyncId);
-          }
-        } else {
-          // No sync running - enable button
-          if (refreshBtn && refreshBtn.disabled) {
-            refreshBtn.disabled = false;
-            refreshBtn.innerHTML = 'Refresh';
-          }
+      if (state.isRunning) {
+        refreshBtn.disabled = true;
+        refreshBtn.innerHTML = refreshButtonContent('Refreshing...', true);
+
+        if (state.currentSyncId && !localStorage.getItem('active_sync_id')) {
+          localStorage.setItem('active_sync_id', state.currentSyncId);
         }
+      } else if (refreshBtn.disabled) {
+        refreshBtn.disabled = false;
+        refreshBtn.innerHTML = refreshButtonContent();
       }
-    }, 1000); // Check every second
+    }, 1000);
   }
 
   function transformMaker(item, index) {
     const offer = item.offer;
     const addr = item.address;
     let fullAddress;
+
     if (typeof addr === 'string') {
       fullAddress = addr;
     } else {
@@ -93,28 +96,19 @@ export function Market(container) {
       fullAddress = host || portSuffix ? `${host}${portSuffix}` : '';
     }
 
-    // Handle null offers (unresponsive makers)
     if (!offer) {
       return {
         address: fullAddress,
-        protocol: 'Unknown',
         baseFee: 0,
-        volumeFee: '0.00',
-        timeFee: '0.00',
+        volumeFee: '0.000',
+        timeFee: '0.0000',
         minSize: 0,
         maxSize: 0,
         bond: 0,
         bondTxid: '',
-        bondVout: '0',
-        bondOutpoint: '',
         bondLocktime: 0,
-        bondPubkey: '',
-        bondConfHeight: null,
-        bondCertExpiry: null,
         bondIsSpent: false,
-        requiredConfirms: 0,
-        minimumLocktime: 0,
-        index: index,
+        index,
       };
     }
 
@@ -124,35 +118,22 @@ export function Market(container) {
 
     return {
       address: fullAddress,
-      protocol:
-        item.protocol || (offer.tweakablePoint ? 'Taproot' : 'Legacy'),
       baseFee: offer.baseFee || 0,
-      volumeFee: (offer.amountRelativeFeePct || 0).toFixed(2),
-      timeFee: (offer.timeRelativeFeePct || 0).toFixed(2),
+      volumeFee: (offer.amountRelativeFeePct || 0).toFixed(3),
+      timeFee: (offer.timeRelativeFeePct || 0).toFixed(4),
       minSize: offer.minSize || 0,
       maxSize: offer.maxSize || 0,
       bond: bond.amount || 0,
       bondTxid: outpoint.split(':')[0] || '',
-      bondVout: outpoint.split(':')[1] || '0',
-      bondOutpoint: outpoint,
       bondLocktime: bond.lock_time || 0,
-      bondPubkey: bond.pubkey || '',
-      bondConfHeight: bond.conf_height || null,
-      bondCertExpiry: bond.cert_expiry || null,
       bondIsSpent: bond.is_spent || false,
-      requiredConfirms: offer.requiredConfirms || 0,
-      minimumLocktime: offer.minimumLocktime || 0,
-      index: index,
+      index,
     };
   }
 
-  // API FUNCTIONS
   async function fetchMakers() {
     try {
-      console.log('📡 [market] Fetching makers from API...');
-      // Only show the full-page "Loading..." takeover on the very first load.
-      // For refreshes (re-mount, incremental sync polls, periodic refresh),
-      // keep the existing rows on screen and let them update in place.
+      console.log('[market] Fetching makers from API...');
       const isInitialLoad = makers.length === 0;
       if (isInitialLoad) {
         isLoading = true;
@@ -160,272 +141,155 @@ export function Market(container) {
       }
 
       const data = await window.api.taker.getOffers();
-      console.log('📡 [market] Raw getOffers response', {
+      console.log('[market] Raw getOffers response', {
         success: data.success,
         cached: data.cached,
         message: data.message,
         error: data.error,
       });
 
-      if (data.success && data.offerbook) {
-        const goodMakers = data.offerbook.goodMakers || [];
-        const badMakers = data.offerbook.badMakers || [];
-        const unresponsiveMakers = data.offerbook.unresponsiveMakers || [];
-        relayCount = Array.isArray(data.relays)
-          ? data.relays.length
-          : typeof data.relayCount === 'number'
-            ? data.relayCount
-            : relayCount;
-
-        makers = [
-          ...goodMakers.map((item, index) => ({
-            ...transformMaker(item, index),
-            status: 'good',
-          })),
-          ...badMakers.map((item, index) => ({
-            ...transformMaker(item, index + goodMakers.length),
-            status: 'bad',
-          })),
-          ...unresponsiveMakers.map((item, index) => ({
-            ...transformMaker(
-              item,
-              index + goodMakers.length + badMakers.length
-            ),
-            status: 'unresponsive',
-          })),
-        ];
-
-        console.log('✅ [market] Loaded makers into UI', {
-          total: makers.length,
-          good: goodMakers.length,
-          bad: badMakers.length,
-          unresponsive: unresponsiveMakers.length,
-          sample: makers.slice(0, 3).map((maker) => ({
-            address: maker.address,
-            status: maker.status,
-            maxSize: maker.maxSize,
-            bond: maker.bond,
-          })),
-        });
-        isLoading = false;
-        updateUI();
-      } else {
+      if (!data.success || !data.offerbook) {
         throw new Error(data.error || 'Failed to fetch offers');
       }
+
+      const goodMakers = data.offerbook.goodMakers || [];
+      const badMakers = data.offerbook.badMakers || [];
+      const unresponsiveMakers = data.offerbook.unresponsiveMakers || [];
+      relayCount = Array.isArray(data.relays)
+        ? data.relays.length
+        : typeof data.relayCount === 'number'
+          ? data.relayCount
+          : relayCount;
+
+      makers = [
+        ...goodMakers.map((item, index) => ({
+          ...transformMaker(item, index),
+          status: 'good',
+        })),
+        ...badMakers.map((item, index) => ({
+          ...transformMaker(item, index + goodMakers.length),
+          status: 'bad',
+        })),
+        ...unresponsiveMakers.map((item, index) => ({
+          ...transformMaker(item, index + goodMakers.length + badMakers.length),
+          status: 'unresponsive',
+        })),
+      ];
+
+      isLoading = false;
+      updateUI();
     } catch (error) {
-      console.error('❌ Failed to fetch makers:', error);
+      console.error('Failed to fetch makers:', error);
       isLoading = false;
       showError('Failed to load makers: ' + error.message);
       updateUI();
     }
   }
 
-  async function syncOfferbookAndWait() {
-    try {
-      // Check if sync is already running
-      const activeSyncId = localStorage.getItem('active_sync_id');
-      if (activeSyncId) {
-        const status = await window.api.taker.getSyncStatus(activeSyncId);
-        if (
-          status.success &&
-          (status.sync.status === 'syncing' ||
-            status.sync.status === 'starting')
-        ) {
-          throw new Error('Sync already in progress');
-        }
-      }
-
-      console.log('🔄 Starting offerbook sync...');
-
-      const result = await window.api.taker.syncOfferbookAndWait();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to start sync');
-      }
-
-      const syncId = result.syncId;
-      console.log('📡 Sync started:', syncId);
-
-      // Store sync ID in localStorage
-      localStorage.setItem('active_sync_id', syncId);
-
-      // Poll for completion and update progress
-      let tickFetchInFlight = false;
-      return new Promise((resolve, reject) => {
-        const pollInterval = setInterval(async () => {
-          try {
-            const status = await window.api.taker.getSyncStatus(syncId);
-
-            if (!status.success) {
-              clearInterval(pollInterval);
-              localStorage.removeItem('active_sync_id');
-              syncProgress = null;
-              updateUI();
-              reject(new Error('Failed to get sync status'));
-              return;
-            }
-
-            const sync = status.sync;
-            console.log('📊 Sync status:', sync.status);
-
-            // Update progress data - simplified version
-            syncProgress = {
-              percent: 50,
-              status: sync.status,
-              message:
-                sync.status === 'syncing'
-                  ? 'Discovering makers...'
-                  : 'Starting...',
-            };
-
-            if (sync.progress !== undefined) {
-              syncProgress.percent = sync.progress;
-            }
-            if (sync.message) {
-              syncProgress.message = sync.message;
-            }
-
-            updateUI();
-
-            // Incremental refresh: pull the latest offerbook mid-sync so makers
-            // appear one-by-one as the backend persists them. Skip if a prior
-            // tick's fetch is still in flight to avoid overlapping reads.
-            if (sync.status === 'syncing' && !tickFetchInFlight) {
-              tickFetchInFlight = true;
-              fetchMakers()
-                .then(() => updateUI())
-                .catch((e) => console.warn('Incremental fetchMakers failed:', e))
-                .finally(() => { tickFetchInFlight = false; });
-            }
-
-            if (sync.status === 'completed') {
-              clearInterval(pollInterval);
-              localStorage.removeItem('active_sync_id');
-              syncProgress = null;
-              console.log('✅ Offerbook synced');
-              await new Promise((r) => setTimeout(r, 1000));
-              await fetchMakers();
-              updateUI();
-              resolve();
-            } else if (sync.status === 'failed') {
-              clearInterval(pollInterval);
-              localStorage.removeItem('active_sync_id');
-              syncProgress = null;
-              updateUI();
-              reject(new Error(sync.error || 'Sync failed'));
-            }
-          } catch (error) {
-            clearInterval(pollInterval);
-            localStorage.removeItem('active_sync_id');
-            syncProgress = null;
-            updateUI();
-            reject(error);
-          }
-        }, 1000);
-      });
-    } catch (error) {
-      console.error('❌ Sync failed:', error);
-      syncProgress = null;
-      updateUI();
-      throw error;
-    }
-  }
-
   async function handleRefresh() {
     const refreshBtn = content.querySelector('#refresh-market-btn');
-    console.log('🔁 [market] Refresh button clicked');
-
-    // Guard against double-click if sync already running
     const stateCheck = await window.api.taker.getCurrentSyncState();
-    console.log('🔁 [market] Current sync state before refresh', stateCheck);
+
     if (stateCheck.success && stateCheck.isRunning) {
       showError('Sync already in progress');
       return;
     }
 
-    const originalText = refreshBtn.innerHTML;
     refreshBtn.disabled = true;
-    refreshBtn.innerHTML = '<span class="animate-pulse">Refreshing...</span>';
+    refreshBtn.innerHTML = refreshButtonContent('Refreshing...', true);
 
-    syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
+    syncProgress = {
+      percent: 50,
+      status: 'syncing',
+      message: 'Syncing market data...',
+    };
     updateUI();
 
     try {
       const result = await window.api.taker.syncOfferbookAndWait();
-      console.log('🔁 [market] syncOfferbookAndWait start result', result);
       if (!result.success) {
         throw new Error(result.error || 'Failed to start sync');
       }
 
       const syncId = result.syncId;
+      localStorage.setItem('active_sync_id', syncId);
+
       let tickFetchInFlight = false;
       await new Promise((resolve, reject) => {
         const poll = setInterval(async () => {
           try {
             const status = await window.api.taker.getSyncStatus(syncId);
-            console.log('🔁 [market] Polled sync status', {
-              syncId,
-              success: status.success,
-              status: status.sync?.status,
-              error: status.sync?.error || status.error,
-              offerbook: status.sync?.offerbook,
-            });
-            if (!status.success) { clearInterval(poll); reject(new Error('Failed to get sync status')); return; }
 
-            // Incremental refresh while syncing — makers appear as they're polled.
+            if (!status.success) {
+              clearInterval(poll);
+              reject(new Error('Failed to get sync status'));
+              return;
+            }
+
             if (status.sync.status === 'syncing' && !tickFetchInFlight) {
               tickFetchInFlight = true;
               fetchMakers()
                 .then(() => updateUI())
-                .catch((e) => console.warn('Incremental fetchMakers failed:', e))
-                .finally(() => { tickFetchInFlight = false; });
+                .catch((e) =>
+                  console.warn('Incremental fetchMakers failed:', e)
+                )
+                .finally(() => {
+                  tickFetchInFlight = false;
+                });
             }
 
-            if (status.sync.status === 'completed') { clearInterval(poll); resolve(); }
-            else if (status.sync.status === 'failed') { clearInterval(poll); reject(new Error(status.sync.error || 'Sync failed')); }
-          } catch (err) { clearInterval(poll); reject(err); }
+            if (status.sync.status === 'completed') {
+              clearInterval(poll);
+              resolve();
+            } else if (status.sync.status === 'failed') {
+              clearInterval(poll);
+              reject(new Error(status.sync.error || 'Sync failed'));
+            }
+          } catch (err) {
+            clearInterval(poll);
+            reject(err);
+          }
         }, 1000);
       });
 
+      localStorage.removeItem('active_sync_id');
       syncProgress = null;
-      console.log('🔁 [market] Sync finished, reloading makers');
       await fetchMakers();
 
-      refreshBtn.innerHTML = 'Refreshed!';
+      refreshBtn.innerHTML = refreshButtonContent('Refreshed!');
       setTimeout(() => {
         refreshBtn.disabled = false;
-        refreshBtn.innerHTML = originalText;
+        refreshBtn.innerHTML = refreshButtonContent();
       }, 2000);
     } catch (error) {
-      console.error('❌ [market] Refresh failed', error);
+      console.error('[market] Refresh failed', error);
+      localStorage.removeItem('active_sync_id');
       syncProgress = null;
       updateUI();
-      refreshBtn.innerHTML = 'Refresh Failed';
+      refreshBtn.innerHTML = refreshButtonContent('Refresh Failed');
       showError(error.message);
       setTimeout(() => {
         refreshBtn.disabled = false;
-        refreshBtn.innerHTML = originalText;
+        refreshBtn.innerHTML = refreshButtonContent();
       }, 3000);
     }
   }
 
   async function initialize() {
-    // Keep protocol fetch to preserve existing initialization flow.
     await window.api.taker.getProtocol();
 
-    // Always render whatever's already on disk first so re-mounting the page
-    // mid-sync doesn't blank out the table. fetchMakers() will then update
-    // in place if a sync is in progress.
     await fetchMakers();
     isLoading = false;
 
-    // Check if app-level sync is currently running.
     try {
       const syncingResult = await window.api.taker.getCurrentSyncState();
 
       if (syncingResult.success && syncingResult.isRunning) {
-        console.log('⏳ Background sync in progress, monitoring...');
-        syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
+        syncProgress = {
+          percent: 50,
+          status: 'syncing',
+          message: 'Syncing market data...',
+        };
         updateUI();
         await monitorExistingSync();
         return;
@@ -434,7 +298,6 @@ export function Market(container) {
       console.error('Failed to check if syncing:', err);
     }
 
-    // Check localStorage for active sync
     const activeSyncId = localStorage.getItem('active_sync_id');
     if (activeSyncId) {
       try {
@@ -444,39 +307,34 @@ export function Market(container) {
           (status.sync.status === 'syncing' ||
             status.sync.status === 'starting')
         ) {
-          const refreshBtn = content.querySelector('#refresh-market-btn');
-          if (refreshBtn) {
-            refreshBtn.disabled = true;
-            refreshBtn.innerHTML =
-              '<span class="animate-pulse">Refreshing...</span>';
-          }
-
-          syncProgress = { percent: 50, status: 'syncing', message: 'Syncing market data...' };
+          syncProgress = {
+            percent: 50,
+            status: 'syncing',
+            message: 'Syncing market data...',
+          };
           updateUI();
           await monitorExistingSync();
           return;
-        } else {
-          localStorage.removeItem('active_sync_id');
         }
+
+        localStorage.removeItem('active_sync_id');
       } catch (err) {
         localStorage.removeItem('active_sync_id');
       }
     }
 
-    // No sync in progress — initial fetchMakers() at the top of this function
-    // already populated the table. Just make sure the UI reflects it.
     updateUI();
 
-    // Refresh offerbook data every 15 minutes. The Rust backend keeps
-    // offerbook.json up to date; this just re-reads the file for the UI.
-    periodicRefreshInterval = setInterval(async () => {
-      const syncState = await window.api.taker.getCurrentSyncState();
-      if (!syncState.isRunning) {
-        await fetchMakers();
-      }
-    }, 15 * 60 * 1000);
+    periodicRefreshInterval = setInterval(
+      async () => {
+        const syncState = await window.api.taker.getCurrentSyncState();
+        if (!syncState.isRunning) {
+          await fetchMakers();
+        }
+      },
+      15 * 60 * 1000
+    );
 
-    // Clean up the interval when this component is removed from the DOM
     const observer = new MutationObserver(() => {
       if (!document.body.contains(content)) {
         clearInterval(periodicRefreshInterval);
@@ -488,11 +346,6 @@ export function Market(container) {
   }
 
   async function monitorExistingSync() {
-    console.log('🔍 Monitoring existing offerbook sync...');
-
-    // Don't blank the table — caller already rendered cached makers and set
-    // syncProgress for the header spinner. We just poll and refresh in place.
-
     let tickFetchInFlight = false;
     let isSyncing = true;
     while (isSyncing) {
@@ -503,25 +356,24 @@ export function Market(container) {
         if (result.success) {
           isSyncing = result.isRunning;
 
-          // Incremental refresh: pull latest offerbook each tick so newly-polled
-          // makers appear without waiting for the sync to finish.
           if (isSyncing && !tickFetchInFlight) {
             tickFetchInFlight = true;
             fetchMakers()
               .then(() => updateUI())
               .catch((e) => console.warn('Incremental fetchMakers failed:', e))
-              .finally(() => { tickFetchInFlight = false; });
+              .finally(() => {
+                tickFetchInFlight = false;
+              });
           } else if (isSyncing) {
-            console.log('⏳ Still syncing (prior tick fetch in flight)...');
+            console.log('Still syncing (prior tick fetch in flight)...');
           }
         }
       } catch (error) {
         console.error('Error checking sync status:', error);
-        break; // Exit on error
+        break;
       }
     }
 
-    console.log('✅ Offerbook sync completed - final refresh');
     syncProgress = null;
     await fetchMakers();
     updateUI();
@@ -529,14 +381,13 @@ export function Market(container) {
 
   function showError(message) {
     const errorDiv = document.createElement('div');
-    errorDiv.className =
-      'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 max-w-md';
+    errorDiv.className = 'market-toast-error';
     errorDiv.innerHTML = `
-      <div class="flex items-start gap-3">
-        <span class="text-xl">${icons.xCircle(20)}</span>
-        <div class="flex-1">
-          <div class="font-semibold text-lg mb-1">Error</div>
-          <div class="text-sm">${message}</div>
+      <div>
+        ${icons.xCircle(20)}
+        <div>
+          <strong>Error</strong>
+          <span>${message}</span>
         </div>
       </div>
     `;
@@ -545,18 +396,19 @@ export function Market(container) {
   }
 
   function calculateStats() {
-    const displayedMakers = makers.filter(
-      (m) => m.status === currentMakerStatus
-    );
-    const totalLiquidity = displayedMakers.reduce(
-      (sum, m) => sum + m.maxSize,
-      0
-    );
-    const totalFidelity = displayedMakers.reduce((sum, m) => sum + m.bond, 0);
+    const goodMakers = makers.filter((m) => m.status === 'good');
+    const totalLiquidity = goodMakers.reduce((sum, m) => sum + m.maxSize, 0);
+    const totalFidelity = goodMakers.reduce((sum, m) => sum + m.bond, 0);
+    const counts = {
+      good: goodMakers.length,
+      bad: makers.filter((m) => m.status === 'bad').length,
+      unresponsive: makers.filter((m) => m.status === 'unresponsive').length,
+    };
 
     return {
-      totalLiquidity: (totalLiquidity / 100000000).toFixed(2),
-      totalFidelity: totalFidelity.toLocaleString(),
+      totalLiquidity,
+      totalFidelity,
+      counts,
       nostrRelays: relayCount ?? 0,
     };
   }
@@ -569,8 +421,7 @@ export function Market(container) {
     }
 
     const modal = document.createElement('div');
-    modal.className =
-      'fixed inset-0 bg-black/70 flex items-center justify-center z-50';
+    modal.className = 'market-modal-backdrop';
     modal.onclick = (e) => {
       if (e.target === modal) modal.remove();
     };
@@ -580,63 +431,34 @@ export function Market(container) {
       : 0;
 
     modal.innerHTML = `
-      <div class="bg-[#1a2332] rounded-lg p-6 max-w-2xl w-full mx-4 border border-gray-700 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
-        <div class="flex justify-between items-start mb-6">
-          <h3 class="text-2xl font-bold text-[#FF6B35]">Fidelity Bond Details</h3>
-          <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+      <div class="market-modal" onclick="event.stopPropagation()">
+        <div class="market-modal-head">
+          <h3>Fidelity Bond Details</h3>
+          <button onclick="this.closest('.market-modal-backdrop').remove()">&times;</button>
         </div>
-        
-        <div class="space-y-4">
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Tor Address</p>
-            <p class="text-white font-mono text-sm break-all">${maker.address}</p>
+        <div class="market-modal-grid">
+          <div>
+            <span>Tor Address</span>
+            <strong>${maker.address}</strong>
           </div>
-
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Bond Amount</p>
-            <p class="text-2xl font-mono text-purple-400">${maker.bond.toLocaleString()} sats</p>
-            <p class="text-xs text-gray-500 mt-1">${(maker.bond / 100000000).toFixed(8)} BTC</p>
+          <div>
+            <span>Bond Amount</span>
+            <strong>${formatSats(maker.bond)}</strong>
           </div>
-
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Bond Status</p>
-            <p class="text-2xl font-mono ${maker.bondIsSpent ? 'text-red-400' : 'text-green-400'}">
-              ${maker.bondIsSpent ? 'Spent' : 'Active'}
-            </p>
+          <div>
+            <span>Bond Status</span>
+            <strong class="${maker.bondIsSpent ? 'negative' : 'positive'}">${maker.bondIsSpent ? 'Spent' : 'Active'}</strong>
           </div>
-
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Expires In</p>
-            <p class="text-2xl font-mono text-yellow-400">~${locktimeDays} days</p>
-            ${
-              maker.bondLocktime
-                ? `<p class="text-xs text-gray-500 mt-1">${maker.bondLocktime.toLocaleString()} blocks</p>`
-                : ''
-            }
+          <div>
+            <span>Expires In</span>
+            <strong>~${locktimeDays} days</strong>
           </div>
-
-          ${
-            maker.bondTxid
-              ? `
-          <div class="bg-[#0f1419] p-4 rounded-lg">
-            <p class="text-sm text-gray-400 mb-1">Bond Txid</p>
-            <button
-              onclick="window.open('http://170.75.166.88:8080/tx/${maker.bondTxid}', '_blank')"
-              class="text-cyan-400 hover:text-cyan-300 underline font-mono text-sm break-all text-left w-full"
-            >
+          <div class="wide">
+            <span>Bond Txid</span>
+            <button onclick="window.open('http://170.75.166.88:8080/tx/${maker.bondTxid}', '_blank')">
               ${maker.bondTxid}
             </button>
           </div>
-          `
-              : ''
-          }
-        </div>
-
-        <div class="mt-6 flex justify-end">
-          <button onclick="this.closest('.fixed').remove()" 
-            class="bg-gray-700 hover:bg-gray-600 text-white px-6 py-2 rounded-lg font-semibold text-lg transition-colors">
-            Close
-          </button>
         </div>
       </div>
     `;
@@ -644,87 +466,201 @@ export function Market(container) {
     document.body.appendChild(modal);
   };
 
+  window.openMakerFeeCalculator = (makerIndex) => {
+    const maker = makers.find((m) => m.index === makerIndex);
+    if (!maker) {
+      showError('Maker data is not available');
+      return;
+    }
+
+    const defaultAmountSats =
+      maker.minSize > 0
+        ? maker.minSize
+        : Math.min(10000000, maker.maxSize || 10000000);
+    const modal = document.createElement('div');
+    modal.className = 'market-modal-backdrop';
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+
+    modal.innerHTML = `
+      <div class="market-modal market-fee-modal" onclick="event.stopPropagation()">
+        <div class="market-fee-head">
+          <div>
+            <span>Fee Calculator</span>
+            <h3>Estimate swap cost</h3>
+            <p title="${maker.address}">${formatTorEndpoint(maker.address, 22, 12)}</p>
+          </div>
+          <button class="market-modal-close" type="button" aria-label="Close">&times;</button>
+        </div>
+
+        <div class="market-fee-body">
+          <label class="market-fee-field">
+            <span>Swap Amount</span>
+            <input id="market-fee-amount" type="number" min="0" step="1" value="${Math.round(defaultAmountSats)}">
+          </label>
+          <div class="market-fee-range">
+            <span>Maker range</span>
+            <strong>${formatSats(maker.minSize)} - ${formatSats(maker.maxSize)}</strong>
+          </div>
+
+          <label class="market-fee-field">
+            <span>Maker Position in Circuit (n)</span>
+            <div class="market-fee-index-field">
+              <input id="market-fee-position" type="number" min="1" step="1" value="1">
+              <strong>Position</strong>
+            </div>
+          </label>
+          <label class="market-fee-field">
+            <span>Total Makers in Swap (m)</span>
+            <div class="market-fee-index-field">
+              <input id="market-fee-total-makers" type="number" min="1" step="1" value="2">
+              <strong>Makers</strong>
+            </div>
+          </label>
+          <div class="market-fee-range">
+            <span>Refund locktime = 20 x (m - n + 1)</span>
+            <strong id="market-fee-locktime">Enter position</strong>
+          </div>
+          <p id="market-fee-position-error" class="market-fee-validation">Enter positive maker counts where n is not greater than m.</p>
+
+          <div class="market-fee-formula">
+            <span>Formula</span>
+            <strong>Total Fee</strong> = Base Fee + (Swap Amount x Liquidity Fee) +<br>
+            (Refund Locktime x Swap Amount x Time Rate)
+          </div>
+
+          <div class="market-fee-results">
+            <div>
+              <span>Base Fee</span>
+              <strong><span id="market-fee-base">0</span> 丰</strong>
+              <small>Fixed maker fee</small>
+            </div>
+            <div>
+              <span>Liquidity Fee</span>
+              <strong><span id="market-fee-liquidity">0</span> 丰</strong>
+              <small id="market-fee-liquidity-detail">0 丰 x 0 fee rate</small>
+            </div>
+            <div>
+              <span>Time Fee</span>
+              <strong><span id="market-fee-time">0</span> 丰</strong>
+              <small id="market-fee-time-detail">20 x 0 丰 x 0 time rate</small>
+            </div>
+            <div class="total">
+              <span>Total Fee</span>
+              <strong><span id="market-fee-total">0</span> 丰</strong>
+              <small id="market-fee-percent">0.0000% of swap amount</small>
+            </div>
+          </div>
+
+          <p class="market-fee-note">Estimates exclude on-chain miner fees.</p>
+        </div>
+      </div>
+    `;
+
+    const amountInput = modal.querySelector('#market-fee-amount');
+    const positionInput = modal.querySelector('#market-fee-position');
+    const totalMakersInput = modal.querySelector('#market-fee-total-makers');
+    const closeBtn = modal.querySelector('.market-modal-close');
+
+    const updateEstimate = () => {
+      const amountSats = parseSatsInput(amountInput.value);
+      const rawMakerPosition = Number.parseFloat(positionInput.value);
+      const makerPosition =
+        Number.isInteger(rawMakerPosition) && rawMakerPosition > 0
+          ? rawMakerPosition
+          : null;
+      const rawTotalMakers = Number.parseFloat(totalMakersInput.value);
+      const totalMakers =
+        Number.isInteger(rawTotalMakers) && rawTotalMakers > 0
+          ? rawTotalMakers
+          : null;
+
+      if (makerPosition === null || totalMakers === null || makerPosition > totalMakers) {
+        modal.querySelector('#market-fee-locktime').textContent =
+          'Enter position';
+        modal.querySelector('#market-fee-base').textContent = '0';
+        modal.querySelector('#market-fee-liquidity').textContent = '0';
+        modal.querySelector('#market-fee-liquidity-detail').textContent =
+          `${formatSats(amountSats)} x ${Number(maker.volumeFee || 0).toFixed(4)} fee rate`;
+        modal.querySelector('#market-fee-time').textContent = '0';
+        modal.querySelector('#market-fee-time-detail').textContent =
+          'Enter position to calculate time fee';
+        modal.querySelector('#market-fee-total').textContent = '0';
+        modal.querySelector('#market-fee-percent').textContent =
+          'Enter position to calculate total fee';
+        modal
+          .querySelector('#market-fee-position-error')
+          .classList.remove('hidden');
+        return;
+      }
+
+      modal.querySelector('#market-fee-position-error').classList.add('hidden');
+
+      const estimate = calculateMakerFee(maker, amountSats, makerPosition, totalMakers);
+      const totalPercent =
+        amountSats > 0 ? (estimate.totalFee / amountSats) * 100 : 0;
+
+      modal.querySelector('#market-fee-locktime').textContent =
+        `${estimate.refundLocktime} blocks`;
+      modal.querySelector('#market-fee-base').textContent = formatSatsNumber(
+        estimate.baseFee
+      );
+      modal.querySelector('#market-fee-liquidity').textContent =
+        formatSatsNumber(estimate.liquidityFee);
+      modal.querySelector('#market-fee-liquidity-detail').textContent =
+        `${formatSats(amountSats)} x ${estimate.liquidityRate.toFixed(4)} fee rate`;
+      modal.querySelector('#market-fee-time').textContent = formatSatsNumber(
+        estimate.timeFee
+      );
+      modal.querySelector('#market-fee-time-detail').textContent =
+        `${estimate.refundLocktime} x ${formatSats(amountSats)} x ${estimate.timeRate.toFixed(6)} time rate`;
+      modal.querySelector('#market-fee-total').textContent = formatSatsNumber(
+        estimate.totalFee
+      );
+      modal.querySelector('#market-fee-percent').textContent =
+        `${totalPercent.toFixed(4)}% of swap amount`;
+    };
+
+    amountInput.addEventListener('input', updateEstimate);
+    positionInput.addEventListener('input', updateEstimate);
+    totalMakersInput.addEventListener('input', updateEstimate);
+    closeBtn.addEventListener('click', () => modal.remove());
+    updateEstimate();
+
+    document.body.appendChild(modal);
+    positionInput.focus();
+  };
+
   function updateUI() {
     const stats = calculateStats();
     const tableBody = content.querySelector('#maker-table-body');
     const statsContainer = content.querySelector('#market-stats');
-
-    // Update sync status display
     const syncStatusDiv = content.querySelector('#sync-status');
+    const progressContainer = content.querySelector('#sync-progress-container');
+    const activeSummary = content.querySelector('#market-active-summary');
+
     if (syncStatusDiv) {
       syncStatusDiv.innerHTML = `
-      <div class="text-sm text-gray-400">
-        <span class="text-gray-400">Market Data:</span>
-        <span class="px-2 py-1 bg-blue-500/20 text-blue-400 rounded text-xs font-semibold text-lg ml-2">
-          ${makers.length} makers available
-        </span>
-      </div>
-    `;
+        <span class="market-sync-dot"></span>
+        <span>${makers.length} makers available</span>
+        ${stats.nostrRelays ? `<span>${stats.nostrRelays} relays</span>` : ''}
+      `;
     }
 
-    // Update progress bar - SHOW WHILE LOADING
-    const progressContainer = content.querySelector('#sync-progress-container');
     if (progressContainer) {
-      if (isLoading) {
-        // ✅ SHOW LOADING ANIMATION
+      if (isLoading || syncProgress) {
         progressContainer.classList.remove('hidden');
         progressContainer.innerHTML = `
-        <div class="bg-[#0f1419] rounded-lg p-6 border border-blue-500/30">
-          <div class="flex items-center justify-between mb-4">
-            <span class="text-lg font-semibold text-lg text-blue-400">
-              ${icons.refreshCw(16, 'mr-2 animate-spin')} Syncing Market Data...
-            </span>
-            <span class="text-sm text-gray-400">
-              Please wait
-            </span>
-          </div>
-          
-          <div class="bg-gray-700 rounded-full h-4 overflow-hidden mb-4">
-            <div class="bg-gradient-to-r from-[#FF6B35] via-[#ff7d4d] to-[#FF6B35] h-4 rounded-full animate-pulse"
-                 style="width: 100%; animation: shimmer 2s infinite linear;">
+          <div class="market-progress-card">
+            <div class="market-progress-head">
+              <span>${icons.refreshCw(16, 'animate-spin')} ${syncProgress?.message || 'Syncing market data...'}</span>
+              <span>Please wait</span>
             </div>
+            <div class="market-progress-bar"><span></span></div>
+            <div class="market-progress-copy">${icons.search(14)} Discovering makers over Tor network...</div>
           </div>
-          
-          <div class="flex items-center justify-center text-sm text-cyan-400">
-            <svg class="animate-spin h-5 w-5 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            Discovering makers over Tor network...
-          </div>
-        </div>
-      `;
-      } else if (
-        syncProgress &&
-        (syncProgress.status === 'syncing' ||
-          syncProgress.status === 'starting')
-      ) {
-        progressContainer.classList.remove('hidden');
-        progressContainer.innerHTML = `
-        <div class="bg-[#0f1419] rounded-lg p-4 border border-blue-500/30">
-          <div class="flex items-center justify-between mb-2">
-            <span class="text-sm font-semibold text-lg text-blue-400">
-              ${syncProgress.message || 'Syncing market data...'}
-            </span>
-            <span class="text-sm text-gray-400">
-              Please wait...
-            </span>
-          </div>
-          
-          <div class="bg-gray-700 rounded-full h-3 overflow-hidden">
-            <div class="bg-gradient-to-r from-[#FF6B35] to-[#ff7d4d] h-3 rounded-full transition-all duration-500 relative animate-pulse"
-                 style="width: 100%">
-              <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
-            </div>
-          </div>
-          
-          <div class="flex items-center justify-center text-xs text-gray-400 mt-2">
-            <div class="text-cyan-400">
-              ${icons.search(16, 'mr-2')} Discovering makers over Tor network...
-            </div>
-          </div>
-        </div>
-      `;
+        `;
       } else {
         progressContainer.classList.add('hidden');
       }
@@ -732,100 +668,95 @@ export function Market(container) {
 
     if (statsContainer) {
       statsContainer.innerHTML = `
-      <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-        <p class="text-2xl font-mono text-[#FF6B35]">${stats.totalLiquidity} BTC</p>
-      </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Total Fidelity Locked</p>
-        <p class="text-2xl font-mono text-purple-400">${stats.totalFidelity} sats</p>
-      </div>
-      <!-- <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Nostr Relays</p>
-        <p class="text-2xl font-mono text-cyan-400">${stats.nostrRelays}</p>
-      </div> -->
-    `;
+        <div class="market-stat-card fidelity">
+          <span class="app-accent"></span>
+          <div class="app-card-label">Fidelity Locked</div>
+          <div class="app-card-value"><span>${formatSats(stats.totalFidelity)}</span></div>
+          <p>Across ${stats.counts.good} active makers.</p>
+        </div>
+        <div class="market-stat-card liquidity">
+          <span class="app-accent"></span>
+          <div class="app-card-label">Total Liquidity</div>
+          <div class="app-card-value"><span>${formatSats(stats.totalLiquidity)}</span></div>
+          <p>Spendable maker depth.</p>
+        </div>
+        <div class="market-stat-card makers">
+          <span class="app-accent"></span>
+          <div class="app-card-label">Active Makers</div>
+          <div class="app-card-value"><span>${stats.counts.good}</span><small>responding</small></div>
+          <p>${stats.counts.good} good &middot; ${stats.counts.bad} bad &middot; ${stats.counts.unresponsive} unresponsive in this window.</p>
+        </div>
+      `;
     }
 
-    // Update tab counts
     const goodCount = content.querySelector('#good-count');
     const badCount = content.querySelector('#bad-count');
     const unresponsiveCount = content.querySelector('#unresponsive-count');
 
-    if (goodCount)
-      goodCount.textContent = makers.filter((m) => m.status === 'good').length;
-    if (badCount)
-      badCount.textContent = makers.filter((m) => m.status === 'bad').length;
+    if (goodCount) goodCount.textContent = stats.counts.good;
+    if (badCount) badCount.textContent = stats.counts.bad;
     if (unresponsiveCount)
-      unresponsiveCount.textContent = makers.filter(
-        (m) => m.status === 'unresponsive'
-      ).length;
+      unresponsiveCount.textContent = stats.counts.unresponsive;
+
+    const displayedMakers = makers.filter(
+      (m) => m.status === currentMakerStatus
+    );
+    if (activeSummary) {
+      activeSummary.textContent = `${displayedMakers.length} ${currentMakerStatus} offers`;
+    }
 
     if (tableBody) {
       if (isLoading) {
-        // ✅ SHOW BIG LOADING SPINNER IN TABLE
         tableBody.innerHTML = `
-        <div class="col-span-8 text-center py-16">
-          <div class="inline-block">
-            <svg class="animate-spin h-16 w-16 text-[#FF6B35] mx-auto mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
+          <div class="market-empty-state">
+            ${icons.loader(42, 'animate-spin')}
+            <strong>Syncing market data...</strong>
+            <span>Fetching makers over Tor network</span>
           </div>
-          <p class="text-gray-400 text-lg font-semibold text-lg mb-2">Syncing Market Data...</p>
-          <p class="text-gray-500 text-sm">Fetching makers over Tor network</p>
-        </div>
-      `;
+        `;
       } else if (makers.length === 0) {
         tableBody.innerHTML = `
-        <div class="col-span-8 text-center py-12">
-          <p class="text-gray-400 mb-4">No makers found</p>
-          <button onclick="document.querySelector('#refresh-market-btn').click()" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg">
-            Refresh
-          </button>
-        </div>
-      `;
+          <div class="market-empty-state">
+            ${icons.inbox(42)}
+            <strong>No makers found</strong>
+            <button onclick="document.querySelector('#refresh-market-btn').click()" class="app-button primary sm">
+              ${icons.refreshCw(14)} Refresh
+            </button>
+          </div>
+        `;
+      } else if (displayedMakers.length === 0) {
+        tableBody.innerHTML = `
+          <div class="market-empty-state">
+            ${icons.inbox(42)}
+            <strong>No ${currentMakerStatus} makers found</strong>
+          </div>
+        `;
       } else {
-        const displayedMakers = makers.filter(
-          (m) => m.status === currentMakerStatus
-        );
-
-        if (displayedMakers.length === 0) {
-          tableBody.innerHTML = `
-          <div class="col-span-8 text-center py-12">
-            <p class="text-gray-400">No ${currentMakerStatus} makers found</p>
-          </div>
-        `;
-        } else {
-          tableBody.innerHTML = displayedMakers
-            .map(
-              (maker) => {
-                return `
-          <div class="grid gap-4 p-4 hover:bg-[#242d3d] transition-colors items-center" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
-
-            <div class="text-gray-300 font-mono text-sm truncate" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
-            <div class="text-green-400">${maker.baseFee}</div>
-            <div class="text-blue-400">${maker.volumeFee}%</div>
-            <div class="text-cyan-400">${maker.timeFee}%</div>
-            <div class="text-yellow-400">${maker.minSize.toLocaleString()}</div>
-<div class="text-yellow-400">${maker.maxSize < 1000000 ? maker.maxSize.toLocaleString() : (maker.maxSize / 1000000).toFixed(1) + 'M'}</div>
-            <div onclick="window.viewFidelityBond('${maker.address}')" class="text-purple-400 cursor-pointer hover:text-purple-300 hover:underline transition-colors">
-              ${maker.bond > 0 ? maker.bond.toLocaleString() : 'N/A'}
-            </div>
-            <div class="flex gap-2">
-              <button data-maker-poll="${maker.address}" class="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors" title="Re-poll this maker now">
-                Poll
-              </button>
-              <button data-maker-remove="${maker.address}" class="px-2 py-1 text-xs bg-red-600 hover:bg-red-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded transition-colors" title="Remove this maker from the offerbook">
-                Remove
-              </button>
-            </div>
-          </div>
-        `;
-              }
-            )
-            .join('');
-        }
+        tableBody.innerHTML = displayedMakers
+          .map((maker) => {
+            return `
+              <div class="market-row">
+                <div class="market-address" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
+                <div class="market-number primary">${formatSats(maker.baseFee)}</div>
+                <div class="market-number">${maker.volumeFee}</div>
+                <div class="market-number">${maker.timeFee}</div>
+                <div class="market-number muted">${formatSats(maker.minSize)}</div>
+                <div class="market-number muted">${formatSats(maker.maxSize)}</div>
+                <div class="market-bond">
+                  <span>${maker.bond > 0 ? formatSats(maker.bond) : 'N/A'}</span>
+                  <button onclick="window.viewFidelityBond('${maker.address}')" class="market-bond-action" title="View fidelity bond">
+                    ${icons.externalLink(12)}
+                  </button>
+                </div>
+                <div class="market-actions">
+                  <button class="market-action-btn" onclick="window.openMakerFeeCalculator(${maker.index})" data-tooltip="Calculate the estimated maker fee for this maker using your amount and hop position.">Calculate</button>
+                  <button class="market-action-btn" data-maker-poll="${maker.address}" data-tooltip="Ask this maker for a fresh offer now and update its availability and fee data.">Poll</button>
+                  <button class="market-action-btn danger" data-maker-remove="${maker.address}" data-tooltip="Remove this maker from your local offerbook so it no longer appears in market results.">Remove</button>
+                </div>
+              </div>
+            `;
+          })
+          .join('');
       }
     }
 
@@ -837,131 +768,74 @@ export function Market(container) {
         minute: '2-digit',
         second: '2-digit',
       });
-      const displayedCount = makers.filter(
-        (m) => m.status === currentMakerStatus
-      ).length;
-      footer.innerHTML = `Showing ${displayedCount} ${currentMakerStatus} offers • ${timeStr}`;
+
+      footer.innerHTML = `
+        <span>Showing ${displayedMakers.length} ${currentMakerStatus} offers &middot; ${timeStr}</span>
+      `;
     }
   }
 
   content.innerHTML = `
-    <div class="flex justify-between items-center mb-8">
-      <div>
-        <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">Coinswap Market</h2>
-        <p class="text-gray-400">Live view of the current coinswap market</p>
-      </div>
-      <button id="refresh-market-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
-        Refresh
-      </button>
-    </div>
-
-    <!-- Sync Status Display -->
-    <div class="bg-[#1a2332] rounded-lg p-4 mb-4">
-      <div id="sync-status"></div>
-    </div>
-
-    <!-- Progress Bar -->
-    <div id="sync-progress-container" class="mb-4 hidden"></div>
-
-    <div class="bg-[#1a2332] rounded-lg p-6 mb-6">
-      <div class="flex items-start gap-3">
-        <span class="text-[#FF6B35]">${icons.info(24)}</span>
+    <div class="app-page market-page">
+      <div class="app-head">
         <div>
-          <h3 class="text-lg font-semibold text-lg text-[#FF6B35] mb-2">Fee Calculation</h3>
-          <p class="text-gray-300 mb-2">Total fee for a swap is calculated as:</p>
-          <code class="block bg-[#0f1419] p-3 rounded text-green-400 font-mono text-sm">
-            Total Fee = Base Fee + (Swap Amount × % Fee Rate) + (Refund Locktime × Swap Amount × % Time Rate)
-          </code>
-          <p class="text-gray-400 text-sm mt-3">
-            Refund Locktime depends on the position of a maker in swap circuit. Calculated as 20*(n+1), where n = index position of the maker in the swap circuit.
-          </p>
+          <h2>Market</h2>
+          <p class="market-subtitle">Live view of coinswap makers routing through your Tor circuit.</p>
+          <div id="sync-status" class="market-sync-shell"></div>
         </div>
-      </div>
-    </div>
-
-    <div id="market-stats" class="grid grid-cols-2 gap-4 mb-6">
-      <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Total Liquidity</p>
-        <p class="text-2xl font-mono text-[#FF6B35]">0.00 BTC</p>
-      </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Total Fidelity Locked</p>
-        <p class="text-2xl font-mono text-purple-400">0 sats</p>
-      </div>
-      <div class="bg-[#1a2332] rounded-lg p-6">
-        <p class="text-sm text-gray-400 mb-2">Nostr Relays</p>
-        <p class="text-2xl font-mono text-cyan-400">0</p>
-      </div>
-    </div>
-
-    <div class="bg-[#1a2332] rounded-lg overflow-hidden">
-      <!-- Maker Status Tabs -->
-      <div class="flex border-b-2 border-[#FF6B35]">
-  <button id="tab-good" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#FF6B35] text-white border-b-4 border-[#FF6B35] transition-all">
-    ${icons.checkCircle(14, 'mr-1')} Good Makers (<span id="good-count">0</span>)
-  </button>
-  <button id="tab-bad" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
-    ${icons.xCircle(14, 'mr-1')} Bad Makers (<span id="bad-count">0</span>)
-  </button>
-  <button id="tab-unresponsive" class="flex-1 px-6 py-4 font-semibold text-lg bg-[#1a2332] text-gray-400 border-b-4 border-transparent hover:text-white hover:border-gray-600 transition-all">
-    ${icons.pauseCircle(14, 'mr-1')} Unresponsive (<span id="unresponsive-count">0</span>)
-  </button>
-</div>
-
-      
-
-      <div class="grid gap-4 bg-[#FF6B35] p-4 text-xs" style="grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr 1.2fr">
-        <div class="font-semibold">Tor Address</div>
-        <div class="font-semibold">Base Fee</div>
-        <div class="font-semibold">% Fee Rate</div>
-        <div class="font-semibold">% Time Rate</div>
-        <div class="font-semibold">Min Swap Size</div>
-        <div class="font-semibold">Max Swap Size</div>
-        <div class="font-semibold">Fidelity Bond</div>
-        <div class="font-semibold">Actions</div>
+        <button id="refresh-market-btn" class="app-button primary">
+          ${refreshButtonContent()}
+        </button>
       </div>
 
-      <div id="maker-table-body" class="divide-y divide-gray-700">
-        <div class="col-span-8 text-center py-12">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
-          <p class="text-gray-400">Loading makers...</p>
+      <div id="sync-progress-container" class="hidden"></div>
+      <div id="market-stats" class="market-stats"></div>
+
+      <section class="market-panel">
+        <div class="market-panel-head">
+          <div class="app-tabs market-tabs">
+            <button id="tab-good" class="active">Good Makers <span id="good-count">0</span></button>
+            <button id="tab-bad">Bad Makers <span id="bad-count">0</span></button>
+            <button id="tab-unresponsive">Unresponsive <span id="unresponsive-count">0</span></button>
+          </div>
+          <div id="market-active-summary" class="app-meta">0 good offers</div>
         </div>
-      </div>
 
-      <div id="market-footer" class="p-4 text-center text-gray-400 text-sm border-t border-gray-700">
-        Loading...
-      </div>
+        <div class="market-table-header">
+          <div>Tor Address</div>
+          <div>Base Fee</div>
+          <div>Liquidity Fee</div>
+          <div>Time Rate</div>
+          <div>Min Swap</div>
+          <div>Max Swap</div>
+          <div>Fidelity Bond</div>
+          <div>Actions</div>
+        </div>
+
+        <div id="maker-table-body" class="market-table-body">
+          <div class="market-empty-state">
+            ${icons.loader(42, 'animate-spin')}
+            <strong>Loading makers...</strong>
+          </div>
+        </div>
+
+        <div id="market-footer" class="market-footer">Loading...</div>
+      </section>
     </div>
   `;
 
   container.appendChild(content);
 
-  // Event listeners
   content
     .querySelector('#refresh-market-btn')
     .addEventListener('click', handleRefresh);
-  // Tab switching
+
   function switchTab(status) {
     currentMakerStatus = status;
 
-    // Update tab styling
     ['good', 'bad', 'unresponsive'].forEach((s) => {
       const tab = content.querySelector(`#tab-${s}`);
-      if (s === status) {
-        tab.classList.add('bg-[#FF6B35]', 'text-white', 'border-[#FF6B35]');
-        tab.classList.remove(
-          'bg-[#1a2332]',
-          'text-gray-400',
-          'border-transparent'
-        );
-      } else {
-        tab.classList.remove('bg-[#FF6B35]', 'text-white', 'border-[#FF6B35]');
-        tab.classList.add(
-          'bg-[#1a2332]',
-          'text-gray-400',
-          'border-transparent'
-        );
-      }
+      tab.classList.toggle('active', s === status);
     });
 
     updateUI();
@@ -977,9 +851,6 @@ export function Market(container) {
     .querySelector('#tab-unresponsive')
     .addEventListener('click', () => switchTab('unresponsive'));
 
-  // Delegated handlers for per-maker Poll / Remove buttons. The table body is
-  // re-rendered on every updateUI() call, so attaching at the container avoids
-  // having to re-wire individual buttons.
   content.addEventListener('click', async (event) => {
     const pollBtn = event.target.closest('[data-maker-poll]');
     const removeBtn = event.target.closest('[data-maker-remove]');
@@ -988,11 +859,11 @@ export function Market(container) {
       const address = pollBtn.dataset.makerPoll;
       const original = pollBtn.innerHTML;
       pollBtn.disabled = true;
-      pollBtn.innerHTML = 'Polling…';
+      pollBtn.innerHTML = 'Polling...';
       try {
         const res = await window.api.taker.pollMaker(address);
         if (!res.success) throw new Error(res.error || 'Poll failed');
-        console.log('🎯 Poll result:', res.maker);
+        console.log('Poll result:', res.maker);
         await fetchMakers();
         updateUI();
       } catch (err) {
@@ -1009,7 +880,7 @@ export function Market(container) {
       if (!confirm(`Remove maker ${address} from the offerbook?`)) return;
       const original = removeBtn.innerHTML;
       removeBtn.disabled = true;
-      removeBtn.innerHTML = 'Removing…';
+      removeBtn.innerHTML = 'Removing...';
       try {
         const res = await window.api.taker.removeMaker(address);
         if (!res.success) throw new Error(res.error || 'Remove failed');
@@ -1028,7 +899,6 @@ export function Market(container) {
   initialize();
   startSyncStateMonitor();
 
-  // Clean up
   window.addEventListener('beforeunload', () => {
     if (syncCheckInterval) {
       clearInterval(syncCheckInterval);

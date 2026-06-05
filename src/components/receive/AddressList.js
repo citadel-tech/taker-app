@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function AddressListComponent(container) {
   let currentFilter = 'all';
@@ -116,7 +117,7 @@ const result = await window.api.taker.getTransactions(200, 0);
       P2WSH: 'blue',
       P2TR: 'purple',
       P2PKH: 'yellow',
-      P2SH: 'orange',
+      P2SH: 'yellow',
     };
     return colors[type] || 'gray';
   }
@@ -182,9 +183,9 @@ const result = await window.api.taker.getTransactions(200, 0);
     }
 
     const csv = [
-      'Address,Type,Spend Type,Times Used,Received (BTC),Created At,Last Used',
+      'Address,Type,Spend Type,Times Used,Received (丰),Created At,Last Used',
       ...allAddresses.map((addr) => {
-        return `"${addr.address}","${addr.type}","${addr.spendType}",${addr.used},${(addr.received / 100000000).toFixed(8)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
+        return `"${addr.address}","${addr.type}","${addr.spendType}",${addr.used},${Math.round(addr.received)},"${new Date(addr.createdAt).toLocaleString()}","${formatLastUsed(addr.lastUsed)}"`;
       }),
     ].join('\n');
 
@@ -209,48 +210,48 @@ const result = await window.api.taker.getTransactions(200, 0);
     ];
 
     container.innerHTML = `
-      <div id="address-list-content">
-        <div class="flex justify-between items-center mb-6">
+      <div id="address-list-content" class="app-page address-list-page">
+        <div class="app-head">
           <div>
-            <button id="back-to-receive" class="text-gray-400 hover:text-white transition-colors mb-4 flex items-center gap-2">
-              <span>←</span> Back to Receive
+            <button id="back-to-receive" class="app-button ghost sm" type="button">
+              ${icons.arrowLeft(14)} Back to Receive
             </button>
-            <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Addresses</h2>
-            <p class="text-gray-400">Addresses derived from transaction history</p>
+            <h2>All Addresses</h2>
+            <p>Addresses derived from transaction history</p>
           </div>
-          <div class="flex gap-2">
-            <button id="export-addresses" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-              ${icons.arrowDownCircle(14, 'mr-1')} Export CSV
+          <div class="app-actions">
+            <button id="export-addresses" class="app-button secondary" type="button">
+              ${icons.arrowDownCircle(14)} Export CSV
             </button>
-            <button id="refresh-addresses" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
-              Refresh
+            <button id="refresh-addresses" class="app-button primary" type="button">
+              ${icons.refreshCw(14)} Refresh
             </button>
           </div>
         </div>
 
-        <!-- Address Stats -->
-        <div class="grid grid-cols-3 gap-4 mb-6">
-          <div class="bg-[#1a2332] rounded-lg p-6">
-            <p class="text-sm text-gray-400 mb-2">Used Addresses</p>
-            <p class="text-2xl font-mono text-green-400">${stats.used}</p>
+        <section class="address-stats">
+          <div class="app-card">
+            <span class="app-accent"></span>
+            <span class="app-card-label">Used Addresses</span>
+            <strong>${stats.used}</strong>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-6">
-            <p class="text-sm text-gray-400 mb-2">Reused Addresses</p>
-            <p class="text-2xl font-mono text-blue-400">${stats.reused}</p>
+          <div class="app-card">
+            <span class="app-accent"></span>
+            <span class="app-card-label">Reused Addresses</span>
+            <strong>${stats.reused}</strong>
           </div>
-          <div class="bg-[#1a2332] rounded-lg p-6">
-            <p class="text-sm text-gray-400 mb-2">Total Received</p>
-            <p class="text-2xl font-mono text-cyan-400">${(stats.totalReceived / 100000000).toFixed(8)} BTC</p>
+          <div class="app-card">
+            <span class="app-accent"></span>
+            <span class="app-card-label">Total Received</span>
+            <strong>${formatSats(stats.totalReceived)}</strong>
           </div>
-        </div>
+        </section>
 
-        <!-- Filter & Sort -->
-        <div class="bg-[#1a2332] rounded-lg p-4 mb-6">
-          <div class="flex items-center justify-between flex-wrap gap-4">
-            <!-- Type Filter -->
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-400 mr-2">Filter:</span>
-              <button data-filter="all" class="filter-btn ${currentFilter === 'all' ? 'bg-[#FF6B35] text-white' : 'bg-[#0f1419] text-gray-400 border border-gray-700 hover:bg-[#242d3d]'} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
+        <section class="address-panel">
+          <div class="address-toolbar">
+            <div class="address-filter-group">
+              <span>Filter</span>
+              <button data-filter="all" class="address-filter-btn ${currentFilter === 'all' ? 'is-active' : ''}" type="button">
                 All (${allAddresses.length})
               </button>
               ${spendTypeFilters
@@ -258,14 +259,8 @@ const result = await window.api.taker.getTransactions(200, 0);
                   const count = allAddresses.filter(
                     (a) => a.spendType === type.label
                   ).length;
-                  const color =
-                    type.value === 'regular'
-                      ? 'green'
-                      : type.value === 'contract'
-                        ? 'yellow'
-                        : 'blue';
                   return `
-                  <button data-filter="${type.value}" class="filter-btn ${currentFilter === type.value ? 'bg-[#FF6B35] text-white' : `bg-[#0f1419] text-${color}-400 border border-gray-700 hover:bg-[#242d3d]`} px-3 py-1.5 rounded-lg text-sm font-semibold text-lg transition-colors">
+                  <button data-filter="${type.value}" class="address-filter-btn ${currentFilter === type.value ? 'is-active' : ''}" type="button">
                     ${type.label} (${count})
                   </button>
                 `;
@@ -273,93 +268,91 @@ const result = await window.api.taker.getTransactions(200, 0);
                 .join('')}
             </div>
 
-            <!-- Sort -->
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-gray-400">Sort:</span>
-              <select id="sort-select" class="bg-[#0f1419] border border-gray-700 text-white rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#FF6B35]">
+            <label class="address-sort">
+              <span>Sort</span>
+              <select id="sort-select">
                 <option value="newest" ${sortBy === 'newest' ? 'selected' : ''}>Newest First</option>
                 <option value="oldest" ${sortBy === 'oldest' ? 'selected' : ''}>Oldest First</option>
                 <option value="most-used" ${sortBy === 'most-used' ? 'selected' : ''}>Most Used</option>
                 <option value="most-received" ${sortBy === 'most-received' ? 'selected' : ''}>Most Received</option>
               </select>
-            </div>
+            </label>
           </div>
-        </div>
 
-        <!-- Address Table -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-xl font-semibold text-lg text-gray-300 mb-4">Address Details</h3>
+          <div class="address-panel-head">
+            <h3>Address Details</h3>
+            <span>Showing ${filteredAddresses.length} of ${allAddresses.length}</span>
+          </div>
 
           ${
             filteredAddresses.length === 0
               ? `
-            <div class="text-center py-12">
-              <div class="text-gray-500 mb-4 flex justify-center">${icons.inbox(48)}</div>
-              <p class="text-gray-400 mb-4">No addresses ${currentFilter !== 'all' ? `for ${currentFilter} spend type` : 'found in transaction history'}</p>
-              <button id="go-to-receive" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg px-6 py-2 rounded-lg transition-colors">
+            <div class="address-empty">
+              ${icons.inbox(44)}
+              <p>No addresses ${currentFilter !== 'all' ? `for ${currentFilter} spend type` : 'found in transaction history'}</p>
+              <button id="go-to-receive" class="app-button primary" type="button">
                 Generate New Address
               </button>
             </div>
           `
               : `
-            <div class="overflow-x-auto">
-              <table class="w-full">
+            <div class="address-table-wrap">
+              <table class="address-table">
                 <thead>
-                  <tr class="border-b border-gray-700">
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Address</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Type</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Spend Type</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Times Used</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Received</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Created</th>
-                    <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg text-sm">Last Used</th>
+                  <tr>
+                    <th>Address</th>
+                    <th>Type</th>
+                    <th>Spend Type</th>
+                    <th>Times Used</th>
+                    <th>Received</th>
+                    <th>Created</th>
+                    <th>Last Used</th>
                   </tr>
                 </thead>
                 <tbody>
                   ${filteredAddresses
                     .map((addr) => {
-                      const typeColor = getTypeColor(addr.type);
-                      const spendTypeColor =
+                      const typeClass = `is-${getTypeColor(addr.type)}`;
+                      const spendTypeClass =
                         addr.spendType === 'Regular'
-                          ? 'green'
+                          ? 'is-green'
                           : addr.spendType === 'Contract'
-                            ? 'yellow'
-                            : 'blue';
+                            ? 'is-yellow'
+                            : 'is-blue';
                       const createdDate = new Date(addr.createdAt);
 
                       return `
-                      <tr class="border-b border-gray-800 hover:bg-[#242d3d] transition-colors address-row" data-address="${addr.address}">
-                        <td class="py-3 px-4">
-                          <div class="flex items-center gap-2">
+                      <tr class="address-row" data-address="${addr.address}">
+                        <td>
+                          <div class="address-cell">
                             <a href="https://mutinynet.com/address/${addr.address}" 
                                target="_blank" 
-                               class="font-mono text-sm text-blue-400 hover:text-blue-300 underline truncate max-w-[200px]" 
                                title="${addr.address}">
                                 ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}
                             </a>
-                            <button class="copy-btn text-gray-500 hover:text-[#FF6B35] transition-colors" data-address="${addr.address}" title="Copy address">
+                            <button class="copy-btn" data-address="${addr.address}" title="Copy address" type="button">
                                 ${icons.clipboardCopy(14)}
                             </button>
                           </div>
                         </td>
-                        <td class="py-3 px-4">
-                          <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${typeColor}-500/20 text-${typeColor}-400 border border-${typeColor}-500/30">
+                        <td>
+                          <span class="address-badge ${typeClass}">
                             ${addr.type}
                           </span>
                         </td>
-                        <td class="py-3 px-4">
-                          <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${spendTypeColor}-500/20 text-${spendTypeColor}-400 border border-${spendTypeColor}-500/30">
+                        <td>
+                          <span class="address-badge ${spendTypeClass}">
                             ${addr.spendType}
                           </span>
                         </td>
-                        <td class="py-3 px-4 text-sm text-gray-300 font-mono">${addr.used}</td>
-                        <td class="py-3 px-4 text-sm font-mono ${addr.received > 0 ? 'text-green-400' : 'text-gray-500'}">
-                          ${(addr.received / 100000000).toFixed(8)}
+                        <td>${addr.used}</td>
+                        <td class="${addr.received > 0 ? 'is-positive' : 'is-muted'}">
+                          ${formatSats(addr.received)}
                         </td>
-                        <td class="py-3 px-4 text-sm text-gray-400" title="${createdDate.toLocaleString()}">
+                        <td title="${createdDate.toLocaleString()}">
                           ${createdDate.toLocaleDateString()}
                         </td>
-                        <td class="py-3 px-4 text-sm text-gray-400">
+                        <td>
                           ${formatLastUsed(addr.lastUsed)}
                         </td>
                       </tr>
@@ -369,13 +362,9 @@ const result = await window.api.taker.getTransactions(200, 0);
                 </tbody>
               </table>
             </div>
-            
-            <div class="mt-4 text-center text-sm text-gray-500">
-              Showing ${filteredAddresses.length} of ${allAddresses.length} addresses
-            </div>
           `
           }
-        </div>
+        </section>
       </div>
     `;
 
@@ -406,7 +395,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     }
 
     // Filter buttons
-    const filterButtons = container.querySelectorAll('.filter-btn');
+    const filterButtons = container.querySelectorAll('.address-filter-btn');
     filterButtons.forEach((btn) => {
       btn.addEventListener('click', () => {
         currentFilter = btn.dataset.filter;
@@ -461,7 +450,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     container.innerHTML = `
       <div class="flex items-center justify-center h-64">
         <div class="text-center">
-          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+          <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p class="text-gray-400">Loading addresses...</p>
         </div>
       </div>

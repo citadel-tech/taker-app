@@ -7,71 +7,65 @@ import { icons } from '../../js/icons.js';
 export function ConnectionStatusComponent(container, onConnected) {
     const connectionDiv = document.createElement('div');
     connectionDiv.id = 'connection-status';
-    connectionDiv.className = 'fixed inset-0 bg-[#0f1419] flex items-center justify-center z-50';
+    connectionDiv.className = 'app-loader-screen';
 
     // Initial loading state
     connectionDiv.innerHTML = `
-        <div class="bg-[#1a2332] rounded-lg max-w-md w-full mx-4 p-8">
-            <!-- Header -->
-            <div class="text-center mb-8">
-                <div class="w-20 h-20 bg-[#FF6B35]/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <span class="text-4xl">₿</span>
+        <div class="app-loader-card">
+            <div class="app-loader-head">
+                <div class="app-loader-orb bitcoin">
+                    <span>₿</span>
                 </div>
-                <h2 class="text-2xl font-bold text-white mb-2">Connecting to Bitcoin Core</h2>
-                <p id="connection-status-text" class="text-gray-400 text-sm">Initializing connection...</p>
+                <span class="app-loader-kicker">Node connection</span>
+                <h2>Connecting to Bitcoin Core</h2>
+                <p id="connection-status-text">Initializing connection...</p>
             </div>
 
-            <!-- Progress Animation -->
-            <div class="mb-6">
-                <div class="flex justify-center mb-4">
-                    <div class="flex space-x-2">
-                        <div id="dot-1" class="w-3 h-3 bg-[#FF6B35] rounded-full animate-pulse"></div>
-                        <div id="dot-2" class="w-3 h-3 bg-[#FF6B35]/50 rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
-                        <div id="dot-3" class="w-3 h-3 bg-[#FF6B35]/30 rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
-                    </div>
+            <div class="app-loader-progress">
+                <div class="app-loader-dots" aria-hidden="true">
+                    <div id="dot-1" class="loader-dot"></div>
+                    <div id="dot-2" class="loader-dot" style="animation-delay: 0.2s"></div>
+                    <div id="dot-3" class="loader-dot" style="animation-delay: 0.4s"></div>
                 </div>
-                <div class="bg-gray-700 rounded-full h-2">
-                    <div id="progress-bar" class="bg-[#FF6B35] h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                <div class="app-loader-progress-track">
+                    <div id="progress-bar" class="app-loader-progress-fill" style="width: 0%"></div>
                 </div>
-                <p id="progress-text" class="text-xs text-gray-400 mt-2 text-center">Attempt 1 of 5</p>
+                <p id="progress-text">Attempt 1 of 5</p>
             </div>
 
-            <!-- Connection Details -->
-            <div id="connection-details" class="bg-[#0f1419] rounded-lg p-4 border border-gray-700">
-                <h4 class="text-white text-sm font-semibold text-lg mb-2">Connection Details:</h4>
-                <div class="space-y-1 text-xs text-gray-400">
-                    <div class="flex justify-between">
-                        <span>Host:</span>
-                        <span id="rpc-host">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Port:</span>
-                        <span id="rpc-port">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Network:</span>
-                        <span id="rpc-network">-</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span>Status:</span>
-                        <span id="connection-status-indicator" class="text-yellow-400">Connecting...</span>
-                    </div>
+            <div id="connection-details" class="app-loader-details">
+                <div class="app-loader-section-head">
+                    <span>Connection details</span>
+                    <strong id="connection-status-indicator" class="loader-status-value is-pending">Connecting</strong>
                 </div>
-            </div>
-
-            <!-- Error Display (hidden by default) -->
-            <div id="connection-error" class="hidden mt-4 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
-                <div class="flex items-start">
-                    <span class="text-red-400 mr-2">${icons.alertTriangle(16)}</span>
+                <div class="app-loader-detail-grid">
                     <div>
-                        <p class="text-sm font-medium text-red-400">Connection Failed</p>
-                        <p id="error-message" class="text-xs text-red-300 mt-1"></p>
+                        <span>Host</span>
+                        <strong id="rpc-host">-</strong>
+                    </div>
+                    <div>
+                        <span>Port</span>
+                        <strong id="rpc-port">-</strong>
+                    </div>
+                    <div>
+                        <span>Network</span>
+                        <strong id="rpc-network">-</strong>
                     </div>
                 </div>
-                <button id="retry-connection" class="mt-3 w-full bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors text-sm">
+            </div>
+
+            <div id="connection-error" class="app-loader-message error hidden">
+                <div>
+                    ${icons.alertTriangle(18)}
+                    <div>
+                        <strong>Connection failed</strong>
+                        <p id="error-message"></p>
+                    </div>
+                </div>
+                <button id="retry-connection" class="app-loader-action danger">
                     Retry Connection
                 </button>
-                <button id="configure-rpc" class="mt-2 w-full bg-[#242d3d] hover:bg-[#2d3748] text-gray-300 font-medium py-2 px-4 rounded-lg transition-colors text-sm border border-gray-600">
+                <button id="configure-rpc" class="app-loader-action secondary">
                     Configure RPC Settings
                 </button>
             </div>
@@ -102,7 +96,7 @@ export function ConnectionStatusComponent(container, onConnected) {
     // Show error
     function showError(message, showRetryButton = true) {
         document.getElementById('connection-status-indicator').textContent = 'Failed';
-        document.getElementById('connection-status-indicator').className = 'text-red-400';
+        document.getElementById('connection-status-indicator').className = 'loader-status-value is-error';
         document.getElementById('error-message').textContent = message;
         
         const errorDiv = document.getElementById('connection-error');
@@ -115,8 +109,7 @@ export function ConnectionStatusComponent(container, onConnected) {
         // Stop the pulse animation
         ['dot-1', 'dot-2', 'dot-3'].forEach(id => {
             const dot = document.getElementById(id);
-            dot.classList.remove('animate-pulse');
-            dot.classList.add('bg-red-400');
+            dot.classList.add('is-error');
         });
     }
 
@@ -124,7 +117,7 @@ export function ConnectionStatusComponent(container, onConnected) {
     function showSuccess(info) {
         document.getElementById('connection-status-text').textContent = 'Successfully connected!';
         document.getElementById('connection-status-indicator').textContent = 'Connected';
-        document.getElementById('connection-status-indicator').className = 'text-green-400';
+        document.getElementById('connection-status-indicator').className = 'loader-status-value is-success';
         document.getElementById('rpc-network').textContent = info.chain || 'Unknown';
         document.getElementById('progress-bar').style.width = '100%';
         document.getElementById('progress-text').textContent = 'Connection established';
@@ -132,8 +125,7 @@ export function ConnectionStatusComponent(container, onConnected) {
         // Update dots to green
         ['dot-1', 'dot-2', 'dot-3'].forEach(id => {
             const dot = document.getElementById(id);
-            dot.classList.remove('animate-pulse');
-            dot.classList.add('bg-green-400');
+            dot.classList.add('is-success');
         });
 
         // Auto-hide after a short delay
@@ -147,12 +139,12 @@ export function ConnectionStatusComponent(container, onConnected) {
     document.getElementById('retry-connection')?.addEventListener('click', () => {
         document.getElementById('connection-error').classList.add('hidden');
         document.getElementById('connection-status-indicator').textContent = 'Connecting...';
-        document.getElementById('connection-status-indicator').className = 'text-yellow-400';
+        document.getElementById('connection-status-indicator').className = 'loader-status-value is-pending';
         
         // Restart pulse animation
         ['dot-1', 'dot-2', 'dot-3'].forEach((id, index) => {
             const dot = document.getElementById(id);
-            dot.className = `w-3 h-3 bg-[#FF6B35] rounded-full animate-pulse`;
+            dot.className = 'loader-dot';
             dot.style.animationDelay = (index * 0.2) + 's';
         });
 
@@ -165,7 +157,7 @@ export function ConnectionStatusComponent(container, onConnected) {
         connectionDiv.remove();
         
         // Import and show setup modal
-        import('./FirstTimeSetup.js').then((module) => {
+        import('../settings/FirstTimeSetup.js').then((module) => {
             module.FirstTimeSetupModal(document.body, (config) => {
                 // After config is saved, restart the connection process
                 location.reload(); // Simple approach - reload the page

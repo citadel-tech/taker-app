@@ -132,6 +132,10 @@ export const SwapStateManager = {
         feePercentage: report.feePercentage || 0,
         durationSeconds: report.swapDurationSeconds || 0,
         status: 'completed',
+        protocol: report.protocol || (report.isTaproot ? 'Taproot' : 'Legacy'),
+        isTaproot: Boolean(report.isTaproot),
+        protocolVersion:
+          report.protocolVersion || (report.isTaproot ? 2 : 1),
         report: report,
       };
 

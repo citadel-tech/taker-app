@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
 
 export function TransactionsListComponent(container) {
   // State
@@ -25,10 +26,6 @@ export function TransactionsListComponent(container) {
   }
 
   // Helper Functions
-  function satsToBtc(sats) {
-    return (sats / 100000000).toFixed(8);
-  }
-
   function formatDate(timestamp) {
     const date = new Date(timestamp * 1000);
     const now = new Date();
@@ -122,10 +119,10 @@ export function TransactionsListComponent(container) {
       const filter = btn.dataset.filter;
       if (filter === currentFilter) {
         btn.className =
-          'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+          'filter-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
       } else {
         btn.className =
-          'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+          'filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
       }
     });
   }
@@ -142,10 +139,10 @@ export function TransactionsListComponent(container) {
       const sort = btn.dataset.sort;
       if (sort === currentSort) {
         btn.className =
-          'sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+          'sort-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
       } else {
         btn.className =
-          'sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
+          'sort-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors';
       }
     });
   }
@@ -172,10 +169,12 @@ export function TransactionsListComponent(container) {
   }
 
   function formatAmount(sats) {
-    const btc = satsToBtc(Math.abs(sats));
     const prefix = sats >= 0 ? '+' : '';
     const colorClass = sats >= 0 ? 'text-green-400' : 'text-red-400';
-    return { text: `${prefix}${btc} BTC`, colorClass };
+    return {
+      text: `${prefix}${formatSats(Math.abs(sats))}`,
+      colorClass,
+    };
   }
 
   function getStatusBadge(confirmations) {
@@ -226,7 +225,7 @@ export function TransactionsListComponent(container) {
         const label = tx.detail.label || '';
 
         return `
-        <div class="flex items-center justify-between p-4 bg-[#0f1419] hover:bg-[#242d3d] rounded-lg transition-colors group">
+        <div class="flex items-center justify-between p-4 bg-app-bg hover:bg-secondary rounded-lg transition-colors group">
             <div class="flex items-center space-x-4">
                 <div class="w-12 h-12 bg-${iconData.bg}-500/20 rounded-full flex items-center justify-center flex-shrink-0">
                     <span class="text-${iconData.color}-400 text-xl">${iconData.icon}</span>
@@ -240,7 +239,7 @@ export function TransactionsListComponent(container) {
                         ${label ? `<span class="text-xs text-gray-500 truncate max-w-[150px]" title="${label}">${label}</span>` : ''}
                     </div>
                     <div class="flex items-center gap-3 text-xs text-gray-400 flex-wrap">
-                        <span class="cursor-pointer hover:text-[#FF6B35] hover:underline transition-colors font-mono" 
+                        <span class="cursor-pointer hover:text-primary hover:underline transition-colors font-mono" 
                               onclick="openTxOnMempool('${txid}')" 
                               title="${txid}">
                             ${txid.substring(0, 16)}...${txid.substring(txid.length - 8)}
@@ -251,7 +250,7 @@ export function TransactionsListComponent(container) {
             </div>
             <div class="text-right flex-shrink-0">
                 <p class="${amountData.colorClass} font-mono text-lg font-semibold text-lg">${amountData.text}</p>
-                ${tx.detail.fee ? `<p class="text-gray-500 text-xs">Fee: ${satsToBtc(Math.abs(tx.detail.fee.sats))} BTC</p>` : ''}
+                ${tx.detail.fee ? `<p class="text-gray-500 text-xs">Fee: ${formatSats(Math.abs(tx.detail.fee.sats))}</p>` : ''}
             </div>
         </div>
       `;
@@ -293,8 +292,8 @@ export function TransactionsListComponent(container) {
     ).length;
 
     return {
-      totalReceived: satsToBtc(totalReceived),
-      totalSent: satsToBtc(totalSent),
+      totalReceived,
+      totalSent,
       totalSwaps,
     };
   }
@@ -308,7 +307,7 @@ export function TransactionsListComponent(container) {
     // Show loading state
     transactionContainer.innerHTML = `
       <div class="text-center py-12">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35] mx-auto mb-4"></div>
+        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
         <p class="text-gray-400">Loading transactions...</p>
       </div>
     `;
@@ -339,7 +338,7 @@ export function TransactionsListComponent(container) {
           <div class="text-red-400 mb-4 flex justify-center">${icons.xCircle(48)}</div>
           <p class="text-red-400">Failed to load transactions</p>
           <p class="text-gray-500 text-sm mt-2">${error.message}</p>
-          <button onclick="location.reload()" class="mt-4 bg-[#FF6B35] text-white px-4 py-2 rounded-lg">Retry</button>
+          <button onclick="location.reload()" class="mt-4 bg-primary text-white px-4 py-2 rounded-lg">Retry</button>
         </div>
       `;
       if (refreshBtn) {
@@ -362,9 +361,9 @@ export function TransactionsListComponent(container) {
 
     // Update stats cards
     content.querySelector('#total-received').textContent =
-      totals.totalReceived + ' BTC';
+      `${totals.totalReceived.toLocaleString()} 丰`;
     content.querySelector('#total-sent').textContent =
-      totals.totalSent + ' BTC';
+      `${totals.totalSent.toLocaleString()} 丰`;
     content.querySelector('#total-swaps').textContent = totals.totalSwaps;
   }
 
@@ -378,51 +377,51 @@ export function TransactionsListComponent(container) {
                 <button id="back-to-wallet" class="text-gray-400 hover:text-white transition-colors mb-4 flex items-center gap-2">
                     <span>←</span> Back to Wallet
                 </button>
-                <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">All Transactions</h2>
+                <h2 class="text-3xl font-bold text-primary mb-2">All Transactions</h2>
                 <p class="text-gray-400">Complete transaction history with filtering and sorting</p>
             </div>
-            <button id="refresh-transactions-btn" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors">
+            <button id="refresh-transactions-btn" class="bg-primary hover:bg-primary-hover text-white font-semibold text-lg py-2 px-6 rounded-lg transition-colors">
                 Refresh
             </button>
         </div>
 
         <!-- Transaction Stats -->
         <div class="grid grid-cols-3 gap-4 mb-6">
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Received</p>
-                <p id="total-received" class="text-2xl font-mono text-green-400">-- BTC</p>
+                <p id="total-received" class="text-2xl font-mono text-green-400">-- 丰</p>
             </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Sent</p>
-                <p id="total-sent" class="text-2xl font-mono text-red-400">-- BTC</p>
+                <p id="total-sent" class="text-2xl font-mono text-red-400">-- 丰</p>
             </div>
-            <div class="bg-[#1a2332] rounded-lg p-6">
+            <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Swaps</p>
-                <p id="total-swaps" class="text-2xl font-mono text-[#FF6B35]">--</p>
+                <p id="total-swaps" class="text-2xl font-mono text-primary">--</p>
             </div>
         </div>
 
         <!-- Transactions List -->
-        <div class="bg-[#1a2332] rounded-lg p-6">
+        <div class="bg-surface rounded-lg p-6">
             <div class="flex justify-between items-center mb-6">
                 <h3 class="text-xl font-semibold text-lg text-gray-300">Transaction History</h3>
                 <div class="flex gap-2 items-center flex-wrap">
-                    <button data-filter="all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button data-filter="all" class="filter-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         All (<span id="filter-all-count">--</span>)
                     </button>
-                    <button data-filter="received" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button data-filter="received" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         ${icons.arrowDownCircle(14, 'mr-1')} Received (<span id="filter-received-count">--</span>)
                     </button>
-                    <button data-filter="sent" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button data-filter="sent" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         ${icons.arrowUpCircle(14, 'mr-1')} Sent (<span id="filter-sent-count">--</span>)
                     </button>
-                    <button data-filter="swaps" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button data-filter="swaps" class="filter-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         ${icons.refreshCw(14, 'mr-1')} Swaps (<span id="filter-swaps-count">--</span>)
                     </button>
-                    <button data-sort="newest" id="sort-newest" class="sort-btn bg-[#FF6B35] text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button data-sort="newest" id="sort-newest" class="sort-btn bg-primary text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Newest
                     </button>
-                    <button data-sort="amount" id="sort-amount" class="sort-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button data-sort="amount" id="sort-amount" class="sort-btn bg-app-bg hover:bg-secondary border border-gray-700 text-gray-400 px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
                         Amount
                     </button>
                 </div>
@@ -435,7 +434,7 @@ export function TransactionsListComponent(container) {
 
             <!-- Load More Button -->
             <div class="mt-6 text-center">
-                <button id="load-more-btn" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
+                <button id="load-more-btn" class="bg-secondary hover:bg-secondary-hover text-white px-6 py-3 rounded-lg font-semibold text-lg transition-colors">
                     Load More Transactions
                 </button>
             </div>

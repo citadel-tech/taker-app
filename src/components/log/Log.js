@@ -59,15 +59,15 @@ export function LogComponent(container) {
   function getTypeColor(type) {
     switch (type) {
       case 'error':
-        return 'text-red-400';
+        return 'error';
       case 'warn':
-        return 'text-yellow-400';
+        return 'warn';
       case 'debug':
-        return 'text-blue-400';
+        return 'debug';
       case 'trace':
-        return 'text-purple-400';
+        return 'trace';
       default:
-        return 'text-green-400';
+        return 'info';
     }
   }
 
@@ -93,14 +93,20 @@ export function LogComponent(container) {
 
     if (filtered.length === 0) {
       logOutput.innerHTML =
-        '<div class="text-gray-500 text-center py-8">No logs available</div>';
+        '<div class="app-empty">No logs available for this filter.</div>';
     } else {
       logOutput.innerHTML = filtered
         .map((log) => {
           const timeStr = showTimestamps
-            ? `<span class="text-gray-500">[${formatTime(log.timestamp)}]</span>`
+            ? `<span class="log-time">${formatTime(log.timestamp)}</span>`
             : '';
-          return `<div class="mb-1 hover:bg-[#1a2332] px-2 py-1 rounded">${timeStr} <span class="${getTypeColor(log.type)}">[${getTypeLabel(log.type)}]</span> <span class="text-gray-300">${escapeHtml(log.message)}</span></div>`;
+          return `
+            <div class="log-entry ${getTypeColor(log.type)}">
+              ${timeStr}
+              <span class="log-level">${getTypeLabel(log.type)}</span>
+              <span class="log-message">${escapeHtml(log.message)}</span>
+            </div>
+          `;
         })
         .join('');
     }
@@ -136,116 +142,110 @@ export function LogComponent(container) {
   function setFilter(filter) {
     currentFilter = filter;
     content.querySelectorAll('.filter-btn').forEach((btn) => {
-      btn.className =
-        'filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors';
+      btn.classList.toggle('active', btn.dataset.filter === filter);
     });
-    content.querySelector(`#filter-${filter}`).className =
-      'filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold';
     renderLogs();
   }
 
   content.innerHTML = `
-    <h2 class="text-3xl font-bold text-[#FF6B35] mb-2">System Logs</h2>
-    <p class="text-gray-400 mb-4">Real-time coinswap protocol logs (last ${MAX_LOGS} lines)</p>
-    
-    <div class="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
-      <div class="flex items-start gap-3">
-        <span>${icons.lightbulb(24)}</span>
-        <div class="flex-1">
-          <p class="text-blue-400 text-sm">
-            <strong>Limited view:</strong> Only the last ${MAX_LOGS} log lines are shown here for performance. 
-            For complete logs, use the "Open Log File" button to view the full debug.log file.
-          </p>
+    <div class="app-page log-page">
+      <header class="app-head log-head">
+        <div>
+          <h2>System Logs</h2>
+          <div class="app-meta">
+            <span>Last ${MAX_LOGS} lines</span>
+            <span>Protocol monitor</span>
+          </div>
         </div>
-      </div>
-    </div>
+        <div class="app-actions">
+          <button id="refresh-logs" class="app-button ghost" type="button">
+            ${icons.refreshCw(16)} Refresh
+          </button>
+          <button id="open-log-file" class="app-button primary" type="button">
+            ${icons.folderOpen(16)} Open Log File
+          </button>
+        </div>
+      </header>
 
-    <div class="grid grid-cols-4 gap-6">
-      <div class="col-span-3">
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <div class="flex justify-between items-center mb-6">
-            <div class="flex gap-2">
-              <button id="filter-all" class="filter-btn bg-[#FF6B35] text-white px-4 py-2 rounded text-sm font-semibold">All</button>
-              <button id="filter-info" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Info</button>
-              <button id="filter-warn" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Warning</button>
-              <button id="filter-error" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Error</button>
-              <button id="filter-debug" class="filter-btn bg-[#0f1419] hover:bg-[#242d3d] border border-gray-700 text-gray-400 px-4 py-2 rounded text-sm font-semibold transition-colors">Debug</button>
+      <section class="log-notice">
+        ${icons.lightbulb(18)}
+        <p>Showing a compact live view for performance. Open the full debug.log file for complete history.</p>
+      </section>
+
+      <section class="log-layout">
+        <article class="app-panel log-main-panel">
+          <header class="app-panel-head compact">
+            <div>
+              <h3>Live Output</h3>
+              <span>Auto refresh every 2s</span>
             </div>
-            <div class="flex gap-2">
-              <button id="refresh-logs" class="bg-[#242d3d] hover:bg-[#2d3748] text-white px-4 py-2 rounded text-sm transition-colors">
-                ${icons.refreshCw(14, 'mr-1')} Refresh
-              </button>
-              <button id="open-log-file" class="bg-[#FF6B35] hover:bg-[#ff7d4d] text-white px-4 py-2 rounded text-sm font-semibold transition-colors">
-                ${icons.folder(14, 'mr-1')} Open Log File
-              </button>
+            <div class="app-panel-controls">
+              <div class="app-tabs log-filters">
+                <button id="filter-all" data-filter="all" class="filter-btn active" type="button">All</button>
+                <button id="filter-info" data-filter="info" class="filter-btn" type="button">Info</button>
+                <button id="filter-warn" data-filter="warn" class="filter-btn" type="button">Warning</button>
+                <button id="filter-error" data-filter="error" class="filter-btn" type="button">Error</button>
+                <button id="filter-debug" data-filter="debug" class="filter-btn" type="button">Debug</button>
+              </div>
             </div>
+          </header>
+          <div class="app-panel-body">
+            <div id="log-output" class="log-output"></div>
           </div>
-          <div id="log-output" class="bg-[#0f1419] rounded-lg p-4 font-mono text-xs h-[500px] overflow-y-auto"></div>
-        </div>
-      </div>
+        </article>
       
-      <div class="col-span-1 space-y-6">
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-lg font-semibold text-gray-300 mb-4">Log Stats</h3>
-          <div class="space-y-4">
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-400">Info</span>
-                <span id="info-count" class="text-green-400 font-semibold">0</span>
+        <aside class="log-side">
+          <article class="app-panel log-stats-panel">
+            <header class="app-panel-head">
+              <div>
+                <h3>Log Stats</h3>
+                <span>Current sample</span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
-                <div id="info-bar" class="bg-green-400 h-2 rounded-full" style="width:0%"></div>
+            </header>
+            <div class="app-panel-body log-stats">
+              <div class="log-stat info">
+                <div><span>Info</span><strong id="info-count">0</strong></div>
+                <span class="log-stat-track"><span id="info-bar"></span></span>
               </div>
-            </div>
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-400">Warning</span>
-                <span id="warn-count" class="text-yellow-400 font-semibold">0</span>
+              <div class="log-stat warn">
+                <div><span>Warning</span><strong id="warn-count">0</strong></div>
+                <span class="log-stat-track"><span id="warn-bar"></span></span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
-                <div id="warn-bar" class="bg-yellow-400 h-2 rounded-full" style="width:0%"></div>
+              <div class="log-stat error">
+                <div><span>Error</span><strong id="error-count">0</strong></div>
+                <span class="log-stat-track"><span id="error-bar"></span></span>
               </div>
-            </div>
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-400">Error</span>
-                <span id="error-count" class="text-red-400 font-semibold">0</span>
-              </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
-                <div id="error-bar" class="bg-red-400 h-2 rounded-full" style="width:0%"></div>
+              <div class="log-stat debug">
+                <div><span>Debug</span><strong id="debug-count">0</strong></div>
+                <span class="log-stat-track"><span id="debug-bar"></span></span>
               </div>
             </div>
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-sm text-gray-400">Debug</span>
-                <span id="debug-count" class="text-blue-400 font-semibold">0</span>
+          </article>
+
+          <article class="app-panel log-settings-panel">
+            <header class="app-panel-head">
+              <div>
+                <h3>Display</h3>
+                <span>Preferences</span>
               </div>
-              <div class="w-full bg-[#0f1419] rounded-full h-2">
-                <div id="debug-bar" class="bg-blue-400 h-2 rounded-full" style="width:0%"></div>
-              </div>
+            </header>
+            <div class="app-panel-body log-settings">
+              <label>
+                <input type="checkbox" id="auto-scroll" checked />
+                <span>Auto-scroll</span>
+              </label>
+              <label>
+                <input type="checkbox" id="show-timestamps" checked />
+                <span>Show timestamps</span>
+              </label>
+              <label>
+                <input type="checkbox" id="auto-refresh" checked />
+                <span>Auto-refresh</span>
+              </label>
             </div>
-          </div>
-        </div>
-        
-        <div class="bg-[#1a2332] rounded-lg p-6">
-          <h3 class="text-lg font-semibold text-gray-300 mb-4">Display Settings</h3>
-          <div class="space-y-3">
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="auto-scroll" checked class="w-4 h-4 accent-[#FF6B35]" />
-              <span class="text-sm text-gray-300">Auto-scroll</span>
-            </label>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="show-timestamps" checked class="w-4 h-4 accent-[#FF6B35]" />
-              <span class="text-sm text-gray-300">Show timestamps</span>
-            </label>
-            <label class="flex items-center gap-3 cursor-pointer">
-              <input type="checkbox" id="auto-refresh" checked class="w-4 h-4 accent-[#FF6B35]" />
-              <span class="text-sm text-gray-300">Auto-refresh (2s)</span>
-            </label>
-          </div>
-        </div>
-        
-      </div>
+          </article>
+        </aside>
+      </section>
     </div>
   `;
 

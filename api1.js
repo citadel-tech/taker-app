@@ -1,7 +1,9 @@
 const { ipcMain, dialog, app } = require('electron');
 const { Worker } = require('worker_threads');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const Store = require('electron-store');
 const store = new Store();
 
@@ -55,6 +57,27 @@ function isUsableMaker(maker) {
   return maker.offer != null;
 }
 
+function getMakerProtocolName(maker = {}) {
+  if (maker.protocol === 'Unified') return 'Unified';
+  if (maker.protocol === 'Taproot' || maker.protocol === 'v2') return 'Taproot';
+  if (maker.protocol === 'Legacy' || maker.protocol === 'v1') return 'Legacy';
+  return maker.offer?.tweakable_point || maker.offer?.tweakablePoint
+    ? 'Taproot'
+    : 'Legacy';
+}
+
+function isMakerCompatibleWithProtocol(maker, protocol) {
+  const makerProtocol = getMakerProtocolName(maker);
+  if (makerProtocol === 'Unified') return true;
+  return protocol === 'v2' ? makerProtocol === 'Taproot' : makerProtocol === 'Legacy';
+}
+
+function countUsableCompatibleMakers(makers, protocol) {
+  return makers.filter(
+    (maker) => isUsableMaker(maker) && isMakerCompatibleWithProtocol(maker, protocol)
+  ).length;
+}
+
 function getCurrentWalletName() {
   try {
     const configPath = path.join(api1State.DATA_DIR, 'config.toml');
@@ -97,6 +120,369 @@ function buildTakerConfig({
     logLevel,
     appSwapId,
   };
+}
+
+function requireWalletPassword(password) {
+  if (typeof password !== 'string' || password.trim().length === 0) {
+    throw new Error('Wallet password is required');
+  }
+
+  return password;
+}
+
+function classifyWalletInitializationError(error) {
+  const message = error?.message || String(error || 'Unknown wallet error');
+  const lowerMessage = message.toLowerCase();
+
+  if (
+    lowerMessage.includes('decrypt') ||
+    lowerMessage.includes('passphrase') ||
+    lowerMessage.includes('incorrect password') ||
+    lowerMessage.includes('wrong password')
+  ) {
+    return {
+      success: false,
+      error: 'Incorrect password. Please try again.',
+      wrongPassword: true,
+      recoverable: true,
+    };
+  }
+
+  if (message === 'Wallet password is required') {
+    return {
+      success: false,
+      error: message,
+      needsPassword: true,
+      recoverable: true,
+    };
+  }
+
+  if (
+    lowerMessage.includes('wallet') ||
+    lowerMessage.includes('json') ||
+    lowerMessage.includes('parse') ||
+    lowerMessage.includes('serde') ||
+    lowerMessage.includes('deserialize') ||
+    lowerMessage.includes('eof') ||
+    lowerMessage.includes('invalid') ||
+    lowerMessage.includes('corrupt') ||
+    lowerMessage.includes('malformed')
+  ) {
+    return {
+      success: false,
+      error:
+        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Coinswap wallet file.',
+      walletLoadFailed: true,
+      recoverable: true,
+      details: message,
+    };
+  }
+
+  return null;
+}
+
+function createCborReader(buffer) {
+  let offset = 0;
+
+  function readByte() {
+    if (offset >= buffer.length) {
+      throw new Error('Unexpected end of wallet file');
+    }
+    return buffer[offset++];
+  }
+
+  function readLength(additionalInfo) {
+    if (additionalInfo < 24) return additionalInfo;
+    if (additionalInfo === 24) return readByte();
+    if (additionalInfo === 25) {
+      const value = buffer.readUInt16BE(offset);
+      offset += 2;
+      return value;
+    }
+    if (additionalInfo === 26) {
+      const value = buffer.readUInt32BE(offset);
+      offset += 4;
+      return value;
+    }
+    if (additionalInfo === 27) {
+      const value = Number(buffer.readBigUInt64BE(offset));
+      offset += 8;
+      return value;
+    }
+    throw new Error('Unsupported wallet CBOR encoding');
+  }
+
+  function readHeader() {
+    const byte = readByte();
+    return {
+      majorType: byte >> 5,
+      length: readLength(byte & 0x1f),
+    };
+  }
+
+  function readText() {
+    const header = readHeader();
+    if (header.majorType !== 3) {
+      throw new Error('Invalid wallet CBOR map key');
+    }
+    const end = offset + header.length;
+    const value = buffer.toString('utf8', offset, end);
+    offset = end;
+    return value;
+  }
+
+  function readUnsigned() {
+    const header = readHeader();
+    if (header.majorType !== 0) {
+      throw new Error('Invalid wallet CBOR byte value');
+    }
+    return header.length;
+  }
+
+  function readBytesLike() {
+    const header = readHeader();
+
+    if (header.majorType === 2) {
+      const end = offset + header.length;
+      const value = buffer.subarray(offset, end);
+      offset = end;
+      return Buffer.from(value);
+    }
+
+    if (header.majorType === 4) {
+      const bytes = Buffer.alloc(header.length);
+      for (let i = 0; i < header.length; i += 1) {
+        bytes[i] = readUnsigned();
+      }
+      return bytes;
+    }
+
+    throw new Error('Invalid encrypted wallet data');
+  }
+
+  function skipValue() {
+    const header = readHeader();
+
+    if (header.majorType === 0 || header.majorType === 1) return;
+
+    if (header.majorType === 2 || header.majorType === 3) {
+      offset += header.length;
+      return;
+    }
+
+    if (header.majorType === 4) {
+      for (let i = 0; i < header.length; i += 1) skipValue();
+      return;
+    }
+
+    if (header.majorType === 5) {
+      for (let i = 0; i < header.length; i += 1) {
+        skipValue();
+        skipValue();
+      }
+      return;
+    }
+
+    if (header.majorType === 6) {
+      skipValue();
+      return;
+    }
+
+    if (header.majorType === 7) return;
+
+    throw new Error('Unsupported wallet CBOR encoding');
+  }
+
+  return {
+    readEncryptedWalletHeader() {
+      const header = readHeader();
+      if (header.majorType !== 5) {
+        throw new Error('Wallet file is not a valid CBOR map');
+      }
+
+      const encrypted = {};
+      for (let i = 0; i < header.length; i += 1) {
+        const key = readText();
+        if (
+          key === 'nonce' ||
+          key === 'encrypted_payload' ||
+          key === 'pbkdf2_salt'
+        ) {
+          encrypted[key] = readBytesLike();
+        } else {
+          skipValue();
+        }
+      }
+      return encrypted;
+    },
+  };
+}
+
+function preflightExistingWallet(walletPath, password) {
+  if (!fs.existsSync(walletPath)) {
+    return { success: true, exists: false, encrypted: false };
+  }
+
+  let encryptedData;
+  try {
+    const walletBytes = fs.readFileSync(walletPath);
+    encryptedData = createCborReader(walletBytes).readEncryptedWalletHeader();
+  } catch (error) {
+    return {
+      success: false,
+      error:
+        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Coinswap wallet file.',
+      walletLoadFailed: true,
+      recoverable: true,
+      details: error.message,
+    };
+  }
+
+  const { nonce, encrypted_payload: encryptedPayload, pbkdf2_salt: salt } =
+    encryptedData;
+
+  if (!nonce || !encryptedPayload || !salt) {
+    return {
+      success: false,
+      error:
+        'This wallet is not encrypted. Password-protected wallets are required.',
+      walletLoadFailed: true,
+      recoverable: true,
+    };
+  }
+
+  if (typeof password !== 'string' || password.trim().length === 0) {
+    return {
+      success: false,
+      error: 'Wallet password is required',
+      needsPassword: true,
+      recoverable: true,
+    };
+  }
+
+  const authTagLength = 16;
+  if (encryptedPayload.length <= authTagLength) {
+    return {
+      success: false,
+      error:
+        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Coinswap wallet file.',
+      walletLoadFailed: true,
+      recoverable: true,
+      details: 'Encrypted wallet payload is too short',
+    };
+  }
+
+  const ciphertext = encryptedPayload.subarray(
+    0,
+    encryptedPayload.length - authTagLength
+  );
+  const authTag = encryptedPayload.subarray(
+    encryptedPayload.length - authTagLength
+  );
+
+  try {
+    const key = crypto.pbkdf2Sync(password, salt, 600000, 32, 'sha256');
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, nonce);
+    decipher.setAuthTag(authTag);
+    decipher.update(ciphertext);
+    decipher.final();
+  } catch (error) {
+    return {
+      success: false,
+      error: 'Incorrect password. Please try again.',
+      wrongPassword: true,
+      recoverable: true,
+    };
+  }
+
+  return { success: true, exists: true, encrypted: true };
+}
+
+function runNativeWalletPreflight(config) {
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [path.join(__dirname, 'wallet-native-preflight.js')],
+      {
+        cwd: __dirname,
+        env: {
+          ...process.env,
+          ELECTRON_RUN_AS_NODE: '1',
+        },
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }
+    );
+
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill('SIGTERM');
+      resolve({
+        success: false,
+        error: 'Wallet validation timed out. Please try again.',
+        walletLoadFailed: true,
+        recoverable: true,
+      });
+    }, 30000);
+
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve({
+        success: false,
+        error: `Unable to validate wallet: ${error.message}`,
+        walletLoadFailed: true,
+        recoverable: true,
+      });
+    });
+
+    child.on('close', (code, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+
+      const marker = stdout
+        .split(/\r?\n/)
+        .find((line) => line.startsWith('__WALLET_PREFLIGHT_RESULT__'));
+      if (marker) {
+        try {
+          const result = JSON.parse(
+            marker.replace('__WALLET_PREFLIGHT_RESULT__', '')
+          );
+          resolve(result);
+          return;
+        } catch (error) {
+          // Fall through to the generic failure below.
+        }
+      }
+
+      const combinedOutput = `${stderr}\n${stdout}`.trim();
+      resolve({
+        success: false,
+        error:
+          signal || code
+            ? 'Wallet could not be opened safely. It may be corrupted or incompatible with this app build.'
+            : 'Wallet validation failed.',
+        walletLoadFailed: true,
+        recoverable: true,
+        details: combinedOutput.slice(-1000),
+      });
+    });
+
+    child.stdin.end(JSON.stringify(config));
+  });
 }
 
 function safelyShutdownTaker(takerInstance) {
@@ -171,35 +557,33 @@ function getOfferbookSnapshot() {
   return snapshot;
 }
 
-function getAllSwapReportPaths() {
-  const reportsRoot = path.join(api1State.DATA_DIR, 'swap_reports');
+function getWalletSwapReportPaths() {
+  const walletsDir = path.join(api1State.DATA_DIR, 'wallets');
   const reportPaths = [];
+  const walletNames = new Set(
+    [
+      api1State.currentWalletName,
+      getCurrentWalletName(),
+      api1State.storedTakerConfig?.walletName,
+      api1State.DEFAULT_WALLET_NAME,
+    ].filter(Boolean)
+  );
 
-  function walk(dirPath) {
-    if (!fs.existsSync(dirPath)) return;
+  for (const walletName of walletNames) {
+    reportPaths.push(path.join(walletsDir, `${walletName}_swap_report.json`));
+  }
 
-    for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
-      const fullPath = path.join(dirPath, entry.name);
-      if (entry.isDirectory()) {
-        walk(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.json')) {
-        reportPaths.push(fullPath);
+  if (fs.existsSync(walletsDir)) {
+    for (const entry of fs.readdirSync(walletsDir, { withFileTypes: true })) {
+      if (entry.isFile() && entry.name.endsWith('_swap_report.json')) {
+        reportPaths.push(path.join(walletsDir, entry.name));
       }
     }
   }
 
-  walk(reportsRoot);
-  return reportPaths;
-}
-
-function getCoreSwapReportPaths() {
-  const reportsRoot = path.join(api1State.DATA_DIR, 'swap_reports');
-  if (!fs.existsSync(reportsRoot)) return [];
-
-  return fs
-    .readdirSync(reportsRoot, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
-    .map((entry) => path.join(reportsRoot, entry.name));
+  return [...new Set(reportPaths)].filter((filePath) =>
+    fs.existsSync(filePath)
+  );
 }
 
 function readJsonFile(filePath) {
@@ -260,9 +644,13 @@ function inferTaprootFromReport(rawReport = {}) {
   });
 }
 
-function buildSwapReportRecord(filePath, rawReport) {
+function buildSwapReportRecord(filePath, rawReport, meta = {}) {
   const fileStats = fs.statSync(filePath);
-  const fileName = path.basename(filePath, '.json');
+  const baseFileName = path.basename(filePath, '.json');
+  const fileName =
+    meta.section != null && meta.index != null
+      ? `${baseFileName}:${meta.section}:${meta.index}`
+      : baseFileName;
   const nativeSwapId =
     rawReport.nativeSwapId ||
     rawReport.native_swap_id ||
@@ -285,13 +673,17 @@ function buildSwapReportRecord(filePath, rawReport) {
   const nestedReport = rawReport.report ? rawReport.report : rawReport;
   const normalizedFilePath = path.normalize(String(filePath || ''));
   const escapedSep = path.sep.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const walletScopedReportPattern = new RegExp(
-    `${escapedSep}swap_reports${escapedSep}[^${escapedSep}]+${escapedSep}`
+  const walletAdjacentReportPattern = new RegExp(
+    `${escapedSep}wallets${escapedSep}[^${escapedSep}]+_swap_report\\.json$`
   );
-  const isWalletScopedReport = walletScopedReportPattern.test(normalizedFilePath);
-  const isCoreReport = !isWalletScopedReport;
+  const isWalletAdjacentReport =
+    meta.source === 'wallet' ||
+    walletAdjacentReportPattern.test(normalizedFilePath);
+  const isCoreReport = !isWalletAdjacentReport;
   const rawStatus =
-    rawReport.status || rawReport.report?.status || (isCoreReport ? 'Success' : null);
+    rawReport.status ||
+    rawReport.report?.status ||
+    (isCoreReport ? 'Success' : null);
   const normalizedStatus =
     String(rawStatus || '').toLowerCase() === 'success'
       ? 'completed'
@@ -301,6 +693,8 @@ function buildSwapReportRecord(filePath, rawReport) {
   const rawCompletedAt =
     rawReport.completedAt ||
     rawReport.completed_at ||
+    rawReport.endTimestamp ||
+    rawReport.end_timestamp ||
     rawReport.report?.completedAt ||
     rawReport.report?.completed_at ||
     rawReport.report?.endTimestamp ||
@@ -310,6 +704,8 @@ function buildSwapReportRecord(filePath, rawReport) {
   const startedAt = normalizeTimestamp(
     rawReport.startedAt ||
       rawReport.started_at ||
+      rawReport.startTimestamp ||
+      rawReport.start_timestamp ||
       rawReport.report?.startedAt ||
       rawReport.report?.started_at ||
       rawReport.report?.startTimestamp ||
@@ -341,39 +737,180 @@ function buildSwapReportRecord(filePath, rawReport) {
     filePath,
     fileName,
     isCoreReport,
+    isWalletAdjacentReport,
+    isUnifiedReport: false,
+    reportSource: 'wallet',
     protocol,
     isTaproot,
     protocolVersion,
   };
 }
 
+function buildSwapReportRecords(filePath, rawReport, source) {
+  if (Array.isArray(rawReport)) {
+    return rawReport.map((entry, index) =>
+      buildSwapReportRecord(filePath, entry, {
+        source,
+        section: 'items',
+        index,
+      })
+    );
+  }
+
+  if (Array.isArray(rawReport?.taker)) {
+    return rawReport.taker.map((entry, index) =>
+      buildSwapReportRecord(filePath, entry, {
+        source,
+        section: 'taker',
+        index,
+      })
+    );
+  }
+
+  return [buildSwapReportRecord(filePath, rawReport, { source })];
+}
+
+function readSwapReportRecords(filePath, source) {
+  return buildSwapReportRecords(filePath, readJsonFile(filePath), source);
+}
+
+function getSwapStateHistoryMetadata() {
+  const stateFile = path.join(api1State.DATA_DIR, 'swap_state.json');
+  const metadataById = new Map();
+
+  if (!fs.existsSync(stateFile)) return metadataById;
+
+  try {
+    const state = readJsonFile(stateFile);
+    const history = Array.isArray(state.swap_history) ? state.swap_history : [];
+
+    history.forEach((entry) => {
+      const report = entry.report || {};
+      const swapId =
+        entry.id ||
+        entry.swapId ||
+        entry.swap_id ||
+        report.swapId ||
+        report.swap_id ||
+        null;
+      if (!swapId) return;
+
+      const protocol = entry.protocol || report.protocol || null;
+      const hasIsTaproot =
+        typeof entry.isTaproot === 'boolean' ||
+        typeof report.isTaproot === 'boolean';
+      const isTaproot =
+        typeof entry.isTaproot === 'boolean'
+          ? entry.isTaproot
+          : typeof report.isTaproot === 'boolean'
+            ? report.isTaproot
+            : null;
+      const protocolVersion =
+        entry.protocolVersion ||
+        entry.protocol_version ||
+        report.protocolVersion ||
+        report.protocol_version ||
+        null;
+
+      if (protocol || hasIsTaproot || protocolVersion) {
+        metadataById.set(String(swapId), {
+          protocol,
+          isTaproot,
+          protocolVersion,
+        });
+      }
+    });
+  } catch (error) {
+    console.error('Failed to read swap state protocol metadata:', error);
+  }
+
+  return metadataById;
+}
+
+function getSwapLogProtocolMetadata() {
+  const logPath = path.join(api1State.DATA_DIR, 'debug.log');
+  const metadataById = new Map();
+
+  if (!fs.existsSync(logPath)) return metadataById;
+
+  try {
+    const lines = fs.readFileSync(logPath, 'utf8').split(/\r?\n/);
+    let pendingProtocol = null;
+
+    lines.forEach((line) => {
+      const prepareMatch = line.match(
+        /Preparing coinswap:\s+amount=.*protocol=(Taproot|Legacy)/i
+      );
+      if (prepareMatch) {
+        pendingProtocol = normalizeSwapProtocol(prepareMatch[1], false);
+        return;
+      }
+
+      const idMatch = line.match(/Preparing coinswap with id:\s+([a-f0-9]+)/i);
+      if (!idMatch || !pendingProtocol) return;
+
+      metadataById.set(idMatch[1], {
+        protocol: pendingProtocol,
+        isTaproot: pendingProtocol === 'Taproot',
+        protocolVersion: pendingProtocol === 'Taproot' ? 2 : 1,
+      });
+      pendingProtocol = null;
+    });
+  } catch (error) {
+    console.error('Failed to read swap log protocol metadata:', error);
+  }
+
+  return metadataById;
+}
+
 function getPreferredSwapReports() {
   const records = [];
   const seen = new Set();
 
-  const corePaths = getCoreSwapReportPaths();
-  for (const filePath of corePaths) {
+  const addRecord = (record) => {
+    const key = record.nativeSwapId || record.swapId || record.fileName;
+    if (seen.has(key)) return;
+    seen.add(key);
+    records.push(record);
+  };
+
+  for (const filePath of getWalletSwapReportPaths()) {
     try {
-      const record = buildSwapReportRecord(filePath, readJsonFile(filePath));
-      const key = record.nativeSwapId || record.swapId || record.fileName;
-      seen.add(key);
-      records.push(record);
+      readSwapReportRecords(filePath, 'wallet').forEach(addRecord);
     } catch (error) {
-      console.error(`Failed to read core swap report ${filePath}:`, error);
+      console.error(`Failed to read wallet swap report ${filePath}:`, error);
     }
   }
 
-  for (const filePath of getAllSwapReportPaths()) {
-    try {
-      const record = buildSwapReportRecord(filePath, readJsonFile(filePath));
-      const key = record.nativeSwapId || record.swapId || record.fileName;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      records.push(record);
-    } catch (error) {
-      console.error(`Failed to read swap report ${filePath}:`, error);
-    }
-  }
+  const localMetadata = getSwapStateHistoryMetadata();
+  const logMetadata = getSwapLogProtocolMetadata();
+  records.forEach((record) => {
+    const metadata =
+      localMetadata.get(String(record.swapId || '')) ||
+      localMetadata.get(String(record.nativeSwapId || '')) ||
+      localMetadata.get(String(record.appSwapId || '')) ||
+      logMetadata.get(String(record.swapId || '')) ||
+      logMetadata.get(String(record.nativeSwapId || '')) ||
+      logMetadata.get(String(record.appSwapId || ''));
+    if (!metadata) return;
+
+    const fallbackIsTaproot =
+      typeof metadata.isTaproot === 'boolean'
+        ? metadata.isTaproot
+        : record.isTaproot;
+    const protocol = normalizeSwapProtocol(metadata.protocol, fallbackIsTaproot);
+
+    record.protocol = protocol;
+    record.isTaproot = protocol === 'Taproot';
+    record.protocolVersion =
+      metadata.protocolVersion || (protocol === 'Taproot' ? 2 : 1);
+    record.report = {
+      ...record.report,
+      protocol,
+      isTaproot: record.isTaproot,
+      protocolVersion: record.protocolVersion,
+    };
+  });
 
   return records.sort((a, b) => {
     const aTime = Number(a.completedAt || 0);
@@ -399,9 +936,9 @@ function findSwapReportRecord(swapId) {
 function getHistoricalSwapOutputMap() {
   const swapOutputs = new Map();
 
-  for (const reportPath of getAllSwapReportPaths()) {
+  for (const record of getPreferredSwapReports()) {
     try {
-      const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+      const report = record.report || record;
       const outputSwapUtxos =
         report.output_swap_utxos ||
         report.outputSwapUtxos ||
@@ -417,7 +954,7 @@ function getHistoricalSwapOutputMap() {
       });
     } catch (error) {
       console.warn('⚠️ Failed to parse swap report for balance derivation:', {
-        reportPath,
+        reportPath: record.filePath,
         error: error.message,
       });
     }
@@ -536,7 +1073,7 @@ function normalizeBalancePayload(rawBalance = {}, rawUtxos = []) {
 async function initNAPI() {
   try {
     api1State.coinswapNapi = require('coinswap-napi');
-    console.log('✅ coinswap-napi loaded successfully');
+    console.log('✅ coinswap-napi module loaded (wallet not initialized yet)');
     return true;
   } catch (error) {
     console.error('❌ Failed to load coinswap-napi:', error);
@@ -608,17 +1145,20 @@ function registerTakerHandlers() {
       const protocol = config.protocol || 'v1';
       const network = config.network || 'signet';
       const walletPath = path.join(api1State.DATA_DIR, 'wallets', walletName);
+      const finalPassword = requireWalletPassword(config.wallet?.password);
 
       // ✅ CHECK IF WE CAN REUSE EXISTING INSTANCE (simplified)
       const canReuse =
         api1State.takerInstance &&
         api1State.protocolVersion === protocol &&
-        api1State.currentWalletName === walletName;
+        api1State.currentWalletName === walletName &&
+        api1State.currentWalletPassword === finalPassword;
 
       console.log('🔍 Reuse check:', {
         hasInstance: !!api1State.takerInstance,
         protocolMatch: api1State.protocolVersion === protocol,
         walletMatch: api1State.currentWalletName === walletName,
+        passwordMatch: api1State.currentWalletPassword === finalPassword,
         canReuse,
       });
 
@@ -650,10 +1190,8 @@ function registerTakerHandlers() {
         api1State.takerInstance = null;
       }
 
-      console.log('🔧 Creating NEW Taker instance...');
-
       const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
-      console.log(`📦 Initializing ${protocolName} taker...`);
+      console.log(`📦 Preparing ${protocolName} taker...`);
 
       if (!api1State.coinswapNapi) {
         await initNAPI();
@@ -670,7 +1208,6 @@ function registerTakerHandlers() {
         password: config.rpc?.password || 'password',
         walletName,
       };
-      const finalPassword = config.wallet?.password?.trim() || '';
       const torAuthPassword = config.taker?.tor_auth_password;
       const controlPort = config.taker?.control_port || 9051;
 
@@ -682,6 +1219,42 @@ function registerTakerHandlers() {
           success: false,
           error: 'Taker class not found. Rebuild coinswap-napi.',
         };
+      }
+
+      const walletPreflight = preflightExistingWallet(
+        walletPath,
+        finalPassword
+      );
+      if (!walletPreflight.success) {
+        console.warn('⚠️ Wallet preflight failed before native init:', {
+          walletName,
+          error: walletPreflight.error,
+          details: walletPreflight.details,
+        });
+        return walletPreflight;
+      }
+      console.log('✅ Wallet password preflight passed');
+
+      if (walletPreflight.exists) {
+        const nativePreflight = await runNativeWalletPreflight({
+          dataDir: api1State.DATA_DIR,
+          walletName,
+          rpcConfig,
+          controlPort,
+          torAuthPassword,
+          zmqAddr,
+          password: finalPassword,
+        });
+
+        if (!nativePreflight.success) {
+          console.warn('⚠️ Native wallet preflight failed:', {
+            walletName,
+            error: nativePreflight.error,
+            details: nativePreflight.details,
+          });
+          return nativePreflight;
+        }
+        console.log('✅ Native wallet preflight passed');
       }
 
       // ✅ SETUP LOGGING
@@ -698,6 +1271,7 @@ function registerTakerHandlers() {
       }
 
       // ✅ CREATE INSTANCE
+      console.log('🔧 Creating NEW native Taker instance...');
       api1State.takerInstance = new TakerClass(
         api1State.DATA_DIR,
         walletName,
@@ -744,18 +1318,13 @@ function registerTakerHandlers() {
     } catch (error) {
       console.error('❌ Initialization failed:', error);
 
-      if (
-        error.message.includes('decrypt') ||
-        error.message.includes('passphrase')
-      ) {
-        return {
-          success: false,
-          error: 'Incorrect password',
-          wrongPassword: true,
-        };
-      }
+      const walletError = classifyWalletInitializationError(error);
+      if (walletError) return walletError;
 
-      return { success: false, error: error.message };
+      return {
+        success: false,
+        error: error?.message || String(error || 'Initialization failed'),
+      };
     }
   });
 
@@ -1068,27 +1637,42 @@ function registerTakerHandlers() {
       }
 
       const rawUtxos = api1State.takerInstance.listAllUtxoSpendInfo();
+      const historicalSwapOutputs = getHistoricalSwapOutputMap();
 
-      const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => ({
-        utxo: {
-          txid: utxoEntry.txid.value,
-          vout: utxoEntry.vout,
-          amount: utxoEntry.amount.sats,
-          confirmations: utxoEntry.confirmations,
-          address: utxoEntry.address,
-          scriptPubKey: utxoEntry.scriptPubKey,
-          spendable: utxoEntry.spendable,
-          solvable: utxoEntry.solvable,
-          safe: utxoEntry.safe,
-        },
-        spendInfo: {
-          spendType: spendInfo.spendType,
-          path: spendInfo.path,
-          multisigRedeemscript: spendInfo.multisigRedeemscript,
-          inputValue: spendInfo.inputValue,
-          index: spendInfo.index,
-        },
-      }));
+      const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => {
+        const historicalSwapAmount = historicalSwapOutputs.get(
+          utxoEntry.address
+        );
+        const isHistoricalSwapOutput =
+          historicalSwapAmount !== undefined &&
+          historicalSwapAmount === toNumber(utxoEntry.amount?.sats, 0);
+        const spendType = isHistoricalSwapOutput
+          ? 'SwapCoin'
+          : spendInfo.spendType;
+
+        return {
+          utxo: {
+            txid: utxoEntry.txid.value,
+            vout: utxoEntry.vout,
+            amount: utxoEntry.amount.sats,
+            confirmations: utxoEntry.confirmations,
+            address: utxoEntry.address,
+            scriptPubKey: utxoEntry.scriptPubKey,
+            spendable: utxoEntry.spendable,
+            solvable: utxoEntry.solvable,
+            safe: utxoEntry.safe,
+          },
+          spendInfo: {
+            spendType,
+            originalSpendType: spendInfo.spendType,
+            swapOrigin: isHistoricalSwapOutput ? 'historical-report' : null,
+            path: spendInfo.path,
+            multisigRedeemscript: spendInfo.multisigRedeemscript,
+            inputValue: spendInfo.inputValue,
+            index: spendInfo.index,
+          },
+        };
+      });
 
       return { success: true, utxos: transformedUtxos || [] };
     } catch (error) {
@@ -1109,7 +1693,7 @@ function registerTakerHandlers() {
           return { success: false, error: 'Invalid address or amount' };
         }
 
-        console.log(`📤 Sending ${amount} sats to ${address}...`);
+        console.log(`📤 Sending ${amount} 丰 to ${address}...`);
 
         const txidObj = api1State.takerInstance.sendToAddress(
           address,
@@ -1179,6 +1763,8 @@ function registerTakerHandlers() {
           }
         }
 
+        const finalPassword = requireWalletPassword(password);
+
         console.log(`♻️ Restoring wallet from: ${backupFilePath}`);
 
         const restoredWalletName =
@@ -1199,7 +1785,7 @@ function registerTakerHandlers() {
           restoredWalletName,
           rpcConfig,
           backupFilePath,
-          password || ''
+          finalPassword
         );
 
         console.log('✅ Wallet restored successfully to:', restoredWalletName);
@@ -1481,7 +2067,7 @@ function registerCoinswapHandlers() {
   // Start coinswap
   ipcMain.handle(
     'coinswap:start',
-    async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses }) => {
+    async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses, protocol: requestedProtocol }) => {
       try {
         if (!api1State.takerInstance) {
           return { success: false, error: 'Taker not initialized' };
@@ -1500,11 +2086,21 @@ function registerCoinswapHandlers() {
           return { success: false, error: 'Invalid selectedMakerAddresses: must be an array of non-empty strings' };
         }
 
-        const protocol = api1State.protocolVersion || 'v1';
+        const protocol =
+          requestedProtocol === 'v1' ||
+          requestedProtocol === 'v2' ||
+          requestedProtocol === 'Legacy' ||
+          requestedProtocol === 'Taproot'
+            ? requestedProtocol === 'Legacy'
+              ? 'v1'
+              : requestedProtocol === 'Taproot'
+                ? 'v2'
+                : requestedProtocol
+            : 'v2';
         const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
         const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         console.log(
-          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} sats, ${makerCount} makers`
+          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} 丰, ${makerCount} makers`
         );
 
         // WAIT FOR OFFERBOOK SYNC TO COMPLETE
@@ -1528,11 +2124,11 @@ function registerCoinswapHandlers() {
                 const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
                 const offerbook = JSON.parse(offerbookData);
                 const makers = offerbook.makers || [];
-                const goodMakersCount = makers.filter(isUsableMaker).length;
+                const goodMakersCount = countUsableCompatibleMakers(makers, protocol);
 
                 if (goodMakersCount >= makerCount) {
                   console.log(
-                    `✅ Offerbook ready with ${goodMakersCount} good makers`
+                    `✅ Offerbook ready with ${goodMakersCount} ${protocolName} makers`
                   );
                   break;
                 }
@@ -1559,20 +2155,20 @@ function registerCoinswapHandlers() {
             const offerbookData = fs.readFileSync(offerbookPath, 'utf8');
             const offerbook = JSON.parse(offerbookData);
             const makers = offerbook.makers || [];
-            const goodMakersCount = makers.filter(isUsableMaker).length;
+            const goodMakersCount = countUsableCompatibleMakers(makers, protocol);
 
             if (goodMakersCount < makerCount) {
               console.error(
-                `❌ Not enough makers available: ${goodMakersCount}/${makerCount}`
+                `❌ Not enough ${protocolName} makers available: ${goodMakersCount}/${makerCount}`
               );
               return {
                 success: false,
-                error: `Not enough makers available. Found ${goodMakersCount}, need ${makerCount}. Please sync market data first.`,
+                error: `Not enough ${protocolName} makers available. Found ${goodMakersCount}, need ${makerCount}. Please sync market data first.`,
               };
             }
 
             console.log(
-              `✅ Ready to start swap with ${goodMakersCount} makers`
+              `✅ Ready to start ${protocolName} swap with ${goodMakersCount} makers`
             );
           } else {
             return {
@@ -1601,7 +2197,9 @@ function registerCoinswapHandlers() {
             password: 'password',
             walletName,
           },
-          password: password || api1State.storedTakerConfig?.password || '',
+          password: requireWalletPassword(
+            password || api1State.storedTakerConfig?.password
+          ),
           protocol,
           appSwapId: swapId,
         });
