@@ -20,6 +20,7 @@ export const SwapStateManager = {
 
     const state = await this.loadState();
     state[STORAGE_KEYS.ACTIVE_SWAP] = swapData;
+    delete state[STORAGE_KEYS.SWAP_PROGRESS];
     await this.saveState(state);
 
     console.log('Swap config saved:', swapData);
@@ -60,15 +61,52 @@ export const SwapStateManager = {
   // Swap Progress Management
   async saveSwapProgress(progressData) {
     const state = await this.loadState();
-    state[STORAGE_KEYS.SWAP_PROGRESS] = progressData;
+    const activeSwap = state[STORAGE_KEYS.ACTIVE_SWAP];
+    const scopedProgress = { ...progressData };
 
-    console.log('Swap progress saved:', progressData);
+    if (activeSwap?.swapId && !scopedProgress.swapId) {
+      scopedProgress.swapId = activeSwap.swapId;
+    }
+    if (activeSwap?.nativeSwapId && !scopedProgress.nativeSwapId) {
+      scopedProgress.nativeSwapId = activeSwap.nativeSwapId;
+    }
+
+    if (
+      scopedProgress.swapId &&
+      activeSwap?.swapId &&
+      scopedProgress.swapId !== activeSwap.swapId
+    ) {
+      const error = new Error('Swap progress swapId does not match active swap');
+      console.error('Refusing to save swap progress:', error.message);
+      throw error;
+    }
+
+    if (
+      scopedProgress.nativeSwapId &&
+      activeSwap?.nativeSwapId &&
+      scopedProgress.nativeSwapId !== activeSwap.nativeSwapId
+    ) {
+      const error = new Error(
+        'Swap progress nativeSwapId does not match active swap'
+      );
+      console.error('Refusing to save swap progress:', error.message);
+      throw error;
+    }
+
+    state[STORAGE_KEYS.SWAP_PROGRESS] = scopedProgress;
+
+    console.log('Swap progress saved:', {
+      status: scopedProgress.status || 'in_progress',
+      currentStep: scopedProgress.currentStep,
+      logCount: Array.isArray(scopedProgress.logMessages)
+        ? scopedProgress.logMessages.length
+        : 0,
+    });
 
     // Also update the active swap status
-    const activeSwap = state[STORAGE_KEYS.ACTIVE_SWAP];
     if (activeSwap) {
-      activeSwap.status = progressData.status || 'in_progress';
-      activeSwap.currentStep = progressData.currentStep;
+      activeSwap.status = scopedProgress.status || 'in_progress';
+      activeSwap.currentStep = scopedProgress.currentStep;
       activeSwap.lastUpdated = Date.now();
       state[STORAGE_KEYS.ACTIVE_SWAP] = activeSwap;
     }
@@ -134,8 +172,7 @@ export const SwapStateManager = {
         status: 'completed',
         protocol: report.protocol || (report.isTaproot ? 'Taproot' : 'Legacy'),
         isTaproot: Boolean(report.isTaproot),
-        protocolVersion:
-          report.protocolVersion || (report.isTaproot ? 2 : 1),
+        protocolVersion: report.protocolVersion || (report.isTaproot ? 2 : 1),
         report: report,
       };
 
@@ -198,7 +235,7 @@ export const SwapStateManager = {
   async getElapsedTime() {
     const progress = await this.getSwapProgress();
     if (!progress || !progress.startTime) return 0;
-    return Date.now() - progress.startTime;
+    return Math.max(0, Date.now() - progress.startTime);
   },
 
   async loadState() {

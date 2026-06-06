@@ -4,3 +4,4 @@ coinswap-ffi
 dist/
 squashfs-root/
 .DS_Store
+tor-manager/target/

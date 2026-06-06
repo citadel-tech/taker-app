@@ -13,6 +13,7 @@ console.log(
 // Add hot reload in development
 try {
   require('electron-reloader')(module, {
+    ignore: [/tor-manager[\\/]target/],
     watchRenderer: true,
   });
 } catch (_) {}
