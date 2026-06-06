@@ -1191,127 +1191,134 @@
   position: fixed;
   inset: 0;
   z-index: 60;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 24px;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(239, 68, 68, 0.14), transparent 34%),
-    rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(10px);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(2px);
 }
 
 .swap-failure-dialog {
-  width: min(520px, 100%);
+  width: min(460px, 100%);
+  max-height: 90vh;
+  overflow: auto;
   display: grid;
-  gap: 18px;
-  padding: 28px;
-  border: 1px solid color-mix(in srgb, var(--color-danger) 36%, var(--color-line));
-  border-radius: 12px;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 18px;
   background: var(--color-surface);
-  box-shadow:
-    0 24px 80px rgba(0, 0, 0, 0.58),
-    0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
 }
 
 .swap-failure-head {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-line);
 }
 
 .swap-failure-icon {
-  width: 52px;
-  height: 52px;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--color-danger) 18%, transparent);
+  border-radius: 9px;
+  background: rgba(255, 91, 110, 0.15);
   color: var(--color-danger);
-}
-
-.swap-failure-head span,
-.swap-failure-details summary {
-  color: var(--color-subtle);
-  font-family: var(--app-font-mono);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
 }
 
 .swap-failure-head h3 {
-  margin: 4px 0 0;
-  color: var(--color-danger);
-  font-size: 28px;
-  line-height: 1.1;
-  font-weight: 800;
+  margin: 0;
+  color: var(--color-foreground);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.2;
   letter-spacing: 0;
+}
+
+.swap-failure-head span,
+.swap-failure-error span {
+  display: block;
+  margin-top: 3px;
+  color: var(--color-subtle);
+  font-family: var(--app-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.swap-failure-head span {
+  color: var(--color-danger);
 }
 
 .swap-failure-copy {
   margin: 0;
-  color: var(--color-foreground);
-  font-size: 15px;
-  line-height: 1.65;
-}
-
-.swap-failure-recovery {
-  display: grid;
-  grid-template-columns: 22px 1fr;
-  gap: 12px;
-  align-items: start;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--color-primary) 32%, var(--color-line));
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-surface-raised));
-  color: #9cc8ff;
+  color: var(--color-muted);
+  font-family: var(--app-font-sans);
   font-size: 13px;
-  line-height: 1.55;
+  line-height: 1.6;
 }
 
-.swap-failure-recovery svg {
-  color: #9cc8ff;
+.swap-failure-status {
+  width: 100%;
+  min-width: 0;
 }
 
-.swap-failure-details {
+.swap-failure-status .label {
+  min-width: auto;
+}
+
+.swap-failure-error {
   border: 1px solid var(--color-line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--color-app-bg);
-}
-
-.swap-failure-details summary {
-  cursor: pointer;
   padding: 12px 14px;
-  list-style-position: inside;
 }
 
-.swap-failure-details pre {
-  max-height: 180px;
+.swap-failure-error span {
+  margin: 0 0 9px;
+}
+
+.swap-failure-error pre {
+  max-height: 104px;
   margin: 0;
-  padding: 0 14px 14px;
   overflow: auto;
-  color: #ffaaa8;
+  color: var(--color-danger);
   font-family: var(--app-font-mono);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.swap-failure-primary {
-  width: 100%;
-  min-height: 48px;
-  border: 0;
-  border-radius: 10px;
-  background: var(--color-primary);
-  color: white;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+.swap-failure-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
-.swap-failure-primary:hover {
-  background: var(--color-primary-hover);
+.swap-failure-actions .app-button {
+  min-width: 150px;
+}
+
+@media (max-width: 520px) {
+  .swap-failure-overlay {
+    padding: 16px;
+  }
+
+  .swap-failure-dialog {
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .swap-failure-actions,
+  .swap-failure-actions .app-button {
+    width: 100%;
+  }
 }
 
 .swap-net-badge {

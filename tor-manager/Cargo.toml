@@ -1,0 +1,7 @@
+[package]
+name = "coinswap-tor-manager"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+libtor = { version = "47.13.0", features = ["vendored-openssl"] }

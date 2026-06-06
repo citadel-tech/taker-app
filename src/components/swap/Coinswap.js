@@ -1,9 +1,13 @@
-import { SwapStateManager, formatElapsedTime } from './SwapStateManager.js';
+import { SwapStateManager } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
 import { createSwapProgressAnimation } from './SwapProgressAnimation.js';
 
 export async function CoinswapComponent(container, swapConfig) {
+  if (typeof window !== 'undefined' && window.__coinswapProgressCleanup) {
+    window.__coinswapProgressCleanup();
+  }
+
   function normalizeProtocol(value, fallbackIsTaproot = false) {
     switch (value) {
       case 'v2':
@@ -23,19 +27,58 @@ export async function CoinswapComponent(container, swapConfig) {
   content.id = 'coinswap-content';
 
   const existingSwap = await SwapStateManager.getActiveSwap();
-  const savedProgress = await SwapStateManager.getSwapProgress();
+  const storedProgress = await SwapStateManager.getSwapProgress();
 
   let actualSwapConfig;
+  let savedProgress = null;
   let shouldStartNew = true;
 
   let pollInterval = null;
   let logPollInterval = null;
+  let elapsedInterval = null;
   let lastLogLine = '';
   let processedLogs = new Set();
   let progressAnimation = null;
 
-  if (existingSwap && existingSwap.status === 'in_progress' && savedProgress) {
+  function cleanupProgressScreen() {
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
+    if (logPollInterval) {
+      clearInterval(logPollInterval);
+      logPollInterval = null;
+    }
+    if (elapsedInterval) {
+      clearInterval(elapsedInterval);
+      elapsedInterval = null;
+    }
+    if (
+      typeof window !== 'undefined' &&
+      window.__coinswapProgressCleanup === cleanupProgressScreen
+    ) {
+      window.__coinswapProgressCleanup = null;
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    window.__coinswapProgressCleanup = cleanupProgressScreen;
+  }
+
+  function progressBelongsToSwap(progress, swap) {
+    if (!progress || !swap || !progress.swapId) return false;
+    return (
+      progress.swapId === swap.swapId || progress.swapId === swap.nativeSwapId
+    );
+  }
+
+  if (
+    existingSwap &&
+    existingSwap.status === 'in_progress' &&
+    progressBelongsToSwap(storedProgress, existingSwap)
+  ) {
     actualSwapConfig = existingSwap;
+    savedProgress = storedProgress;
     shouldStartNew = false;
   } else {
     actualSwapConfig = swapConfig;
@@ -66,7 +109,10 @@ export async function CoinswapComponent(container, swapConfig) {
   while (routeMakerAddresses.length < swapData.makers) {
     routeMakerAddresses.push(null);
   }
-  const pendingMakerAddresses = Array.from({ length: swapData.makers }, () => null);
+  const pendingMakerAddresses = Array.from(
+    { length: swapData.makers },
+    () => null
+  );
   const contractDataReceivedMakers = new Set();
 
   if (swapData.transactions.length === 0) {
@@ -120,6 +166,8 @@ export async function CoinswapComponent(container, swapConfig) {
 
   function saveProgress() {
     SwapStateManager.saveSwapProgress({
+      swapId: actualSwapConfig.swapId,
+      nativeSwapId: actualSwapConfig.nativeSwapId,
       currentStep,
       startTime,
       logMessages,
@@ -221,7 +269,10 @@ export async function CoinswapComponent(container, swapConfig) {
       ) {
         return 'is-recovery';
       }
-      if (text.includes('swap report') || text.includes('generating swap report')) {
+      if (
+        text.includes('swap report') ||
+        text.includes('generating swap report')
+      ) {
         return 'is-report';
       }
       if (text.includes('txid') || text.includes('broadcast')) return 'is-tx';
@@ -242,17 +293,16 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function updateElapsedTime() {
-    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const elapsed = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
     const minutes = Math.floor(elapsed / 60);
+    const hours = Math.floor(minutes / 60);
     const seconds = elapsed % 60;
     const timeEl = content.querySelector('#elapsed-time');
-    if (timeEl)
-      timeEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    const etaEl = content.querySelector('#swap-eta');
-    if (etaEl) {
-      const total = Math.max(30, (swapData.hops || 3) * 40);
-      const remaining = Math.max(0, total - elapsed);
-      etaEl.textContent = `${Math.floor(remaining / 60)}m ${String(remaining % 60).padStart(2, '0')}s`;
+    if (timeEl) {
+      timeEl.textContent =
+        hours > 0
+          ? `${hours}:${String(minutes % 60).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+          : `${minutes}:${String(seconds).padStart(2, '0')}`;
     }
   }
 
@@ -265,18 +315,20 @@ export async function CoinswapComponent(container, swapConfig) {
     }
 
     const connected = content.querySelectorAll('.route-node.connected').length;
-    const connecting = content.querySelectorAll('.route-node.connecting').length;
-    const animationPhase = content.querySelector('.swap-animation')?.dataset.phase;
+    const connecting = content.querySelectorAll(
+      '.route-node.connecting'
+    ).length;
+    const animationPhase =
+      content.querySelector('.swap-animation')?.dataset.phase;
     const stepEl = content.querySelector('#swap-step-label');
     const titleEl = content.querySelector('#swap-page-title');
     const progressEl = content.querySelector('#swap-progress-fill');
     const routeStatuses = Array.from(
       content.querySelectorAll('.route-node .route-status')
     ).map((node) => String(node.textContent || '').toLowerCase());
-    const isSweeping =
-      routeStatuses.some((status) =>
-        /sweep|complete|settled/.test(status) || status === 'received'
-      );
+    const isSweeping = routeStatuses.some(
+      (status) => /sweep|complete|settled/.test(status) || status === 'received'
+    );
     const isKeyHandover = routeStatuses.some((status) =>
       /key|exchange|final|receiving/.test(status)
     );
@@ -284,15 +336,16 @@ export async function CoinswapComponent(container, swapConfig) {
       4,
       Math.max(1, connected + (connecting > 0 ? 1 : 0))
     );
-    const phaseHeader =
-      isSweeping
-        ? { step: 4, title: 'Sweeping the Contract' }
-        : isKeyHandover
-          ? { step: 3, title: 'Handing Over Key Materials' }
+    const phaseHeader = isSweeping
+      ? { step: 4, title: 'Sweeping the Contract' }
+      : isKeyHandover
+        ? { step: 3, title: 'Handing Over Key Materials' }
         : animationPhase === 'contract'
           ? { step: 2, title: 'Establishing Contract Txs' }
           : null;
-    const step = phaseHeader ? Math.max(routeStep, phaseHeader.step) : routeStep;
+    const step = phaseHeader
+      ? Math.max(routeStep, phaseHeader.step)
+      : routeStep;
 
     currentStep = Math.max(currentStep, step);
     if (stepEl) stepEl.textContent = `Step ${step} of 4 · Swap in progress`;
@@ -459,17 +512,17 @@ export async function CoinswapComponent(container, swapConfig) {
         substituteMakerMatch[2]
       );
     }
-    const selectedMakersMatch = message.match(/Selected\s+\d+\s+makers[^:]*:\s+(.+)$/i);
+    const selectedMakersMatch = message.match(
+      /Selected\s+\d+\s+makers[^:]*:\s+(.+)$/i
+    );
     if (selectedMakersMatch) {
-      selectedMakersMatch[1]
-        .split(/,\s*/)
-        .forEach((entry) => {
-          const match = entry.match(/#(\d+)\s+(\S+?\.onion)/i);
-          if (!match) return;
-          const makerIdx = Number(match[1]) - 1;
-          setPendingMakerAddress(makerIdx, match[2]);
-          revealMakerAddress(makerIdx, match[2]);
-        });
+      selectedMakersMatch[1].split(/,\s*/).forEach((entry) => {
+        const match = entry.match(/#(\d+)\s+(\S+?\.onion)/i);
+        if (!match) return;
+        const makerIdx = Number(match[1]) - 1;
+        setPendingMakerAddress(makerIdx, match[2]);
+        revealMakerAddress(makerIdx, match[2]);
+      });
     }
 
     // Update UI based on message content (supports both V1 and V2 protocols)
@@ -789,7 +842,10 @@ export async function CoinswapComponent(container, swapConfig) {
         return;
       }
 
+      startTime = Date.now();
+      actualSwapConfig.startTime = startTime;
       currentStep = 1;
+      updateElapsedTime();
       addLog('Coinswap started...', 'info');
       addLog(`Swap ID: ${swapId}`, 'info');
       if (actualSwapConfig.nativeSwapId) {
@@ -799,6 +855,8 @@ export async function CoinswapComponent(container, swapConfig) {
       addLog(`Makers: ${swapData.makers}`, 'info');
 
       SwapStateManager.saveSwapProgress({
+        swapId,
+        nativeSwapId: actualSwapConfig.nativeSwapId,
         currentStep: 1,
         startTime,
         logMessages,
@@ -810,7 +868,9 @@ export async function CoinswapComponent(container, swapConfig) {
       if (window.appManager) window.appManager.startBackgroundSwapManager();
     }
 
-    setInterval(updateElapsedTime, 1000);
+    if (!elapsedInterval) {
+      elapsedInterval = setInterval(updateElapsedTime, 1000);
+    }
     startPollingSwapStatus();
     startPollingLogs();
   }
@@ -866,8 +926,14 @@ export async function CoinswapComponent(container, swapConfig) {
         }
 
         if (swap.status === 'completed') {
-          clearInterval(pollInterval);
-          clearInterval(logPollInterval);
+          if (pollInterval) {
+            clearInterval(pollInterval);
+            pollInterval = null;
+          }
+          if (logPollInterval) {
+            clearInterval(logPollInterval);
+            logPollInterval = null;
+          }
 
           console.log('🎯 Swap completed! Report data:', swap.report);
 
@@ -896,6 +962,8 @@ export async function CoinswapComponent(container, swapConfig) {
 
           await SwapStateManager.saveSwapProgress({
             ...(await SwapStateManager.getSwapProgress()),
+            swapId,
+            nativeSwapId: actualSwapConfig.nativeSwapId,
             status: 'failed',
             error: swap.error,
           });
@@ -905,6 +973,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
           // Trigger recovery
           triggerRecovery();
+          cleanupProgressScreen();
         }
       } catch (error) {
         console.error('Polling error:', error);
@@ -918,10 +987,10 @@ export async function CoinswapComponent(container, swapConfig) {
     modal.innerHTML = `
     <section class="swap-failure-dialog" role="dialog" aria-modal="true" aria-labelledby="swap-failure-title">
       <header class="swap-failure-head">
-        <div class="swap-failure-icon">${icons.xCircle(24)}</div>
+        <div class="swap-failure-icon">${icons.xCircle(18)}</div>
         <div>
-          <span>Swap failed</span>
-          <h3 id="swap-failure-title">Recovery Started</h3>
+          <h3 id="swap-failure-title">Swap failed</h3>
+          <span>Recovery started</span>
         </div>
       </header>
 
@@ -929,19 +998,22 @@ export async function CoinswapComponent(container, swapConfig) {
         The coinswap could not be completed. Your funds are safe and recovery has been initiated. Check your wallet for returned funds.
       </p>
 
-      <div class="swap-failure-recovery">
-        ${icons.shieldCheck(18)}
-        <span>Recovery has started. Once completed the wallet will reflect recovered balance.</span>
+      <div class="app-status-row ok swap-failure-status">
+        <span class="indicator">${icons.shieldCheck(11)}</span>
+        <span class="label">RECOVERY</span>
+        <span class="message">Wallet recovery is running</span>
       </div>
 
-      <details class="swap-failure-details">
-        <summary>Error details</summary>
+      <div class="swap-failure-error">
+        <span>Error details</span>
         <pre>${escapeHtml(errorMessage || 'Unknown error')}</pre>
-      </details>
+      </div>
 
-      <button id="modal-to-swap" class="swap-failure-primary" type="button">
+      <div class="swap-failure-actions">
+        <button id="modal-to-swap" class="app-button primary" type="button">
         Back to Swap Page
-      </button>
+        </button>
+      </div>
     </section>
   `;
 
@@ -949,13 +1021,20 @@ export async function CoinswapComponent(container, swapConfig) {
 
     modal.querySelector('#modal-to-swap').addEventListener('click', () => {
       modal.remove();
-      if (pollInterval) clearInterval(pollInterval);
-      if (logPollInterval) clearInterval(logPollInterval);
+      cleanupProgressScreen();
 
-      import('./Swap.js').then((module) => {
-        container.innerHTML = '';
-        module.SwapComponent(container);
-      });
+      SwapStateManager.clearSwapData()
+        .then(() => import('./Swap.js'))
+        .then((module) => {
+          container.innerHTML = '';
+          module.SwapComponent(container);
+        })
+        .catch((error) => {
+          console.error('⚠️ Failed to reload swap flow:', error);
+          alert(
+            'Could not reload the swap page. Please restart the app and check recovery from your wallet.'
+          );
+        });
     });
   }
 
@@ -977,28 +1056,37 @@ export async function CoinswapComponent(container, swapConfig) {
     completeButton.hidden = false;
     completeButton.classList.remove('hidden');
 
-    const transformedReport = transformSwapReport(report);
+    const normalizedReport = transformSwapReport(report);
+    const transformedReport = {
+      ...report,
+      ...normalizedReport,
+      report: {
+        ...(report?.report || report || {}),
+        ...normalizedReport,
+      },
+    };
     transformedReport.protocol = swapProtocol;
     transformedReport.isTaproot = swapProtocol === 'Taproot';
     transformedReport.protocolVersion = swapProtocol === 'Taproot' ? 2 : 1;
     transformedReport.nativeSwapId =
       transformedReport.nativeSwapId || actualSwapConfig.nativeSwapId || null;
+    transformedReport.appSwapId =
+      transformedReport.appSwapId || actualSwapConfig.swapId || null;
 
     actualSwapConfig.swapReport = transformedReport;
 
     await SwapStateManager.saveSwapProgress({
       ...(await SwapStateManager.getSwapProgress()),
+      swapId: actualSwapConfig.swapId,
+      nativeSwapId: actualSwapConfig.nativeSwapId,
       status: 'completed',
       report: transformedReport,
     });
 
     await SwapStateManager.completeSwap(transformedReport);
 
-    setTimeout(() => {
-      void SwapStateManager.clearSwapData();
-    }, 3000);
-
     if (window.appManager) window.appManager.stopBackgroundSwapManager();
+    cleanupProgressScreen();
   }
 
   function transformSwapReport(backendReport) {
@@ -1208,12 +1296,46 @@ export async function CoinswapComponent(container, swapConfig) {
     actualSwapConfig.swapReport = defaultReport;
 
     if (window.appManager) window.appManager.stopBackgroundSwapManager();
+    cleanupProgressScreen();
+  }
+
+  async function loadBestSwapReportForView() {
+    const fallbackReport = actualSwapConfig.swapReport || getDefaultReport();
+    const ids = [
+      fallbackReport.swapId,
+      fallbackReport.nativeSwapId,
+      fallbackReport.appSwapId,
+      actualSwapConfig.swapId,
+      actualSwapConfig.nativeSwapId,
+    ].filter(Boolean);
+
+    for (const id of [...new Set(ids.map(String))]) {
+      try {
+        const result = await window.api.swapReports.get(id);
+        if (!result.success || !result.report) continue;
+        return {
+          ...result.report,
+          ...result.report.report,
+          protocol: result.report.protocol ?? fallbackReport.protocol ?? 'v1',
+          isTaproot:
+            result.report.isTaproot ?? fallbackReport.isTaproot ?? false,
+          protocolVersion:
+            result.report.protocolVersion ??
+            fallbackReport.protocolVersion ??
+            1,
+        };
+      } catch (error) {
+        console.warn('Full swap report lookup failed:', error);
+      }
+    }
+
+    return fallbackReport;
   }
 
   function viewSwapReport() {
-    import('./SwapReport.js').then((module) => {
+    import('./SwapReport.js').then(async (module) => {
       container.innerHTML = '';
-      const report = actualSwapConfig.swapReport || getDefaultReport();
+      const report = await loadBestSwapReportForView();
       module.SwapReportComponent(container, report);
     });
   }
@@ -1366,8 +1488,7 @@ export async function CoinswapComponent(container, swapConfig) {
         <div><span>Amount</span><strong>${formatSats(swapData.amount)}</strong></div>
         <div><span>Hops</span><strong>${swapData.hops}</strong></div>
         <div><span>Fee</span><strong>${formatSats((actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops))}</strong></div>
-        <div><span>ETA</span><strong id="swap-eta">2m 40s</strong></div>
-        <div class="hidden"><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
+        <div><span>Elapsed</span><strong id="elapsed-time">0:00</strong></div>
       </section>
 
       <section class="swap-terminal is-collapsed" id="swap-log-panel">
@@ -1390,14 +1511,16 @@ export async function CoinswapComponent(container, swapConfig) {
       amount: swapData.amount,
       makers: swapData.makers,
       hops: swapData.hops,
-      fee: (actualSwapConfig.networkFeeRate || 2) * 225 * Math.max(1, swapData.hops),
+      fee:
+        (actualSwapConfig.networkFeeRate || 2) *
+        225 *
+        Math.max(1, swapData.hops),
       makerAddresses: routeMakerAddresses,
     }
   );
 
   content.querySelector('#back-to-swap').addEventListener('click', () => {
-    if (pollInterval) clearInterval(pollInterval);
-    if (logPollInterval) clearInterval(logPollInterval);
+    cleanupProgressScreen();
     import('./Swap.js').then((module) => {
       container.innerHTML = '';
       module.SwapComponent(container);
@@ -1419,11 +1542,14 @@ export async function CoinswapComponent(container, swapConfig) {
   });
 
   // Initialize UI
+  updateElapsedTime();
   updateTxList();
   if (logMessages.length > 0) updateLogs();
 
   if (savedProgress && savedProgress.currentStep > 0) {
-    setInterval(updateElapsedTime, 1000);
+    if (!elapsedInterval) {
+      elapsedInterval = setInterval(updateElapsedTime, 1000);
+    }
     startPollingSwapStatus();
     startPollingLogs();
   } else if (shouldStartNew) {
