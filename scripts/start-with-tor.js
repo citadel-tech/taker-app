@@ -10,14 +10,6 @@ function spawnLogged(command, args, options = {}) {
 }
 
 const manifestPath = path.join('tor-manager', 'Cargo.toml');
-const torBinary = path.join(
-  'tor-manager',
-  'target',
-  'debug',
-  process.platform === 'win32'
-    ? 'coinswap-tor-manager.exe'
-    : 'coinswap-tor-manager'
-);
 
 function runToCompletion(command, args) {
   return new Promise((resolve, reject) => {
@@ -32,30 +24,20 @@ function runToCompletion(command, args) {
 }
 
 let shuttingDown = false;
-let tor = null;
 let electron = null;
-
-function stopTor() {
-  if (!tor) return;
-  if (tor.killed || tor.exitCode !== null || tor.signalCode !== null) return;
-  tor.kill(process.platform === 'win32' ? undefined : 'SIGTERM');
-}
 
 function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
-  stopTor();
   process.exitCode = code;
 }
 
 process.on('SIGINT', () => {
-  stopTor();
   electron?.kill('SIGINT');
   shutdown(130);
 });
 
 process.on('SIGTERM', () => {
-  stopTor();
   electron?.kill('SIGTERM');
   shutdown(143);
 });
@@ -73,34 +55,18 @@ async function main() {
     return;
   }
 
-  tor = spawnLogged(torBinary, []);
-  tor.on('error', (error) => {
-    console.error(`[tor-manager] failed to start:`, error);
-  });
-
   electron = spawnLogged('electron', ['.']);
   electron.on('error', (error) => {
     console.error('[electron] failed to start:', error);
-    stopTor();
     shutdown(1);
   });
 
   electron.on('exit', (code, signal) => {
-    stopTor();
     if (signal) {
       shutdown(1);
       return;
     }
     shutdown(code ?? 0);
-  });
-
-  tor.on('exit', (code) => {
-    if (shuttingDown) return;
-    if (code && code !== 0) {
-      console.warn(
-        `[tor-manager] exited early with code ${code}; continuing app startup`
-      );
-    }
   });
 }
 
