@@ -35,6 +35,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
   let pollInterval = null;
   let logPollInterval = null;
+  let cborPollInterval = null;
   let elapsedInterval = null;
   let lastLogLine = '';
   let processedLogs = new Set();
@@ -48,6 +49,10 @@ export async function CoinswapComponent(container, swapConfig) {
     if (logPollInterval) {
       clearInterval(logPollInterval);
       logPollInterval = null;
+    }
+    if (cborPollInterval) {
+      clearInterval(cborPollInterval);
+      cborPollInterval = null;
     }
     if (elapsedInterval) {
       clearInterval(elapsedInterval);
@@ -415,6 +420,66 @@ export async function CoinswapComponent(container, swapConfig) {
     progressAnimation?.setReceiverActive(active);
   }
 
+  // Map per-maker CBOR flags (from buildMakerProgress) to a display label + color.
+  function makerStatusFromCbor(p) {
+    if (!p) return null;
+    if (p.privkeyForwarded) return { label: 'Finalizing...', color: 'yellow' };
+    if (p.privkeyReceived)  return { label: 'Key received', color: 'green' };
+    if (p.swapcoinCreated)  return { label: 'Contract ready', color: 'green' };
+    if (p.makerContractReceived) return { label: 'Contract received', color: 'yellow' };
+    if (p.contractDataSent) return { label: 'Contracting...', color: 'yellow' };
+    if (p.connected)        return { label: 'Connected', color: 'green' };
+    if (p.negotiated)       return { label: 'Negotiated', color: 'yellow' };
+    return null;
+  }
+
+  // Apply a live CBOR snapshot to the animation without touching log parsing.
+  function applyProgressFromCbor(cbor) {
+    if (!cbor || content.dataset.completed === 'true' || content.dataset.failed === 'true') return;
+
+    const { phase, makers = [], outgoingContractTxids = [] } = cbor;
+
+    // Activate wallet node as soon as the swap has moved past discovery
+    if (phase && phase !== 'MakersDiscovered') {
+      updateYouSend(true);
+    }
+
+    // Reveal maker addresses and status from CBOR flags
+    makers.forEach((m, i) => {
+      if (i >= swapData.makers) return;
+      if (m.address) revealMakerAddress(i, m.address);
+      const s = makerStatusFromCbor(m);
+      if (s) {
+        updateMakerVisibility(i, true);
+        updateHopStatus(i, s.label, s.color);
+      }
+    });
+
+    // Surface the outgoing contract txid once we have it
+    if (outgoingContractTxids.length > 0 && !swapData.transactions[0]?.txid) {
+      setTransactionTxid(0, outgoingContractTxids[0]);
+    }
+
+    // Phase-level overrides: receiver active when keys have been forwarded
+    if (phase === 'PrivkeysForwarded') {
+      updateYouReceive(true);
+    }
+  }
+
+  // Start polling the CBOR tracker every 2s to drive the animation.
+  // Called as soon as nativeSwapId is known (worker may set it seconds after start).
+  function startCborTracking(nativeSwapId) {
+    if (cborPollInterval) return;
+    cborPollInterval = setInterval(async () => {
+      try {
+        const result = await window.api.taker.getSwapProgress(nativeSwapId);
+        if (result.success && result.swap) applyProgressFromCbor(result.swap);
+      } catch (err) {
+        console.error('CBOR poll error:', err);
+      }
+    }, 2000);
+  }
+
   function setTransactionTxid(hopIndex, txid) {
     if (swapData.transactions[hopIndex]) {
       swapData.transactions[hopIndex].txid = txid;
@@ -458,6 +523,8 @@ export async function CoinswapComponent(container, swapConfig) {
     }
   }
 
+  // Animation is now driven by CBOR polling (startCborTracking).
+  // This function only feeds the log terminal panel.
   function parseAndHandleLog(line) {
     const match = line.match(
       /^(\d{4}-\d{2}-\d{2}T[\d:.]+)[^\s]*\s+(\w+)\s+([\w:]+)\s+-\s+(.+)$/
@@ -472,364 +539,8 @@ export async function CoinswapComponent(container, swapConfig) {
     if (processedLogs.has(logKey)) return;
     processedLogs.add(logKey);
 
-    const type =
-      level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info';
-
-    const relevantModules = [
-      'coinswap::taker::api',
-      'coinswap::taker::taproot_swap',
-      'coinswap::taker::taproot_verification',
-      'coinswap::wallet::api',
-      'coinswap::wallet::spend',
-      'coinswap::wallet::swapcoin',
-      'coinswap::wallet::report',
-    ];
-    if (!relevantModules.includes(module)) return;
-
-    // Add raw message to log
+    const type = level === 'ERROR' ? 'error' : level === 'WARN' ? 'warn' : 'info';
     addLog(message, type);
-
-    const makerIndexMatch = message.match(/maker\s+(\d+)/i);
-    const makerIndex =
-      makerIndexMatch && Number.isFinite(Number(makerIndexMatch[1]))
-        ? Number(makerIndexMatch[1])
-        : null;
-    const connectingMakerMatch = message.match(
-      /Connecting to maker\s+(\d+)\s+at\s+(\S+)/i
-    );
-    if (connectingMakerMatch) {
-      setPendingMakerAddress(
-        Number(connectingMakerMatch[1]),
-        connectingMakerMatch[2]
-      );
-    }
-    const substituteMakerMatch = message.match(
-      /Substituting maker\s+(\d+)\s+with spare at\s+(\S+)/i
-    );
-    if (substituteMakerMatch) {
-      setPendingMakerAddress(
-        Number(substituteMakerMatch[1]),
-        substituteMakerMatch[2]
-      );
-    }
-    const selectedMakersMatch = message.match(
-      /Selected\s+\d+\s+makers[^:]*:\s+(.+)$/i
-    );
-    if (selectedMakersMatch) {
-      selectedMakersMatch[1].split(/,\s*/).forEach((entry) => {
-        const match = entry.match(/#(\d+)\s+(\S+?\.onion)/i);
-        if (!match) return;
-        const makerIdx = Number(match[1]) - 1;
-        setPendingMakerAddress(makerIdx, match[2]);
-        revealMakerAddress(makerIdx, match[2]);
-      });
-    }
-
-    // Update UI based on message content (supports both V1 and V2 protocols)
-
-    // V1: "Initiating coinswap with id" | V2: "Initiating coinswap with id"
-    if (message.includes('Initiating coinswap with id')) {
-      updateYouSend(true);
-      updateHopStatus(0, 'Initializing...', 'yellow');
-    }
-    // V1: "Broadcasted Funding tx" / "Waiting for funding transaction confirmation"
-    else if (
-      message.includes('Broadcasted Funding tx') ||
-      message.includes('Waiting for funding transaction confirmation. Txids')
-    ) {
-      const txMatch = message.match(/(?:txid:|Txids\s*:\s*\[)([a-f0-9]+)/i);
-      if (txMatch) {
-        const emptySlot = swapData.transactions.findIndex((tx) => !tx.txid);
-        if (emptySlot !== -1) {
-          setTransactionTxid(emptySlot, txMatch[1]);
-          updateHopStatus(emptySlot, 'In mempool...', 'orange');
-        }
-      }
-    }
-    // V2: "Registered watcher for taker's outgoing contract: txid:vout"
-    else if (
-      message.includes("Registered watcher for taker's outgoing contract")
-    ) {
-      const txMatch = message.match(/([a-f0-9]{64}):(\d+)/i);
-      if (txMatch) {
-        // This is hop 0 - taker's outgoing contract
-        setTransactionTxid(0, txMatch[1]);
-        updateHopStatus(0, 'Broadcasting...', 'orange');
-        updateMakerVisibility(0, true); // Light up first maker
-      }
-    }
-    // Taproot: "Broadcast contract tx: <txid>"
-    else if (message.includes('Broadcast contract tx')) {
-      const txMatch = message.match(/([a-f0-9]{64})/i);
-      if (txMatch) {
-        setTransactionTxid(0, txMatch[1]);
-        updateHopStatus(0, 'Broadcasting...', 'orange');
-        updateMakerVisibility(0, true);
-      }
-    }
-    // V2: "Persisted outgoing swapcoin to wallet store"
-    else if (message.includes('Persisted outgoing swapcoin to wallet store')) {
-      updateHopStatus(0, 'In mempool...', 'orange');
-    }
-    // V1: "Tx [txid] | Confirmed at"
-    else if (message.match(/Tx [a-f0-9]+ \| Confirmed at/i)) {
-      const txMatch = message.match(/Tx ([a-f0-9]+)/i);
-      if (txMatch) {
-        const slot = swapData.transactions.findIndex((tx) =>
-          tx.txid?.startsWith(txMatch[1].substring(0, 8))
-        );
-        if (slot !== -1) {
-          setTransactionConfirmed(slot);
-          updateHopStatus(slot, 'Confirmed', 'green');
-
-          const confirmedHops = swapData.transactions.filter(
-            (tx) => tx.status === 'confirmed'
-          ).length;
-
-          for (let i = 0; i < Math.min(confirmedHops, swapData.makers); i++) {
-            updateMakerVisibility(i, true);
-          }
-
-          console.log(
-            `✅ Hop ${slot + 1} confirmed. Lighting up ${Math.min(confirmedHops, swapData.makers)} makers`
-          );
-        }
-      }
-    }
-    // V2: "Transaction confirmed at blockheight: {ht}, txid : {txid}"
-    else if (message.includes('Transaction confirmed at blockheight')) {
-      const txMatch = message.match(/txid\s*:\s*([a-f0-9]{64})/i);
-      if (txMatch) {
-        const slot = swapData.transactions.findIndex((tx) =>
-          tx.txid?.startsWith(txMatch[1].substring(0, 8))
-        );
-        if (slot !== -1) {
-          setTransactionConfirmed(slot);
-          updateHopStatus(slot, 'Confirmed', 'green');
-
-          // ✅ When outgoing is confirmed, light up ALL makers and mark intermediate hops as "Processing"
-          if (slot === 0) {
-            // Light up all makers
-            for (let i = 0; i < swapData.makers; i++) {
-              updateMakerVisibility(i, true);
-            }
-            // Mark intermediate hops as processing (hops 1 to N-1)
-            for (let i = 1; i < swapData.hops - 1; i++) {
-              updateHopStatus(i, 'Processing...', 'blue');
-            }
-            console.log(
-              `✅ Outgoing contract confirmed. All ${swapData.makers} makers now active`
-            );
-          }
-        }
-      }
-    }
-    // V2: "Transaction seen in mempool,waiting for confirmation, txid: {txid}"
-    else if (message.includes('Transaction seen in mempool')) {
-      const txMatch = message.match(/txid\s*:\s*([a-f0-9]{64})/i);
-      if (txMatch) {
-        const slot = swapData.transactions.findIndex((tx) =>
-          tx.txid?.startsWith(txMatch[1].substring(0, 8))
-        );
-        if (slot !== -1) {
-          updateHopStatus(slot, 'In mempool...', 'yellow');
-        }
-      }
-    }
-    // V2: Negotiating with makers
-    else if (message.includes('Received AckResponse from maker')) {
-      // Mark first few hops as negotiating
-      updateHopStatus(0, 'Negotiating...', 'yellow');
-    }
-    // V1: Maker responded during negotiation. Only now reveal the address.
-    else if (
-      makerIndex !== null &&
-      (message.includes('Received offer from maker') ||
-        (message.includes('Maker') && message.includes('accepted swap')) ||
-        message.includes('Sending ProofOfFunding to maker') ||
-        (message.includes('Maker') &&
-          message.includes('processed successfully')))
-    ) {
-      revealMakerAddress(makerIndex);
-      updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Connected', 'green');
-    }
-    // V2: "All makers have responded with their outgoing keys"
-    else if (
-      message.includes('All makers have responded with their outgoing keys')
-    ) {
-      // Mark all intermediate hops as "Key received"
-      for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, 'Key received', 'green');
-      }
-    }
-    // V2: "Registered watcher for taker's incoming contract"
-    else if (
-      message.includes("Registered watcher for taker's incoming contract")
-    ) {
-      const txMatch = message.match(/([a-f0-9]{64}):(\d+)/i);
-      if (txMatch) {
-        // This is the final hop - mark it
-        const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, 'Receiving...', 'blue');
-      }
-    }
-    // V2: "Sweeping taker's incoming contract"
-    else if (message.includes("Sweeping taker's incoming contract")) {
-      const lastHop = swapData.hops - 1;
-      updateHopStatus(lastHop, 'Sweeping...', 'yellow');
-    }
-    // V2: "Broadcast taker sweep transaction"
-    else if (message.includes('Broadcast taker sweep transaction')) {
-      const txMatch = message.match(/([a-f0-9]{64})/i);
-      if (txMatch) {
-        const lastHop = swapData.hops - 1;
-        updateHopStatus(lastHop, 'Received', 'green');
-      }
-    }
-    // V1: "Swaps settled successfully"
-    else if (message.includes('Swaps settled successfully')) {
-      markAllMakersComplete();
-    }
-    // V2: "Taker sweep completed successfully"
-    else if (message.includes('Taker sweep completed successfully')) {
-      markAllMakersComplete();
-      updateYouReceive(true);
-    }
-    // V2: "Successfully Completed Taproot Coinswap"
-    else if (message.includes('Successfully Completed Taproot Coinswap')) {
-      markAllMakersComplete();
-      updateYouReceive(true);
-    }
-    // V1: "Successfully swept incoming swap coin"
-    else if (message.includes('Successfully swept incoming swap coin')) {
-      updateYouReceive(true);
-    }
-    // V2: "Recorded swept incoming swapcoin V2"
-    else if (message.includes('Recorded swept incoming swapcoin V2')) {
-      updateYouReceive(true);
-    }
-    // V2: "Starting forward-flow private key handover"
-    else if (message.includes('Starting forward-flow private key handover')) {
-      // Mark intermediate hops as doing key exchange
-      for (let i = 1; i < swapData.hops - 1; i++) {
-        updateHopStatus(i, 'Key exchange...', 'yellow');
-      }
-    }
-    // V2: "Downloading offer from taproot maker"
-    else if (message.includes('Downloading offer from taproot maker')) {
-      updateHopStatus(0, 'Fetching offers...', 'yellow');
-    }
-    // V2: "Successfully downloaded offer from taproot maker"
-    else if (
-      message.includes('Successfully downloaded offer from taproot maker')
-    ) {
-      updateHopStatus(0, 'Offers received', 'blue');
-    }
-    // V2: "Sending contract data to maker N"
-    else if (
-      makerIndex !== null &&
-      message.includes('Sending contract data to maker')
-    ) {
-      revealMakerAddress(makerIndex);
-      updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Contracting...', 'yellow');
-    }
-    // V2: "Received Taproot contract data from maker N"
-    else if (
-      makerIndex !== null &&
-      message.includes('Received Taproot contract data from maker')
-    ) {
-      revealMakerAddress(makerIndex);
-      updateMakerVisibility(makerIndex, true);
-      contractDataReceivedMakers.add(makerIndex);
-      updateHopStatus(makerIndex, 'Contract received', 'yellow');
-      markContractsReceivedIfComplete();
-    }
-    // V2: "Verified Taproot contract data from maker N"
-    else if (
-      makerIndex !== null &&
-      message.includes('Verified Taproot contract data from maker')
-    ) {
-      revealMakerAddress(makerIndex);
-      updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Contract ready', 'green');
-    }
-    // V2: "Received private key from maker N"
-    else if (
-      makerIndex !== null &&
-      message.includes('Received private key from maker')
-    ) {
-      revealMakerAddress(makerIndex);
-      updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Key received', 'green');
-    }
-    // V2: "Sending privkey to maker N and awaiting response"
-    else if (
-      makerIndex !== null &&
-      message.includes('Sending privkey to maker') &&
-      message.includes('awaiting response')
-    ) {
-      revealMakerAddress(makerIndex);
-      updateMakerVisibility(makerIndex, true);
-      updateHopStatus(makerIndex, 'Finalizing...', 'yellow');
-    }
-    // V2: "Exchanging contract data with makers..."
-    else if (message.includes('Exchanging contract data with makers')) {
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-        updateHopStatus(i, 'Exchanging...', 'yellow');
-      }
-    }
-    // V2: "Finalizing swap..."
-    else if (message.includes('Finalizing swap')) {
-      for (let i = 0; i < swapData.makers; i++) {
-        updateMakerVisibility(i, true);
-        updateHopStatus(i, 'Finalizing...', 'yellow');
-      }
-    }
-    // V2: "Swap finalized successfully"
-    else if (message.includes('Swap finalized successfully')) {
-      markAllMakersComplete();
-    }
-    // V2: "Sweeping N completed incoming swap coins"
-    else if (
-      message.includes('Sweeping') &&
-      message.includes('completed incoming swap coins')
-    ) {
-      markAllMakersComplete();
-    }
-    // V2: Recovery started
-    else if (message.includes('Starting taproot swap recovery')) {
-      addLog('Recovery initiated...', 'warn');
-      updateHopStatus(0, 'Recovering...', 'orange');
-    }
-    // V2: Recovery success (hashlock)
-    else if (
-      message.includes('Successfully recovered incoming contract via hashlock')
-    ) {
-      addLog('Recovered via hashlock', 'success');
-    }
-    // V2: Recovery success (timelock)
-    else if (
-      message.includes('Successfully recovered outgoing contract via timelock')
-    ) {
-      addLog('Recovered via timelock', 'success');
-    } else if (
-      message.includes("Registered watcher for taker's outgoing contract")
-    ) {
-      const txMatch = message.match(/([a-f0-9]{64})/);
-      if (txMatch && isV2) {
-        setTransactionTxid(0, txMatch[1]); // slot 0 = outgoing
-        updateHopStatus(0, 'Locked', 'orange'); // but we won't show per-hop status anymore
-      }
-    } else if (message.includes('Broadcast taker sweep transaction')) {
-      const txMatch = message.match(/([a-f0-9]{64})/i);
-      if (txMatch && isV2) {
-        setTransactionTxid(1, txMatch[1]);
-        updateYouReceive(true);
-      }
-    }
   }
 
   function startSwap() {
@@ -918,6 +629,7 @@ export async function CoinswapComponent(container, swapConfig) {
         ) {
           actualSwapConfig.nativeSwapId = swap.nativeSwapId;
           addLog(`Backend Swap ID: ${swap.nativeSwapId}`, 'info');
+          startCborTracking(swap.nativeSwapId);
         }
 
         if (swap.status === 'prepared') {
@@ -933,6 +645,10 @@ export async function CoinswapComponent(container, swapConfig) {
           if (logPollInterval) {
             clearInterval(logPollInterval);
             logPollInterval = null;
+          }
+          if (cborPollInterval) {
+            clearInterval(cborPollInterval);
+            cborPollInterval = null;
           }
 
           console.log('🎯 Swap completed! Report data:', swap.report);
@@ -951,6 +667,10 @@ export async function CoinswapComponent(container, swapConfig) {
           if (logPollInterval) {
             clearInterval(logPollInterval);
             logPollInterval = null;
+          }
+          if (cborPollInterval) {
+            clearInterval(cborPollInterval);
+            cborPollInterval = null;
           }
 
           if (content.dataset.failed === 'true') return;

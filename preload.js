@@ -36,9 +36,10 @@ contextBridge.exposeInMainWorld('api', {
     testTorConnection: (config) =>
       ipcRenderer.invoke('tor:testConnection', config),
     getProtocol: () => ipcRenderer.invoke('taker:getProtocol'),
-    setupLogging: (dataDir, level) => 
+    setupLogging: (dataDir, level) =>
       ipcRenderer.invoke('taker:setupLogging', { dataDir, level }),
-
+    getSwapProgress: (nativeSwapId) =>
+      ipcRenderer.invoke('taker:getSwapProgress', nativeSwapId),
   },
 
   // Coinswap operations
