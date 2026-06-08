@@ -8,6 +8,7 @@ function satsToBtc(sats) {
 }
 
 export function SwapReportComponent(container, swapReport, options = {}) {
+  const trackerInfo = options.trackerInfo || null;
   function normalizeProtocol(value, fallbackIsTaproot = false) {
     switch (value) {
       case 'v2':
@@ -70,6 +71,28 @@ export function SwapReportComponent(container, swapReport, options = {}) {
   };
 
   const nestedReport = swapReport.report || {};
+  const rawStatus =
+    swapReport.status ||
+    swapReport.reportStatus ||
+    swapReport.report_status ||
+    nestedReport.status ||
+    null;
+  const normalizedStatus = (() => {
+    const status = String(rawStatus || '').toLowerCase();
+    if (status === 'success' || status === 'completed') return 'completed';
+    if (status === 'failed' || status === 'failure' || status === 'error') {
+      return 'failed';
+    }
+    return status || 'completed';
+  })();
+  const errorMessage =
+    swapReport.errorMessage ||
+    swapReport.error_message ||
+    nestedReport.errorMessage ||
+    nestedReport.error_message ||
+    swapReport.error ||
+    nestedReport.error ||
+    null;
 
   const rawTotalMakerFees = toNumber(
     swapReport.totalMakerFees ??
@@ -305,6 +328,8 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     protocolVersion:
       swapReport.protocolVersion ||
       (protocol === 'Taproot' ? 2 : 1),
+    status: normalizedStatus,
+    errorMessage,
     outgoingContractTxid,
     incomingContractTxid,
     recoveryTxids,
@@ -891,6 +916,32 @@ export function SwapReportComponent(container, swapReport, options = {}) {
       .join('');
   }
 
+  const HANDSHAKE_STEPS = [
+    { key: 'negotiated', label: 'Negotiated' },
+    { key: 'connected', label: 'Connected' },
+    { key: 'contractDataSent', label: 'Contract sent' },
+    { key: 'makerContractReceived', label: 'Contract received' },
+    { key: 'swapcoinCreated', label: 'Swapcoin created' },
+    { key: 'privkeyReceived', label: 'Privkey received' },
+    { key: 'privkeyForwarded', label: 'Privkey forwarded' },
+  ];
+
+  function buildHandshakeHtml(progress) {
+    if (!progress) return '';
+    // Find the last completed step to detect where it broke
+    let lastDone = -1;
+    HANDSHAKE_STEPS.forEach((s, i) => { if (progress[s.key]) lastDone = i; });
+    return `
+      <div class="maker-handshake">
+        ${HANDSHAKE_STEPS.map((s, i) => {
+          const done = progress[s.key];
+          const broken = !done && i === lastDone + 1;
+          return `<span class="maker-handshake-step ${done ? 'done' : broken ? 'broken' : 'skip'}" title="${s.label}">${done ? icons.checkCircle(11) : broken ? icons.xCircle(11) : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>'}<small>${s.label}</small></span>`;
+        }).join('')}
+      </div>
+    `;
+  }
+
   // Build maker addresses HTML - Now clickable to show popup
   function buildMakersHtml() {
     if (!report.makerAddresses || report.makerAddresses.length === 0) {
@@ -899,12 +950,16 @@ export function SwapReportComponent(container, swapReport, options = {}) {
 
     return report.makerAddresses
       .map((addr, idx) => {
+        const progress = trackerInfo?.makerProgress?.[idx] || null;
         return `
-        <button class="maker-card swap-report-maker-row" data-maker-index="${idx}">
-          <span>Maker ${String(idx + 1).padStart(2, '0')}</span>
-          <strong>${truncateAddress(addr, 20, 18)}</strong>
-          <em>View ${icons.externalLink(12)}</em>
-        </button>
+        <div class="maker-card-wrap">
+          <button class="maker-card swap-report-maker-row" data-maker-index="${idx}">
+            <span>Maker ${String(idx + 1).padStart(2, '0')}</span>
+            <strong>${truncateAddress(addr, 20, 18)}</strong>
+            <em>View ${icons.externalLink(12)}</em>
+          </button>
+          ${isFailedReport && progress ? buildHandshakeHtml(progress) : ''}
+        </div>
       `;
       })
       .join('');
@@ -1255,23 +1310,38 @@ export function SwapReportComponent(container, swapReport, options = {}) {
   const makerCount = report.makersCount || report.makerAddresses.length;
   const displaySwapId = report.swapId || 'unknown';
   const displayAmount = report.totalOutputAmount || report.targetAmount;
+  const isFailedReport = report.status === 'failed';
+  const reportStatusLabel = isFailedReport ? 'Failed' : 'Completed';
 
   content.innerHTML = `
-    <div class="swap-report-page">
+    <div class="swap-report-page ${isFailedReport ? 'is-failed' : ''}">
       <header class="swap-report-head">
         <button id="report-back-btn" class="swap-report-head-back" type="button" aria-label="Back to swap">
           ${icons.arrowLeft(28)}
         </button>
         <div>
-          <h2>Swap <span>Completed</span></h2>
+          <h2>Swap <span>${reportStatusLabel}</span></h2>
         </div>
       </header>
 
       <div class="swap-report-layout">
         <section class="swap-report-main">
           <h3>Swap Summary</h3>
+          ${
+            isFailedReport && report.errorMessage
+              ? `
+                <div class="swap-report-error-banner">
+                  ${icons.alertTriangle(18)}
+                  <div>
+                    <strong>Failure reason${trackerInfo?.failedAtPhase ? ` <em class="swap-report-phase-badge">${escapeHtml(trackerInfo.failedAtPhase)}</em>` : ''}</strong>
+                    <span>${escapeHtml(trackerInfo?.failureReasonFormatted || report.errorMessage)}</span>
+                  </div>
+                </div>
+              `
+              : ''
+          }
           <div class="swap-report-hero">
-            <span>Amount Swapped</span>
+            <span>${isFailedReport ? 'Attempted Amount' : 'Amount Swapped'}</span>
             <strong>${formatNumber(displayAmount)} <small>丰</small></strong>
             <p>≈ ${satsToBtc(displayAmount)} BTC</p>
             <b>${icons.timer(15)} Duration ${formatDuration(report.swapDurationSeconds)}</b>
@@ -1286,6 +1356,13 @@ export function SwapReportComponent(container, swapReport, options = {}) {
               ${buildWalletOutputsHtml()}
             </div>
           </div>
+
+          ${isFailedReport && trackerInfo?.recoveryPhase === 'NotStarted' ? `
+          <div class="swap-report-recovery-callout">
+            ${icons.recycle(15)}
+            <span>Funds pending recovery — visit the <strong>Recovery</strong> page to track progress.</span>
+          </div>
+          ` : ''}
 
           <div class="swap-report-block">
             <div class="swap-report-block-head">

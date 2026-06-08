@@ -70,6 +70,27 @@ function getProtocolBadgeClasses(protocolLabel) {
   return 'is-legacy';
 }
 
+function normalizeStatus(value) {
+  const status = String(value || '').toLowerCase();
+  if (status === 'success' || status === 'completed') return 'completed';
+  if (status.startsWith('recovery')) return 'completed';
+  if (status === 'failed' || status === 'failure' || status === 'error') {
+    return 'failed';
+  }
+  return status || 'unknown';
+}
+
+function getStatusLabel(status) {
+  switch (normalizeStatus(status)) {
+    case 'completed':
+      return 'Completed';
+    case 'failed':
+      return 'Failed';
+    default:
+      return 'Unknown';
+  }
+}
+
 function normalizeSwapReport(report) {
   const nested = report.report || {};
   const toNumber = (value, fallback = 0) => {
@@ -137,6 +158,15 @@ function normalizeSwapReport(report) {
       : derivedTotalFee;
   const makersCount =
     nested.makersCount || nested.makers_count || report.makerCount || 0;
+  const status = normalizeStatus(report.status || nested.status);
+  const errorMessage =
+    report.errorMessage ||
+    report.error_message ||
+    nested.errorMessage ||
+    nested.error_message ||
+    report.error ||
+    nested.error ||
+    null;
 
   return {
     id: report.swapId || nested.swapId || `swap_${Date.now()}`,
@@ -181,7 +211,8 @@ function normalizeSwapReport(report) {
             0
           )
     ),
-    status: report.status || 'completed',
+    status,
+    errorMessage,
     protocol:
       report.protocol ||
       nested.protocol ||
@@ -206,7 +237,6 @@ export async function loadSwapHistory() {
     const result = await window.api.swapReports.getAll();
     if (result.success && result.reports) {
       swapHistory = result.reports
-        .filter((report) => report.status === 'completed') // ✅ Only show completed
         .map((report) => {
           const normalized = normalizeSwapReport(report);
           return {
@@ -220,6 +250,7 @@ export async function loadSwapHistory() {
             feePercentage: normalized.feePercentage,
             durationSeconds: normalized.durationSeconds,
             status: normalized.status,
+            errorMessage: normalized.errorMessage,
             protocol: normalized.protocol,
             report: normalized.report,
           };
@@ -239,16 +270,30 @@ export async function loadSwapHistory() {
 
 export function summarizeSwapHistory(history) {
   const totalSwaps = history.length;
-  const totalAmount = history.reduce(
+  const completedSwaps = history.filter(
+    (s) => normalizeStatus(s.status) === 'completed'
+  );
+  const failedSwaps = history.filter(
+    (s) => normalizeStatus(s.status) === 'failed'
+  );
+  const totalAmount = completedSwaps.reduce(
     (sum, s) => sum + (Number(s.amount) || 0),
     0
   );
-  const totalFees = history.reduce(
+  const totalFees = completedSwaps.reduce(
     (sum, s) => sum + (Number(s.totalFee) || 0),
     0
   );
-  const avgFeePaid = totalSwaps > 0 ? Math.round(totalFees / totalSwaps) : 0;
-  return { totalSwaps, totalAmount, totalFees, avgFeePaid };
+  const avgFeePaid =
+    completedSwaps.length > 0 ? Math.round(totalFees / completedSwaps.length) : 0;
+  return {
+    totalSwaps,
+    completedSwaps: completedSwaps.length,
+    failedSwaps: failedSwaps.length,
+    totalAmount,
+    totalFees,
+    avgFeePaid,
+  };
 }
 
 export function buildSwapHistoryMarkup(history) {
@@ -257,7 +302,7 @@ export function buildSwapHistoryMarkup(history) {
       <div class="swap-reports-empty">
         <div>${icons.fileText(42)}</div>
         <h3>No swap reports</h3>
-        <p>Completed swap reports will appear here.</p>
+        <p>Completed and failed swap reports will appear here.</p>
       </div>
     `;
   }
@@ -272,23 +317,35 @@ export function buildSwapHistoryMarkup(history) {
           const totalFee = Number(swap.totalFee) || 0;
           const protocolLabel = getProtocolLabel(swap);
           const protocolClasses = getProtocolBadgeClasses(protocolLabel);
+          const status = normalizeStatus(swap.status);
+          const statusLabel = getStatusLabel(status);
+          const statusClasses =
+            status === 'failed'
+              ? 'swap-report-status failed'
+              : 'swap-report-status completed';
+          const displayedOutputAmount =
+            status === 'failed' ? 0 : totalOutputAmount;
           const timeAgo = Number.isFinite(swap.completedAt)
             ? formatRelativeTime(swap.completedAt)
             : 'Unknown time';
           const dateStr = formatDate(swap.completedAt);
           const duration = formatDuration(swap.durationSeconds);
+          const errorMessage = swap.errorMessage
+            ? `<p class="swap-report-row-error">${escapeHtml(swap.errorMessage)}</p>`
+            : '';
 
           return `
-          <button class="swap-report-list-row" data-swap-id="${escapeHtml(swap.id)}" type="button">
+          <button class="swap-report-list-row ${status === 'failed' ? 'is-failed' : ''}" data-swap-id="${escapeHtml(swap.id)}" type="button">
             <div class="swap-report-row-main">
-              <span class="swap-report-row-icon">${icons.fileText(20)}</span>
+              <span class="swap-report-row-icon">${status === 'failed' ? icons.xCircle(20) : icons.fileText(20)}</span>
               <div>
                 <strong>Swap ${escapeHtml(String(swap.id).slice(0, 10))}</strong>
                 <p>${timeAgo} · ${dateStr} · ${duration}</p>
+                ${errorMessage}
               </div>
             </div>
             <div class="swap-report-row-badges">
-              <span>Completed</span>
+              <span class="${statusClasses}">${statusLabel}</span>
               <span>${swap.hops} hops</span>
               <span class="${protocolClasses}">${protocolLabel}</span>
             </div>
@@ -307,7 +364,7 @@ export function buildSwapHistoryMarkup(history) {
               </div>
               <div>
                 <span>Output</span>
-                <strong>${formatSats(totalOutputAmount)}</strong>
+                <strong>${formatSats(displayedOutputAmount)}</strong>
               </div>
             </div>
             <em>${icons.externalLink(16)}</em>
@@ -352,6 +409,7 @@ export async function SwapHistoryComponent(container) {
           };
           module.SwapReportComponent(container, fullReport, {
             backTarget: 'swapReports',
+            trackerInfo: result.trackerInfo || null,
           });
         });
       } else {
@@ -366,12 +424,19 @@ export async function SwapHistoryComponent(container) {
 
   // Calculate stats
   const totalSwaps = swapHistory.length;
-  const totalVolume = swapHistory.reduce((sum, s) => sum + (s.amount || 0), 0);
-  const totalFees = swapHistory.reduce((sum, s) => sum + (s.totalFee || 0), 0);
+  const completedSwaps = swapHistory.filter(
+    (s) => normalizeStatus(s.status) === 'completed'
+  );
+  const failedSwaps = swapHistory.filter(
+    (s) => normalizeStatus(s.status) === 'failed'
+  );
+  const totalVolume = completedSwaps.reduce((sum, s) => sum + (s.amount || 0), 0);
+  const totalFees = completedSwaps.reduce((sum, s) => sum + (s.totalFee || 0), 0);
   const avgHops =
-    totalSwaps > 0
+    completedSwaps.length > 0
       ? (
-          swapHistory.reduce((sum, s) => sum + (s.hops || 0), 0) / totalSwaps
+          completedSwaps.reduce((sum, s) => sum + (s.hops || 0), 0) /
+          completedSwaps.length
         ).toFixed(1)
       : 0;
 
@@ -380,7 +445,7 @@ export async function SwapHistoryComponent(container) {
       <header class="swap-reports-head">
         <div>
           <h2>Swap Reports</h2>
-          <p>Review completed coinswap reports and fee details.</p>
+          <p>Review completed and failed coinswap reports, makers, and fee details.</p>
         </div>
         <button id="back-to-swap" class="swap-reports-back" type="button">
           ${icons.arrowLeft(17)} Back
@@ -394,6 +459,10 @@ export async function SwapHistoryComponent(container) {
           <div>
             <span>Total reports</span>
             <strong>${totalSwaps}</strong>
+          </div>
+          <div>
+            <span>Failed</span>
+            <strong>${failedSwaps.length}</strong>
           </div>
           <div>
             <span>Total volume</span>

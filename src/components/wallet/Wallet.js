@@ -1,4 +1,5 @@
 import { formatSats } from '../../js/price.js';
+import { icons } from '../../js/icons.js';
 
 const WALLET_CACHE_KEY = 'wallet_data_cache';
 
@@ -256,9 +257,7 @@ export async function WalletComponent(container) {
               ${compactId(utxo.address || 'No address', 10, 6)}
             </span>
             <span class="app-icon-action" aria-label="Open transaction">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 17L17 7M9 7h8v8" />
-              </svg>
+              ${icons.externalLink(18)}
             </span>
           </button>
         `;
@@ -314,10 +313,14 @@ export async function WalletComponent(container) {
         const timestamp = tx.info?.time || tx.info?.timereceived;
         const directionClass = isReceive ? 'in' : 'out';
         const amountPrefix = amount >= 0 ? '+' : '-';
+        const directionIcon = isReceive
+          ? icons.arrowDownLeft(20)
+          : icons.arrowUpRight(20);
+        const directionLabel = isReceive ? 'Incoming' : 'Outgoing';
 
         return `
           <button class="app-tx-row ${directionClass}" data-txid="${txid || ''}" type="button">
-            <span class="app-tx-icon">${isReceive ? '+' : '-'}</span>
+            <span class="app-tx-icon" aria-label="${directionLabel}" title="${directionLabel} transaction">${directionIcon}</span>
             <span class="app-tx-mid">
               <span class="app-mono app-id">${compactId(txid, 16, 8)}</span>
               <span class="app-tx-meta">
@@ -329,10 +332,8 @@ export async function WalletComponent(container) {
               <span class="app-amount ${isReceive ? 'positive' : 'negative'}">${amountPrefix}${formatSats(Math.abs(amount))}</span>
               <span class="app-time">${formatDate(timestamp)}</span>
             </span>
-            <span class="app-icon-action" aria-label="Open transaction">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M7 17L17 7M9 7h8v8" />
-              </svg>
+            <span class="app-icon-action" aria-label="Open transaction" title="View on mempool">
+              ${icons.externalLink(18)}
             </span>
           </button>
         `;
@@ -372,20 +373,12 @@ export async function WalletComponent(container) {
     const balance = await fetchBalance();
     const regular = Number(balance.regular || 0);
     const swap = Number(balance.swap || 0);
-    const swappable = Math.max(regular, swap);
-    const total =
-      regular +
-      swap +
-      Number(balance.contract || 0);
-    const share = total > 0 ? Math.min(100, (swappable / total) * 100) : 0;
+    const totalBalance = regular + swap;
 
-    renderSatsAmount('#spendable-balance', swappable);
+    renderSatsAmount('#spendable-balance', totalBalance);
     renderSatsAmount('#swap-balance', balance.swap);
     renderSatsAmount('#regular-balance', balance.regular);
     renderSatsAmount('#contract-balance', balance.contract);
-    content.querySelector('#balance-share').textContent =
-      `${share.toFixed(1)}%`;
-    content.querySelector('#balance-share-bar').style.width = `${share}%`;
 
     return balance;
   }
@@ -499,32 +492,27 @@ export async function WalletComponent(container) {
     <section class="app-balances" aria-label="Wallet balances">
       <article class="app-balance-card hero">
         <span class="app-accent"></span>
-        <span class="app-card-label">Swappable</span>
+        <span class="app-card-label">Total Balance</span>
         <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
-        <p>Highest Regular/Swap bucket</p>
-        <div class="app-share">
-          <span id="balance-share">0.0%</span>
-          <span class="app-share-track"><span id="balance-share-bar"></span></span>
-          <span>of total</span>
-        </div>
+        <p>Swap + Regular Coins</p>
       </article>
       <article class="app-balance-card info">
         <span class="app-accent"></span>
         <span class="app-card-label">Swaps</span>
         <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
-        <p>Reserved for swaps</p>
+        <p>Coins Received by swap txs</p>
       </article>
       <article class="app-balance-card wallet">
         <span class="app-accent"></span>
         <span class="app-card-label">Regular</span>
         <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
-        <p>Regular coins</p>
+        <p>Coins Received by regular txs</p>
       </article>
       <article class="app-balance-card warning">
         <span class="app-accent"></span>
         <span class="app-card-label">Contracts</span>
         <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
-        <p>In active contracts</p>
+        <p>Coins stuck in HTLC</p>
       </article>
     </section>
 

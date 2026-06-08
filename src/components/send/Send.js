@@ -37,6 +37,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
   let availableUtxos = [];
   let availableBalance = 0;
+  let previouslyUsedAddresses = new Set();
 
   function getUtxoKind(utxo) {
     return String(utxo?.type || '').toLowerCase().includes('swap')
@@ -116,6 +117,33 @@ export function SendComponent(container, preSelectedUtxos = null) {
     }
   }
 
+  async function fetchPreviouslyUsedAddresses() {
+    try {
+      const result = await window.api.taker.getTransactions(200, 0);
+      if (!result.success || !Array.isArray(result.transactions)) return;
+
+      previouslyUsedAddresses = new Set(
+        result.transactions
+          .map((tx) => tx.detail?.address?.address || tx.detail?.address)
+          .filter(Boolean)
+          .map((address) => String(address).trim())
+      );
+      updateAddressReuseWarning();
+    } catch (error) {
+      console.warn('Failed to check address reuse history:', error);
+    }
+  }
+
+  function updateAddressReuseWarning() {
+    const warning = content.querySelector('#address-reuse-warning');
+    if (!warning) return;
+
+    const hasReusedAddress = recipients.some((recipient) =>
+      previouslyUsedAddresses.has(String(recipient.address || '').trim())
+    );
+    warning.classList.toggle('hidden', !hasReusedAddress);
+  }
+
   // VALIDATION
   function validateTransaction() {
     const errors = [];
@@ -137,24 +165,33 @@ export function SendComponent(container, preSelectedUtxos = null) {
         return { valid: false, errors };
       }
       availableForSpending = getSelectedUtxosTotal();
-      totalAmount = availableForSpending; // In manual mode, we send the UTXO total
     } else {
       // Auto mode
-      totalAmount = getTotalAmountToSend();
       availableForSpending = availableBalance;
-
-      // Check for negative amounts
-      recipients.forEach((r, i) => {
-        if (r.amount < 0) {
-          errors.push(`Recipient ${i + 1} has negative amount`);
-        }
-      });
-
-      if (totalAmount <= 0) {
-        errors.push('Enter an amount to send');
-        return { valid: false, errors };
-      }
     }
+
+    totalAmount = validRecipients.reduce(
+      (sum, recipient) => sum + (recipient.amount || 0),
+      0
+    );
+
+    // Check for negative amounts
+    recipients.forEach((r, i) => {
+      if (r.amount < 0) {
+        errors.push(`Recipient ${i + 1} has negative amount`);
+      }
+    });
+
+    if (totalAmount <= 0) {
+      errors.push('Enter an amount to send');
+      return { valid: false, errors };
+    }
+
+    validRecipients.forEach((recipient, index) => {
+      if (!recipient.amount || recipient.amount <= 0) {
+        errors.push(`Recipient ${index + 1} needs an amount`);
+      }
+    });
 
     // Check if sufficient balance (amount doesn't include fee in calculation)
     const numInputs =
@@ -165,22 +202,16 @@ export function SendComponent(container, preSelectedUtxos = null) {
     );
     const estimatedFee = selectedFeeRate * estimatedTxSize;
 
-    // In manual mode, fee comes from selected UTXOs
-    // In auto mode, fee comes from total balance
-    if (selectionMode === 'manual') {
-      // Selected UTXOs must cover fee (we'll send UTXO total minus fee)
-      if (availableForSpending < estimatedFee) {
-        errors.push(
-          `Selected UTXOs (${availableForSpending} 丰) can't cover fee (${estimatedFee} 丰)`
-        );
-      }
-    } else {
-      // Must have enough to cover amount + fee
-      const total = totalAmount + estimatedFee;
-      if (total > availableForSpending) {
-        const shortfall = total - availableForSpending;
-        errors.push(`Need ${shortfall.toLocaleString()} more 丰`);
-      }
+    const total = totalAmount + estimatedFee;
+    if (selectionMode === 'manual' && totalAmount > availableForSpending) {
+      errors.push(
+        `Amount (${Math.floor(totalAmount).toLocaleString()} 丰) exceeds selected UTXOs (${availableForSpending.toLocaleString()} 丰)`
+      );
+    }
+
+    if (total > availableForSpending) {
+      const shortfall = total - availableForSpending;
+      errors.push(`Need ${shortfall.toLocaleString()} more 丰`);
     }
 
     return { valid: errors.length === 0, errors };
@@ -278,37 +309,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
     if (secondaryEl) secondaryEl.textContent = secondary;
   }
 
-  function setAmountToUtxoMinusFees(index) {
-    if (selectionMode !== 'manual' || selectedUtxos.length === 0) return;
-
-    const utxoTotal = getSelectedUtxosTotal();
-    const numInputs = selectedUtxos.length;
-    const numOutputs = 1;
-    const estimatedTxSize = Math.ceil(10.5 + 68 * numInputs + 31 * numOutputs);
-    const estimatedFee = selectedFeeRate * estimatedTxSize;
-    const amountToSend = Math.max(0, utxoTotal - estimatedFee);
-
-    recipients[index].amount = amountToSend;
-
-    const input = content.querySelector(
-      `.recipient-amount[data-index="${index}"]`
-    );
-    if (input) {
-      if (amountUnit === 'sats') {
-        input.value = amountToSend;
-      } else if (amountUnit === 'btc') {
-        input.value = (amountToSend / 100000000).toFixed(8);
-      } else if (amountUnit === 'usd' && hasUsdPrice()) {
-        input.value = ((amountToSend / 100000000) * btcPrice).toFixed(2);
-      } else if (amountUnit === 'usd') {
-        input.value = '';
-      }
-    }
-
-    updateRecipientConversions(index);
-    updateSummary();
-  }
-
   function renderRecipients() {
     const container = content.querySelector('#recipients-container');
     if (!container) return;
@@ -317,7 +317,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     container.innerHTML = recipients
       .map((recipient, index) => {
-        const showAmountInput = selectionMode === 'auto';
         const hasAddress = Boolean(recipient.address);
         const normalizedAddress = recipient.address.toLowerCase();
         const addressType =
@@ -382,9 +381,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
           />
         </div>
 
-        ${
-          showAmountInput
-            ? `
         <div class="send-field amount">
           <div class="send-field-row">
             <label>Amount</label>
@@ -417,25 +413,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <span id="recipient-${index}-conversion-secondary">$0.00 USD</span>
           </div>
         </div>
-        `
-            : `
-        <div class="send-field amount">
-          <div class="send-field-row">
-            <label>Amount from selected UTXOs</label>
-            <button class="use-utxo-minus-fees" type="button" data-index="${index}">
-              UTXO - Fees
-            </button>
-          </div>
-          <div class="send-static-amount">
-            <strong>${getSelectedUtxosTotal().toLocaleString()} 丰</strong>
-            <div>
-              <span>= ${(getSelectedUtxosTotal() / 100000000).toFixed(8)} BTC</span>
-              <span>${hasUsdPrice() ? `$${((getSelectedUtxosTotal() / 100000000) * btcPrice).toFixed(2)} USD` : 'USD price unavailable'}</span>
-            </div>
-          </div>
-        </div>
-        `
-        }
       </div>
     `;
       })
@@ -446,6 +423,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
       input.addEventListener('input', (e) => {
         const index = parseInt(e.target.dataset.index);
         updateRecipient(index, 'address', e.target.value.trim());
+        updateAddressReuseWarning();
       });
     });
 
@@ -488,14 +466,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
       });
     });
 
-    // UTXO minus fees button
-    container.querySelectorAll('.use-utxo-minus-fees').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        const index = parseInt(e.target.dataset.index);
-        setAmountToUtxoMinusFees(index);
-      });
-    });
-
     // Update conversions
     recipients.forEach((_, index) => {
       updateRecipientConversions(index);
@@ -514,9 +484,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     if (mode === 'manual') {
       if (manualSection) manualSection.classList.remove('hidden');
-      recipients.forEach((r, i) => {
-        r.amount = 0;
-      });
     } else {
       if (manualSection) manualSection.classList.add('hidden');
       selectedUtxos = [];
@@ -692,11 +659,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
   }
 
   function getTotalAmountToSend() {
-    if (selectionMode === 'manual') {
-      // In manual mode, we send the selected UTXO total (fee will be deducted)
-      return getSelectedUtxosTotal();
-    }
-    // In auto mode, use recipient amounts
     return recipients.reduce((sum, r) => sum + (r.amount || 0), 0);
   }
 
@@ -727,7 +689,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     const displayFee = signedTx ? actualFee : estimatedFee;
     const displayTxSize = signedTx ? actualTxSize : estimatedTxSize;
-    const displayTotal = signedTx ? amountSats + actualFee : total;
     const displayRemaining = signedTx
       ? availableForSpending - amountSats - actualFee
       : remaining;
@@ -747,41 +708,26 @@ export function SendComponent(container, preSelectedUtxos = null) {
     const summaryAmount = content.querySelector('#summary-amount');
     const summaryFeeRate = content.querySelector('#summary-fee-rate');
     const summaryFee = content.querySelector('#summary-fee');
-    const summaryTotal = content.querySelector('#summary-total');
-    const summaryTotalUsd = content.querySelector('#summary-total-usd');
-    const summaryRemaining = content.querySelector('#summary-remaining');
-    const summaryRemainingDetail = content.querySelector(
-      '#summary-remaining-detail'
-    );
+    const summaryInputValue = content.querySelector('#summary-input-value');
 
     if (summaryAmount)
       summaryAmount.textContent =
-        Math.floor(amountSats).toLocaleString() +
-        ' 丰' +
-        (signedTx ? '' : ' (est)');
+        Math.floor(amountSats).toLocaleString() + ' 丰';
     if (summaryFeeRate) summaryFeeRate.textContent = selectedFeeRate;
     if (summaryFee)
       summaryFee.textContent =
         (signedTx ? '' : '~') + displayFee.toLocaleString() + ' 丰';
-    if (summaryTotal)
-      summaryTotal.textContent =
-        Math.floor(displayTotal).toLocaleString() + ' 丰';
-    if (summaryTotalUsd)
-      summaryTotalUsd.textContent = hasUsdPrice()
-        ? '= $' + ((displayTotal * btcPrice) / 100000000).toFixed(2)
-        : 'USD price unavailable';
+    if (summaryInputValue) {
+      summaryInputValue.textContent =
+        `${numInputs} / ${availableForSpending.toLocaleString()} 丰`;
+    }
 
     // Technical details
     const txSizeEl = content.querySelector('#tx-size');
-    const txInputsEl = content.querySelector('#tx-inputs');
-    const txOutputsEl = content.querySelector('#tx-outputs');
     const changeAmountEl = content.querySelector('#change-amount');
     const summaryEtaEl = content.querySelector('#summary-eta');
 
-    if (txSizeEl)
-      txSizeEl.textContent = displayTxSize + ' vB' + (signedTx ? '' : ' (est)');
-    if (txInputsEl) txInputsEl.textContent = numInputs;
-    if (txOutputsEl) txOutputsEl.textContent = numOutputs;
+    if (txSizeEl) txSizeEl.textContent = displayTxSize + ' vB';
     if (summaryEtaEl) summaryEtaEl.textContent = `ETA ${confTime}`;
 
     // Show change amount in red if negative
@@ -794,18 +740,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
         changeAmountEl.classList.add('text-purple-400');
         changeAmountEl.classList.remove('text-red-400');
       }
-    }
-
-    if (summaryRemaining)
-      summaryRemaining.textContent =
-        Math.floor(displayRemaining).toLocaleString() + ' 丰';
-    const remainingBtc = displayRemaining / 100000000;
-    const remainingUsd = hasUsdPrice() ? remainingBtc * btcPrice : null;
-    if (summaryRemainingDetail) {
-      summaryRemainingDetail.textContent =
-        remainingBtc.toFixed(8) +
-        ' BTC' +
-        (remainingUsd == null ? '' : ' - $' + remainingUsd.toFixed(2));
     }
 
     // Update available balance
@@ -889,26 +823,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
     try {
       const txids = [];
 
-      // Calculate amount to send
-      let amountToSend = 0;
-      if (selectionMode === 'manual') {
-        // In manual mode: UTXO total minus fee, split among recipients
-        const utxoTotal = getSelectedUtxosTotal();
-        const numInputs = selectedUtxos.length;
-        const numOutputs = recipients.filter((r) => r.address).length;
-        const estimatedTxSize = Math.ceil(
-          10.5 + 68 * numInputs + 31 * numOutputs
-        );
-        const estimatedFee = selectedFeeRate * estimatedTxSize;
-        const totalToSend = Math.max(0, utxoTotal - estimatedFee);
-        amountToSend = Math.floor(totalToSend / numOutputs);
-      }
-
       for (const recipient of recipients) {
         if (!recipient.address) continue;
 
-        const amount =
-          selectionMode === 'manual' ? amountToSend : recipient.amount;
+        const amount = recipient.amount;
         if (amount <= 0) continue;
 
         let manuallySelectedOutpoints = null;
@@ -1024,12 +942,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <p class="send-subtitle">Send BTC to one or multiple Bitcoin addresses</p>
         </div>
         <div class="app-actions">
-          <button class="app-button ghost" type="button">${icons.search(16)} Scan QR</button>
           <button class="app-button ghost" type="button" id="refresh-send-btn">${icons.refreshCw(16)} Refresh</button>
         </div>
       </div>
 
-      <div class="send-warning">
+      <div id="address-reuse-warning" class="send-warning hidden">
         ${icons.alertTriangle(17)}
         <span><strong>You've sent to this address before!</strong> Reusing addresses reduces privacy. Ask the recipient for a fresh address.</span>
       </div>
@@ -1145,28 +1062,21 @@ export function SendComponent(container, preSelectedUtxos = null) {
                 <strong id="summary-amount">0 丰</strong>
               </div>
               <div class="send-summary-line">
+                <span>Inputs</span>
+                <strong id="summary-input-value">1 / 0 丰</strong>
+              </div>
+              <div class="send-summary-line">
+                <span>TX Size (est)</span>
+                <strong id="tx-size">140 vB</strong>
+              </div>
+              <div class="send-summary-line">
                 <span>Network Fee (<b id="summary-fee-rate">2</b> 丰/vB)</span>
                 <strong id="summary-fee">~280 丰</strong>
               </div>
-              <div class="send-summary-line total">
-                <span>Total Sent</span>
-                <strong id="summary-total">280 丰</strong>
+              <div class="send-summary-line">
+                <span>Change Amount</span>
+                <strong id="change-amount">0 丰</strong>
               </div>
-              <p id="summary-total-usd" class="send-summary-usd">= $0.00 USD</p>
-            </div>
-            <div class="send-summary-tech">
-              <div><span>TX Size</span><strong id="tx-size">140 vB</strong></div>
-              <div><span>Inputs</span><strong id="tx-inputs">1</strong></div>
-              <div><span>Outputs</span><strong id="tx-outputs">1</strong></div>
-            </div>
-            <div class="send-change-row">
-              <span>Change Amount</span>
-              <strong id="change-amount">0 丰</strong>
-            </div>
-            <div class="send-remaining">
-              <span>Remaining Balance</span>
-              <strong id="summary-remaining">0 丰</strong>
-              <small id="summary-remaining-detail">0.00000000 BTC - $0.00</small>
             </div>
           </section>
 
@@ -1227,4 +1137,5 @@ export function SendComponent(container, preSelectedUtxos = null) {
   // Initialize
   renderRecipients();
   fetchUtxosFromAPI();
+  fetchPreviouslyUsedAddresses();
 }

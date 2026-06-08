@@ -62,10 +62,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-glow-3 { position: absolute; right: -10%; top: 30%; width: 500px; height: 500px; border-radius: 50%; background: radial-gradient(closest-side, rgba(81,141,239,0.10), transparent 70%); filter: blur(60px); }
       #setup-modal .setup-grain { position: fixed; inset: 0; pointer-events: none; z-index: 1; opacity: 0.05; mix-blend-mode: overlay; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
       #setup-modal .setup-shell { position: relative; z-index: 2; width: min(1080px, 100%); max-height: 92vh; overflow-y: auto; border-radius: 32px; background: #101014; border: 1px solid var(--setup-border); box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 40px 120px -20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.02); }
-      #setup-modal .setup-titlebar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--setup-border); position: relative; }
-      #setup-modal .setup-traffic { display: flex; gap: 8px; align-items: center; }
-      #setup-modal .setup-traffic span { width: 11px; height: 11px; border-radius: 50%; background: rgba(255,255,255,0.10); display: block; }
-      #setup-modal .setup-traffic span:first-child { background: #ff5f57; box-shadow: 0 0 0 0.5px rgba(0,0,0,0.2); }
+      #setup-modal .setup-titlebar { display: flex; align-items: center; justify-content: flex-end; padding: 14px 20px; border-bottom: 1px solid var(--setup-border); position: relative; }
       #setup-modal .setup-titlebar-name { font-size: 12px; color: var(--setup-text-3); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); }
       #setup-modal .setup-titlebar-right { font-size: 11px; color: var(--setup-text-3); font-family: ui-monospace, 'SF Mono', Menlo, Monaco, Consolas, monospace; letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
       #setup-modal .setup-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--setup-primary); box-shadow: 0 0 10px var(--setup-primary); }
@@ -145,7 +142,6 @@ export function FirstTimeSetupModal(container, onComplete) {
 
     <div class="setup-shell">
       <div class="setup-titlebar">
-        <div class="setup-traffic"><span></span><span></span><span></span></div>
         <div class="setup-titlebar-name">Coinswap · Taker</div>
         <div class="setup-titlebar-right"><span class="setup-dot"></span>Onboarding</div>
       </div>
@@ -1473,6 +1469,19 @@ export function FirstTimeSetupModal(container, onComplete) {
         modal.remove();
         if (onComplete) onComplete(config);
       }
+    });
+
+    [
+      '#create-password',
+      '#create-password-confirm',
+      '#load-password',
+      '#restore-password',
+    ].forEach((selector) => {
+      modal.querySelector(selector)?.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        if (!nextBtn.disabled) nextBtn.click();
+      });
     });
   }
 
