@@ -7,6 +7,7 @@
     "start": "node scripts/start-with-tor.js",
     "start:electron": "electron .",
     "dev": "concurrently \"npm run tailwind:watch\" \"npm run start\"",
+    "build:tor-manager": "cargo build --manifest-path tor-manager/Cargo.toml --quiet",
     "tor:ensure": "cargo run --manifest-path tor-manager/Cargo.toml --quiet",
     "tailwind:watch": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css --watch",
     "build:css": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css",
@@ -17,7 +18,7 @@
     "prebuild:electron": "node prepare-dist.js",
     "build:electron": "electron-builder",
     "postbuild:electron": "node postbuild-dist.js",
-    "dist": "node prepare-dist.js && npm run build && npm run build:electron && node postbuild-dist.js"
+    "dist": "node prepare-dist.js && npm run build:tor-manager && npm run build && npm run build:electron && node postbuild-dist.js"
   },
   "build": {
     "appId": "com.citadel.coinswap-taker",

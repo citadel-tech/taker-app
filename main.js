@@ -1,6 +1,7 @@
 const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const { registerAPI1, api1State } = require('./api1');
 
 console.log('MAIN.JS __dirname:', __dirname);
@@ -17,6 +18,54 @@ try {
     watchRenderer: true,
   });
 } catch (_) {}
+
+let torManager = null;
+
+function startManagedTor() {
+  if (process.env.COINSWAP_DISABLE_MANAGED_TOR === '1') {
+    console.log('[tor-manager] Managed Tor startup disabled by environment');
+    return;
+  }
+
+  const torManagerPath = path.join(
+    __dirname,
+    'tor-manager',
+    'target',
+    'debug',
+    process.platform === 'win32'
+      ? 'coinswap-tor-manager.exe'
+      : 'coinswap-tor-manager'
+  );
+
+  if (!fs.existsSync(torManagerPath)) {
+    console.warn(
+      `[tor-manager] ${torManagerPath} not found; Tor will not be auto-started`
+    );
+    return;
+  }
+
+  console.log('[tor-manager] Starting:', torManagerPath);
+  torManager = spawn(torManagerPath, [], {
+    stdio: 'inherit',
+    windowsHide: true,
+  });
+
+  torManager.on('error', (error) => {
+    console.error('[tor-manager] failed to start:', error);
+    torManager = null;
+  });
+
+  torManager.on('exit', (code) => {
+    if (code) {
+      console.warn(`[tor-manager] exited with code ${code}`);
+    }
+    torManager = null;
+  });
+}
+
+function stopManagedTor() {
+  if (torManager && torManager.exitCode === null) torManager.kill();
+}
 
 /**
  * Create the main application window
@@ -72,10 +121,16 @@ function createWindow() {
 app.whenReady().then(async () => {
   console.log('🚀 Electron app starting...');
 
+  startManagedTor();
+
   // Register API v1 handlers
   registerAPI1();
 
   createWindow();
+});
+
+app.on('before-quit', () => {
+  stopManagedTor();
 });
 
 app.on('window-all-closed', () => {
