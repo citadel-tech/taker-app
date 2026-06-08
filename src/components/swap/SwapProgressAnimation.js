@@ -72,7 +72,8 @@ function phaseForStatus(statusText, tone) {
 }
 
 function phaseRank(phase) {
-  if (phase === 'failed') return 4;
+  if (phase === 'failed') return 5;
+  if (phase === 'complete') return 4;
   if (phase === 'settlement') return 3;
   if (phase === 'contract') return 2;
   if (phase === 'handshake') return 1;
@@ -312,6 +313,7 @@ export function createSwapProgressAnimation(stage, options = {}) {
     setComplete() {
       state.failed = false;
       updatePhase({ title: 'Settlement', phase: 'settlement' });
+      updatePhase({ title: 'Swap Complete', phase: 'complete' });
       stage.querySelectorAll('.route-node.maker').forEach((node, index) => {
         setNodeState(node, 'Complete', 'settled', `maker-${index}`);
       });

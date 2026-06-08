@@ -395,6 +395,22 @@ export function Market(container) {
     setTimeout(() => errorDiv.remove(), 5000);
   }
 
+  function showSuccess(message) {
+    const div = document.createElement('div');
+    div.className = 'market-toast-success';
+    div.innerHTML = `
+      <div>
+        ${icons.checkCircle(20)}
+        <div>
+          <strong>Success</strong>
+          <span>${message}</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(div);
+    setTimeout(() => div.remove(), 4000);
+  }
+
   function calculateStats() {
     const goodMakers = makers.filter((m) => m.status === 'good');
     const totalLiquidity = goodMakers.reduce((sum, m) => sum + m.maxSize, 0);
@@ -801,21 +817,23 @@ export function Market(container) {
           <div id="market-active-summary" class="app-meta">0 good offers</div>
         </div>
 
-        <div class="market-table-header">
-          <div>Tor Address</div>
-          <div>Base Fee</div>
-          <div>Liquidity Fee</div>
-          <div>Time Rate</div>
-          <div>Min Swap</div>
-          <div>Max Swap</div>
-          <div>Fidelity Bond</div>
-          <div>Actions</div>
-        </div>
+        <div class="market-table-scroll">
+          <div class="market-table-header">
+            <div>Tor Address</div>
+            <div>Base Fee</div>
+            <div>Liquidity Fee</div>
+            <div>Time Rate</div>
+            <div>Min Swap</div>
+            <div>Max Swap</div>
+            <div>Fidelity Bond</div>
+            <div>Actions</div>
+          </div>
 
-        <div id="maker-table-body" class="market-table-body">
-          <div class="market-empty-state">
-            ${icons.loader(42, 'animate-spin')}
-            <strong>Loading makers...</strong>
+          <div id="maker-table-body" class="market-table-body">
+            <div class="market-empty-state">
+              ${icons.loader(42, 'animate-spin')}
+              <strong>Loading makers...</strong>
+            </div>
           </div>
         </div>
 
@@ -857,20 +875,36 @@ export function Market(container) {
 
     if (pollBtn) {
       const address = pollBtn.dataset.makerPoll;
-      const original = pollBtn.innerHTML;
       pollBtn.disabled = true;
       pollBtn.innerHTML = 'Polling...';
       try {
         const res = await window.api.taker.pollMaker(address);
         if (!res.success) throw new Error(res.error || 'Poll failed');
-        console.log('Poll result:', res.maker);
-        await fetchMakers();
+
+        // pollMakerAsync never writes offerbook.json, so re-reading from disk
+        // would return stale data. Merge the normalized maker directly into the
+        // in-memory array so the UI reflects the fresh poll result immediately.
+        if (res.maker) {
+          const newStatus = (res.maker.stateType || 'Good').toLowerCase();
+          const existingIdx = makers.findIndex((m) => m.address === address);
+          if (existingIdx >= 0) {
+            const fresh = {
+              ...transformMaker(res.maker, makers[existingIdx].index),
+              status: newStatus,
+            };
+            makers[existingIdx] = fresh;
+          } else {
+            makers.push({ ...transformMaker(res.maker, makers.length), status: newStatus });
+          }
+        }
+
         updateUI();
+        showSuccess(`Maker responded with a fresh offer. Offerbook updated.`);
       } catch (err) {
         console.error('Poll failed:', err);
         showError(`Poll failed: ${err.message}`);
         pollBtn.disabled = false;
-        pollBtn.innerHTML = original;
+        pollBtn.innerHTML = 'Poll';
       }
       return;
     }

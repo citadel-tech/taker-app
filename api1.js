@@ -2249,7 +2249,52 @@ function registerTakerHandlers() {
       }
       console.log(`🎯 [pollMaker] ${address}`);
       const candidate = await api1State.takerInstance.pollMakerAsync(address);
-      return { success: true, maker: candidate };
+
+      // Normalize NAPI candidate into the same format getOffers returns so the
+      // renderer can merge it into the in-memory makers array without a disk read.
+      // pollMakerAsync uses OfferSyncClient directly and never writes offerbook.json,
+      // so re-reading the file would return stale data.
+      const candidateAddress = candidate.address?.address || address;
+      const stateType = candidate.state?.stateType || 'Good';
+
+      let normalizedOffer = null;
+      if (candidate.offer) {
+        const fid = candidate.offer.fidelity || {};
+        const bond = fid.bond || {};
+        const rawOutpoint = bond.outpoint;
+        const outpointStr =
+          rawOutpoint && typeof rawOutpoint === 'object'
+            ? `${rawOutpoint.txid}:${rawOutpoint.vout}`
+            : rawOutpoint || '';
+
+        normalizedOffer = {
+          baseFee: candidate.offer.baseFee,
+          amountRelativeFeePct: candidate.offer.amountRelativeFeePct,
+          timeRelativeFeePct: candidate.offer.timeRelativeFeePct,
+          requiredConfirms: candidate.offer.requiredConfirms,
+          minimumLocktime: candidate.offer.minimumLocktime,
+          maxSize: candidate.offer.maxSize,
+          minSize: candidate.offer.minSize,
+          fidelity: {
+            bond: {
+              outpoint: outpointStr,
+              amount: bond.amount || 0,
+              lock_time: bond.lockTime || 0,
+              is_spent: bond.isSpent || false,
+            },
+          },
+        };
+      }
+
+      return {
+        success: true,
+        maker: {
+          address: candidateAddress,
+          protocol: candidate.protocol?.protocolType || null,
+          offer: normalizedOffer,
+          stateType,
+        },
+      };
     } catch (error) {
       console.error('❌ pollMaker failed:', error);
       return { success: false, error: error.message };
@@ -2274,6 +2319,33 @@ function registerTakerHandlers() {
     } catch (error) {
       console.error('❌ removeMaker failed:', error);
       return { success: false, error: error.message };
+    }
+  });
+
+  // Return live per-maker progress from swap_tracker.cbor for animation driving.
+  // Only reads from disk — no NAPI call — so it is always safe to call during a swap.
+  ipcMain.handle('taker:getSwapProgress', async (_event, nativeSwapId) => {
+    try {
+      if (!nativeSwapId) return { success: false, error: 'No swap ID provided' };
+      const swap = getSwapFromTracker(nativeSwapId);
+      if (!swap) return { success: true, swap: null };
+      return {
+        success: true,
+        swap: {
+          phase: swap.phase || null,
+          failedAtPhase: swap.failed_at_phase || null,
+          failureReason: formatFailureReason(swap.failure_reason),
+          makers: (swap.makers || []).map((m) => ({
+            address: typeof m.address === 'string' ? m.address : null,
+            ...buildMakerProgress(m),
+          })),
+          outgoingContractTxids: swap.outgoing_contract_txids || [],
+          incomingContractTxids: swap.incoming_contract_txids || [],
+        },
+      };
+    } catch (err) {
+      console.error('⚠️ getSwapProgress error:', err.message);
+      return { success: false, error: err.message };
     }
   });
 
