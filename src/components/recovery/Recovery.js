@@ -1,4 +1,20 @@
 import { icons } from '../../js/icons.js';
+import { formatSats } from '../../js/price.js';
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function compactTxid(txid = '') {
+  const text = String(txid || '');
+  if (text.length <= 20) return text || '-';
+  return `${text.slice(0, 12)}...${text.slice(-8)}`;
+}
 
 export function RecoveryComponent(container) {
   const content = document.createElement('div');
@@ -7,12 +23,141 @@ export function RecoveryComponent(container) {
 
   async function triggerRecovery() {
     try {
-      const result = await window.api.taker.recover();
-      return result;
+      return await window.api.taker.recover();
     } catch (error) {
       console.error('Recovery failed:', error);
       return { success: false, error: error.message };
     }
+  }
+
+  async function loadRecoveryStatus() {
+    try {
+      const result = await window.api.taker.getRecoveryStatus();
+      return result.success ? result.recovery : null;
+    } catch (error) {
+      console.error('Failed to load recovery status:', error);
+      return null;
+    }
+  }
+
+  function renderPendingRecoveries(recovery) {
+    const list = content.querySelector('#pending-recovery-list');
+    const pendingCountEl = content.querySelector('#pending-count');
+    const totalRecoveredEl = content.querySelector('#total-recovered');
+    const recoveryRateEl = content.querySelector('#recovery-rate');
+    const recoverySourceEl = content.querySelector('#recovery-source-note');
+    if (!list) return;
+
+    const pending = Array.isArray(recovery?.pending) ? recovery.pending : [];
+    const totalPendingAmount = Number(recovery?.totalPendingAmount || 0);
+    const recoveredCount = Number(recovery?.recoveredCount || 0);
+
+    pendingCountEl.textContent = String(pending.length);
+    totalRecoveredEl.textContent = recoveredCount > 0 ? String(recoveredCount) + ' swaps' : formatSats(0);
+    recoveryRateEl.textContent = pending.length > 0 ? 'Pending' : 'Clear';
+    recoverySourceEl.textContent =
+      recovery?.source === 'debug-log'
+        ? 'Status inferred from wallet debug log.'
+        : '';
+
+    if (!pending.length) {
+      list.innerHTML = `
+        <div class="recovery-empty-state">
+          ${icons.shieldCheck(22)}
+          <div>
+            <strong>No pending recovery</strong>
+            <span>${recoveredCount > 0 ? `${recoveredCount} previously failed swap${recoveredCount > 1 ? 's have' : ' has'} been recovered.` : 'No failed swaps require recovery.'}</span>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const fromTracker = recovery?.source === 'swap-tracker';
+
+    list.innerHTML = `
+      <div class="recovery-pending-summary">
+        <span>Pending recovery</span>
+        <strong>${formatSats(totalPendingAmount)}</strong>
+      </div>
+      ${pending
+        .map((item) => {
+          const amount =
+            Number.isFinite(item.amount) && item.amount > 0
+              ? formatSats(item.amount)
+              : 'Amount unavailable';
+
+          if (fromTracker) {
+            const date = item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '';
+            const phase = item.failedAtPhase ? escapeHtml(item.failedAtPhase) : '';
+            const reason = item.failureReason ? escapeHtml(item.failureReason) : '';
+            const hasBlocks = item.blocksRemaining != null;
+            const statusText = item.status === 'ready'
+              ? 'Ready to recover'
+              : hasBlocks
+                ? `${Number(item.blocksRemaining).toLocaleString()} blocks remaining`
+                : 'Awaiting timelock recovery';
+            return `
+              <article class="recovery-pending-item">
+                <div class="recovery-pending-main">
+                  <span>${escapeHtml(statusText)}</span>
+                  <strong>${escapeHtml(amount)}</strong>
+                  <small title="${escapeHtml(item.txid || '')}">${escapeHtml(compactTxid(item.txid))}</small>
+                </div>
+                <div class="recovery-pending-grid">
+                  ${hasBlocks ? `
+                  <div>
+                    <span>Current block</span>
+                    <strong>${Number(item.currentHeight).toLocaleString()}</strong>
+                  </div>
+                  <div>
+                    <span>Unlock block</span>
+                    <strong>${Number(item.unlockBlock).toLocaleString()}</strong>
+                  </div>
+                  ` : `
+                  <div>
+                    <span>Failed at</span>
+                    <strong>${phase || '—'}</strong>
+                  </div>
+                  <div>
+                    <span>Date</span>
+                    <strong>${date || '—'}</strong>
+                  </div>
+                  `}
+                </div>
+                ${reason ? `<div class="recovery-failure-reason"><span>${reason}</span></div>` : ''}
+              </article>
+            `;
+          }
+
+          const blocksRemaining = Math.max(0, Number(item.blocksRemaining || 0));
+          const statusText =
+            item.status === 'ready'
+              ? 'Ready to recover'
+              : `${blocksRemaining.toLocaleString()} blocks remaining`;
+
+          return `
+            <article class="recovery-pending-item">
+              <div class="recovery-pending-main">
+                <span>${escapeHtml(statusText)}</span>
+                <strong>${escapeHtml(amount)}</strong>
+                <small title="${escapeHtml(item.txid)}">${escapeHtml(compactTxid(item.txid))}</small>
+              </div>
+              <div class="recovery-pending-grid">
+                <div>
+                  <span>Current block</span>
+                  <strong>${Number(item.currentHeight || 0).toLocaleString()}</strong>
+                </div>
+                <div>
+                  <span>Unlock block</span>
+                  <strong>${Number(item.unlockBlock || 0).toLocaleString()}</strong>
+                </div>
+              </div>
+            </article>
+          `;
+        })
+        .join('')}
+    `;
   }
 
   content.innerHTML = `
@@ -25,12 +170,19 @@ export function RecoveryComponent(container) {
         </div>
       </div>
       <div class="app-actions">
-        <button id="manual-recovery-btn" class="app-button primary" type="button">
-          ${icons.recycle(16)}
+        <button id="manual-recovery-btn" class="app-button secondary" type="button">
+          ${icons.recycle(14)}
           <span>Trigger Recovery</span>
         </button>
       </div>
     </header>
+
+    <div class="recovery-how-strip">
+      <span>01 — Detects failed swaps via timelock script</span>
+      <span>02 — Waits for HTLC expiry, broadcasts recovery tx</span>
+      <span>03 — Recovered funds land in Contract Balance</span>
+      <span>04 — Resumes on every restart until complete</span>
+    </div>
 
     <section class="recovery-stats" aria-label="Recovery stats">
       <article class="recovery-stat-card recovered">
@@ -40,92 +192,58 @@ export function RecoveryComponent(container) {
       </article>
       <article class="recovery-stat-card rate">
         <span class="app-accent"></span>
-        <span class="app-card-label">Recovery Rate</span>
-        <div class="app-card-value"><span id="recovery-rate">100%</span></div>
+        <span class="app-card-label">Recovery Status</span>
+        <div class="app-card-value"><span id="recovery-rate">Checking</span></div>
       </article>
       <article class="recovery-stat-card pending">
         <span class="app-accent"></span>
         <span class="app-card-label">Pending</span>
-        <div class="app-card-value"><span id="pending-count">0</span></div>
+        <div class="app-card-value"><span id="pending-count">-</span></div>
       </article>
     </section>
 
-    <section class="recovery-layout">
-      <article class="app-panel recovery-flow-panel">
-        <header class="app-panel-head">
+    <section class="app-panel recovery-pending-panel">
+      <header class="app-panel-head">
+        <div>
+          <h3>Pending Recovery</h3>
+          <span id="recovery-source-note">Checking wallet debug log</span>
+        </div>
+      </header>
+      <div id="pending-recovery-list" class="app-panel-body recovery-pending-list">
+        <div class="recovery-empty-state">
+          ${icons.loader(18, 'animate-spin')}
           <div>
-            <h3>Recovery Flow</h3>
-            <span>Automatic refund path</span>
-          </div>
-        </header>
-        <div class="app-panel-body recovery-flow">
-          <div class="recovery-step">
-            <span>01</span>
-            <p>The app automatically detects failed swaps and attempts to recover via the timelock script.</p>
-          </div>
-          <div class="recovery-step">
-            <span>02</span>
-            <p>It waits for the HTLC timelock to expire, then create and broadcast the recovery transaction.</p>
-          </div>
-          <div class="recovery-step">
-            <span>03</span>
-            <p>All recoverable funds appear in the wallet's Contract Balance.</p>
-          </div>
-          <div class="recovery-step">
-            <span>04</span>
-            <p>It automatically resumes recovery at every restart if the previous recovery didn't complete.</p>
+            <strong>Checking recovery state</strong>
+            <span>Reading latest wallet log entries.</span>
           </div>
         </div>
-      </article>
-
-      <aside class="app-panel recovery-action-panel">
-        <header class="app-panel-head">
-          <div>
-            <h3>Manual Recovery</h3>
-            <span>Fallback control</span>
-          </div>
-        </header>
-        <div class="app-panel-body">
-          <div class="recovery-manual-copy">
-            ${icons.shieldCheck(28)}
-            <p>Use this only when automatic recovery doesn't work for some reason. This will force the recovery process to begin again.</p>
-          </div>
-          <div id="recovery-status" class="recovery-status hidden"></div>
-        </div>
-      </aside>
+      </div>
     </section>
+
   `;
 
   container.appendChild(content);
 
+  loadRecoveryStatus().then(renderPendingRecoveries);
+
   content.querySelector('#manual-recovery-btn').addEventListener('click', async () => {
     const btn = content.querySelector('#manual-recovery-btn');
-    const statusDiv = content.querySelector('#recovery-status');
     const label = btn.querySelector('span');
-
     label.textContent = 'Recovering...';
     btn.disabled = true;
-    btn.classList.add('loading');
-
-    statusDiv.className = 'recovery-status info';
-    statusDiv.innerHTML = `${icons.loader(16, 'animate-spin')} <span>Recovery has started. Once completed the wallet will reflect recovered balance.</span>`;
 
     const result = await triggerRecovery();
 
     if (result.success) {
-      statusDiv.className = 'recovery-status success';
-      statusDiv.innerHTML = `${icons.checkCircle(16)} <span>Recovery completed successfully</span>`;
-      label.textContent = 'Recovery Complete';
+      label.textContent = 'Done';
+      loadRecoveryStatus().then(renderPendingRecoveries);
     } else {
-      statusDiv.className = 'recovery-status error';
-      statusDiv.innerHTML = `${icons.xCircle(16)} <span>${result.error || 'Recovery failed'}</span>`;
-      label.textContent = 'Recovery Failed';
+      label.textContent = 'Failed';
     }
 
     setTimeout(() => {
       label.textContent = 'Trigger Recovery';
       btn.disabled = false;
-      btn.classList.remove('loading');
     }, 3000);
   });
 }

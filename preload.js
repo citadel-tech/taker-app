@@ -10,7 +10,8 @@ contextBridge.exposeInMainWorld('api', {
   taker: {
     initialize: (config) => ipcRenderer.invoke('taker:initialize', config),
     getBalance: () => ipcRenderer.invoke('taker:getBalance'),
-    getNextAddress: () => ipcRenderer.invoke('taker:getNextAddress'),
+    getNextAddress: (addressType) =>
+      ipcRenderer.invoke('taker:getNextAddress', addressType),
     sync: () => ipcRenderer.invoke('taker:sync'),
     syncOfferbookAndWait: () =>
       ipcRenderer.invoke('taker:syncOfferbookAndWait'),
@@ -27,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
     sendToAddress: (address, amount) =>
       ipcRenderer.invoke('taker:sendToAddress', { address, amount }),
     recover: () => ipcRenderer.invoke('taker:recover'),
+    getRecoveryStatus: () => ipcRenderer.invoke('taker:getRecoveryStatus'),
     isWalletEncrypted: (walletPath) =>
       ipcRenderer.invoke('taker:isWalletEncrypted', walletPath),
     getWalletInfo: () => ipcRenderer.invoke('taker:getWalletInfo'),

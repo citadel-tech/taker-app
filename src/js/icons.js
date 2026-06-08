@@ -23,6 +23,8 @@ import {
   Package,
   Save,
   ExternalLink,
+  ArrowUpRight,
+  ArrowDownLeft,
   Zap,
   Copy,
   Search,
@@ -95,6 +97,10 @@ export const icons = {
   save:           (size = 16, cls = '') => toSvg(Save,           size, cls),
   /** 🔍 mempool explorer / external link */
   externalLink:   (size = 16, cls = '') => toSvg(ExternalLink,   size, cls),
+  /** incoming transaction */
+  arrowDownLeft:  (size = 16, cls = '') => toSvg(ArrowDownLeft,  size, cls),
+  /** outgoing transaction */
+  arrowUpRight:   (size = 16, cls = '') => toSvg(ArrowUpRight,   size, cls),
   /** ⚡ speed / zap */
   zap:            (size = 16, cls = '') => toSvg(Zap,            size, cls),
   /** copy to clipboard */

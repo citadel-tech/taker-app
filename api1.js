@@ -130,6 +130,121 @@ function requireWalletPassword(password) {
   return password;
 }
 
+function readFileTail(filePath, maxBytes = 1024 * 1024) {
+  const stats = fs.statSync(filePath);
+  const start = Math.max(0, stats.size - maxBytes);
+  const length = stats.size - start;
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    const buffer = Buffer.alloc(length);
+    fs.readSync(fd, buffer, 0, length, start);
+    return buffer.toString('utf8');
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+function parseRecoveryStatusFromLog(logText = '') {
+  const pendingByTxid = new Map();
+  const targetByTxid = new Map();
+  const recoveredTxids = new Set();
+  const recoveryTxids = new Set();
+  const lines = String(logText || '').split(/\r?\n/);
+  let latestCurrentHeight = null;
+  let latestRecoveryStartedAt = null;
+  let latestRecoverTimelockedCount = 0;
+  let latestRecoverTimelockedAt = null;
+  let lastCoinSelectionTarget = null;
+
+  for (const line of lines) {
+    const timestamp = line.match(/^(\S+)/)?.[1] || null;
+
+    const targetMatch = line.match(/Coinselection\s*:\s*.*Target\s*:\s*(\d+)/i);
+    if (targetMatch) {
+      lastCoinSelectionTarget = Number(targetMatch[1]);
+    }
+
+    const createdTxMatch = line.match(/Created tx,\s*txid:\s*([0-9a-f]{64})/i);
+    if (createdTxMatch && Number.isFinite(lastCoinSelectionTarget)) {
+      targetByTxid.set(createdTxMatch[1], lastCoinSelectionTarget);
+      lastCoinSelectionTarget = null;
+    }
+
+    if (/Funds were broadcast, triggering recovery|Starting swap recovery/i.test(line)) {
+      latestRecoveryStartedAt = timestamp;
+    }
+
+    const recoverCountMatch = line.match(
+      /recover_timelocked:\s*(\d+)\s+outgoing swapcoins in store at height\s+(\d+)/i
+    );
+    if (recoverCountMatch) {
+      latestRecoverTimelockedCount = Number(recoverCountMatch[1]);
+      latestCurrentHeight = Number(recoverCountMatch[2]);
+      latestRecoverTimelockedAt = timestamp;
+
+      if (latestRecoverTimelockedCount === 0) {
+        pendingByTxid.clear();
+      }
+    }
+
+    const notReadyMatch = line.match(
+      /Outgoing swapcoin\s+([0-9a-f]{64})\s+not yet ready\s+\(current:\s*(\d+),\s*CLTV:\s*(\d+)\)/i
+    );
+    if (notReadyMatch) {
+      const [, txid, currentRaw, cltvRaw] = notReadyMatch;
+      const currentHeight = Number(currentRaw);
+      const cltv = Number(cltvRaw);
+      latestCurrentHeight = currentHeight;
+      if (!recoveredTxids.has(txid)) {
+        pendingByTxid.set(txid, {
+          txid,
+          amount: targetByTxid.get(txid) ?? null,
+          currentHeight,
+          unlockBlock: cltv,
+          blocksRemaining: Math.max(0, cltv - currentHeight),
+          status: currentHeight >= cltv ? 'ready' : 'waiting_timelock',
+          detectedAt: timestamp,
+        });
+      }
+    }
+
+    const removedMatch = line.match(/Removed outgoing swapcoin:\s*([0-9a-f]{64})/i);
+    if (removedMatch) {
+      const txid = removedMatch[1];
+      recoveredTxids.add(txid);
+      pendingByTxid.delete(txid);
+    }
+
+    const recoveryTxMatch = line.match(
+      /(?:Sweep|Recovery|Refund) transaction\s+([0-9a-f]{64})/i
+    );
+    if (recoveryTxMatch) {
+      recoveryTxids.add(recoveryTxMatch[1]);
+    }
+  }
+
+  const pending = Array.from(pendingByTxid.values()).sort(
+    (a, b) => (b.detectedAt || '').localeCompare(a.detectedAt || '')
+  );
+  const totalPendingAmount = pending.reduce(
+    (sum, item) => sum + (Number.isFinite(item.amount) ? item.amount : 0),
+    0
+  );
+
+  return {
+    source: 'debug-log',
+    currentHeight: latestCurrentHeight,
+    pendingCount: pending.length,
+    latestRecoverTimelockedCount,
+    pending,
+    totalPendingAmount,
+    recoveredCount: recoveredTxids.size,
+    recoveryTxids: Array.from(recoveryTxids),
+    lastRecoveryStartedAt: latestRecoveryStartedAt,
+    lastRecoverTimelockedAt: latestRecoverTimelockedAt,
+  };
+}
+
 function classifyWalletInitializationError(error) {
   const message = error?.message || String(error || 'Unknown wallet error');
   const lowerMessage = message.toLowerCase();
@@ -316,6 +431,202 @@ function createCborReader(buffer) {
       return encrypted;
     },
   };
+}
+
+function reverseTxid(hex) {
+  if (!hex || hex.length !== 64) return hex;
+  return hex.match(/.{2}/g).reverse().join('');
+}
+
+function decodeCbor(buffer) {
+  let offset = 0;
+
+  function readByte() {
+    if (offset >= buffer.length) throw new Error('Unexpected end of CBOR data');
+    return buffer[offset++];
+  }
+
+  function readLength(additionalInfo) {
+    if (additionalInfo < 24) return additionalInfo;
+    if (additionalInfo === 24) return readByte();
+    if (additionalInfo === 25) { const v = buffer.readUInt16BE(offset); offset += 2; return v; }
+    if (additionalInfo === 26) { const v = buffer.readUInt32BE(offset); offset += 4; return v; }
+    if (additionalInfo === 27) { const v = Number(buffer.readBigUInt64BE(offset)); offset += 8; return v; }
+    throw new Error('Unsupported CBOR additional info: ' + additionalInfo);
+  }
+
+  function readValue() {
+    const byte = readByte();
+    const majorType = byte >> 5;
+    const additionalInfo = byte & 0x1f;
+
+    if (majorType === 6) { readLength(additionalInfo); return readValue(); } // tagged — skip tag
+
+    const len = readLength(additionalInfo);
+
+    if (majorType === 0) return len;
+    if (majorType === 1) return -1 - len;
+    if (majorType === 2) { const v = buffer.slice(offset, offset + len).toString('hex'); offset += len; return v; }
+    if (majorType === 3) { const v = buffer.toString('utf8', offset, offset + len); offset += len; return v; }
+    if (majorType === 4) { const arr = []; for (let i = 0; i < len; i++) arr.push(readValue()); return arr; }
+    if (majorType === 5) { const obj = {}; for (let i = 0; i < len; i++) { const k = readValue(); obj[k] = readValue(); } return obj; }
+    if (majorType === 7) {
+      if (additionalInfo === 20) return false;
+      if (additionalInfo === 21) return true;
+      if (additionalInfo === 22) return null;
+      return null;
+    }
+    throw new Error('Unsupported CBOR major type: ' + majorType);
+  }
+
+  return readValue();
+}
+
+function formatFailureReason(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const general = raw.match(/^General\("(.+)"\)$/s);
+  if (general) return general[1];
+  if (raw === 'FundingTxWaitTimeOut') return 'Funding transaction timed out';
+  if (raw.startsWith('ContractsBroadcasted')) return 'Contracts broadcast without maker response';
+  if (raw.startsWith('Net(')) return 'Network connection error';
+  return raw;
+}
+
+function enrichRecoveryFromLog(pending, logPath) {
+  if (!pending.length || !fs.existsSync(logPath)) return pending;
+  try {
+    const logTail = readFileTail(logPath, 2 * 1024 * 1024);
+    const lines = logTail.split(/\r?\n/);
+
+    const cltvByTxid = new Map();
+    let latestHeight = null;
+
+    for (const line of lines) {
+      const heightMatch = line.match(/recover_timelocked:\s*\d+\s+outgoing swapcoins in store at height\s+(\d+)/i);
+      if (heightMatch) latestHeight = Number(heightMatch[1]);
+
+      const cltvMatch = line.match(/Outgoing swapcoin\s+([0-9a-f]{64})\s+not yet ready\s+\(current:\s*(\d+),\s*CLTV:\s*(\d+)\)/i);
+      if (cltvMatch) {
+        cltvByTxid.set(cltvMatch[1].toLowerCase(), {
+          currentHeight: Number(cltvMatch[2]),
+          unlockBlock: Number(cltvMatch[3]),
+        });
+      }
+    }
+
+    return pending.map(item => {
+      const info = cltvByTxid.get((item.txid || '').toLowerCase());
+      if (!info) return item;
+      const currentHeight = latestHeight ?? info.currentHeight;
+      const blocksRemaining = Math.max(0, info.unlockBlock - currentHeight);
+      return {
+        ...item,
+        currentHeight,
+        unlockBlock: info.unlockBlock,
+        blocksRemaining,
+        status: blocksRemaining === 0 ? 'ready' : 'waiting_timelock',
+      };
+    });
+  } catch (err) {
+    console.error('⚠️ Failed to enrich recovery from log:', err.message);
+    return pending;
+  }
+}
+
+function getSwapFromTracker(swapId) {
+  try {
+    const trackerPath = path.join(api1State.DATA_DIR, 'swap_tracker.cbor');
+    if (!fs.existsSync(trackerPath)) return null;
+    const data = decodeCbor(fs.readFileSync(trackerPath));
+    return (data && data.swaps && data.swaps[String(swapId)]) || null;
+  } catch (err) {
+    console.error('⚠️ Failed to read swap from tracker:', err.message);
+    return null;
+  }
+}
+
+function buildMakerProgress(makerEntry) {
+  if (!makerEntry) return null;
+  const exchangeData = makerEntry.exchange
+    ? Object.values(makerEntry.exchange)[0]
+    : null;
+  return {
+    negotiated: Boolean(makerEntry.negotiated),
+    connected: Boolean(exchangeData?.connected),
+    contractDataSent: Boolean(exchangeData?.contract_data_sent),
+    makerContractReceived: Boolean(exchangeData?.maker_contract_received),
+    swapcoinCreated: Boolean(exchangeData?.swapcoins_created),
+    privkeyReceived: Boolean(makerEntry.finalization?.privkey_received),
+    privkeyForwarded: Boolean(makerEntry.finalization?.privkey_forwarded),
+  };
+}
+
+function parseSwapTracker(trackerPath) {
+  if (!fs.existsSync(trackerPath)) return null;
+  try {
+    const buffer = fs.readFileSync(trackerPath);
+    const data = decodeCbor(buffer);
+    const swaps = data && data.swaps;
+    if (!swaps || typeof swaps !== 'object' || Array.isArray(swaps)) return null;
+
+    const result = {
+      source: 'swap-tracker',
+      total: 0,
+      completed: 0,
+      failed: 0,
+      pending: [],
+      cleanedUp: 0,
+      totalPendingAmount: 0,
+      pendingCount: 0,
+      recoveredCount: 0,
+    };
+
+    for (const swapId of Object.keys(swaps)) {
+      const swap = swaps[swapId];
+      result.total++;
+
+      if (swap.phase === 'Completed') {
+        result.completed++;
+        continue;
+      }
+
+      if (swap.phase === 'Failed') {
+        result.failed++;
+        const recoveryPhase = swap.recovery && swap.recovery.phase;
+
+        if (recoveryPhase === 'CleanedUp') {
+          result.cleanedUp++;
+        } else {
+          // CBOR stores txids in internal byte order; Bitcoin logs/UI use reversed (display) order
+          const rawTxid = Array.isArray(swap.outgoing_contract_txids) && swap.outgoing_contract_txids[0] || null;
+          const displayTxid = rawTxid ? reverseTxid(rawTxid) : null;
+          const amount = Number(swap.send_amount_sat || 0);
+          result.pending.push({
+            swapId: String(swap.swap_id || swapId),
+            txid: displayTxid,
+            amount,
+            status: 'pending_recovery',
+            failedAtPhase: swap.failed_at_phase || null,
+            failureReason: formatFailureReason(
+              typeof swap.failure_reason === 'string' ? swap.failure_reason : null
+            ),
+            createdAt: swap.created_at ? new Date(swap.created_at * 1000).toISOString() : null,
+            blocksRemaining: null,
+            currentHeight: null,
+            unlockBlock: null,
+          });
+          result.totalPendingAmount += amount;
+        }
+      }
+    }
+
+    result.pendingCount = result.pending.length;
+    result.recoveredCount = result.cleanedUp;
+    return result;
+  } catch (err) {
+    console.error('⚠️ Failed to parse swap_tracker.cbor:', err.message);
+    return null;
+  }
 }
 
 function preflightExistingWallet(walletPath, password) {
@@ -1523,28 +1834,69 @@ function registerTakerHandlers() {
   }
 
   // Get next address
-  ipcMain.handle('taker:getNextAddress', async () => {
+  ipcMain.handle('taker:getNextAddress', async (_event, requestedAddressType) => {
     try {
       if (!api1State.takerInstance) {
         return { success: false, error: 'Taker not initialized' };
       }
 
-      // ✅ Determine address type based on protocol
+      const normalizedType = String(requestedAddressType || '').toUpperCase();
+      const hasRequestedType =
+        normalizedType === 'P2TR' ||
+        normalizedType === 'TAPROOT' ||
+        normalizedType === 'P2WPKH' ||
+        normalizedType === 'SEGWIT';
       const protocol = api1State.protocolVersion || 'v1';
-      const addressType = protocol === 'v2' ? 1 : 0; // 1 = Taproot (P2TR), 0 = Legacy (P2WPKH)
+      const requestedType =
+        normalizedType === 'P2TR' || normalizedType === 'TAPROOT'
+          ? 'P2TR'
+          : normalizedType === 'P2WPKH' || normalizedType === 'SEGWIT'
+            ? 'P2WPKH'
+            : protocol === 'v2'
+              ? 'P2TR'
+              : 'P2WPKH';
+      const initialAddressType = hasRequestedType
+        ? normalizedType === 'P2TR' || normalizedType === 'TAPROOT'
+          ? 1
+          : 0
+        : protocol === 'v2'
+          ? 1
+          : 0; // 1 = Taproot (P2TR), 0 = P2WPKH
 
-      console.log(
-        `📍 Generating ${protocol === 'v2' ? 'Taproot (P2TR)' : 'Legacy (P2WPKH)'} address...`
-      );
+      const detectGeneratedAddressType = (value) => {
+        const addressString = String(value?.address || value || '');
+        if (
+          addressString.startsWith('bc1p') ||
+          addressString.startsWith('tb1p') ||
+          addressString.startsWith('bcrt1p')
+        ) {
+          return 'P2TR';
+        }
+        return 'P2WPKH';
+      };
 
-      const address =
-        api1State.takerInstance.getNextExternalAddress(addressType);
+      console.log(`📍 Generating ${requestedType} address...`);
+
+      let nativeAddressType = initialAddressType;
+      let address = api1State.takerInstance.getNextExternalAddress(nativeAddressType);
+      let actualType = detectGeneratedAddressType(address);
+
+      if (hasRequestedType && actualType !== requestedType) {
+        const alternateAddressType = nativeAddressType === 1 ? 0 : 1;
+        console.warn(
+          `Requested ${requestedType}, but native type ${nativeAddressType} returned ${actualType}. Retrying with ${alternateAddressType}.`
+        );
+        nativeAddressType = alternateAddressType;
+        address = api1State.takerInstance.getNextExternalAddress(nativeAddressType);
+        actualType = detectGeneratedAddressType(address);
+      }
+
       api1State.takerInstance.syncAndSave();
 
       return {
         success: true,
         address: address.address || address,
-        addressType: protocol === 'v2' ? 'P2TR' : 'P2WPKH',
+        addressType: actualType,
       };
     } catch (error) {
       console.error('❌ Failed to generate address:', error);
@@ -1727,6 +2079,46 @@ function registerTakerHandlers() {
       return { success: true, message: 'Recovery completed' };
     } catch (error) {
       console.error('❌ Recovery failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('taker:getRecoveryStatus', async () => {
+    try {
+      const trackerPath = path.join(api1State.DATA_DIR, 'swap_tracker.cbor');
+      const trackerData = parseSwapTracker(trackerPath);
+      if (trackerData) {
+        const logPath = path.join(api1State.DATA_DIR, 'debug.log');
+        trackerData.pending = enrichRecoveryFromLog(trackerData.pending, logPath);
+        trackerData.totalPendingAmount = trackerData.pending.reduce((s, p) => s + (p.amount || 0), 0);
+        return { success: true, recovery: trackerData };
+      }
+
+      // Fall back to log parsing if tracker is unavailable
+      const logPath = path.join(api1State.DATA_DIR, 'debug.log');
+      if (!fs.existsSync(logPath)) {
+        return {
+          success: true,
+          recovery: {
+            source: 'debug-log',
+            currentHeight: null,
+            pendingCount: 0,
+            pending: [],
+            totalPendingAmount: 0,
+            recoveredCount: 0,
+            recoveryTxids: [],
+            lastRecoveryStartedAt: null,
+          },
+        };
+      }
+
+      const logTail = readFileTail(logPath, 2 * 1024 * 1024);
+      return {
+        success: true,
+        recovery: parseRecoveryStatusFromLog(logTail),
+      };
+    } catch (error) {
+      console.error('❌ Failed to get recovery status:', error);
       return { success: false, error: error.message };
     }
   });
@@ -2313,7 +2705,27 @@ function registerSwapReportsHandlers() {
         return { success: false, error: 'Swap report not found' };
       }
 
-      return { success: true, report };
+      const trackerSwapId = report.nativeSwapId || report.swapId;
+      const trackerEntry = trackerSwapId ? getSwapFromTracker(trackerSwapId) : null;
+      let trackerInfo = null;
+
+      if (trackerEntry) {
+        trackerInfo = {
+          failedAtPhase: trackerEntry.failed_at_phase || null,
+          failureReasonFormatted: formatFailureReason(
+            typeof trackerEntry.failure_reason === 'string' ? trackerEntry.failure_reason : null
+          ),
+          recoveryPhase: trackerEntry.recovery?.phase || null,
+          makerProgress: Array.isArray(trackerEntry.makers)
+            ? trackerEntry.makers.map((m) => ({
+                address: m.address,
+                ...buildMakerProgress(m),
+              }))
+            : null,
+        };
+      }
+
+      return { success: true, report, trackerInfo };
     } catch (error) {
       console.error('Failed to get swap report:', error);
       return { success: false, error: error.message };

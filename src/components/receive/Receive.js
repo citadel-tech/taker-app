@@ -17,6 +17,7 @@ export function ReceiveComponent(container) {
   let currentAddress = null;
   let isGenerating = false;
   let currentAddressData = null;
+  let selectedAddressType = 'P2TR';
 
   content.innerHTML = `
     <div class="app-page receive-page">
@@ -25,19 +26,15 @@ export function ReceiveComponent(container) {
           <h2>Receive Bitcoin</h2>
           <p class="receive-subtitle">Generate a fresh address to receive BTC</p>
         </div>
-        <button id="share-request" class="app-button ghost">
-          ${icons.link(16)} Share request
-        </button>
       </div>
 
       <div class="receive-layout">
         <section class="receive-main-card">
           <div class="receive-card-head">
             <h3>Your Bitcoin Address</h3>
-            <div id="address-type-tabs" class="receive-type-tabs">
-              <span data-type="P2TR">P2TR</span>
-              <span data-type="P2WPKH">P2WPKH</span>
-              <span data-type="LEGACY">Legacy</span>
+            <div id="address-type-toggle" class="receive-type-tabs" aria-label="Address type">
+              <button class="active" data-type="P2TR" type="button">P2TR</button>
+              <button data-type="P2WPKH" type="button">P2WPKH</button>
             </div>
           </div>
 
@@ -54,9 +51,6 @@ export function ReceiveComponent(container) {
                   <span>Generate a receive address below.</span>
                 </div>
               </div>
-              <button id="open-qr-popup" class="receive-qr-expand" type="button" disabled>
-                ${icons.search(14)} View QR
-              </button>
             </div>
 
             <div class="receive-address-strip">
@@ -68,29 +62,12 @@ export function ReceiveComponent(container) {
 
             <div class="receive-meta-row">
               <div>
-                <span id="address-type-badge" class="receive-chip">--</span>
                 <span id="address-derivation" class="receive-chip">m/86'/0'/0'/0/-</span>
                 <span class="receive-muted">Gap-limit - 20 ahead</span>
               </div>
-              <button id="view-mempool" disabled>View on mempool ${icons.externalLink(12)}</button>
-            </div>
-
-            <div class="receive-request-row">
-              <span>Request specific amount</span>
-              <div class="receive-unit-toggle">
-                <button class="active" type="button">丰</button>
-                <button type="button">BTC</button>
-              </div>
-            </div>
-
-            <label class="receive-input-wrap">
-              <input id="request-amount" type="number" min="0" step="1" placeholder="0">
-              <span>丰</span>
-            </label>
-
-            <div class="receive-note-row">
-              <input id="request-note" type="text" placeholder="Add a label or note (e.g. invoice 1042)">
-              <span>BIP21</span>
+              <button id="view-mempool" type="button" title="View on mempool" aria-label="View on mempool" disabled>
+                ${icons.externalLink(16)}
+              </button>
             </div>
 
             <button id="generate-new" class="app-button primary lg receive-generate">
@@ -127,7 +104,7 @@ export function ReceiveComponent(container) {
             <div id="recent-addresses" class="receive-recent-list">
               <div class="receive-empty-list">No addresses generated yet</div>
             </div>
-            <button id="view-all-addresses" class="receive-view-all">View all addresses -></button>
+            <button id="view-all-addresses" class="receive-view-all" type="button">View all addresses ${icons.externalLink(13)}</button>
           </section>
         </aside>
       </div>
@@ -142,21 +119,18 @@ export function ReceiveComponent(container) {
   const generateText = content.querySelector('.generate-text');
   const generateLoading = content.querySelector('.generate-loading');
   const qrContainer = content.querySelector('#qr-container');
-  const openQrPopupButton = content.querySelector('#open-qr-popup');
   const generationTime = content.querySelector('#generation-time');
   const usageCount = content.querySelector('#usage-count');
   const totalReceived = content.querySelector('#total-received');
-  const addressTypeBadge = content.querySelector('#address-type-badge');
   const addressStatusText = content.querySelector('#address-status-text');
   const derivationIndex = content.querySelector('#derivation-index');
   const addressDerivation = content.querySelector('#address-derivation');
   const recentAddressesEl = content.querySelector('#recent-addresses');
   const totalAddressesEl = content.querySelector('#total-addresses');
-  const shareButton = content.querySelector('#share-request');
   const viewMempoolButton = content.querySelector('#view-mempool');
 
   async function getNextAddress() {
-    return await window.api.taker.getNextAddress();
+    return await window.api.taker.getNextAddress(selectedAddressType);
   }
 
   function qrUrl(text, size = 340) {
@@ -170,6 +144,7 @@ export function ReceiveComponent(container) {
       <img
         src="${qrApiUrl}"
         alt="QR Code for ${escapeHtml(text)}"
+        title="Open QR code"
         onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'receive-empty-qr\\'><strong>QR generation failed</strong><span>${escapeHtml(text.substring(0, 22))}...</span></div>'"
       />
     `;
@@ -195,7 +170,7 @@ export function ReceiveComponent(container) {
       <div class="receive-qr-modal" role="dialog" aria-modal="true" aria-label="Receive QR code">
         <div class="receive-qr-modal-head">
           <div>
-            <span>Receive request</span>
+            <span>Receive address</span>
             <h3>Scan QR Code</h3>
           </div>
           <button class="receive-qr-modal-close" type="button" aria-label="Close">&times;</button>
@@ -340,8 +315,8 @@ export function ReceiveComponent(container) {
   }
 
   function updateTypeTabs(type) {
-    const tabType = type === 'P2PKH' || type === 'P2SH' ? 'LEGACY' : type;
-    content.querySelectorAll('#address-type-tabs span').forEach((tab) => {
+    const tabType = type === 'P2TR' ? 'P2TR' : 'P2WPKH';
+    content.querySelectorAll('#address-type-toggle button').forEach((tab) => {
       tab.classList.toggle('active', tab.dataset.type === tabType);
     });
   }
@@ -355,10 +330,9 @@ export function ReceiveComponent(container) {
       totalReceived.textContent = '-';
       addressStatusText.textContent = '-';
       addressStatusText.className = '';
-      addressTypeBadge.textContent = '--';
       derivationIndex.textContent = '-';
       addressDerivation.textContent = "m/86'/0'/0'/0/-";
-      updateTypeTabs(null);
+      updateTypeTabs(selectedAddressType);
       return;
     }
 
@@ -380,12 +354,7 @@ export function ReceiveComponent(container) {
       addressStatusText.className = 'primary';
     }
 
-    addressTypeBadge.textContent =
-      addressData.type === 'P2PKH' || addressData.type === 'P2SH'
-        ? `${addressData.type} - Legacy`
-        : addressData.type;
     addressDerivation.textContent = getDerivationPath(addressData.type, index);
-    updateTypeTabs(addressData.type);
   }
 
   async function updateRecentAddresses() {
@@ -449,7 +418,6 @@ export function ReceiveComponent(container) {
     currentAddressEl.textContent = addressString;
     copyButton.disabled = false;
     viewMempoolButton.disabled = false;
-    openQrPopupButton.disabled = false;
     generateQR(addressString);
 
     const addresses = await getAddressesFromTransactions();
@@ -506,14 +474,13 @@ export function ReceiveComponent(container) {
       currentAddressEl.textContent = addressString;
       copyButton.disabled = false;
       viewMempoolButton.disabled = false;
-      openQrPopupButton.disabled = false;
       generateQR(addressString);
       updateAddressStatus(addressData);
+      updateTypeTabs(addressType);
       updateRecentAddresses();
     } catch (error) {
       console.error('Address generation failed:', error);
       currentAddressEl.textContent = `Error: ${error.message}`;
-      openQrPopupButton.disabled = true;
       qrContainer.innerHTML = `
         <div class="receive-empty-qr error">
           ${icons.xCircle(42)}
@@ -551,12 +518,11 @@ export function ReceiveComponent(container) {
     }
   });
 
-  shareButton.addEventListener('click', () => {
-    if (currentAddress) {
-      copyToClipboard(`bitcoin:${currentAddress}`);
-    } else {
-      generateNewAddress();
-    }
+  content.querySelectorAll('#address-type-toggle button').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectedAddressType = button.dataset.type === 'P2WPKH' ? 'P2WPKH' : 'P2TR';
+      updateTypeTabs(selectedAddressType);
+    });
   });
 
   viewMempoolButton.addEventListener('click', () => {
@@ -565,7 +531,7 @@ export function ReceiveComponent(container) {
     }
   });
 
-  openQrPopupButton.addEventListener('click', showQrPopup);
+  qrContainer.addEventListener('click', showQrPopup);
 
   generateButton.addEventListener('click', generateNewAddress);
 
