@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { formatSats } from '../../js/price.js';
+import { formatSats, SATS_SYMBOL } from '../../js/price.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -14,6 +14,14 @@ function compactTxid(txid = '') {
   const text = String(txid || '');
   if (text.length <= 20) return text || '-';
   return `${text.slice(0, 12)}...${text.slice(-8)}`;
+}
+
+function formatRecoveryError(error = '') {
+  const message = String(error || 'Recovery failed');
+  if (message.includes('No persisted swapcoins found for recovery')) {
+    return 'No persisted recovery data was found. There is nothing for the recovery command to broadcast.';
+  }
+  return message.replace(/^Recover error:\s*/i, '');
 }
 
 export function RecoveryComponent(container) {
@@ -46,19 +54,48 @@ export function RecoveryComponent(container) {
     const totalRecoveredEl = content.querySelector('#total-recovered');
     const recoveryRateEl = content.querySelector('#recovery-rate');
     const recoverySourceEl = content.querySelector('#recovery-source-note');
+    const recoveryActionNoteEl = content.querySelector('#recovery-action-note');
+    const recoveryButton = content.querySelector('#manual-recovery-btn');
+    const recoveryButtonLabel = recoveryButton?.querySelector('.button-label');
     if (!list) return;
 
     const pending = Array.isArray(recovery?.pending) ? recovery.pending : [];
     const totalPendingAmount = Number(recovery?.totalPendingAmount || 0);
     const recoveredCount = Number(recovery?.recoveredCount || 0);
+    const canTriggerRecovery = Boolean(recovery?.canTriggerRecovery);
+    const hasWalletRecoveryStoreCount = recovery?.walletRecoveryStoreCount != null;
 
     pendingCountEl.textContent = String(pending.length);
-    totalRecoveredEl.textContent = recoveredCount > 0 ? String(recoveredCount) + ' swaps' : formatSats(0);
-    recoveryRateEl.textContent = pending.length > 0 ? 'Pending' : 'Clear';
+    totalRecoveredEl.innerHTML = recoveredCount > 0 ? `${recoveredCount} swaps` : formatSats(0);
+    recoveryRateEl.textContent = pending.length > 0
+      ? canTriggerRecovery
+        ? 'Wallet ready'
+        : hasWalletRecoveryStoreCount
+          ? 'Store empty'
+          : 'Tracked only'
+      : 'Clear';
     recoverySourceEl.textContent =
       recovery?.source === 'debug-log'
-        ? 'Status inferred from wallet debug log.'
-        : '';
+        ? 'Status inferred from wallet debug log. The recovery command needs persisted swapcoin data.'
+        : recovery?.statusNote || '';
+    if (recoveryActionNoteEl) {
+      recoveryActionNoteEl.textContent = canTriggerRecovery
+        ? 'Broadcasts refund transactions for persisted failed swaps.'
+        : pending.length > 0
+          ? 'Override retry is available, but the wallet currently reports no recovery swapcoins.'
+          : 'Manual recovery can retry the native wallet recovery command.';
+    }
+    if (recoveryButton) {
+      recoveryButton.disabled = false;
+      recoveryButton.title = canTriggerRecovery
+        ? 'Trigger recovery for persisted failed swaps'
+        : 'Force a retry of the native wallet recovery command';
+    }
+    if (recoveryButtonLabel) {
+      recoveryButtonLabel.textContent = canTriggerRecovery
+        ? 'Trigger Recovery'
+        : 'Force Recovery Retry';
+    }
 
     if (!pending.length) {
       list.innerHTML = `
@@ -82,7 +119,7 @@ export function RecoveryComponent(container) {
       </div>
       ${pending
         .map((item) => {
-          const amount =
+          const amountHtml =
             Number.isFinite(item.amount) && item.amount > 0
               ? formatSats(item.amount)
               : 'Amount unavailable';
@@ -93,7 +130,9 @@ export function RecoveryComponent(container) {
             const reason = item.failureReason ? escapeHtml(item.failureReason) : '';
             const hasBlocks = item.blocksRemaining != null;
             const statusText = item.status === 'ready'
-              ? 'Ready to recover'
+              ? canTriggerRecovery
+                ? 'Wallet recovery data found'
+                : 'Tracked failed swap - wallet recovery store empty'
               : hasBlocks
                 ? `${Number(item.blocksRemaining).toLocaleString()} blocks remaining`
                 : 'Awaiting timelock recovery';
@@ -101,7 +140,7 @@ export function RecoveryComponent(container) {
               <article class="recovery-pending-item">
                 <div class="recovery-pending-main">
                   <span>${escapeHtml(statusText)}</span>
-                  <strong>${escapeHtml(amount)}</strong>
+                  <strong>${amountHtml}</strong>
                   <small title="${escapeHtml(item.txid || '')}">${escapeHtml(compactTxid(item.txid))}</small>
                 </div>
                 <div class="recovery-pending-grid">
@@ -125,7 +164,7 @@ export function RecoveryComponent(container) {
                   </div>
                   `}
                 </div>
-                ${reason ? `<div class="recovery-failure-reason"><span>${reason}</span></div>` : ''}
+                ${reason ? `<div class="recovery-failure-reason"><span>Last attempt: ${reason}</span></div>` : ''}
               </article>
             `;
           }
@@ -133,14 +172,16 @@ export function RecoveryComponent(container) {
           const blocksRemaining = Math.max(0, Number(item.blocksRemaining || 0));
           const statusText =
             item.status === 'ready'
-              ? 'Ready to recover'
+              ? canTriggerRecovery
+                ? 'Wallet recovery data found'
+                : 'Tracked failed swap - wallet recovery store empty'
               : `${blocksRemaining.toLocaleString()} blocks remaining`;
 
           return `
             <article class="recovery-pending-item">
               <div class="recovery-pending-main">
                 <span>${escapeHtml(statusText)}</span>
-                <strong>${escapeHtml(amount)}</strong>
+                <strong>${amountHtml}</strong>
                 <small title="${escapeHtml(item.txid)}">${escapeHtml(compactTxid(item.txid))}</small>
               </div>
               <div class="recovery-pending-grid">
@@ -170,25 +211,26 @@ export function RecoveryComponent(container) {
         </div>
       </div>
       <div class="app-actions">
-        <button id="manual-recovery-btn" class="app-button secondary" type="button">
+        <button id="manual-recovery-btn" class="app-button secondary" type="button" disabled>
           ${icons.recycle(14)}
-          <span>Trigger Recovery</span>
+          <span class="button-label">Trigger Recovery</span>
         </button>
+        <span id="recovery-action-note" class="recovery-action-note">Checking recovery data.</span>
       </div>
     </header>
 
     <div class="recovery-how-strip">
-      <span>01 — Detects failed swaps via timelock script</span>
-      <span>02 — Waits for HTLC expiry, broadcasts recovery tx</span>
-      <span>03 — Recovered funds land in Contract Balance</span>
-      <span>04 — Resumes on every restart until complete</span>
+      <span>01 - Detects failed swaps via timelock script</span>
+      <span>02 - Waits until the refund timelock expires</span>
+      <span>03 - Recovery requires persisted failed-swap data</span>
+      <span>04 - Recovered funds land in Contract Balance</span>
     </div>
 
     <section class="recovery-stats" aria-label="Recovery stats">
       <article class="recovery-stat-card recovered">
         <span class="app-accent"></span>
         <span class="app-card-label">Total Recovered</span>
-        <div class="app-card-value"><span id="total-recovered">0 丰</span></div>
+        <div class="app-card-value"><span id="total-recovered">0 ${SATS_SYMBOL}</span></div>
       </article>
       <article class="recovery-stat-card rate">
         <span class="app-accent"></span>
@@ -228,7 +270,9 @@ export function RecoveryComponent(container) {
 
   content.querySelector('#manual-recovery-btn').addEventListener('click', async () => {
     const btn = content.querySelector('#manual-recovery-btn');
-    const label = btn.querySelector('span');
+    const label = btn.querySelector('.button-label');
+    const recoveryActionNoteEl = content.querySelector('#recovery-action-note');
+    if (btn.disabled) return;
     label.textContent = 'Recovering...';
     btn.disabled = true;
 
@@ -236,14 +280,19 @@ export function RecoveryComponent(container) {
 
     if (result.success) {
       label.textContent = 'Done';
+      if (recoveryActionNoteEl) {
+        recoveryActionNoteEl.textContent = 'Recovery completed.';
+      }
       loadRecoveryStatus().then(renderPendingRecoveries);
     } else {
       label.textContent = 'Failed';
+      if (recoveryActionNoteEl) {
+        recoveryActionNoteEl.textContent = formatRecoveryError(result.error);
+      }
     }
 
     setTimeout(() => {
-      label.textContent = 'Trigger Recovery';
-      btn.disabled = false;
+      loadRecoveryStatus().then(renderPendingRecoveries);
     }, 3000);
   });
 }

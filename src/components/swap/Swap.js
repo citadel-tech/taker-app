@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { SwapStateManager } from './SwapStateManager.js';
-import { getBtcPriceUsd, formatSats } from '../../js/price.js';
+import { getBtcPriceUsd, formatSats, SATS_SYMBOL } from '../../js/price.js';
 
 // ✅ ADD CACHE CONSTANTS
 const SWAP_DATA_CACHE_KEY = 'swap_data_cache';
@@ -141,7 +141,7 @@ export async function SwapComponent(container) {
   let balancesLoaded = false;
 
   function getAmountUnitLabel(unit = amountUnit) {
-    if (unit === 'sats') return '丰';
+    if (unit === 'sats') return SATS_SYMBOL;
     return unit.toUpperCase();
   }
 
@@ -150,7 +150,7 @@ export async function SwapComponent(container) {
     const btcAmount = amountSats / 100000000;
 
     if (selectedUnit !== 'sats') {
-      labels.push(`= ${Math.round(amountSats || 0).toLocaleString()} 丰`);
+      labels.push(`= ${Math.round(amountSats || 0).toLocaleString()} ${SATS_SYMBOL}`);
     }
     if (selectedUnit !== 'btc') {
       labels.push(`= ${btcAmount.toFixed(8)} BTC`);
@@ -456,7 +456,7 @@ export async function SwapComponent(container) {
           <input type="checkbox" id="utxo-${index}" ${isChecked ? 'checked' : ''} />
           <span class="swap-row-id">${utxo.txid.substring(0, 8)}...${utxo.txid.substring(utxo.txid.length - 6)}</span>
           <span class="swap-pill ${typeLabel.toLowerCase()}">${typeLabel}</span>
-          <strong>${utxo.amount.toLocaleString()}<small>丰</small></strong>
+          <strong>${utxo.amount.toLocaleString()}<small>${SATS_SYMBOL}</small></strong>
         </label>
       `;
       })
@@ -701,8 +701,8 @@ export async function SwapComponent(container) {
     const receiveAmount = Math.max(0, swapAmount - details.totalFeeSats);
 
     // Update swap amount display (what user is sending)
-    content.querySelector('#swap-amount-display').textContent =
-      swapAmount.toLocaleString() + ' 丰';
+    content.querySelector('#swap-amount-display').innerHTML =
+      swapAmount.toLocaleString() + ' ' + SATS_SYMBOL;
 
     const swapBtc = swapAmount / 100000000;
     const swapUsd = hasUsdPrice() ? swapBtc * btcPrice : null;
@@ -714,7 +714,7 @@ export async function SwapComponent(container) {
 
     const utxoPickerTotal = content.querySelector('#utxo-picker-total');
     if (utxoPickerTotal) {
-      utxoPickerTotal.textContent = `${selectedTotal.toLocaleString()} 丰`;
+      utxoPickerTotal.innerHTML = `${selectedTotal.toLocaleString()} ${SATS_SYMBOL}`;
     }
 
     const numMakersSummary = content.querySelector('#num-hops-display');
@@ -733,27 +733,27 @@ export async function SwapComponent(container) {
 
     content.querySelector('#maker-fee-percent').textContent =
       details.makerFeePercent + '%';
-    content.querySelector('#maker-fee-sats').textContent =
-      details.makerFeeSats.toLocaleString() + ' 丰';
-    content.querySelector('#network-fee-sats').textContent =
-      details.networkFeeSats.toLocaleString() + ' 丰';
-    content.querySelector('#network-fee-rate').textContent =
-      networkFeeRate + ' 丰/vB';
+    content.querySelector('#maker-fee-sats').innerHTML =
+      details.makerFeeSats.toLocaleString() + ' ' + SATS_SYMBOL;
+    content.querySelector('#network-fee-sats').innerHTML =
+      details.networkFeeSats.toLocaleString() + ' ' + SATS_SYMBOL;
+    content.querySelector('#network-fee-rate').innerHTML =
+      networkFeeRate + ' ' + SATS_SYMBOL + '/vB';
     content.querySelector('#funding-txs-count').textContent =
       details.fundingTxs.toString();
     content.querySelector('#avg-funding-tx-size').textContent =
       `${details.avgFundingTxSize} vB`;
-    content.querySelector('#total-fee-sats').textContent =
-      details.totalFeeSats.toLocaleString() + ' 丰';
+    content.querySelector('#total-fee-sats').innerHTML =
+      details.totalFeeSats.toLocaleString() + ' ' + SATS_SYMBOL;
 
     const maxSwapEl = content.querySelector('#max-swappable-amount');
     if (maxSwapEl) {
-      maxSwapEl.textContent = `${maxSwappableAmount.toLocaleString()} 丰`;
+      maxSwapEl.innerHTML = `${maxSwappableAmount.toLocaleString()} ${SATS_SYMBOL}`;
     }
 
     // Total = Amount - Fees (what user receives)
-    content.querySelector('#total-amount').textContent =
-      receiveAmount.toLocaleString() + ' 丰';
+    content.querySelector('#total-amount').innerHTML =
+      receiveAmount.toLocaleString() + ' ' + SATS_SYMBOL;
     const totalBtc = receiveAmount / 100000000;
     content.querySelector('#total-btc').textContent =
       totalBtc.toFixed(8) + ' BTC';
@@ -787,7 +787,7 @@ export async function SwapComponent(container) {
 
       if (selectedUtxos.length > 0 && selectedTotal < swapAmount) {
         warnings.push(
-          `Selected UTXOs only cover ${selectedTotal.toLocaleString()} 丰`
+          `Selected UTXOs only cover ${selectedTotal.toLocaleString()} ${SATS_SYMBOL}`
         );
       }
 
@@ -803,7 +803,7 @@ export async function SwapComponent(container) {
       // Check if amount exceeds balance
       if (balancesLoaded && swapAmount > maxSwappableAmount) {
         warnings.push(
-          `Swap amount (${swapAmount.toLocaleString()} 丰) exceeds swappable balance`
+          `Swap amount (${swapAmount.toLocaleString()} ${SATS_SYMBOL}) exceeds swappable balance`
         );
       }
     }
@@ -829,14 +829,14 @@ export async function SwapComponent(container) {
       const maxMakerSize = Math.max(...availableMakers.map((m) => m.maxSize));
       if (swapAmount > maxMakerSize) {
         warnings.push(
-          `Swap amount exceeds maker max size (${maxMakerSize.toLocaleString()} 丰)`
+          `Swap amount exceeds maker max size (${maxMakerSize.toLocaleString()} ${SATS_SYMBOL})`
         );
       }
 
       const minMakerSize = Math.min(...availableMakers.map((m) => m.minSize));
       if (swapAmount < minMakerSize) {
         warnings.push(
-          `Swap amount below maker minimum (${minMakerSize.toLocaleString()} 丰)`
+          `Swap amount below maker minimum (${minMakerSize.toLocaleString()} ${SATS_SYMBOL})`
         );
       }
     }
@@ -869,7 +869,7 @@ export async function SwapComponent(container) {
     else input.placeholder = '0.00';
 
     const unitEl = content.querySelector('#swap-amount-unit');
-    if (unitEl) unitEl.textContent = getAmountUnitLabel(unit);
+    if (unitEl) unitEl.innerHTML = getAmountUnitLabel(unit);
 
     writeSwapAmountInput(currentAmountSats);
     updateSummary();
@@ -956,9 +956,7 @@ export async function SwapComponent(container) {
   function setUtxoFilter(filter, { prune = true } = {}) {
     utxoFilter = filter;
     if (prune) {
-      selectedUtxos = selectedUtxos.filter(
-        (index) => getUtxoKind(availableUtxos[index]) === filter
-      );
+      selectedUtxos = [];
     }
 
     content.querySelectorAll('.utxo-filter-btn').forEach((btn) => {
@@ -1037,7 +1035,12 @@ export async function SwapComponent(container) {
     }
 
     if (hasMixedSelectedUtxos()) {
-      warningEl.classList.remove('hidden');
+      selectedUtxos = selectedUtxos.filter(
+        (index) => getUtxoKind(availableUtxos[index]) === utxoFilter
+      );
+      const selectedCountEl = content.querySelector('#selected-utxos-count');
+      if (selectedCountEl) selectedCountEl.textContent = selectedUtxos.length;
+      warningEl.classList.add('hidden');
     } else {
       warningEl.classList.add('hidden');
     }
@@ -1056,6 +1059,9 @@ export async function SwapComponent(container) {
         utxoFilter = nextKind;
       }
       selectedUtxos.push(index);
+      content.querySelectorAll('.utxo-filter-btn').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.id === 'utxo-filter-' + utxoFilter);
+      });
     }
 
     const checkbox = content.querySelector('#utxo-' + index);
@@ -1066,6 +1072,7 @@ export async function SwapComponent(container) {
     content.querySelector('#selected-utxos-count').textContent =
       selectedUtxos.length;
 
+    renderUtxoList();
     checkUtxoTypeWarning();
     updateSummary();
   }
@@ -1147,7 +1154,7 @@ export async function SwapComponent(container) {
               <div class="swap-field-row">
                 <label>Amount</label>
                 <div class="swap-unit-toggle">
-                  <button id="unit-sats" class="unit-btn is-active">丰</button>
+                  <button id="unit-sats" class="unit-btn is-active">${SATS_SYMBOL}</button>
                   <button id="unit-btc" class="unit-btn">BTC</button>
                   <button id="unit-usd" class="unit-btn">USD</button>
                 </div>
@@ -1158,7 +1165,7 @@ export async function SwapComponent(container) {
               </label>
               <div class="swap-amount-meta">
                 <span id="amount-input-conversions"><span>= 0.00000000 BTC</span><span>$0.00 USD</span></span>
-                <button id="max-swap-btn">Use Max Swappable: <span id="max-swappable-amount">0 丰</span></button>
+                <button id="max-swap-btn">Use Max Swappable: <span id="max-swappable-amount">0 ${SATS_SYMBOL}</span></button>
               </div>
             </div>
           </div>
@@ -1178,7 +1185,7 @@ export async function SwapComponent(container) {
               </div>
               <div class="swap-picker-head">
                 <span>Pick UTXOs to fund the swap</span>
-                <strong>Total <span id="utxo-picker-total">0 丰</span></strong>
+                <strong>Total <span id="utxo-picker-total">0 ${SATS_SYMBOL}</span></strong>
               </div>
               <div class="utxo-filter-toggle">
                 <button id="utxo-filter-regular" class="utxo-filter-btn is-active" type="button">Regular</button>
@@ -1238,20 +1245,20 @@ export async function SwapComponent(container) {
             <div class="send-fee-grid">
               <button id="swap-fee-low" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.low ? 'active' : ''}" data-level="low" type="button">
                 <strong>Low</strong>
-                <span>${networkFeeRates.low} 丰/vB - ~60 min</span>
+                <span>${networkFeeRates.low} ${SATS_SYMBOL}/vB - ~60 min</span>
               </button>
               <button id="swap-fee-medium" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.medium ? 'active' : ''}" data-level="medium" type="button">
                 <strong>Medium</strong>
-                <span>${networkFeeRates.medium} 丰/vB - ~20 min</span>
+                <span>${networkFeeRates.medium} ${SATS_SYMBOL}/vB - ~20 min</span>
               </button>
               <button id="swap-fee-high" class="fee-btn swap-fee-rate-btn ${networkFeeRate === networkFeeRates.high ? 'active' : ''}" data-level="high" type="button">
                 <strong>High</strong>
-                <span>${networkFeeRates.high} 丰/vB - ~10 min</span>
+                <span>${networkFeeRates.high} ${SATS_SYMBOL}/vB - ~10 min</span>
               </button>
             </div>
             <label class="send-custom-fee">
               <input id="swap-custom-fee" type="number" min="1" placeholder="Custom" value="${Object.values(networkFeeRates).includes(networkFeeRate) ? '' : networkFeeRate}">
-              <span>丰 / vbyte</span>
+              <span>${SATS_SYMBOL} / vbyte</span>
             </label>
           </div>
 
@@ -1274,7 +1281,7 @@ export async function SwapComponent(container) {
         <aside class="swap-summary-stack">
           <section class="swap-balance-card">
             <span>Swappable Balance</span>
-            <strong id="available-balance-sats">0 丰</strong>
+            <strong id="available-balance-sats">0 ${SATS_SYMBOL}</strong>
             <small id="available-balance-btc">0.00000000 BTC</small>
           </section>
 
@@ -1282,21 +1289,21 @@ export async function SwapComponent(container) {
             <h3>Swap Summary</h3>
             <div class="swap-time-pill">Estimated Time <strong id="estimated-time">2m 00s</strong></div>
             <div class="swap-summary-lines">
-              <div><span>Swap amount</span><strong id="swap-amount-display">0 丰</strong></div>
+              <div><span>Swap amount</span><strong id="swap-amount-display">0 ${SATS_SYMBOL}</strong></div>
               <p id="swap-amount-conversions">0.00000000 BTC</p>
               <div><span>Makers</span><strong id="num-hops-display">2 makers</strong></div>
               <div><span>Funding transactions</span><strong id="funding-txs-count">3</strong></div>
               <div><span>Avg funding tx size</span><strong id="avg-funding-tx-size">300 vB</strong></div>
             </div>
             <div class="swap-fee-box">
-              <div><span>Estimated maker fee</span><strong><span id="maker-fee-sats">0 丰</span></strong></div>
+              <div><span>Estimated maker fee</span><strong><span id="maker-fee-sats">0 ${SATS_SYMBOL}</span></strong></div>
               <span id="maker-fee-percent" class="swap-hidden-percent">0.00%</span>
-              <div><span>Network fee</span><strong><span id="network-fee-sats">0 丰</span><small id="network-fee-rate">2 丰/vB</small></strong></div>
-              <div class="total"><span>Total estimated fee</span><strong id="total-fee-sats">0 丰</strong></div>
+              <div><span>Network fee</span><strong><span id="network-fee-sats">0 ${SATS_SYMBOL}</span><small id="network-fee-rate">2 ${SATS_SYMBOL}/vB</small></strong></div>
+              <div class="total"><span>Total estimated fee</span><strong id="total-fee-sats">0 ${SATS_SYMBOL}</strong></div>
             </div>
             <div class="swap-you-receive">
               <span>You receive</span>
-              <strong id="total-amount">0 丰</strong>
+              <strong id="total-amount">0 ${SATS_SYMBOL}</strong>
               <small id="total-btc">0.00000000 BTC</small>
             </div>
           </section>
@@ -1320,7 +1327,7 @@ export async function SwapComponent(container) {
     const balanceEl = content.querySelector('#available-balance-sats');
     const balanceBtcEl = content.querySelector('#available-balance-btc');
     if (balanceEl) {
-      balanceEl.textContent = maxSwappableAmount.toLocaleString() + ' 丰';
+      balanceEl.innerHTML = maxSwappableAmount.toLocaleString() + ' ' + SATS_SYMBOL;
     }
     if (balanceBtcEl) {
       balanceBtcEl.textContent = (maxSwappableAmount / 100000000).toFixed(8) + ' BTC';

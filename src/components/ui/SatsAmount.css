@@ -1,0 +1,45 @@
+.cs-sats-amount {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.cs-sats-symbol {
+  display: inline-block;
+  position: relative;
+  flex: 0 0 auto;
+  width: 0.72em;
+  height: 1em;
+  margin-left: 0.24em;
+  color: currentColor;
+  font-size: 0.72em;
+  vertical-align: middle;
+}
+
+/* top and bottom dots */
+.cs-sats-symbol::before,
+.cs-sats-symbol::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 0.14em;
+  height: 0.14em;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+.cs-sats-symbol::before { top: 0; }
+.cs-sats-symbol::after  { bottom: 0; }
+
+/* 3 horizontal bars */
+.cs-sats-symbol span {
+  position: absolute;
+  left: 0.04em;
+  right: 0.04em;
+  height: 0.1em;
+  border-radius: 1px;
+  background: currentColor;
+}
+.cs-sats-symbol span:nth-child(1) { top: 0.245em; }
+.cs-sats-symbol span:nth-child(2) { top: 0.45em; }
+.cs-sats-symbol span:nth-child(3) { top: 0.655em; }

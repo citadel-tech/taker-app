@@ -1,6 +1,6 @@
 import { formatRelativeTime } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
-import { formatSats } from '../../js/price.js';
+import { formatSats, SATS_SYMBOL } from '../../js/price.js';
 
 let swapHistory = [];
 let currentSort = 'newest';
@@ -360,7 +360,7 @@ export function buildSwapHistoryMarkup(history) {
               </div>
               <div>
                 <span>Total fee</span>
-                <strong>${totalFee.toLocaleString()} 丰</strong>
+                <strong>${totalFee.toLocaleString()} ${SATS_SYMBOL}</strong>
               </div>
               <div>
                 <span>Output</span>
@@ -470,7 +470,7 @@ export async function SwapHistoryComponent(container) {
           </div>
           <div>
             <span>Total fees</span>
-            <strong>${totalFees.toLocaleString()} 丰</strong>
+            <strong>${totalFees.toLocaleString()} ${SATS_SYMBOL}</strong>
           </div>
           <div>
             <span>Avg hops</span>

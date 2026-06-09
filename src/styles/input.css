@@ -3801,9 +3801,9 @@
 .app-balance-card .app-card-value > span {
   max-width: 100%;
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 6px;
   overflow-wrap: normal;
 }
 
@@ -3817,11 +3817,50 @@
 
 .app-balance-card .app-card-amount-unit {
   color: var(--color-subtle);
-  font-size: 0.42em;
+  font-size: 0.5em;
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
+  align-self: center;
 }
+
+.cs-sats-symbol {
+  display: inline-block;
+  position: relative;
+  flex: 0 0 auto;
+  width: 0.72em;
+  height: 1em;
+  margin-left: 0.24em;
+  color: currentColor;
+  font-size: 0.72em;
+  vertical-align: middle;
+}
+
+.cs-sats-symbol::before,
+.cs-sats-symbol::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  width: 0.14em;
+  height: 0.14em;
+  border-radius: 1px;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+.cs-sats-symbol::before { top: 0; }
+.cs-sats-symbol::after  { bottom: 0; }
+
+.cs-sats-symbol span {
+  position: absolute;
+  left: 0.04em;
+  right: 0.04em;
+  height: 0.1em;
+  border-radius: 1px;
+  background: currentColor;
+}
+.cs-sats-symbol span:nth-child(1) { top: 0.245em; }
+.cs-sats-symbol span:nth-child(2) { top: 0.45em; }
+.cs-sats-symbol span:nth-child(3) { top: 0.655em; }
 
 .app-card-value small {
   color: var(--color-subtle);
@@ -4755,6 +4794,10 @@
   font-size: 18px;
 }
 
+.recovery-pending-main strong .cs-sats-symbol {
+  color: var(--color-warning);
+}
+
 .recovery-pending-main small {
   color: var(--color-subtle);
   font-family: var(--app-font-mono);
@@ -4786,6 +4829,14 @@
   color: var(--color-foreground);
   font-family: var(--app-font-mono);
   font-size: 16px;
+}
+
+.recovery-failure-reason {
+  grid-column: 1 / -1;
+  padding-top: 2px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .recovery-empty-state {
@@ -4824,6 +4875,20 @@
 .log-stats-panel,
 .log-settings-panel {
   min-height: 0;
+}
+
+.recovery-head .app-actions {
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recovery-action-note {
+  max-width: 280px;
+  color: var(--color-subtle);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .recovery-how-strip {
@@ -4939,6 +5004,10 @@
   padding: 5px 8px;
   border-radius: 8px;
   color: var(--color-muted);
+}
+
+.log-entry.no-timestamps {
+  grid-template-columns: 62px minmax(0, 1fr);
 }
 
 .log-entry:hover {
@@ -5469,6 +5538,15 @@
   margin-top: 18px;
 }
 
+.send-manual-section .utxo-filter-btn {
+  min-height: 34px;
+  font-family: var(--app-font-sans);
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
 .send-utxo-warning {
   display: flex;
   align-items: center;
@@ -5480,6 +5558,10 @@
   background: rgba(255, 91, 110, 0.08);
   color: var(--color-danger);
   font-size: 12px;
+}
+
+.send-utxo-warning.hidden {
+  display: none;
 }
 
 .send-utxo-list {
@@ -5595,6 +5677,11 @@
 
 .send-fee-grid button {
   min-height: 66px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   border: 1px solid var(--color-line);
   border-radius: 10px;
   background: var(--color-surface-raised);
@@ -5608,19 +5695,19 @@
   color: white;
 }
 
-.send-fee-grid strong,
-.send-fee-grid span {
+.send-fee-grid button > strong,
+.send-fee-grid button > span {
   display: block;
   font-family: var(--app-font-sans);
 }
 
-.send-fee-grid strong {
-  margin-bottom: 8px;
+.send-fee-grid button > strong {
   font-size: 15px;
 }
 
-.send-fee-grid span {
+.send-fee-grid button > span {
   font-size: 10.5px;
+  line-height: 1.35;
 }
 
 .send-custom-fee {
@@ -6883,8 +6970,8 @@
 .market-row {
   display: grid;
   grid-template-columns:
-    minmax(140px, 1.8fr) repeat(5, minmax(72px, 0.9fr))
-    minmax(108px, 1fr) minmax(260px, 1.2fr);
+    minmax(150px, 1.35fr) repeat(5, minmax(74px, 0.78fr))
+    minmax(122px, 0.9fr) minmax(250px, max-content);
   gap: 12px;
   align-items: center;
 }
@@ -6893,13 +6980,19 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: 14px 18px 10px;
+  padding: 14px 30px 10px;
   background: var(--color-surface);
   color: var(--color-subtle);
   font-family: var(--app-font-mono);
   font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.market-table-header > :nth-child(n + 2):nth-child(-n + 7),
+.market-row > :nth-child(n + 2):nth-child(-n + 7) {
+  justify-self: end;
+  text-align: right;
 }
 
 .market-table-header > :nth-child(8),
@@ -6911,7 +7004,8 @@
 .market-table-scroll {
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -6984,6 +7078,7 @@
 .market-bond {
   width: fit-content;
   max-width: 100%;
+  justify-self: end;
   border: 0;
   background: transparent;
   cursor: pointer;
@@ -7608,7 +7703,16 @@
 
   .app-actions,
   .app-panel-controls {
+    align-items: flex-start;
     justify-content: flex-start;
+  }
+
+  .recovery-head .app-actions {
+    align-items: flex-start;
+  }
+
+  .recovery-action-note {
+    text-align: left;
   }
 
   .market-panel-head {

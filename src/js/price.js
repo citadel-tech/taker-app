@@ -103,6 +103,8 @@ export async function refreshBtcPriceUsd({ force = false } = {}) {
   return inFlightRefresh;
 }
 
+export const SATS_SYMBOL = '<span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span>';
+
 export function formatSats(sats = 0) {
-  return `${Math.round(Number(sats || 0)).toLocaleString()} 丰`;
+  return `${Math.round(Number(sats || 0)).toLocaleString()} ${SATS_SYMBOL}`;
 }

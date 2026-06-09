@@ -233,6 +233,8 @@ function parseRecoveryStatusFromLog(logText = '') {
 
   return {
     source: 'debug-log',
+    canTriggerRecovery: false,
+    statusNote: 'Only log evidence was found. No persisted recovery state is available to trigger.',
     currentHeight: latestCurrentHeight,
     pendingCount: pending.length,
     latestRecoverTimelockedCount,
@@ -533,6 +535,52 @@ function enrichRecoveryFromLog(pending, logPath) {
   }
 }
 
+function getLatestRecoveryStoreStatus(logPath) {
+  if (!fs.existsSync(logPath)) {
+    return {
+      count: null,
+      height: null,
+      checkedAt: null,
+    };
+  }
+
+  try {
+    const logTail = readFileTail(logPath, 2 * 1024 * 1024);
+    const recovery = parseRecoveryStatusFromLog(logTail);
+    return {
+      count: recovery.latestRecoverTimelockedCount,
+      height: recovery.currentHeight,
+      checkedAt: recovery.lastRecoverTimelockedAt,
+    };
+  } catch (error) {
+    console.error('⚠️ Failed to read recovery store status from log:', error.message);
+    return {
+      count: null,
+      height: null,
+      checkedAt: null,
+    };
+  }
+}
+
+function applyRecoveryStoreStatus(recovery, storeStatus) {
+  const count = Number(storeStatus?.count);
+  const hasStoreCount = Number.isFinite(count);
+  const canTriggerRecovery = hasStoreCount && count > 0;
+
+  return {
+    ...recovery,
+    walletRecoveryStoreCount: hasStoreCount ? count : null,
+    walletRecoveryStoreHeight: storeStatus?.height ?? null,
+    walletRecoveryStoreCheckedAt: storeStatus?.checkedAt ?? null,
+    canTriggerRecovery,
+    statusNote: canTriggerRecovery
+      ? `${count} wallet recovery swapcoin${count === 1 ? '' : 's'} found. Recovery can run from wallet data.`
+      : hasStoreCount
+        ? 'The tracker has failed swap metadata, but the wallet recovery store is empty.'
+        : 'The tracker has failed swap metadata, but wallet recovery store status is unknown.',
+  };
+}
+
 function getSwapFromTracker(swapId) {
   try {
     const trackerPath = path.join(api1State.DATA_DIR, 'swap_tracker.cbor');
@@ -571,6 +619,8 @@ function parseSwapTracker(trackerPath) {
 
     const result = {
       source: 'swap-tracker',
+      canTriggerRecovery: false,
+      statusNote: 'Tracker metadata found. Checking wallet recovery store.',
       total: 0,
       completed: 0,
       failed: 0,
@@ -2045,7 +2095,7 @@ function registerTakerHandlers() {
           return { success: false, error: 'Invalid address or amount' };
         }
 
-        console.log(`📤 Sending ${amount} 丰 to ${address}...`);
+        console.log(`📤 Sending ${amount} sats to ${address}...`);
 
         const txidObj = api1State.takerInstance.sendToAddress(
           address,
@@ -2091,7 +2141,11 @@ function registerTakerHandlers() {
         const logPath = path.join(api1State.DATA_DIR, 'debug.log');
         trackerData.pending = enrichRecoveryFromLog(trackerData.pending, logPath);
         trackerData.totalPendingAmount = trackerData.pending.reduce((s, p) => s + (p.amount || 0), 0);
-        return { success: true, recovery: trackerData };
+        const recovery = applyRecoveryStoreStatus(
+          trackerData,
+          getLatestRecoveryStoreStatus(logPath)
+        );
+        return { success: true, recovery };
       }
 
       // Fall back to log parsing if tracker is unavailable
@@ -2101,6 +2155,8 @@ function registerTakerHandlers() {
           success: true,
           recovery: {
             source: 'debug-log',
+            canTriggerRecovery: false,
+            statusNote: '',
             currentHeight: null,
             pendingCount: 0,
             pending: [],
@@ -2564,7 +2620,7 @@ function registerCoinswapHandlers() {
         const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
         const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         console.log(
-          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} 丰, ${makerCount} makers`
+          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} sats, ${makerCount} makers`
         );
 
         // WAIT FOR OFFERBOOK SYNC TO COMPLETE

@@ -100,8 +100,9 @@ export function LogComponent(container) {
           const timeStr = showTimestamps
             ? `<span class="log-time">${formatTime(log.timestamp)}</span>`
             : '';
+          const timestampClass = showTimestamps ? '' : ' no-timestamps';
           return `
-            <div class="log-entry ${getTypeColor(log.type)}">
+            <div class="log-entry ${getTypeColor(log.type)}${timestampClass}">
               ${timeStr}
               <span class="log-level">${getTypeLabel(log.type)}</span>
               <span class="log-message">${escapeHtml(log.message)}</span>

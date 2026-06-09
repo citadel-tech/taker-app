@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { formatSats } from '../../js/price.js';
+import { formatSats, SATS_SYMBOL } from '../../js/price.js';
 
 export function Market(container) {
   const content = document.createElement('div');
@@ -413,8 +413,8 @@ export function Market(container) {
 
   function calculateStats() {
     const goodMakers = makers.filter((m) => m.status === 'good');
-    const totalLiquidity = goodMakers.reduce((sum, m) => sum + m.maxSize, 0);
-    const totalFidelity = goodMakers.reduce((sum, m) => sum + m.bond, 0);
+    const totalLiquidity = goodMakers.reduce((sum, m) => sum + (Number.isFinite(m.maxSize) ? m.maxSize : 0), 0);
+    const totalFidelity = goodMakers.reduce((sum, m) => sum + (Number.isFinite(m.bond) ? m.bond : 0), 0);
     const counts = {
       good: goodMakers.length,
       bad: makers.filter((m) => m.status === 'bad').length,
@@ -549,22 +549,22 @@ export function Market(container) {
           <div class="market-fee-results">
             <div>
               <span>Base Fee</span>
-              <strong><span id="market-fee-base">0</span> 丰</strong>
+              <strong><span id="market-fee-base">0</span> ${SATS_SYMBOL}</strong>
               <small>Fixed maker fee</small>
             </div>
             <div>
               <span>Liquidity Fee</span>
-              <strong><span id="market-fee-liquidity">0</span> 丰</strong>
-              <small id="market-fee-liquidity-detail">0 丰 x 0 fee rate</small>
+              <strong><span id="market-fee-liquidity">0</span> ${SATS_SYMBOL}</strong>
+              <small id="market-fee-liquidity-detail">0 ${SATS_SYMBOL} x 0 fee rate</small>
             </div>
             <div>
               <span>Time Fee</span>
-              <strong><span id="market-fee-time">0</span> 丰</strong>
-              <small id="market-fee-time-detail">20 x 0 丰 x 0 time rate</small>
+              <strong><span id="market-fee-time">0</span> ${SATS_SYMBOL}</strong>
+              <small id="market-fee-time-detail">20 x 0 ${SATS_SYMBOL} x 0 time rate</small>
             </div>
             <div class="total">
               <span>Total Fee</span>
-              <strong><span id="market-fee-total">0</span> 丰</strong>
+              <strong><span id="market-fee-total">0</span> ${SATS_SYMBOL}</strong>
               <small id="market-fee-percent">0.0000% of swap amount</small>
             </div>
           </div>
@@ -885,7 +885,10 @@ export function Market(container) {
         // would return stale data. Merge the normalized maker directly into the
         // in-memory array so the UI reflects the fresh poll result immediately.
         if (res.maker) {
-          const newStatus = (res.maker.stateType || 'Good').toLowerCase();
+          const rawType = (res.maker.stateType || 'Good').toLowerCase();
+          const newStatus = rawType.includes('bad') ? 'bad'
+            : rawType.includes('unresponsive') ? 'unresponsive'
+            : 'good';
           const existingIdx = makers.findIndex((m) => m.address === address);
           if (existingIdx >= 0) {
             const fresh = {
