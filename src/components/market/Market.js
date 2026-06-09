@@ -12,6 +12,7 @@ export function Market(container) {
   let syncCheckInterval = null;
   let periodicRefreshInterval = null;
   let relayCount = null;
+  const activeMakerPolls = new Set();
 
   function refreshButtonContent(label = 'Refresh', spinning = false) {
     return `${icons.refreshCw(16, spinning ? 'animate-spin' : '')} ${label}`;
@@ -129,6 +130,41 @@ export function Market(container) {
       bondIsSpent: bond.is_spent || false,
       index,
     };
+  }
+
+  function getMakerPollStatus(maker = {}) {
+    const rawType = String(maker.stateType || 'Good').toLowerCase();
+    if (rawType.includes('bad')) return 'bad';
+    if (rawType.includes('unresponsive')) return 'unresponsive';
+    if (!maker.offer) return 'unresponsive';
+    return 'good';
+  }
+
+  function mergePolledMaker(address, maker) {
+    const status = getMakerPollStatus(maker);
+    const existingIdx = makers.findIndex((m) => m.address === address);
+
+    if (existingIdx >= 0) {
+      const fresh = {
+        ...transformMaker(maker, makers[existingIdx].index),
+        status,
+      };
+      makers[existingIdx] = fresh;
+      return fresh;
+    }
+
+    const fresh = { ...transformMaker(maker, makers.length), status };
+    makers.push(fresh);
+    return fresh;
+  }
+
+  function getPollFailureMessage(maker) {
+    const status = getMakerPollStatus(maker);
+    if (status === 'bad')
+      return 'Maker returned a bad state and no usable fresh offer.';
+    if (status === 'unresponsive')
+      return 'Maker did not respond with a usable fresh offer.';
+    return 'Poll failed.';
   }
 
   async function fetchMakers() {
@@ -750,6 +786,7 @@ export function Market(container) {
       } else {
         tableBody.innerHTML = displayedMakers
           .map((maker) => {
+            const isPolling = activeMakerPolls.has(maker.address);
             return `
               <div class="market-row">
                 <div class="market-address" title="${maker.address}">${formatTorEndpoint(maker.address)}</div>
@@ -766,7 +803,7 @@ export function Market(container) {
                 </div>
                 <div class="market-actions">
                   <button class="market-action-btn" onclick="window.openMakerFeeCalculator(${maker.index})" data-tooltip="Calculate the estimated maker fee for this maker using your amount and hop position.">Calculate</button>
-                  <button class="market-action-btn" data-maker-poll="${maker.address}" data-tooltip="Ask this maker for a fresh offer now and update its availability and fee data.">Poll</button>
+                  <button class="market-action-btn" data-maker-poll="${maker.address}" data-tooltip="Ask this maker for a fresh offer now and update its availability and fee data." ${isPolling ? 'disabled aria-busy="true"' : ''}>${isPolling ? 'Polling...' : 'Poll'}</button>
                   <button class="market-action-btn danger" data-maker-remove="${maker.address}" data-tooltip="Remove this maker from your local offerbook so it no longer appears in market results.">Remove</button>
                 </div>
               </div>
@@ -875,30 +912,26 @@ export function Market(container) {
 
     if (pollBtn) {
       const address = pollBtn.dataset.makerPoll;
-      pollBtn.disabled = true;
-      pollBtn.innerHTML = 'Polling...';
+      if (activeMakerPolls.has(address)) {
+        showError(
+          `Poll already in progress for ${formatTorEndpoint(address)}.`
+        );
+        return;
+      }
+
+      activeMakerPolls.add(address);
+      updateUI();
       try {
         const res = await window.api.taker.pollMaker(address);
         if (!res.success) throw new Error(res.error || 'Poll failed');
+        if (!res.maker) throw new Error('Maker did not return poll data.');
 
         // pollMakerAsync never writes offerbook.json, so re-reading from disk
         // would return stale data. Merge the normalized maker directly into the
         // in-memory array so the UI reflects the fresh poll result immediately.
-        if (res.maker) {
-          const rawType = (res.maker.stateType || 'Good').toLowerCase();
-          const newStatus = rawType.includes('bad') ? 'bad'
-            : rawType.includes('unresponsive') ? 'unresponsive'
-            : 'good';
-          const existingIdx = makers.findIndex((m) => m.address === address);
-          if (existingIdx >= 0) {
-            const fresh = {
-              ...transformMaker(res.maker, makers[existingIdx].index),
-              status: newStatus,
-            };
-            makers[existingIdx] = fresh;
-          } else {
-            makers.push({ ...transformMaker(res.maker, makers.length), status: newStatus });
-          }
+        const fresh = mergePolledMaker(address, res.maker);
+        if (fresh.status !== 'good') {
+          throw new Error(getPollFailureMessage(res.maker));
         }
 
         updateUI();
@@ -906,8 +939,9 @@ export function Market(container) {
       } catch (err) {
         console.error('Poll failed:', err);
         showError(`Poll failed: ${err.message}`);
-        pollBtn.disabled = false;
-        pollBtn.innerHTML = 'Poll';
+      } finally {
+        activeMakerPolls.delete(address);
+        updateUI();
       }
       return;
     }

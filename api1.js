@@ -57,6 +57,21 @@ function isUsableMaker(maker) {
   return maker.offer != null;
 }
 
+function getMakerStateType(maker = {}) {
+  const state = maker.state;
+  const normalizedState =
+    typeof state === 'string'
+      ? state.toLowerCase()
+      : state && typeof state === 'object'
+        ? (state.stateType || Object.keys(state)[0])?.toLowerCase()
+        : null;
+
+  if (normalizedState === 'bad') return 'Bad';
+  if (normalizedState === 'unresponsive') return 'Unresponsive';
+  if (normalizedState === 'good') return 'Good';
+  return maker.offer != null ? 'Good' : 'Unresponsive';
+}
+
 function getMakerProtocolName(maker = {}) {
   if (maker.protocol === 'Unified') return 'Unified';
   if (maker.protocol === 'Taproot' || maker.protocol === 'v2') return 'Taproot';
@@ -2311,7 +2326,7 @@ function registerTakerHandlers() {
       // pollMakerAsync uses OfferSyncClient directly and never writes offerbook.json,
       // so re-reading the file would return stale data.
       const candidateAddress = candidate.address?.address || address;
-      const stateType = candidate.state?.stateType || 'Good';
+      const stateType = getMakerStateType(candidate);
 
       let normalizedOffer = null;
       if (candidate.offer) {
