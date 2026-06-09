@@ -141,7 +141,7 @@ export async function WalletComponent(container) {
   }
 
   function openMempool(txid) {
-    const url = `http://170.75.166.88:8080/tx/${txid}`;
+    const url = `https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(txid)}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');

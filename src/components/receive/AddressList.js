@@ -325,7 +325,7 @@ const result = await window.api.taker.getTransactions(200, 0);
                       <tr class="address-row" data-address="${addr.address}">
                         <td>
                           <div class="address-cell">
-                            <a href="https://mutinynet.com/address/${addr.address}" 
+                            <a href="https://mempool.citadelfoss.xyz/address/${encodeURIComponent(addr.address)}" 
                                target="_blank" 
                                title="${addr.address}">
                                 ${addr.address.substring(0, 12)}...${addr.address.substring(addr.address.length - 8)}

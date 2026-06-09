@@ -57,6 +57,19 @@ The Taker app requires the following components to operate:
 4. **Rust toolchain** - Only required for building from source
    - Install from [rustup.rs](https://rustup.rs/)
 
+5. **System build dependencies** - Required when compiling native Rust modules and the bundled Tor manager
+   - Debian/Ubuntu:
+     ```bash
+     sudo apt-get update
+     sudo apt-get install -y build-essential git curl pkg-config libssl-dev
+     ```
+   - macOS:
+     ```bash
+     xcode-select --install
+     brew install pkg-config openssl
+     ```
+   - The app can use an existing `tor` binary when available, but source builds also compile the bundled Tor manager used by `npm start`, `npm run dev`, and production builds.
+
 ### Alternative: Docker Setup
 
 If you prefer a pre-configured environment, you can use Docker Compose to spin up Tor, Bitcoin Core (Mutinynet), and maker services automatically.
@@ -113,9 +126,16 @@ Before creating a production build, ensure you have installed all dependencies:
 npm install
 ```
 
+Linux production packaging also needs the packaging/icon tools used by the release build:
+```bash
+sudo apt-get install -y rpm imagemagick libarchive-tools
+sudo snap install snapcraft --classic # only needed when building the snap package
+```
+
 This will automatically:
 - Install Node.js dependencies
 - Clone and build the coinswap native module (first build may take 2-3 minutes)
+- Build the bundled Tor manager
 - Build production CSS
 
 ### Create Distribution Build

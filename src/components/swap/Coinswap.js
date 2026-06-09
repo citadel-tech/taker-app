@@ -1063,12 +1063,12 @@ export async function CoinswapComponent(container, swapConfig) {
   function updateArrowLink(hopIndex, txid) {
     const arrow = content.querySelector(`#arrow-link-${hopIndex}`);
     if (arrow && txid) {
-      const baseUrl = 'https://mutinynet.com/tx/';
+      const baseUrl = 'https://mempool.citadelfoss.xyz/tx/';
       // ✅ FIX: Use setAttributeNS for SVG href
       arrow.setAttributeNS(
         'http://www.w3.org/1999/xlink',
         'href',
-        `${baseUrl}${txid}`
+        `${baseUrl}${encodeURIComponent(txid)}`
       );
     }
   }

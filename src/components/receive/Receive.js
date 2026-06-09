@@ -527,7 +527,7 @@ export function ReceiveComponent(container) {
 
   viewMempoolButton.addEventListener('click', () => {
     if (currentAddress) {
-      window.open(`https://mempool.space/address/${currentAddress}`, '_blank');
+      window.open(`https://mempool.citadelfoss.xyz/address/${encodeURIComponent(currentAddress)}`, '_blank');
     }
   });
 

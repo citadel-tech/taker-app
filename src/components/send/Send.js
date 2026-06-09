@@ -935,7 +935,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <p>${safeAddress}</p>
               <span>TXID</span>
               <div>
-                <a href="http://170.75.166.88:8080/tx/${encodeURIComponent(txid)}" target="_blank" rel="noreferrer">
+                <a href="https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(txid)}" target="_blank" rel="noreferrer">
                   ${safeTxid}
                 </a>
               </div>
