@@ -529,7 +529,7 @@ export async function SwapComponent(container) {
   async function fetchNetworkFees() {
     try {
       const response = await fetch(
-        'http://170.75.166.88:8080/api/v1/fees/recommended'
+        'https://mempool.citadelfoss.xyz/api/v1/fees/recommended'
       );
       const data = await response.json();
       if (!userSelectedNetworkFeeRate) {

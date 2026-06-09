@@ -114,7 +114,7 @@
 |-----------|-----------------|-----------|----------------------|
 | Rename "Maker Address" to "Tor Address" in Detail Modal | Update label in the fidelity bond detail modal | `Market.js` line 450 (`<p class="text-sm text-gray-400 mb-1">Maker Address</p>`) | Change label text to `"Tor Address"`. |
 | Simplify Bond Summary to Three Fields | Show only: Bond Amount, Bond Status, Expires In (days estimate). Remove all other fields. | `Market.js` `viewFidelityBond()` function lines 441–548 | Remove grids for Bond Outpoint, Confirmation Height, Bond Public Key, Required Confirmations, Minimum Locktime, Certificate Expiry detail rows. Keep Bond Amount, Bond Status, and compute `expiresInDays` from `bondLocktime` (blocks ÷ 144) to show "~X days". |
-| Make Bond Txid Clickable | Make the Bond Txid open mempool.space in an external browser | `Market.js` — bond modal | In the simplified bond summary, add the `bondTxid` as a clickable element: `onclick="window.open('https://mempool.space/.../tx/${maker.bondTxid}', '_blank')"` with an underline style. |
+| Make Bond Txid Clickable | Make the Bond Txid open the Citadel mempool explorer in an external browser | `Market.js` — bond modal | In the simplified bond summary, add the `bondTxid` as a clickable element: `onclick="window.open('https://mempool.citadelfoss.xyz/tx/${maker.bondTxid}', '_blank')"` with an underline style. |
 | Remove "View on Block Explorer" Button | Remove the dedicated explorer button from the bond detail modal | `Market.js` lines 529–536 (explorer button block) | Delete the `<div>` containing the "View on Block Explorer" button. |
 
 ---

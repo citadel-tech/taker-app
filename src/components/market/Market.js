@@ -507,7 +507,7 @@ export function Market(container) {
           </div>
           <div class="wide">
             <span>Bond Txid</span>
-            <button onclick="window.open('http://170.75.166.88:8080/tx/${maker.bondTxid}', '_blank')">
+            <button onclick="window.open('https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(maker.bondTxid)}', '_blank')">
               ${maker.bondTxid}
             </button>
           </div>

@@ -443,9 +443,9 @@ export function TransactionsListComponent(container) {
 
   container.appendChild(content);
 
-  // Global function for opening transactions on mempool.space
+  // Global function for opening transactions on the Citadel mempool explorer.
   window.openTxOnMempool = (txid) => {
-    const url = `http://170.75.166.88:8080/tx/${txid}`;
+    const url = `https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(txid)}`;
     if (typeof require !== 'undefined') {
       try {
         const { shell } = require('electron');

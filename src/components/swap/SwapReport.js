@@ -1430,7 +1430,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
 
   content.querySelectorAll('.view-txid-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      window.open(`https://mutinynet.com/tx/${btn.dataset.txid}`, '_blank');
+      window.open(`https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(btn.dataset.txid)}`, '_blank');
     });
   });
 

@@ -1830,7 +1830,7 @@
   border-right: 0;
 }
 
-.swap-progress-stats span {
+.swap-progress-stats div > span {
   display: block;
   margin-bottom: 8px;
   color: var(--color-subtle);
