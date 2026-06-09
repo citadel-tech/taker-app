@@ -24,6 +24,15 @@ function formatRecoveryError(error = '') {
   return message.replace(/^Recover error:\s*/i, '');
 }
 
+function isStillTimelocked(item) {
+  const currentHeight = Number(item?.currentHeight);
+  const unlockBlock = Number(item?.unlockBlock);
+  if (!Number.isFinite(currentHeight) || !Number.isFinite(unlockBlock) || unlockBlock <= 0) {
+    return true;
+  }
+  return currentHeight < unlockBlock;
+}
+
 export function RecoveryComponent(container) {
   const content = document.createElement('div');
   content.id = 'recovery-content';
@@ -59,8 +68,12 @@ export function RecoveryComponent(container) {
     const recoveryButtonLabel = recoveryButton?.querySelector('.button-label');
     if (!list) return;
 
-    const pending = Array.isArray(recovery?.pending) ? recovery.pending : [];
-    const totalPendingAmount = Number(recovery?.totalPendingAmount || 0);
+    const allPending = Array.isArray(recovery?.pending) ? recovery.pending : [];
+    const pending = allPending.filter(isStillTimelocked);
+    const totalPendingAmount = pending.reduce(
+      (sum, item) => sum + (Number.isFinite(Number(item.amount)) ? Number(item.amount) : 0),
+      0
+    );
     const recoveredCount = Number(recovery?.recoveredCount || 0);
     const canTriggerRecovery = Boolean(recovery?.canTriggerRecovery);
     const hasWalletRecoveryStoreCount = recovery?.walletRecoveryStoreCount != null;
