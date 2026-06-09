@@ -1,6 +1,6 @@
 import { SwapStateManager } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
-import { formatSats } from '../../js/price.js';
+import { formatSats, SATS_SYMBOL } from '../../js/price.js';
 import { createSwapProgressAnimation } from './SwapProgressAnimation.js';
 
 export async function CoinswapComponent(container, swapConfig) {
@@ -1128,7 +1128,7 @@ export async function CoinswapComponent(container, swapConfig) {
           </div>
           <div class="font-mono text-gray-300">${tx.txid ? tx.txid.substring(0, 12) + '...' : 'Pending'}</div>
           <div class="text-gray-500 mt-1">
-            ${tx.fee ? `Fee: ${tx.fee} 丰` : ''}
+            ${tx.fee ? `Fee: ${tx.fee} ${SATS_SYMBOL}` : ''}
             ${tx.size ? `| ${tx.size} vB` : ''}
           </div>
         </div>

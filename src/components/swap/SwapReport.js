@@ -1,4 +1,5 @@
 import { icons } from '../../js/icons.js';
+import { SATS_SYMBOL } from '../../js/price.js';
 
 function satsToBtc(sats) {
   const normalized = Number(sats || 0);
@@ -470,7 +471,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     if (Array.isArray(utxo)) {
       const [first, second, third] = utxo;
       const parts = [];
-      if (Number.isFinite(Number(first))) parts.push(`${formatNumber(Number(first))} 丰`);
+      if (Number.isFinite(Number(first))) parts.push(`${formatNumber(Number(first))} ${SATS_SYMBOL}`);
       if (typeof second === 'string' && Number.isFinite(Number(first))) {
         parts.push('report output');
       } else if (third != null) {
@@ -505,7 +506,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
               <strong>${escapeHtml(title)}</strong>
               ${meta ? `<span>${escapeHtml(meta)}</span>` : ''}
             </div>
-            ${Number.isFinite(amount) ? `<em>${formatNumber(amount)} 丰</em>` : ''}
+            ${Number.isFinite(amount) ? `<em>${formatNumber(amount)} ${SATS_SYMBOL}</em>` : ''}
           </div>
         `;
       })
@@ -566,7 +567,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
   function getMakerFeeDisplay(makerIndex) {
     const parts = getMakerFeeParts(makerIndex);
     return Number.isFinite(parts.totalFee) && parts.totalFee > 0
-      ? `${formatNumber(parts.totalFee)} 丰`
+      ? `${formatNumber(parts.totalFee)} ${SATS_SYMBOL}`
       : 'Not itemized';
   }
 
@@ -637,7 +638,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
               <span>${label} ${index + 1}</span>
               <strong title="${escapeHtml(address)}">${escapeHtml(address || 'Address not included')}</strong>
             </div>
-            <em>${Number.isFinite(amount) ? `${formatNumber(amount)} 丰` : 'Amount not included'}</em>
+            <em>${Number.isFinite(amount) ? `${formatNumber(amount)} ${SATS_SYMBOL}` : 'Amount not included'}</em>
             ${address ? `<button class="copy-output-btn" data-copy-text="${escapeHtml(address)}" title="Copy address">${icons.clipboardCopy(16)}</button>` : ''}
           </div>
         `;
@@ -739,7 +740,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
             <div class="maker-popup-metrics">
               <div>
                 <small>Fee Paid</small>
-                <strong>${formatNumber(feePaid)} 丰</strong>
+                <strong>${formatNumber(feePaid)} ${SATS_SYMBOL}</strong>
               </div>
               <div>
                 <small>Fee Rate</small>
@@ -759,7 +760,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
                         <b>${label}</b>
                         <small>${note}</small>
                       </span>
-                      <strong>${formatNumber(amount)} 丰</strong>
+                      <strong>${formatNumber(amount)} ${SATS_SYMBOL}</strong>
                     </div>
                   `
                 )
@@ -769,7 +770,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
                   <b>Total maker fee</b>
                   <small>Base + liquidity + time${feeParts.unattributed > 0 ? ' + other' : ''}</small>
                 </span>
-                <strong>${formatNumber(feePaid)} 丰</strong>
+                <strong>${formatNumber(feePaid)} ${SATS_SYMBOL}</strong>
               </div>
               ${
                 feeParts.hasComponents
@@ -988,13 +989,13 @@ export function SwapReportComponent(container, swapReport, options = {}) {
 
   function buildFeeDetailsHtml() {
     const lines = [
-      `<div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <small>丰</small></strong></div>`,
-      `<div><span>Mining fees</span><strong>${formatNumber(report.miningFee)} <small>丰</small></strong></div>`,
+      `<div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></strong></div>`,
+      `<div><span>Mining fees</span><strong>${formatNumber(report.miningFee)} <span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></strong></div>`,
     ];
 
     if (report.changeAmount > 0) {
       lines.push(
-        `<div><span>Change amount</span><strong>${formatNumber(report.changeAmount)} <small>丰</small></strong></div>`
+        `<div><span>Change amount</span><strong>${formatNumber(report.changeAmount)} <span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></strong></div>`
       );
     }
 
@@ -1342,7 +1343,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
           }
           <div class="swap-report-hero">
             <span>${isFailedReport ? 'Attempted Amount' : 'Amount Swapped'}</span>
-            <strong>${formatNumber(displayAmount)} <small>丰</small></strong>
+            <strong>${formatNumber(displayAmount)} <span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></strong>
             <p>≈ ${satsToBtc(displayAmount)} BTC</p>
             <b>${icons.timer(15)} Duration ${formatDuration(report.swapDurationSeconds)}</b>
           </div>
@@ -1388,7 +1389,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
             ${buildMakerFeeLinesHtml()}
             <div class="swap-report-total-fee">
               <span>Total fee</span>
-              <strong>${formatNumber(report.totalFee)} <small>丰</small></strong>
+              <strong>${formatNumber(report.totalFee)} <span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></strong>
               <p>${satsToBtc(report.totalFee)} BTC</p>
             </div>
             <div class="swap-report-percent">

@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { getBtcPriceUsd } from '../../js/price.js';
+import { getBtcPriceUsd, SATS_SYMBOL } from '../../js/price.js';
 
 export function SendComponent(container, preSelectedUtxos = null) {
   const content = document.createElement('div');
@@ -50,7 +50,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
   }
 
   function getAmountUnitLabel(unit = amountUnit) {
-    if (unit === 'sats') return '丰';
+    if (unit === 'sats') return SATS_SYMBOL;
     return unit.toUpperCase();
   }
 
@@ -59,7 +59,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     const btcAmount = amountSats / 100000000;
 
     if (selectedUnit !== 'sats') {
-      labels.push(`= ${Math.round(amountSats || 0).toLocaleString()} 丰`);
+      labels.push(`= ${Math.round(amountSats || 0).toLocaleString()} ${SATS_SYMBOL}`);
     }
     if (selectedUnit !== 'btc') {
       labels.push(`= ${btcAmount.toFixed(8)} BTC`);
@@ -71,6 +71,18 @@ export function SendComponent(container, preSelectedUtxos = null) {
     }
 
     return labels;
+  }
+
+  function formatSatsHtml(sats) {
+    return `${Math.round(Number(sats || 0)).toLocaleString()} ${SATS_SYMBOL}`;
+  }
+
+  function formatSatsText(sats) {
+    return `${Math.round(Number(sats || 0)).toLocaleString()} sats`;
+  }
+
+  function validationMessage(text, html = text) {
+    return { text, html };
   }
 
   // Fetch real UTXOs from API
@@ -100,6 +112,9 @@ export function SendComponent(container, preSelectedUtxos = null) {
         );
         if (selectedUtxos.length > 0 && availableUtxos[selectedUtxos[0]]) {
           utxoFilter = getUtxoKind(availableUtxos[selectedUtxos[0]]);
+          selectedUtxos = selectedUtxos.filter(
+            (index) => availableUtxos[index] && getUtxoKind(availableUtxos[index]) === utxoFilter
+          );
         }
         console.log(
           'Loaded',
@@ -110,6 +125,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
         );
 
         renderUtxoList();
+        updateSelectedUtxosDisplay();
         updateSummary();
       }
     } catch (error) {
@@ -151,7 +167,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     // Check recipients
     const validRecipients = recipients.filter((r) => r.address);
     if (validRecipients.length === 0) {
-      errors.push('Add at least one recipient');
+      errors.push(validationMessage('Add at least one recipient'));
       return { valid: false, errors };
     }
 
@@ -161,7 +177,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     if (selectionMode === 'manual') {
       if (selectedUtxos.length === 0) {
-        errors.push('Select at least one UTXO');
+        errors.push(validationMessage('Select at least one UTXO'));
         return { valid: false, errors };
       }
       availableForSpending = getSelectedUtxosTotal();
@@ -178,18 +194,18 @@ export function SendComponent(container, preSelectedUtxos = null) {
     // Check for negative amounts
     recipients.forEach((r, i) => {
       if (r.amount < 0) {
-        errors.push(`Recipient ${i + 1} has negative amount`);
+        errors.push(validationMessage(`Recipient ${i + 1} has negative amount`));
       }
     });
 
     if (totalAmount <= 0) {
-      errors.push('Enter an amount to send');
+      errors.push(validationMessage('Enter an amount to send'));
       return { valid: false, errors };
     }
 
     validRecipients.forEach((recipient, index) => {
       if (!recipient.amount || recipient.amount <= 0) {
-        errors.push(`Recipient ${index + 1} needs an amount`);
+        errors.push(validationMessage(`Recipient ${index + 1} needs an amount`));
       }
     });
 
@@ -204,14 +220,19 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     const total = totalAmount + estimatedFee;
     if (selectionMode === 'manual' && totalAmount > availableForSpending) {
-      errors.push(
-        `Amount (${Math.floor(totalAmount).toLocaleString()} 丰) exceeds selected UTXOs (${availableForSpending.toLocaleString()} 丰)`
+      errors.push(validationMessage(
+        `Amount (${formatSatsText(totalAmount)}) exceeds selected UTXOs (${formatSatsText(availableForSpending)})`,
+        `Amount (${formatSatsHtml(totalAmount)}) exceeds selected UTXOs (${formatSatsHtml(availableForSpending)})`
+      )
       );
     }
 
     if (total > availableForSpending) {
       const shortfall = total - availableForSpending;
-      errors.push(`Need ${shortfall.toLocaleString()} more 丰`);
+      errors.push(validationMessage(
+        `Need ${formatSatsText(shortfall)} more`,
+        `Need ${formatSatsHtml(shortfall)} more`
+      ));
     }
 
     return { valid: errors.length === 0, errors };
@@ -227,8 +248,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
       return;
     }
 
-    signBtn.innerHTML = icons.alertTriangle(15) + ' ' + errors[0];
-    signBtn.title = errors.join('\n');
+    signBtn.innerHTML = icons.alertTriangle(15) + ' ' + errors[0].html;
+    signBtn.title = errors.map((error) => error.text).join('\n');
   }
 
   // RECIPIENT MANAGEMENT
@@ -266,7 +287,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     });
 
     content.querySelectorAll('.recipient-amount-unit').forEach((unitEl) => {
-      unitEl.textContent = getAmountUnitLabel(unit);
+      unitEl.innerHTML = getAmountUnitLabel(unit);
     });
 
     recipients.forEach((_, index) => {
@@ -305,8 +326,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
     const secondaryEl = content.querySelector(`#recipient-${index}-conversion-secondary`);
     const [primary, secondary] = getAmountConversionLabels(amountSats);
 
-    if (primaryEl) primaryEl.textContent = primary;
-    if (secondaryEl) secondaryEl.textContent = secondary;
+    if (primaryEl) primaryEl.innerHTML = primary;
+    if (secondaryEl) secondaryEl.innerHTML = secondary;
   }
 
   function renderRecipients() {
@@ -386,7 +407,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <label>Amount</label>
             <div class="send-unit-toggle">
               <button type="button" class="unit-btn ${amountUnit === 'sats' ? 'active' : ''}" data-unit="sats" data-recipient="${index}">
-                丰
+                ${SATS_SYMBOL}
               </button>
               <button type="button" class="unit-btn ${amountUnit === 'btc' ? 'active' : ''}" data-unit="btc" data-recipient="${index}">
                 BTC
@@ -496,9 +517,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
   function setUtxoFilter(filter) {
     utxoFilter = filter === 'swap' ? 'swap' : 'regular';
-    selectedUtxos = selectedUtxos.filter(
-      (index) => getUtxoKind(availableUtxos[index]) === utxoFilter
-    );
+    selectedUtxos = [];
 
     content.querySelectorAll('.utxo-filter-btn').forEach((btn) => {
       btn.classList.toggle('is-active', btn.dataset.filter === utxoFilter);
@@ -516,7 +535,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
     if (utxoIndex > -1) {
       selectedUtxos.splice(utxoIndex, 1);
     } else {
+      const nextKind = getUtxoKind(availableUtxos[index]);
+      utxoFilter = nextKind;
+      selectedUtxos = selectedUtxos.filter(
+        (selectedIndex) => getUtxoKind(availableUtxos[selectedIndex]) === nextKind
+      );
       selectedUtxos.push(index);
+      content.querySelectorAll('.utxo-filter-btn').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.dataset.filter === utxoFilter);
+      });
     }
 
     const checkbox = content.querySelector('#utxo-' + index);
@@ -529,6 +556,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
     }
 
     updateSelectedUtxosDisplay();
+    renderUtxoList();
     checkUtxoTypeWarning();
     renderRecipients();
     updateSummary();
@@ -545,8 +573,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
         (sum, index) => sum + availableUtxos[index].amount,
         0
       );
-      valueEl.textContent = totalValue.toLocaleString() + ' 丰';
+      valueEl.textContent = `${selectedUtxos.length} selected`;
       valueEl.title =
+        totalValue.toLocaleString() +
+        ' sats - ' +
         (totalValue / 100000000).toFixed(8) +
         ' BTC' +
         (hasUsdPrice()
@@ -567,20 +597,18 @@ export function SendComponent(container, preSelectedUtxos = null) {
     const warningEl = content.querySelector('#utxo-warning');
     if (!warningEl) return;
 
-    if (selectedUtxos.length < 2) {
-      warningEl.classList.add('hidden');
-      return;
-    }
-
     const types = selectedUtxos.map((index) => getUtxoKind(availableUtxos[index]));
     const hasRegular = types.includes('regular');
     const hasSwap = types.includes('swap');
 
     if (hasRegular && hasSwap) {
-      warningEl.classList.remove('hidden');
-    } else {
-      warningEl.classList.add('hidden');
+      const keepKind = utxoFilter;
+      selectedUtxos = selectedUtxos.filter(
+        (index) => getUtxoKind(availableUtxos[index]) === keepKind
+      );
+      updateSelectedUtxosDisplay();
     }
+    warningEl.classList.add('hidden');
   }
 
   function renderUtxoList() {
@@ -628,10 +656,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <span></span>
           <div>
             <strong>${utxo.txid.substring(0, 16)}...${utxo.txid.substring(utxo.txid.length - 8)}:${utxo.vout}</strong>
-            <small>${utxo.amount.toLocaleString()} 丰 - ${getUtxoKindLabel(utxo)}</small>
+            <small>${utxo.amount.toLocaleString()} ${SATS_SYMBOL} - ${getUtxoKindLabel(utxo)}</small>
           </div>
           <div>
-            <strong>${utxo.amount.toLocaleString()} 丰</strong>
+            <strong>${utxo.amount.toLocaleString()} ${SATS_SYMBOL}</strong>
             <small>${btcAmount} BTC${usdAmount == null ? '' : ' - $' + usdAmount}</small>
           </div>
         </label>
@@ -711,15 +739,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
     const summaryInputValue = content.querySelector('#summary-input-value');
 
     if (summaryAmount)
-      summaryAmount.textContent =
-        Math.floor(amountSats).toLocaleString() + ' 丰';
+      summaryAmount.innerHTML =
+        Math.floor(amountSats).toLocaleString() + ' ' + SATS_SYMBOL;
     if (summaryFeeRate) summaryFeeRate.textContent = selectedFeeRate;
     if (summaryFee)
-      summaryFee.textContent =
-        (signedTx ? '' : '~') + displayFee.toLocaleString() + ' 丰';
+      summaryFee.innerHTML =
+        (signedTx ? '' : '~') + displayFee.toLocaleString() + ' ' + SATS_SYMBOL;
     if (summaryInputValue) {
-      summaryInputValue.textContent =
-        `${numInputs} / ${availableForSpending.toLocaleString()} 丰`;
+      summaryInputValue.innerHTML =
+        `${numInputs} / ${availableForSpending.toLocaleString()} ${SATS_SYMBOL}`;
     }
 
     // Technical details
@@ -732,7 +760,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
 
     // Show change amount in red if negative
     if (changeAmountEl) {
-      changeAmountEl.textContent = displayRemaining.toLocaleString() + ' 丰';
+      changeAmountEl.innerHTML = displayRemaining.toLocaleString() + ' ' + SATS_SYMBOL;
       if (displayRemaining < 0) {
         changeAmountEl.classList.add('text-red-400');
         changeAmountEl.classList.remove('text-purple-400');
@@ -748,8 +776,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
       '#available-balance-btc'
     );
     if (availableBalanceEl && availableBalanceBtcEl) {
-      availableBalanceEl.textContent =
-        availableForSpending.toLocaleString() + ' 丰';
+      availableBalanceEl.innerHTML =
+        availableForSpending.toLocaleString() + ' ' + SATS_SYMBOL;
       availableBalanceBtcEl.textContent = (
         availableForSpending / 100000000
       ).toFixed(8);
@@ -768,7 +796,10 @@ export function SendComponent(container, preSelectedUtxos = null) {
   async function handleSignTransaction() {
     const validation = validateTransaction();
     if (!validation.valid) {
-      alert('Cannot sign transaction:\n\n' + validation.errors.join('\n'));
+      alert(
+        'Cannot sign transaction:\n\n' +
+          validation.errors.map((error) => error.text).join('\n')
+      );
       return;
     }
 
@@ -980,7 +1011,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <div id="manual-selection-section" class="${selectionMode === 'manual' ? '' : 'hidden'} send-manual-section">
                 <div class="send-section-label">
                   <span>Select UTXOs</span>
-                  <small><span id="selected-utxos-value">0 丰</span> selected</small>
+                  <small><span id="selected-utxos-value">0 selected</span></small>
                 </div>
                 <div class="utxo-filter-toggle">
                   <button class="utxo-filter-btn ${utxoFilter === 'regular' ? 'is-active' : ''}" data-filter="regular" type="button">
@@ -989,10 +1020,6 @@ export function SendComponent(container, preSelectedUtxos = null) {
                   <button class="utxo-filter-btn ${utxoFilter === 'swap' ? 'is-active' : ''}" data-filter="swap" type="button">
                     Swap
                   </button>
-                </div>
-                <div id="utxo-warning" class="hidden send-utxo-warning">
-                  ${icons.alertTriangle(16)}
-                  <span>Privacy warning: selected Regular and Swap UTXOs together.</span>
                 </div>
                 <div id="utxo-list-container" class="send-utxo-list">
                   <div class="send-empty">
@@ -1009,15 +1036,15 @@ export function SendComponent(container, preSelectedUtxos = null) {
               <div class="send-fee-grid">
                 <button id="fee-low" class="fee-btn" data-level="low" type="button">
                   <strong>Low</strong>
-                  <span>1 丰/vB - ~60 min</span>
+                  <span>1 ${SATS_SYMBOL}/vB - ~60 min</span>
                 </button>
                 <button id="fee-medium" class="fee-btn active" data-level="medium" type="button">
                   <strong>Medium</strong>
-                  <span>2 丰/vB - ~20 min</span>
+                  <span>2 ${SATS_SYMBOL}/vB - ~20 min</span>
                 </button>
                 <button id="fee-high" class="fee-btn" data-level="high" type="button">
                   <strong>High</strong>
-                  <span>4 丰/vB - ~10 min</span>
+                  <span>4 ${SATS_SYMBOL}/vB - ~10 min</span>
                 </button>
               </div>
 
@@ -1047,7 +1074,7 @@ export function SendComponent(container, preSelectedUtxos = null) {
           <section class="send-balance-card">
             <span class="app-accent"></span>
             <div class="app-card-label">Available Balance</div>
-            <div class="send-balance-value"><span id="available-balance-sats">0 丰</span></div>
+            <div class="send-balance-value"><span id="available-balance-sats">0 ${SATS_SYMBOL}</span></div>
             <p><span id="available-balance-btc">0.00000000</span> BTC - $0.00</p>
           </section>
 
@@ -1059,23 +1086,23 @@ export function SendComponent(container, preSelectedUtxos = null) {
             <div class="send-summary-body">
               <div class="send-summary-line">
                 <span>Amount</span>
-                <strong id="summary-amount">0 丰</strong>
+                <strong id="summary-amount">0 ${SATS_SYMBOL}</strong>
               </div>
               <div class="send-summary-line">
                 <span>Inputs</span>
-                <strong id="summary-input-value">1 / 0 丰</strong>
+                <strong id="summary-input-value">1 / 0 ${SATS_SYMBOL}</strong>
               </div>
               <div class="send-summary-line">
                 <span>TX Size (est)</span>
                 <strong id="tx-size">140 vB</strong>
               </div>
               <div class="send-summary-line">
-                <span>Network Fee (<b id="summary-fee-rate">2</b> 丰/vB)</span>
-                <strong id="summary-fee">~280 丰</strong>
+                <span>Network Fee (<b id="summary-fee-rate">2</b> ${SATS_SYMBOL}/vB)</span>
+                <strong id="summary-fee">~280 ${SATS_SYMBOL}</strong>
               </div>
               <div class="send-summary-line">
                 <span>Change Amount</span>
-                <strong id="change-amount">0 丰</strong>
+                <strong id="change-amount">0 ${SATS_SYMBOL}</strong>
               </div>
             </div>
           </section>

@@ -171,7 +171,7 @@ export async function WalletComponent(container) {
       `<span class="app-card-amount-number">${Math.round(
         Number(sats || 0)
       ).toLocaleString()}</span>` +
-      '<span class="app-card-amount-unit">丰</span>';
+      '<span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span>';
   }
 
   function calculateUtxoStats() {
@@ -493,25 +493,25 @@ export async function WalletComponent(container) {
       <article class="app-balance-card hero">
         <span class="app-accent"></span>
         <span class="app-card-label">Total Balance</span>
-        <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <div class="app-card-value"><span id="spendable-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></span></div>
         <p>Swap + Regular Coins</p>
       </article>
       <article class="app-balance-card info">
         <span class="app-accent"></span>
         <span class="app-card-label">Swaps</span>
-        <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <div class="app-card-value"><span id="swap-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></span></div>
         <p>Coins Received by swap txs</p>
       </article>
       <article class="app-balance-card wallet">
         <span class="app-accent"></span>
         <span class="app-card-label">Regular</span>
-        <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></span></div>
         <p>Coins Received by regular txs</p>
       </article>
       <article class="app-balance-card warning">
         <span class="app-accent"></span>
         <span class="app-card-label">Contracts</span>
-        <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit">丰</span></span></div>
+        <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></span></div>
         <p>Coins stuck in HTLC</p>
       </article>
     </section>
