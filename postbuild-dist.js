@@ -32,6 +32,13 @@ try {
     console.log('✓ Removed backup file\n');
   }
   
+  // Clean up bin/ directory created by prepare-dist.js
+  const binDir = path.join(__dirname, 'bin');
+  if (fs.existsSync(binDir)) {
+    fs.rmSync(binDir, { recursive: true, force: true });
+    console.log('✓ Cleaned up bin/ directory\n');
+  }
+
 } catch (error) {
   console.error('❌ Error cleaning package.json:', error.message);
   process.exit(1);

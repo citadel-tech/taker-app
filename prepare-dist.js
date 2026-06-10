@@ -48,3 +48,20 @@ packageJson.dependencies['coinswap-napi'] = 'file:./node_modules/coinswap-napi';
 fs.writeFileSync(PACKAGE_JSON, JSON.stringify(packageJson, null, 2));
 
 console.log('✓ Modified package.json for build\n');
+
+// Copy tor-manager binary to bin/ so electron-builder includes it
+// (tor-manager/target/ is gitignored and would otherwise be excluded)
+const TOR_BINARY = process.platform === 'win32' ? 'coinswap-tor-manager.exe' : 'coinswap-tor-manager';
+const torBinarySource = path.join(__dirname, 'tor-manager', 'target', 'debug', TOR_BINARY);
+const binDir = path.join(__dirname, 'bin');
+const torBinaryTarget = path.join(binDir, TOR_BINARY);
+
+if (fs.existsSync(torBinarySource)) {
+  if (!fs.existsSync(binDir)) fs.mkdirSync(binDir, { recursive: true });
+  fs.copyFileSync(torBinarySource, torBinaryTarget);
+  fs.chmodSync(torBinaryTarget, 0o755);
+  console.log('✓ Copied tor-manager binary to bin/\n');
+} else {
+  console.warn('⚠️  tor-manager binary not found at', torBinarySource);
+  console.warn('   Tor will not be auto-started in the built app.\n');
+}

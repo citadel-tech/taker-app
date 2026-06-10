@@ -4,6 +4,9 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const { registerAPI1, api1State } = require('./api1');
 
+// Fix blank screen on Linux systems where GPU VSync fails (VMs, some drivers)
+app.disableHardwareAcceleration();
+
 console.log('MAIN.JS __dirname:', __dirname);
 console.log('PRELOAD PATH:', path.join(__dirname, 'preload.js'));
 console.log(
@@ -27,15 +30,12 @@ function startManagedTor() {
     return;
   }
 
-  const torManagerPath = path.join(
-    __dirname,
-    'tor-manager',
-    'target',
-    'debug',
-    process.platform === 'win32'
-      ? 'coinswap-tor-manager.exe'
-      : 'coinswap-tor-manager'
-  );
+  const TOR_BINARY = process.platform === 'win32' ? 'coinswap-tor-manager.exe' : 'coinswap-tor-manager';
+  // Packaged app: binary is in bin/ (copied by prepare-dist.js)
+  // Dev: binary is in tor-manager/target/debug/ (built by cargo)
+  const torManagerPath = app.isPackaged
+    ? path.join(__dirname, 'bin', TOR_BINARY)
+    : path.join(__dirname, 'tor-manager', 'target', 'debug', TOR_BINARY);
 
   if (!fs.existsSync(torManagerPath)) {
     console.warn(

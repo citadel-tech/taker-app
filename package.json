@@ -18,7 +18,7 @@
     "prebuild:electron": "node prepare-dist.js",
     "build:electron": "electron-builder",
     "postbuild:electron": "node postbuild-dist.js",
-    "dist": "node prepare-dist.js && npm run build:tor-manager && npm run build && npm run build:electron && node postbuild-dist.js"
+    "dist": "npm run build:tor-manager && node prepare-dist.js && npm run build && npm run build:electron && node postbuild-dist.js"
   },
   "build": {
     "appId": "com.citadel.coinswap-taker",
