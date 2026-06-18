@@ -869,7 +869,17 @@ function safelyShutdownTaker(takerInstance) {
 }
 
 function toNumber(value, fallback = 0) {
-  const normalized = Number(value);
+  if (value && typeof value === 'object') {
+    for (const key of ['sats', 'value', 'amount']) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const nested = toNumber(value[key], NaN);
+        if (Number.isFinite(nested)) return nested;
+      }
+    }
+  }
+
+  const normalized =
+    typeof value === 'string' ? Number(value.replace(/,/g, '')) : Number(value);
   return Number.isFinite(normalized) ? normalized : fallback;
 }
 
@@ -2349,9 +2359,9 @@ function registerTakerHandlers() {
           fidelity: {
             bond: {
               outpoint: outpointStr,
-              amount: bond.amount || 0,
-              lock_time: bond.lockTime || 0,
-              is_spent: bond.isSpent || false,
+              amount: toNumber(bond.amount, 0),
+              lock_time: toNumber(bond.lockTime ?? bond.lock_time, 0),
+              is_spent: Boolean(bond.isSpent ?? bond.is_spent),
             },
           },
         };
