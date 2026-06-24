@@ -103,17 +103,17 @@
   },
   "homepage": "https://github.com/citadel-tech/taker-app#readme",
   "devDependencies": {
+    "@tailwindcss/cli": "^4.1.14",
     "concurrently": "^9.2.1",
     "electron": "^27.0.0",
     "electron-builder": "^26.0.12",
     "electron-reloader": "^1.2.3",
     "prettier": "^3.6.2",
-    "prettier-plugin-embed": "^0.5.0"
+    "prettier-plugin-embed": "^0.5.0",
+    "tailwindcss": "^4.1.14"
   },
   "dependencies": {
-    "@tailwindcss/cli": "^4.1.14",
     "electron-store": "^8.2.0",
-    "lucide": "^1.7.0",
-    "tailwindcss": "^4.1.14"
+    "lucide": "^1.7.0"
   }
 }
