@@ -354,6 +354,19 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     NaN
   );
 
+  // Extract deniability proofs from the raw report file structure, filtered to this swap only
+  const rawDeniabilityProofs =
+    swapReport.deniability_proofs ||
+    swapReport.deniabilityProofs ||
+    nestedReport.deniability_proofs ||
+    nestedReport.deniabilityProofs ||
+    [];
+  const allProofs = Array.isArray(rawDeniabilityProofs) ? rawDeniabilityProofs : [];
+  const currentSwapId = report.nativeSwapId || report.swapId || null;
+  report.deniabilityProofs = currentSwapId
+    ? allProofs.filter((p) => p.swap_id === currentSwapId)
+    : [];
+
   console.log('📊 Normalized report:', report);
 
   // Helper functions
@@ -986,6 +999,113 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     `;
   }
 
+  function formatUnixTs(ts) {
+    if (!ts) return 'Unknown';
+    return new Date(ts * 1000).toLocaleString();
+  }
+
+  function truncateHex(hex, start = 12, end = 8) {
+    if (!hex || typeof hex !== 'string') return hex || '—';
+    if (hex.length <= start + end + 3) return hex;
+    return `${hex.slice(0, start)}…${hex.slice(-end)}`;
+  }
+
+  function hexRow(label, value) {
+    if (!value) return '';
+    // ECDSA signatures serialize as { signature: hex, sighash_type: ... }
+    if (value && typeof value === 'object' && value.signature) value = value.signature;
+    if (typeof value !== 'string') value = JSON.stringify(value);
+    const display = truncateHex(value);
+    return `
+      <div class="dp-row">
+        <span class="dp-label">${label}</span>
+        <span class="dp-val" title="${escapeHtml(value)}">${escapeHtml(display)}</span>
+        <button class="dp-copy" data-copy="${escapeHtml(value)}" title="Copy">${icons.clipboardCopy(13)}</button>
+      </div>
+    `;
+  }
+
+  function outpointRow(label, outpoint, accent) {
+    if (!outpoint) return '';
+    const parts = typeof outpoint === 'string' ? outpoint.split(':') : [];
+    const txid = parts.length >= 2 ? parts.slice(0, -1).join(':') : String(outpoint);
+    const vout = parts.length >= 2 ? parts[parts.length - 1] : '';
+    const display = truncateHex(txid) + (vout !== '' ? `:${vout}` : '');
+    return `
+      <div class="dp-row">
+        <span class="dp-label">${label}</span>
+        <span class="dp-val" title="${escapeHtml(txid)}">${escapeHtml(display)}</span>
+        <button class="dp-copy" data-copy="${escapeHtml(txid)}" title="Copy txid">${icons.clipboardCopy(13)}</button>
+        <button class="dp-ext" data-txid="${escapeHtml(txid)}" title="View on explorer">${icons.externalLink(13)}</button>
+      </div>
+    `;
+  }
+
+  function buildDeniabilityProofHtml() {
+    if (!report.deniabilityProofs || report.deniabilityProofs.length === 0) return '';
+
+    const proofBlocks = report.deniabilityProofs.map((dp, i) => {
+      const proofData = dp.proof?.Taproot || dp.proof?.Legacy || null;
+      const isTaproot = !!dp.proof?.Taproot;
+      const contractOutpoint = proofData?.contract_outpoint || null;
+      const fundingOutpoint = proofData?.funding_outpoint || null;
+      const outgoingOutpoint = dp.outgoing_swapcoin || null;
+
+      return `
+        <div class="dp-proof-block">
+          <div class="dp-header">
+            <span class="dp-badge dp-proto">${escapeHtml(dp.protocol || (isTaproot ? 'Taproot' : 'Legacy'))}</span>
+            <span class="dp-badge dp-role">${escapeHtml(dp.role || '')}</span>
+            ${dp.direction ? `<span class="dp-badge dp-dir">${escapeHtml(dp.direction)}</span>` : ''}
+            <span class="dp-created">Created ${formatUnixTs(dp.created_at)}</span>
+          </div>
+
+          <div class="dp-rows">
+            ${outpointRow(isTaproot ? 'Contract outpoint' : 'Funding outpoint', contractOutpoint || fundingOutpoint)}
+            ${outpointRow('Outgoing swapcoin', outgoingOutpoint)}
+            ${hexRow('Internal key', proofData?.internal_key)}
+            ${hexRow('My MuSig key', proofData?.pub_mine_musig)}
+            ${hexRow('Other MuSig key', proofData?.pub_other_musig)}
+            ${hexRow('My hashlock key', proofData?.pub_mine_hashlock)}
+            ${!isTaproot ? hexRow('My multisig key', proofData?.pub_mine_multi) : ''}
+            ${!isTaproot ? hexRow('Other multisig key', proofData?.pub_other_multi) : ''}
+            ${hexRow('Signature (MuSig)', proofData?.sig_musig)}
+            ${hexRow('Signature (hashlock)', proofData?.sig_hashlock)}
+            ${!isTaproot ? hexRow('Signature (multisig)', proofData?.sig_multi) : ''}
+          </div>
+
+          <details class="dp-scripts">
+            <summary>Scripts</summary>
+            ${hexRow('Hashlock script', proofData?.hashlock_script || proofData?.htlc_redeemscript)}
+            ${hexRow('Timelock script', proofData?.timelock_script)}
+            ${!isTaproot ? hexRow('Multisig redeemscript', proofData?.multisig_redeemscript) : ''}
+          </details>
+        </div>
+      `;
+    }).join('');
+
+    const proofCount = report.deniabilityProofs.length;
+    return `
+      <div class="swap-report-block" id="deniability-section">
+        <div class="swap-report-block-head">
+          <span>Deniability Proof</span>
+          <strong>${proofCount} proof${proofCount === 1 ? '' : 's'}</strong>
+        </div>
+        <p class="dp-desc">
+          Proves you controlled the keys for this swap's contract outputs.
+          If a counterparty presents false transaction records, this proof establishes your actual participation in this coinswap.
+        </p>
+        ${proofBlocks}
+        <div class="dp-verify-bar">
+          <button id="verify-deniability-btn" class="dp-verify-btn">
+            Verify on-chain
+          </button>
+          <div id="verify-deniability-result" class="dp-verify-result" style="display:none;"></div>
+        </div>
+      </div>
+    `;
+  }
+
   function buildFeeDetailsHtml() {
     const lines = [
       `<div><span>Maker fees</span><strong>${formatNumber(report.totalMakerFees)} <span class="cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></strong></div>`,
@@ -1374,6 +1494,8 @@ export function SwapReportComponent(container, swapReport, options = {}) {
             </div>
           </div>
 
+          ${buildDeniabilityProofHtml()}
+
           <div class="swap-report-export-bar">
             <button id="export-report">${icons.arrowDownCircle(18)} Export report</button>
           </div>
@@ -1432,6 +1554,51 @@ export function SwapReportComponent(container, swapReport, options = {}) {
       window.open(`https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(btn.dataset.txid)}`, '_blank');
     });
   });
+
+  // Deniability proof — copy buttons
+  content.querySelectorAll('.dp-copy').forEach((btn) => {
+    btn.addEventListener('click', () => copyToClipboard(btn.dataset.copy));
+  });
+
+  // Deniability proof — external link buttons
+  content.querySelectorAll('.dp-ext').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      window.open(`https://mempool.citadelfoss.xyz/tx/${encodeURIComponent(btn.dataset.txid)}`, '_blank');
+    });
+  });
+
+  // Deniability proof — verify on-chain
+  const verifyBtn = content.querySelector('#verify-deniability-btn');
+  if (verifyBtn) {
+    verifyBtn.addEventListener('click', async () => {
+      const resultEl = content.querySelector('#verify-deniability-result');
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Verifying…';
+      resultEl.style.display = 'none';
+      try {
+        const swapId = report.nativeSwapId || report.swapId;
+        const res = await window.api.taker.verifyDeniability(swapId);
+        resultEl.style.display = '';
+        if (res.success && res.isDeniable) {
+          resultEl.className = 'dp-verify-result dp-ok';
+          resultEl.textContent = 'Proof valid — your key ownership over this swap\'s contract output is confirmed on-chain.';
+        } else if (res.success && !res.isDeniable) {
+          resultEl.className = 'dp-verify-result dp-fail';
+          resultEl.textContent = 'Proof did not verify — key ownership could not be confirmed against on-chain data.';
+        } else {
+          resultEl.className = 'dp-verify-result dp-fail';
+          resultEl.textContent = `Verification error: ${res.error}`;
+        }
+      } catch (err) {
+        resultEl.style.display = '';
+        resultEl.className = 'dp-verify-result dp-fail';
+        resultEl.textContent = `Verification error: ${err.message}`;
+      } finally {
+        verifyBtn.disabled = false;
+        verifyBtn.textContent = 'Verify on-chain';
+      }
+    });
+  }
 
   content.querySelector('#export-report').addEventListener('click', () => {
     const reportJson = JSON.stringify(report, null, 2);

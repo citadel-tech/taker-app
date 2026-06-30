@@ -641,6 +641,8 @@
 .swap-summary-lines strong,
 .swap-fee-box strong,
 .swap-you-receive strong {
+  display: inline-flex;
+  align-items: center;
   color: var(--color-foreground);
   font-family: var(--app-font-mono);
   text-align: right;
@@ -2272,6 +2274,8 @@
 }
 
 .swap-report-hero strong {
+  display: inline-flex;
+  align-items: center;
   margin: 16px 0 12px;
   color: var(--color-foreground);
   font-family: var(--app-font-mono);
@@ -2938,6 +2942,8 @@
 .swap-report-fee-lines strong,
 .swap-report-total-fee strong,
 .swap-report-percent strong {
+  display: inline-flex;
+  align-items: center;
   color: var(--color-foreground);
   font-family: var(--app-font-mono);
   text-align: right;
@@ -2980,6 +2986,8 @@
 }
 
 .maker-fee-row strong {
+  display: inline-flex;
+  align-items: center;
   justify-self: end;
   color: var(--color-foreground);
   font-family: var(--app-font-mono);
@@ -3017,7 +3025,9 @@
 }
 
 .swap-report-total-fee strong {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   color: var(--color-primary-hover);
   font-size: 26px;
 }
@@ -8608,3 +8618,148 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Deniability Proof section ─────────────────────────────────────────── */
+
+.dp-desc {
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-bottom: 18px;
+  line-height: 1.5;
+}
+
+.dp-proof-block {
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface-raised);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+}
+
+.dp-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.dp-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.dp-proto { background: rgba(255, 107, 53, 0.15); color: #FF6B35; }
+.dp-role  { background: rgba(81, 141, 239, 0.15); color: #518def; }
+.dp-dir   { background: rgba(16, 185, 129, 0.12); color: #10B981; }
+
+.dp-created {
+  font-size: 12px;
+  color: var(--color-muted);
+  margin-left: auto;
+}
+
+.dp-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.dp-row {
+  display: grid;
+  grid-template-columns: 130px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.dp-label {
+  color: var(--color-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.dp-val {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dp-copy,
+.dp-ext {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  color: var(--color-muted);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+
+.dp-copy:hover { color: var(--color-text); }
+.dp-ext:hover  { color: #518def; }
+
+.dp-scripts {
+  margin-top: 14px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 12px;
+}
+
+.dp-scripts summary {
+  font-size: 12px;
+  color: var(--color-muted);
+  cursor: pointer;
+  user-select: none;
+  margin-bottom: 10px;
+}
+
+.dp-scripts summary:hover { color: var(--color-text); }
+
+.dp-verify-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.dp-verify-btn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.dp-verify-btn:hover:not(:disabled) {
+  border-color: #FF6B35;
+  color: #FF6B35;
+}
+
+.dp-verify-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.dp-verify-result {
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.dp-ok   { background: rgba(16, 185, 129, 0.12); color: #10B981; }
+.dp-fail { background: rgba(239, 68, 68, 0.12);  color: #EF4444; }
