@@ -166,8 +166,7 @@ const result = await window.api.taker.getTransactions(200, 0);
 
   function showToast(message) {
     const toast = document.createElement('div');
-    toast.className =
-      'fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-opacity';
+    toast.className = 'app-toast bottom transition-opacity';
     toast.textContent = message;
     document.body.appendChild(toast);
     setTimeout(() => {

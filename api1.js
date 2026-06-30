@@ -1319,24 +1319,108 @@ function findSwapReportRecord(swapId) {
   });
 }
 
+function getReportOutputCandidates(record) {
+  const report = record.report || record;
+  const outputSwapUtxos =
+    report.output_swap_utxos ||
+    report.outputSwapUtxos ||
+    report.report?.output_swap_utxos ||
+    report.report?.outputSwapUtxos ||
+    [];
+
+  return outputSwapUtxos
+    .map((entry) => {
+      if (Array.isArray(entry)) {
+        const [first, second, third] = entry;
+        const firstNumber = Number(first);
+        const secondNumber = Number(second);
+        const amount = Number.isFinite(firstNumber)
+          ? firstNumber
+          : Number.isFinite(Number(third))
+            ? Number(third)
+            : NaN;
+        const address =
+          typeof second === 'string'
+            ? second
+            : typeof first === 'string'
+              ? first
+              : '';
+        const txid =
+          typeof first === 'string' && Number.isFinite(secondNumber)
+            ? first
+            : typeof second === 'string' && Number.isFinite(Number(third))
+              ? second
+              : null;
+        const vout =
+          typeof first === 'string' && Number.isFinite(secondNumber)
+            ? secondNumber
+            : null;
+        return { amount, address, txid, vout };
+      }
+
+      if (!entry || typeof entry !== 'object') return null;
+
+      const txid =
+        entry.txid ||
+        entry.tx_id ||
+        entry.txHash ||
+        entry.tx_hash ||
+        entry.outpoint?.txid ||
+        null;
+      const vout =
+        entry.vout ??
+        entry.index ??
+        entry.output_index ??
+        entry.outpoint?.vout ??
+        null;
+
+      return {
+        amount: toNumber(
+          entry.amount ??
+            entry.value ??
+            entry.sats ??
+            entry.satoshis ??
+            entry.amount_sats ??
+            entry.amountSats,
+          NaN
+        ),
+        address:
+          entry.address ||
+          entry.destination ||
+          entry.script_pubkey ||
+          entry.scriptPubkey ||
+          '',
+        txid,
+        vout: vout == null ? null : Number(vout),
+      };
+    })
+    .filter(Boolean);
+}
+
 function getHistoricalSwapOutputMap() {
   const swapOutputs = new Map();
+  const outpointOutputs = new Map();
 
   for (const record of getPreferredSwapReports()) {
     try {
-      const report = record.report || record;
-      const outputSwapUtxos =
-        report.output_swap_utxos ||
-        report.outputSwapUtxos ||
-        report.report?.output_swap_utxos ||
-        report.report?.outputSwapUtxos ||
-        [];
+      const reportMeta = {
+        amount: 0,
+        sourceSwapId: record.swapId || record.appSwapId || record.nativeSwapId || null,
+        sourceNativeSwapId: record.nativeSwapId || null,
+        sourceReportPath: record.filePath || null,
+        sourceReportFileName: record.fileName || null,
+        sourceReportAvailable: true,
+      };
 
-      outputSwapUtxos.forEach((entry) => {
-        if (!Array.isArray(entry) || entry.length < 2) return;
-        const [amount, address] = entry;
-        if (!address) return;
-        swapOutputs.set(address, toNumber(amount, 0));
+      getReportOutputCandidates(record).forEach((candidate) => {
+        const amount = toNumber(candidate.amount, 0);
+        const meta = { ...reportMeta, amount };
+        if (candidate.address) {
+          swapOutputs.set(String(candidate.address), meta);
+        }
+        if (candidate.txid && Number.isFinite(Number(candidate.vout))) {
+          outpointOutputs.set(`${candidate.txid}:${Number(candidate.vout)}`, meta);
+        }
       });
     } catch (error) {
       console.warn('⚠️ Failed to parse swap report for balance derivation:', {
@@ -1346,7 +1430,7 @@ function getHistoricalSwapOutputMap() {
     }
   }
 
-  return swapOutputs;
+  return { byAddress: swapOutputs, byOutpoint: outpointOutputs };
 }
 
 function deriveBalancesFromUtxos(rawUtxos = []) {
@@ -1394,9 +1478,14 @@ function normalizeBalancePayload(rawBalance = {}, rawUtxos = []) {
   const derivedFromUtxos = deriveBalancesFromUtxos(rawUtxos);
   const historicalSwapOutputs = getHistoricalSwapOutputMap();
 
-  const matchedHistoricalSwapUtxos = rawUtxos.filter(([utxoEntry]) =>
-    historicalSwapOutputs.has(utxoEntry?.address)
-  );
+  const matchedHistoricalSwapUtxos = rawUtxos.filter(([utxoEntry]) => {
+    if (historicalSwapOutputs.byAddress.has(utxoEntry?.address)) return true;
+    const txid = utxoEntry?.txid?.value || utxoEntry?.txid;
+    if (txid != null && utxoEntry?.vout != null) {
+      return historicalSwapOutputs.byOutpoint.has(`${txid}:${Number(utxoEntry.vout)}`);
+    }
+    return false;
+  });
   const historicalSwapBalance = matchedHistoricalSwapUtxos.reduce(
     (sum, [utxoEntry]) => sum + toNumber(utxoEntry?.amount?.sats, 0),
     0
@@ -2067,19 +2156,21 @@ function registerTakerHandlers() {
       const historicalSwapOutputs = getHistoricalSwapOutputMap();
 
       const transformedUtxos = rawUtxos.map(([utxoEntry, spendInfo]) => {
-        const historicalSwapAmount = historicalSwapOutputs.get(
-          utxoEntry.address
-        );
+        const txid = utxoEntry.txid?.value || utxoEntry.txid;
+        const outpoint = `${txid}:${utxoEntry.vout}`;
+        const historicalSwapMeta =
+          historicalSwapOutputs.byOutpoint.get(outpoint) ||
+          historicalSwapOutputs.byAddress.get(utxoEntry.address);
         const isHistoricalSwapOutput =
-          historicalSwapAmount !== undefined &&
-          historicalSwapAmount === toNumber(utxoEntry.amount?.sats, 0);
+          historicalSwapMeta !== undefined &&
+          historicalSwapMeta.amount === toNumber(utxoEntry.amount?.sats, 0);
         const spendType = isHistoricalSwapOutput
           ? 'SwapCoin'
           : spendInfo.spendType;
 
         return {
           utxo: {
-            txid: utxoEntry.txid.value,
+            txid,
             vout: utxoEntry.vout,
             amount: utxoEntry.amount.sats,
             confirmations: utxoEntry.confirmations,
@@ -2097,6 +2188,19 @@ function registerTakerHandlers() {
             multisigRedeemscript: spendInfo.multisigRedeemscript,
             inputValue: spendInfo.inputValue,
             index: spendInfo.index,
+            sourceSwapId: isHistoricalSwapOutput
+              ? historicalSwapMeta.sourceSwapId
+              : null,
+            sourceNativeSwapId: isHistoricalSwapOutput
+              ? historicalSwapMeta.sourceNativeSwapId
+              : null,
+            sourceReportPath: isHistoricalSwapOutput
+              ? historicalSwapMeta.sourceReportPath
+              : null,
+            sourceReportFileName: isHistoricalSwapOutput
+              ? historicalSwapMeta.sourceReportFileName
+              : null,
+            sourceReportAvailable: Boolean(isHistoricalSwapOutput),
           },
         };
       });

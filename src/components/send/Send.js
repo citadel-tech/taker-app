@@ -1,5 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { getBtcPriceUsd, SATS_SYMBOL } from '../../js/price.js';
+import { openSwapReport } from '../swap/SwapHistory.js';
 
 export function SendComponent(container, preSelectedUtxos = null) {
   const content = document.createElement('div');
@@ -102,6 +103,8 @@ export function SendComponent(container, preSelectedUtxos = null) {
             vout: utxo.vout,
             amount: utxo.amount,
             type: spendInfo.spendType || 'Regular',
+            sourceSwapId: spendInfo.sourceSwapId || null,
+            sourceReportAvailable: Boolean(spendInfo.sourceReportAvailable),
             index: index,
           };
         });
@@ -649,30 +652,49 @@ export function SendComponent(container, preSelectedUtxos = null) {
           ? ((utxo.amount / 100000000) * btcPrice).toFixed(2)
           : null;
         const isSelected = selectedUtxos.includes(originalIndex);
+        const reportLink =
+          getUtxoKind(utxo) === 'swap' && utxo.sourceReportAvailable && utxo.sourceSwapId
+            ? `<button class="app-report-link send-utxo-report-link" type="button" data-report-swap-id="${String(utxo.sourceSwapId).replace(/"/g, '&quot;')}">${icons.fileText(13)} Report</button>`
+            : '';
 
         return `
-        <label class="send-utxo-item ${isSelected ? 'selected' : ''}">
+        <div class="send-utxo-item ${isSelected ? 'selected' : ''}" data-utxo-index="${originalIndex}">
           <input type="checkbox" id="utxo-${originalIndex}" ${isSelected ? 'checked' : ''} />
           <span></span>
           <div>
             <strong>${utxo.txid.substring(0, 16)}...${utxo.txid.substring(utxo.txid.length - 8)}:${utxo.vout}</strong>
             <small>${utxo.amount.toLocaleString()} ${SATS_SYMBOL} - ${getUtxoKindLabel(utxo)}</small>
+            ${reportLink}
           </div>
           <div>
             <strong>${utxo.amount.toLocaleString()} ${SATS_SYMBOL}</strong>
             <small>${btcAmount} BTC${usdAmount == null ? '' : ' - $' + usdAmount}</small>
           </div>
-        </label>
+        </div>
       `;
       })
       .join('');
 
     filteredUtxos.forEach((utxo) => {
       const index = utxo.index;
-      const checkbox = content.querySelector('#utxo-' + index);
-      if (checkbox) {
-        checkbox.addEventListener('change', () => toggleUtxoSelection(index));
+      const item = content.querySelector(`.send-utxo-item[data-utxo-index="${index}"]`);
+      if (item) {
+        item.addEventListener('click', (e) => {
+          if (e.target.closest('.send-utxo-report-link')) return;
+          toggleUtxoSelection(index);
+        });
       }
+    });
+
+    content.querySelectorAll('.send-utxo-report-link').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openSwapReport(container, button.dataset.reportSwapId, {
+          backTarget: 'send',
+          messageTarget: content,
+        });
+      });
     });
   }
 
@@ -762,11 +784,11 @@ export function SendComponent(container, preSelectedUtxos = null) {
     if (changeAmountEl) {
       changeAmountEl.innerHTML = displayRemaining.toLocaleString() + ' ' + SATS_SYMBOL;
       if (displayRemaining < 0) {
-        changeAmountEl.classList.add('text-red-400');
-        changeAmountEl.classList.remove('text-purple-400');
+        changeAmountEl.classList.add('app-field-value', 'danger');
+        changeAmountEl.classList.remove('primary');
       } else {
-        changeAmountEl.classList.add('text-purple-400');
-        changeAmountEl.classList.remove('text-red-400');
+        changeAmountEl.classList.add('app-field-value', 'primary');
+        changeAmountEl.classList.remove('danger');
       }
     }
 

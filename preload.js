@@ -25,8 +25,13 @@ contextBridge.exposeInMainWorld('api', {
     getTransactions: (count, skip) =>
       ipcRenderer.invoke('taker:getTransactions', { count, skip }),
     getUtxos: () => ipcRenderer.invoke('taker:getUtxos'),
-    sendToAddress: (address, amount) =>
-      ipcRenderer.invoke('taker:sendToAddress', { address, amount }),
+    sendToAddress: (address, amount, feeRate, manuallySelectedOutpoints) =>
+      ipcRenderer.invoke('taker:sendToAddress', {
+        address,
+        amount,
+        feeRate,
+        manuallySelectedOutpoints,
+      }),
     recover: () => ipcRenderer.invoke('taker:recover'),
     getRecoveryStatus: () => ipcRenderer.invoke('taker:getRecoveryStatus'),
     isWalletEncrypted: (walletPath) =>
