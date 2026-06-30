@@ -45,6 +45,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('taker:setupLogging', { dataDir, level }),
     getSwapProgress: (nativeSwapId) =>
       ipcRenderer.invoke('taker:getSwapProgress', nativeSwapId),
+    verifyDeniability: (swapId) =>
+      ipcRenderer.invoke('taker:verifyDeniability', swapId),
   },
 
   // Coinswap operations

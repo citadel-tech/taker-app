@@ -1144,8 +1144,13 @@ function buildSwapReportRecords(filePath, rawReport, source) {
   }
 
   if (Array.isArray(rawReport?.taker)) {
+    const fileDeniabilityProofs = Array.isArray(rawReport.deniability_proofs)
+      ? rawReport.deniability_proofs
+      : Array.isArray(rawReport.deniabilityProofs)
+        ? rawReport.deniabilityProofs
+        : [];
     return rawReport.taker.map((entry, index) =>
-      buildSwapReportRecord(filePath, entry, {
+      buildSwapReportRecord(filePath, { ...entry, deniability_proofs: fileDeniabilityProofs }, {
         source,
         section: 'taker',
         index,
@@ -2531,6 +2536,22 @@ function registerTakerHandlers() {
     } catch (err) {
       console.error('⚠️ getSwapProgress error:', err.message);
       return { success: false, error: err.message };
+    }
+  });
+
+  ipcMain.handle('taker:verifyDeniability', async (_event, swapId) => {
+    try {
+      if (!api1State.takerInstance) {
+        return { success: false, error: 'Taker not initialized' };
+      }
+      if (!swapId || typeof swapId !== 'string') {
+        return { success: false, error: 'Swap ID is required (string)' };
+      }
+      const isDeniable = api1State.takerInstance.verifyDeniability(swapId);
+      return { success: true, isDeniable };
+    } catch (error) {
+      console.error('⚠️ verifyDeniability error:', error);
+      return { success: false, error: error.message };
     }
   });
 
