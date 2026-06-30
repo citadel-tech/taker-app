@@ -470,13 +470,13 @@
 }
 
 .swap-pill.regular {
-  border-color: rgba(47, 212, 131, 0.45);
-  color: var(--color-success);
+  border-color: var(--color-line-strong);
+  color: var(--color-muted);
 }
 
 .swap-pill.swap {
-  border-color: rgba(245, 196, 81, 0.45);
-  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-line));
+  color: var(--color-primary);
 }
 
 .swap-maker-fee {
@@ -1037,10 +1037,9 @@
 }
 
 .swap-progress-top {
-  display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) 220px;
-  align-items: start;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  padding: 4px 0;
 }
 
 .swap-progress-actions {
@@ -1391,11 +1390,13 @@
   color: var(--color-primary);
 }
 
-.swap-animation[data-phase='contract'] {
+.swap-animation[data-phase='contract'],
+.swap-animation[data-phase='contracting'] {
   color: var(--color-warning);
 }
 
-.swap-animation[data-phase='settlement'] {
+.swap-animation[data-phase='settlement'],
+.swap-animation[data-phase='settling'] {
   color: var(--color-success);
 }
 
@@ -1449,6 +1450,37 @@
   stroke-dasharray: 0 1;
   filter: drop-shadow(0 0 10px currentColor);
   transition: stroke 250ms ease, stroke-dasharray 450ms ease;
+}
+
+/* All active segments blink during contracting (until individually confirmed) */
+.swap-animation[data-phase='contracting'] .route-segment.active:not(.funding-confirmed):not(.handover-confirmed),
+.route-segment.funding-pending,
+.route-segment.handover-pending {
+  stroke-dasharray: 1 0;
+  transition: none;
+  animation: swap-route-glow-blink 1300ms ease-in-out infinite;
+}
+
+.route-segment.funding-confirmed {
+  stroke: var(--color-warning);
+  stroke-dasharray: 1 0;
+  filter: drop-shadow(0 0 14px var(--color-warning));
+}
+
+.route-segment.handover-confirmed {
+  stroke: var(--color-success);
+  stroke-dasharray: 1 0;
+  filter: drop-shadow(0 0 14px var(--color-success));
+}
+
+.swap-animation[data-phase='handshaking'] .swap-animation-svg,
+.swap-animation[data-phase='handshaking'] .route-node {
+  filter: grayscale(1);
+}
+
+.swap-animation[data-phase='handshaking'].is-blinking .swap-animation-svg,
+.swap-animation[data-phase='handshaking'].is-blinking .route-node {
+  animation: swap-route-blink 1050ms ease-in-out infinite;
 }
 
 .swap-route-ring.active {
@@ -1597,6 +1629,36 @@
   box-shadow: 0 0 34px rgba(47, 212, 131, 0.18);
 }
 
+.route-node.verified {
+  filter: none;
+  border-color: color-mix(in srgb, var(--color-primary) 50%, transparent);
+  box-shadow: 0 0 30px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.route-node.verified .route-icon,
+.route-node.verified .route-status {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.route-node.handover-pending {
+  border-color: color-mix(in srgb, var(--color-success) 58%, transparent);
+  animation: swap-node-green-blink 1400ms ease-in-out infinite;
+}
+
+.route-node.handover-pending .route-icon,
+.route-node.handover-pending .route-status {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 35%, transparent);
+  background: color-mix(in srgb, var(--color-success) 10%, transparent);
+}
+
+.route-node.handover-complete {
+  border-color: color-mix(in srgb, var(--color-success) 58%, transparent);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+
 .route-node.connected .route-icon,
 .route-node.connected .route-status {
   color: var(--color-success);
@@ -1656,9 +1718,49 @@
 
 .swap-center-copy strong {
   display: block;
-  color: var(--color-foreground);
-  font-size: 18px;
+  width: fit-content;
+  margin: 0 auto;
+  color: var(--color-subtle);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  opacity: 0.5;
+  text-shadow: none;
+  filter: blur(0.4px);
+}
+
+.swap-center-copy button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 128px;
+  height: 128px;
+  margin: 0 auto;
+  padding: 12px;
+  border: 1.5px solid var(--color-success);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, color-mix(in srgb, var(--color-success) 14%, transparent) 0%, transparent 68%),
+    var(--color-surface);
+  box-shadow:
+    0 0 28px color-mix(in srgb, var(--color-success) 30%, transparent),
+    inset 0 0 14px color-mix(in srgb, var(--color-success) 8%, transparent);
+  color: var(--color-success);
+  font-size: 14px;
   font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: box-shadow 200ms ease, transform 200ms ease;
+}
+
+.swap-center-copy button:hover {
+  box-shadow:
+    0 0 46px color-mix(in srgb, var(--color-success) 50%, transparent),
+    inset 0 0 20px color-mix(in srgb, var(--color-success) 14%, transparent);
+  transform: scale(1.04);
 }
 
 .swap-center-copy span {
@@ -1668,6 +1770,66 @@
   font-family: var(--app-font-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
+}
+
+.swap-animation.is-handover-complete {
+  animation: swap-route-green-blink 1500ms ease-in-out infinite;
+}
+
+.swap-animation.is-sweep-confirmed {
+  color: var(--color-success);
+  animation: none;
+}
+
+.swap-animation.is-sweep-confirmed .route-segment.active {
+  stroke: var(--color-success);
+  stroke-dasharray: 1 0;
+  filter: drop-shadow(0 0 14px var(--color-success));
+}
+
+.swap-animation.is-sweep-confirmed .route-node {
+  border-color: color-mix(in srgb, var(--color-success) 58%, transparent);
+  box-shadow: 0 0 34px color-mix(in srgb, var(--color-success) 20%, transparent);
+}
+
+/* Opacity blink for whole-diagram grayscale handshaking phase */
+@keyframes swap-route-blink {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+
+/* Glow pulse for route segments (yellow during contracting, green during settling) */
+@keyframes swap-route-glow-blink {
+  0%, 100% {
+    filter: drop-shadow(0 0 4px currentColor);
+    opacity: 0.6;
+  }
+  50% {
+    filter: drop-shadow(0 0 22px currentColor);
+    opacity: 1;
+  }
+}
+
+@keyframes swap-node-green-blink {
+  0%, 100% {
+    box-shadow:
+      0 0 16px color-mix(in srgb, #2fd483 22%, transparent),
+      0 0 0 1px color-mix(in srgb, #2fd483 30%, transparent);
+  }
+  50% {
+    box-shadow:
+      0 0 36px color-mix(in srgb, #2fd483 52%, transparent),
+      0 0 0 1px color-mix(in srgb, #2fd483 60%, transparent);
+  }
+}
+
+@keyframes swap-route-green-blink {
+  0%, 100% {
+    filter: drop-shadow(0 0 8px color-mix(in srgb, #2fd483 25%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 24px color-mix(in srgb, #2fd483 55%, transparent));
+  }
 }
 
 .swap-terminal {
@@ -2176,11 +2338,11 @@
 }
 
 .swap-report-utxo-group.outgoing {
-  --utxo-accent: #f5c451;
+  --utxo-accent: var(--color-muted);
 }
 
 .swap-report-utxo-group.incoming {
-  --utxo-accent: #518def;
+  --utxo-accent: var(--color-primary);
 }
 
 .swap-report-utxo-head {
@@ -3101,6 +3263,132 @@
   --app-nav-orange-soft: rgba(232, 80, 2, 0.14);
 }
 
+.app-field-value {
+  color: var(--color-foreground);
+  font-family: var(--app-font-mono);
+}
+
+.app-field-value.primary {
+  color: var(--color-primary);
+}
+
+.app-field-value.danger {
+  color: var(--color-danger);
+}
+
+.app-field-value.success {
+  color: var(--color-success);
+}
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 3px 8px;
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+  color: var(--color-muted);
+  background: color-mix(in srgb, var(--color-muted) 7%, transparent);
+  font-family: var(--app-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.app-badge.primary {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.app-badge.warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-warning) 10%, transparent);
+}
+
+.app-badge.danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
+.app-report-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-hover);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.app-report-link:hover {
+  color: var(--color-foreground);
+}
+
+/* Semantic one-off color utilities */
+.bg-danger { background-color: var(--color-danger); }
+.text-danger { color: var(--color-danger); }
+
+/* Status/info box — replaces ad-hoc bg-{color}-500/10 border border-{color}-500/30 patterns */
+.app-infobox {
+  border-radius: 8px;
+  padding: 12px 16px;
+  border: 1px solid var(--color-line-strong);
+  background: color-mix(in srgb, var(--color-muted) 5%, transparent);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.app-infobox.primary {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+  color: var(--color-primary);
+}
+
+.app-infobox.warning {
+  border-color: color-mix(in srgb, var(--color-warning) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  color: var(--color-warning);
+}
+
+.app-infobox.danger {
+  border-color: color-mix(in srgb, var(--color-danger) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+  color: var(--color-danger);
+}
+
+.app-infobox.success {
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-success) 8%, transparent);
+  color: var(--color-success);
+}
+
+/* Toast notification — replaces bg-green-500 text-white fixed patterns */
+.app-toast {
+  position: fixed;
+  right: 16px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 50;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  border: 1px solid;
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 35%, var(--color-line));
+  background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface-raised));
+}
+
+.app-toast.top { top: 16px; }
+.app-toast.bottom { bottom: 16px; }
+
 .app-page {
   min-height: calc(100vh - 4rem);
   display: flex;
@@ -3756,6 +4044,11 @@
   background: var(--color-warning);
 }
 
+.app-balance-card.locked .app-accent {
+  background: var(--color-muted);
+  opacity: 0.55;
+}
+
 .app-card-label {
   color: var(--color-subtle);
   font-family: var(--app-font-mono);
@@ -3791,6 +4084,10 @@
 
 .app-balance-card.warning .app-card-value {
   color: var(--color-warning);
+}
+
+.app-balance-card.locked .app-card-value {
+  color: var(--color-foreground);
 }
 
 .app-card-value span {
@@ -4523,11 +4820,16 @@
   background: rgba(81, 141, 239, 0.12);
 }
 
-.app-pill.regular,
 .app-pill.swap {
-  color: var(--color-success);
-  border-color: rgba(47, 212, 131, 0.32);
-  background: rgba(47, 212, 131, 0.1);
+  color: var(--color-primary);
+  border-color: rgba(81, 141, 239, 0.35);
+  background: rgba(81, 141, 239, 0.12);
+}
+
+.app-pill.regular {
+  color: var(--color-muted);
+  border-color: var(--color-line);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .app-pill.contract,
@@ -6899,11 +7201,11 @@
 }
 
 .market-stat-card.fidelity .app-accent {
-  background: var(--color-warning);
+  background: var(--color-primary);
 }
 
 .market-stat-card.fidelity .app-card-value {
-  color: var(--color-warning);
+  color: var(--color-primary);
 }
 
 .market-stat-card.liquidity .app-accent {

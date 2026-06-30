@@ -10,16 +10,17 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-function endpointSuffix(value, right = 12) {
+function endpointSuffix(value) {
   const text = String(value || '').trim();
   if (!text) return '';
   const host = text
     .replace(/^https?:\/\//i, '')
+    .replace(/^tcp:\/\//i, '')
     .split('/')[0]
     .split(':')[0]
     .replace(/\.onion$/i, '');
-  if (host.length <= right) return host;
-  return `...${host.slice(-right)}`;
+  if (host.length <= 14) return host;
+  return `${host.slice(0, 8)}…${host.slice(-8)}`;
 }
 
 function normalizeTone(color) {
@@ -54,19 +55,19 @@ function phaseForStatus(statusText, tone) {
   const status = String(statusText || '').toLowerCase();
   if (tone === 'failed') return { step: 3, title: 'Swap Failed', phase: 'failed' };
   if (/contracts? received|contract ready|contract|broadcast|mempool|confirm/.test(status)) {
-    return { step: 2, title: 'Contract Establishment', phase: 'contract' };
+    return { step: 2, title: 'Contracting', phase: 'contracting' };
   }
   if (tone === 'settled' || /complete|settled|received|swept/.test(status)) {
-    return { step: 3, title: 'Settlement', phase: 'settlement' };
+    return { step: 3, title: 'Settling', phase: 'settling' };
   }
   if (/key|final|exchange|sweep|receiving/.test(status)) {
-    return { step: 3, title: 'Settlement', phase: 'settlement' };
+    return { step: 3, title: 'Settling', phase: 'settling' };
   }
   if (tone === 'locked' || /lock|contract|confirm|mempool|ready/.test(status)) {
-    return { step: 2, title: 'Contract Establishment', phase: 'contract' };
+    return { step: 2, title: 'Contracting', phase: 'contracting' };
   }
   if (tone === 'active' || /connect|handshake|negotiat|offer|initial|fetch/.test(status)) {
-    return { step: 1, title: 'Handshake', phase: 'handshake' };
+    return { step: 1, title: 'Handshaking', phase: 'handshaking' };
   }
   return null;
 }
@@ -74,9 +75,9 @@ function phaseForStatus(statusText, tone) {
 function phaseRank(phase) {
   if (phase === 'failed') return 5;
   if (phase === 'complete') return 4;
-  if (phase === 'settlement') return 3;
-  if (phase === 'contract') return 2;
-  if (phase === 'handshake') return 1;
+  if (phase === 'settlement' || phase === 'settling') return 3;
+  if (phase === 'contract' || phase === 'contracting') return 2;
+  if (phase === 'handshake' || phase === 'handshaking') return 1;
   return 0;
 }
 
@@ -113,7 +114,6 @@ function buildMakerNode(index, angle, cx, cy, radius, address, width, height) {
       style="${positionStyle({ x, y }, width, height)}"
     >
       <div class="route-icon">${icons.globe(22)}</div>
-      <h3>Maker ${String(index + 1).padStart(2, '0')}</h3>
       <p class="route-address${pendingClass}" title="${escapeHtml(address || '')}">${escapeHtml(displayAddress)}</p>
       <b class="route-status">Awaiting</b>
     </article>
@@ -181,13 +181,12 @@ export function createSwapProgressAnimation(stage, options = {}) {
 
       <article id="you-send" class="route-node taker awaiting" style="${positionStyle(wallet, width, height)}">
         <div class="route-icon">${icons.save(22)}</div>
-        <h3>Your wallet</h3>
         <b class="route-status">Awaiting</b>
       </article>
 
       ${makersMarkup}
       <div class="swap-center-copy">
-        <strong id="swap-animation-phase">Handshake</strong>
+        <strong id="swap-animation-phase">Handshaking</strong>
       </div>
 
     </div>
@@ -198,12 +197,18 @@ export function createSwapProgressAnimation(stage, options = {}) {
   const packetGlow = stage.querySelector('.swap-packet-glow');
   const phaseEl = stage.querySelector('#swap-animation-phase');
   const state = {
-    phase: 'handshake',
+    phase: 'handshaking',
     phaseRank: 1,
     progress: 0,
     failed: false,
     nodeRanks: new Map(),
+    verifiedMakers: new Set(),
+    confirmedFundingHops: new Set(),
+    completedHandovers: new Set(),
   };
+
+  stage.querySelector('.swap-animation')?.setAttribute('data-phase', 'handshaking');
+  stage.querySelector('.swap-animation')?.classList.add('is-blinking');
 
   function setNodeState(node, label, tone, key = node?.id) {
     if (!node) return;
@@ -230,6 +235,9 @@ export function createSwapProgressAnimation(stage, options = {}) {
     state.phaseRank = nextRank;
     state.phase = next.phase;
     stage.querySelector('.swap-animation')?.setAttribute('data-phase', next.phase);
+    if (next.phase !== 'handshaking') {
+      stage.querySelector('.swap-animation')?.classList.remove('is-blinking');
+    }
     if (phaseEl) phaseEl.textContent = next.title;
   }
 
@@ -259,6 +267,28 @@ export function createSwapProgressAnimation(stage, options = {}) {
     if (line) line.classList.toggle('is-active', Boolean(active));
   }
 
+  function setRouteSegmentClass(index, className, active = true) {
+    const line = stage.querySelector(`#route-line-${index}`);
+    if (!line) return;
+    line.classList.toggle(className, Boolean(active));
+    if (active) line.style.strokeDasharray = '1 0';
+  }
+
+  function setCenterCompleteButton() {
+    const center = stage.querySelector('.swap-center-copy');
+    if (!center) return;
+    center.innerHTML = `
+      <button id="swap-complete-report-btn" type="button">
+        Swap Complete
+      </button>
+    `;
+    center
+      .querySelector('#swap-complete-report-btn')
+      ?.addEventListener('click', () => {
+        if (typeof options.onOpenReport === 'function') options.onOpenReport();
+      });
+  }
+
   return {
     setMakerAddress(index, address) {
       const node = stage.querySelector(`#maker-${index}`);
@@ -280,6 +310,26 @@ export function createSwapProgressAnimation(stage, options = {}) {
       setNodeState(node, statusText, tone, `maker-${index}`);
       updatePhase(phaseForStatus(statusText, tone));
 
+      const normalizedStatus = String(statusText || '').toLowerCase();
+      if (/offer|handshake|connected|negotiat|initial|fetch/.test(normalizedStatus)) {
+        this.setMakerVerified(index);
+      }
+      if (/contract|broadcast|mempool|confirm|lock/.test(normalizedStatus)) {
+        this.startContracting();
+        if (/confirm|ready|received/.test(normalizedStatus)) {
+          this.setFundingHopConfirmed(index);
+        } else {
+          this.setFundingHopPending(index);
+        }
+      }
+      if (/key|exchange|final|receiv|sweep|complete/.test(normalizedStatus)) {
+        this.startSettling();
+        this.setMakerHandoverPending(index);
+        if (/received|forwarded|complete/.test(normalizedStatus)) {
+          this.setMakerHandoverComplete(index);
+        }
+      }
+
       if (tone !== 'awaiting') {
         const activeThrough = index === makerCount - 1 ? totalNodes - 1 : index;
         for (let i = 0; i <= activeThrough; i += 1) setRouteLine(i, true);
@@ -290,6 +340,7 @@ export function createSwapProgressAnimation(stage, options = {}) {
     setWalletActive(active) {
       const tone = active ? 'active' : 'awaiting';
       setNodeState(stage.querySelector('#you-send'), active ? 'Connected' : 'Awaiting', tone, 'wallet');
+      if (active && state.phase === 'handshaking') this.setHandshakeBlinking(true);
       updateProgress(active ? 0.05 : 0);
     },
 
@@ -297,9 +348,89 @@ export function createSwapProgressAnimation(stage, options = {}) {
       const tone = active ? 'settled' : 'awaiting';
       setNodeState(stage.querySelector('#you-send'), active ? 'Received' : 'Awaiting', tone, 'wallet');
       if (active) {
-        updatePhase({ title: 'Settlement', phase: 'settlement' });
+        updatePhase({ title: 'Settling', phase: 'settling' });
         updateProgress(1);
       }
+    },
+
+    setHandshakeBlinking(active) {
+      updatePhase({ title: 'Handshaking', phase: 'handshaking' });
+      stage.querySelector('.swap-animation')?.classList.toggle('is-blinking', Boolean(active));
+    },
+
+    setMakerVerified(index) {
+      state.verifiedMakers.add(index);
+      const node = stage.querySelector(`#maker-${index}`);
+      if (!node) return;
+      node.classList.add('verified');
+      node.classList.remove('is-muted');
+      const badge = node.querySelector('.route-status');
+      if (badge) badge.textContent = 'Verified';
+    },
+
+    setOffersDownloaded() {
+      this.setHandshakeBlinking(false);
+    },
+
+    startContracting() {
+      updatePhase({ title: 'Contracting', phase: 'contracting' });
+    },
+
+    setFundingHopPending(index) {
+      this.startContracting();
+      setRouteSegmentClass(index, 'funding-pending', true);
+    },
+
+    setFundingHopConfirmed(index) {
+      this.startContracting();
+      state.confirmedFundingHops.add(index);
+      setRouteSegmentClass(index, 'funding-pending', false);
+      setRouteSegmentClass(index, 'funding-confirmed', true);
+      setRouteLine(index, true);
+    },
+
+    startSettling() {
+      updatePhase({ title: 'Settling', phase: 'settling' });
+    },
+
+    setMakerHandoverPending(index) {
+      this.startSettling();
+      setRouteSegmentClass(index, 'funding-pending', false);
+      setRouteSegmentClass(index, 'funding-confirmed', false);
+      setRouteSegmentClass(index, 'handover-pending', true);
+      const node = stage.querySelector(`#maker-${index}`);
+      if (!node || state.completedHandovers.has(index)) return;
+      node.classList.remove('locked', 'active');
+      node.classList.add('handover-pending');
+    },
+
+    setMakerHandoverComplete(index) {
+      this.startSettling();
+      state.completedHandovers.add(index);
+      setRouteSegmentClass(index, 'funding-pending', false);
+      setRouteSegmentClass(index, 'funding-confirmed', false);
+      setRouteSegmentClass(index, 'handover-pending', false);
+      setRouteSegmentClass(index, 'handover-confirmed', true);
+      const node = stage.querySelector(`#maker-${index}`);
+      if (!node) return;
+      node.classList.remove('locked', 'active', 'handover-pending');
+      node.classList.add('handover-complete');
+    },
+
+    setAllHandoversComplete() {
+      this.startSettling();
+      stage.querySelector('.swap-animation')?.classList.add('is-handover-complete');
+    },
+
+    setSweepConfirmed() {
+      stage.querySelector('.swap-animation')?.classList.remove('is-handover-complete');
+      stage.querySelector('.swap-animation')?.classList.add('is-sweep-confirmed');
+      updatePhase({ title: 'Swap Complete', phase: 'complete' });
+      activeSegments.forEach((segment) => {
+        segment.classList.remove('funding-pending', 'funding-confirmed', 'handover-pending');
+        segment.classList.add('handover-confirmed');
+        segment.style.strokeDasharray = '1 0';
+      });
     },
 
     setStats({ amount: nextAmount, fee: nextFee, receiveAmount: nextReceiveAmount } = {}) {
@@ -312,20 +443,26 @@ export function createSwapProgressAnimation(stage, options = {}) {
 
     setComplete() {
       state.failed = false;
-      updatePhase({ title: 'Settlement', phase: 'settlement' });
+      updatePhase({ title: 'Settling', phase: 'settling' });
       updatePhase({ title: 'Swap Complete', phase: 'complete' });
       stage.querySelectorAll('.route-node.maker').forEach((node, index) => {
         setNodeState(node, 'Complete', 'settled', `maker-${index}`);
+        node.classList.remove('handover-pending');
+        node.classList.add('handover-complete');
       });
       setNodeState(stage.querySelector('#you-send'), 'Received', 'settled', 'wallet');
-      for (let i = 0; i < makerCount; i += 1) setRouteLine(i, true);
+      this.setSweepConfirmed();
+      for (let i = 0; i < totalNodes; i += 1) setRouteLine(i, true);
       updateProgress(1);
+      setCenterCompleteButton();
     },
 
     setFailed() {
       state.failed = true;
       state.phaseRank = phaseRank('failed');
-      stage.querySelector('.swap-animation')?.setAttribute('data-phase', 'failed');
+      const animation = stage.querySelector('.swap-animation');
+      animation?.setAttribute('data-phase', 'failed');
+      animation?.classList.remove('is-blinking', 'is-handover-complete', 'is-sweep-confirmed');
       if (phaseEl) phaseEl.textContent = 'Swap Failed';
       stage.querySelectorAll('.route-node.maker').forEach((node, index) => {
         setNodeState(node, 'Failed', 'failed', `maker-${index}`);

@@ -1,5 +1,6 @@
 import { formatSats } from '../../js/price.js';
 import { icons } from '../../js/icons.js';
+import { openSwapReport } from '../swap/SwapHistory.js';
 
 const WALLET_CACHE_KEY = 'wallet_data_cache';
 
@@ -245,8 +246,11 @@ export async function WalletComponent(container) {
           typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
         const type = getSpendTypeDisplay(utxoData.spendInfo?.spendType);
         const scriptType = getScriptType(utxoData);
+        const sourceSwapId = utxoData.spendInfo?.sourceSwapId;
+        const hasReport = type === 'Swap' && utxoData.spendInfo?.sourceReportAvailable && sourceSwapId;
+        const safeSwapId = hasReport ? String(sourceSwapId).replace(/"/g, '&quot;') : '';
         return `
-          <button class="app-utxo-row" data-txid="${txid || ''}" type="button">
+          <div class="app-utxo-row" data-txid="${txid || ''}">
             <span class="app-utxo-main">
               <span class="app-mono app-id">${compactId(txid, 12, 4)}:${utxo.vout ?? 0}</span>
               <span class="app-amount positive">${formatSats(utxo.amount)}</span>
@@ -256,13 +260,32 @@ export async function WalletComponent(container) {
             <span class="app-address">
               ${compactId(utxo.address || 'No address', 10, 6)}
             </span>
-            <span class="app-icon-action" aria-label="Open transaction">
-              ${icons.externalLink(18)}
-            </span>
-          </button>
+            ${
+              hasReport
+                ? `<button class="app-report-link" type="button" data-report-swap-id="${safeSwapId}">${icons.fileText(15)} Report</button>`
+                : `<span class="app-icon-action" aria-label="Open transaction">${icons.externalLink(18)}</span>`
+            }
+          </div>
         `;
       })
       .join('');
+
+    list.querySelectorAll('[data-report-swap-id]').forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openSwapReport(container, link.dataset.reportSwapId, {
+          backTarget: 'wallet',
+          messageTarget: content,
+        });
+      });
+      link.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        link.click();
+      });
+    });
   }
 
   function getFilteredTransactions() {
@@ -508,7 +531,7 @@ export async function WalletComponent(container) {
         <div class="app-card-value"><span id="regular-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></span></div>
         <p>Coins Received by regular txs</p>
       </article>
-      <article class="app-balance-card warning">
+      <article class="app-balance-card locked">
         <span class="app-accent"></span>
         <span class="app-card-label">Contracts</span>
         <div class="app-card-value"><span id="contract-balance"><span class="app-card-amount-number">0</span><span class="app-card-amount-unit cs-sats-symbol" role="img" aria-label="satoshis"><span></span><span></span><span></span></span></span></div>

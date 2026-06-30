@@ -325,9 +325,6 @@ export async function CoinswapComponent(container, swapConfig) {
     ).length;
     const animationPhase =
       content.querySelector('.swap-animation')?.dataset.phase;
-    const stepEl = content.querySelector('#swap-step-label');
-    const titleEl = content.querySelector('#swap-page-title');
-    const progressEl = content.querySelector('#swap-progress-fill');
     const routeStatuses = Array.from(
       content.querySelectorAll('.route-node .route-status')
     ).map((node) => String(node.textContent || '').toLowerCase());
@@ -341,33 +338,20 @@ export async function CoinswapComponent(container, swapConfig) {
       4,
       Math.max(1, connected + (connecting > 0 ? 1 : 0))
     );
-    const phaseHeader = isSweeping
-      ? { step: 4, title: 'Sweeping the Contract' }
+    const phaseStep = isSweeping
+      ? 4
       : isKeyHandover
-        ? { step: 3, title: 'Handing Over Key Materials' }
-        : animationPhase === 'contract'
-          ? { step: 2, title: 'Establishing Contract Txs' }
+        ? 3
+        : animationPhase === 'contract' || animationPhase === 'contracting'
+          ? 2
+          : animationPhase === 'settlement' || animationPhase === 'settling'
+            ? 3
           : null;
-    const step = phaseHeader
-      ? Math.max(routeStep, phaseHeader.step)
+    const step = phaseStep
+      ? Math.max(routeStep, phaseStep)
       : routeStep;
 
     currentStep = Math.max(currentStep, step);
-    if (stepEl) stepEl.textContent = `Step ${step} of 4 · Swap in progress`;
-    if (titleEl) {
-      titleEl.textContent =
-        phaseHeader?.title ||
-        (step <= 1
-          ? 'Handshake'
-          : step === 2
-            ? 'Establishing Contract Txs'
-            : step === 3
-              ? 'Handing Over Key Materials'
-              : 'Sweeping the Contract');
-    }
-    if (progressEl) {
-      progressEl.style.width = `${Math.min(100, step * 25)}%`;
-    }
   }
 
   function updateHopStatus(hopIndex, statusText, color) {
@@ -454,6 +438,35 @@ export async function CoinswapComponent(container, swapConfig) {
         updateHopStatus(i, s.label, s.color);
       }
     });
+
+    makers.forEach((m, i) => {
+      if (i >= swapData.makers) return;
+      if (m.swapcoinCreated || m.makerContractReceived) {
+        progressAnimation?.setFundingHopConfirmed(i);
+      } else if (m.contractDataSent) {
+        progressAnimation?.setFundingHopPending(i);
+      }
+    });
+
+    for (let i = Math.min(makers.length, swapData.makers) - 1; i >= 0; i -= 1) {
+      const maker = makers[i];
+      if (!maker) continue;
+      if (maker.privkeyForwarded || maker.privkeyReceived) {
+        progressAnimation?.setMakerHandoverComplete(i);
+      } else if (phase && /Privkey|Sweep/.test(String(phase))) {
+        progressAnimation?.setMakerHandoverPending(i);
+        break;
+      }
+    }
+
+    if (
+      makers.length >= swapData.makers &&
+      makers
+        .slice(0, swapData.makers)
+        .every((maker) => maker?.privkeyForwarded || maker?.privkeyReceived)
+    ) {
+      progressAnimation?.setAllHandoversComplete();
+    }
 
     // Surface the outgoing contract txid once we have it
     if (outgoingContractTxids.length > 0 && !swapData.transactions[0]?.txid) {
@@ -772,9 +785,6 @@ export async function CoinswapComponent(container, swapConfig) {
     updateHeaderState('completed');
     markAllMakersComplete({ final: true });
     updateYouReceive(true);
-    const completeButton = content.querySelector('#complete-button');
-    completeButton.hidden = false;
-    completeButton.classList.remove('hidden');
 
     const normalizedReport = transformSwapReport(report);
     const transformedReport = {
@@ -1007,9 +1017,6 @@ export async function CoinswapComponent(container, swapConfig) {
     updateHeaderState('completed');
     markAllMakersComplete({ final: true });
     updateYouReceive(true);
-    const completeButton = content.querySelector('#complete-button');
-    completeButton.hidden = false;
-    completeButton.classList.remove('hidden');
 
     const defaultReport = getDefaultReport();
     await SwapStateManager.completeSwap(defaultReport);
@@ -1084,7 +1091,7 @@ export async function CoinswapComponent(container, swapConfig) {
         <div class="bg-app-bg rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Locking Funds</span>
-            <span class="${outgoing.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
+            <span class="app-badge ${outgoing.status === 'confirmed' ? 'primary' : 'warning'}">
               ${outgoing.status === 'confirmed' ? `${icons.check(14, 'mr-1')} Confirmed` : outgoing.txid ? 'Broadcasted' : 'Pending'}
             </span>
           </div>
@@ -1094,7 +1101,7 @@ export async function CoinswapComponent(container, swapConfig) {
         <div class="bg-app-bg rounded p-3">
           <div class="flex justify-between items-center mb-2">
             <span class="text-gray-300 font-medium">Receiving Funds</span>
-            <span class="${incoming.status === 'confirmed' ? 'text-green-400' : 'text-gray-500'}">
+            <span class="app-badge ${incoming.status === 'confirmed' ? 'primary' : ''}">
               ${incoming.status === 'confirmed' ? `${icons.check(14, 'mr-1')} Received` : 'Waiting...'}
             </span>
           </div>
@@ -1122,7 +1129,7 @@ export async function CoinswapComponent(container, swapConfig) {
         <div class="bg-app-bg rounded p-2 text-xs">
           <div class="flex justify-between mb-1">
             <span class="text-gray-400">Hop ${index + 1}</span>
-            <span class="${tx.status === 'confirmed' ? 'text-green-400' : 'text-yellow-400'}">
+            <span class="app-badge ${tx.status === 'confirmed' ? 'primary' : 'warning'}">
               ${tx.status === 'confirmed' ? icons.check(14) : tx.status === 'broadcasting' ? icons.radio(14) : icons.hourglass(14)}
             </span>
           </div>
@@ -1153,35 +1160,26 @@ export async function CoinswapComponent(container, swapConfig) {
   }
 
   function updateHeaderState(state) {
-    const titleEl = content.querySelector('#swap-page-title');
     const badgeEl = content.querySelector('#swap-page-badge');
     const badgeDotEl = content.querySelector('#swap-page-badge-dot');
     const badgeTextEl = content.querySelector('#swap-page-badge-text');
 
-    if (!titleEl) return;
-
     if (state === 'completed') {
-      titleEl.textContent = 'Swap Complete';
-      const stepLabel = content.querySelector('#swap-step-label');
-      const progressFill = content.querySelector('#swap-progress-fill');
-      if (stepLabel) stepLabel.textContent = 'Step 4 of 4 · Swap complete';
-      if (progressFill) progressFill.style.width = '100%';
       if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
-        'flex items-center gap-1.5 px-2.5 py-1 bg-green-500/10 border border-green-500/20 rounded-full';
-      badgeDotEl.className = 'w-2 h-2 rounded-full bg-green-400';
-      badgeTextEl.className = 'text-xs text-green-400 font-medium';
+        'flex items-center gap-1.5 px-2.5 py-1 rounded-full app-badge primary';
+      badgeDotEl.className = 'w-2 h-2 rounded-full bg-primary';
+      badgeTextEl.className = 'text-xs text-primary font-medium';
       badgeTextEl.textContent = 'Complete';
       return;
     }
 
     if (state === 'failed') {
-      titleEl.textContent = 'Coinswap Failed';
       if (!badgeEl || !badgeDotEl || !badgeTextEl) return;
       badgeEl.className =
-        'flex items-center gap-1.5 px-2.5 py-1 bg-red-500/10 border border-red-500/20 rounded-full';
-      badgeDotEl.className = 'w-2 h-2 rounded-full bg-red-400';
-      badgeTextEl.className = 'text-xs text-red-400 font-medium';
+        'flex items-center gap-1.5 px-2.5 py-1 rounded-full app-badge danger';
+      badgeDotEl.className = 'w-2 h-2 rounded-full bg-danger';
+      badgeTextEl.className = 'text-xs font-medium text-danger';
       badgeTextEl.textContent = 'Failed';
     }
   }
@@ -1190,14 +1188,6 @@ export async function CoinswapComponent(container, swapConfig) {
     <div class="swap-progress-page">
       <header class="swap-progress-top">
         <button id="back-to-swap" class="swap-progress-back" title="Back to swap">${icons.refreshCw(16)}</button>
-        <div>
-          <span id="swap-step-label">Step 1 of 4 · Swap in progress</span>
-          <h2 id="swap-page-title">Handshake</h2>
-          <div class="swap-progress-bar"><i id="swap-progress-fill"></i></div>
-        </div>
-        <div class="swap-progress-actions">
-          <button id="complete-button" class="hidden swap-complete-btn" hidden>View Swap Report</button>
-        </div>
       </header>
 
       <section class="swap-route-stage">
@@ -1236,6 +1226,7 @@ export async function CoinswapComponent(container, swapConfig) {
         225 *
         Math.max(1, swapData.hops),
       makerAddresses: routeMakerAddresses,
+      onOpenReport: viewSwapReport,
     }
   );
 
@@ -1247,9 +1238,6 @@ export async function CoinswapComponent(container, swapConfig) {
     });
   });
 
-  content
-    .querySelector('#complete-button')
-    .addEventListener('click', viewSwapReport);
   content.querySelector('#swap-log-toggle').addEventListener('click', () => {
     const panel = content.querySelector('#swap-log-panel');
     const body = content.querySelector('#log-container');

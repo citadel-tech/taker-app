@@ -206,8 +206,8 @@ async function showPasswordPrompt(config) {
         </button>
       </div>
       
-      <div id="password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded p-3 mb-4">
-        <p class="text-sm text-red-400"></p>
+      <div id="password-error" class="hidden app-infobox danger rounded p-3 mb-4">
+        <p class="text-sm"></p>
       </div>
       
       <div class="flex gap-3">
@@ -445,8 +445,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 function showSetupSuccess() {
   const successDiv = document.createElement('div');
-  successDiv.className =
-    'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-opacity duration-300';
+  successDiv.className = 'app-toast top transition-opacity duration-300';
   successDiv.innerHTML = `
       <div class="flex items-center">
         <span class="mr-2">✔</span>

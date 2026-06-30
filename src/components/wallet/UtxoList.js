@@ -1,4 +1,6 @@
 import { formatSats, SATS_SYMBOL } from '../../js/price.js';
+import { icons } from '../../js/icons.js';
+import { openSwapReport } from '../swap/SwapHistory.js';
 
 export function UtxoListComponent(container) {
   // State for UTXO selection and filtering
@@ -41,14 +43,13 @@ export function UtxoListComponent(container) {
     return `${txid.substring(0, 12)}...${txid.substring(txid.length - 4)}`;
   }
 
-  function getUtxoTypeColor(spendType = '') {
+  function getUtxoTypeClass(spendType = '') {
     const type = spendType.toLowerCase();
-    if (type.includes('seed') || type.includes('regular')) return 'green';
-    if (type.includes('swap')) return 'blue';
-    if (type.includes('contract')) return 'yellow';
-    if (type.includes('fidelity')) return 'purple';
-    if (type.includes('swept')) return 'cyan';
-    return 'gray';
+    if (type.includes('swap')) return 'primary';
+    if (type.includes('contract')) return 'warning';
+    if (type.includes('fidelity')) return 'neutral';
+    if (type.includes('swept')) return 'neutral';
+    return 'neutral';
   }
 
   function getSpendTypeDisplay(spendType = '') {
@@ -121,16 +122,16 @@ export function UtxoListComponent(container) {
   }
 
   // Get color for script type badge
-  function getScriptTypeColor(scriptType) {
+  function getScriptTypeClass(scriptType) {
     switch (scriptType) {
       case 'p2wpkh':
-        return 'green';
+        return 'neutral';
       case 'p2wsh':
-        return 'blue';
+        return 'primary';
       case 'p2tr':
-        return 'purple';
+        return 'primary';
       default:
-        return 'gray';
+        return 'neutral';
     }
   }
 
@@ -358,9 +359,30 @@ export function UtxoListComponent(container) {
       const tableBody = content.querySelector('#utxo-table-body');
       if (tableBody) {
         tableBody.innerHTML =
-          '<tr><td colspan="7" class="text-center py-8 text-red-400">Failed to load UTXOs. Please try refreshing.</td></tr>';
+          '<tr><td colspan="8" class="text-center py-8 text-danger">Failed to load UTXOs. Please try refreshing.</td></tr>';
       }
     }
+  }
+
+  function getReportSourceHtml(utxoData) {
+    const spendInfo = utxoData.spendInfo || {};
+    const spendTypeDisplay = getSpendTypeDisplay(spendInfo.spendType);
+    if (spendTypeDisplay !== 'Swap') return '<span class="text-gray-500">--</span>';
+
+    if (spendInfo.sourceReportAvailable && spendInfo.sourceSwapId) {
+      return `
+        <button
+          class="app-report-link"
+          type="button"
+          data-report-swap-id="${String(spendInfo.sourceSwapId).replace(/"/g, '&quot;')}"
+          title="Open source swap report"
+        >
+          ${icons.fileText(14)} Report
+        </button>
+      `;
+    }
+
+    return '<span class="text-gray-500">Report not found</span>';
   }
 
   function updateStatsDisplay() {
@@ -403,7 +425,7 @@ export function UtxoListComponent(container) {
         activeTypeFilter === 'all'
           ? 'No UTXOs found'
           : `No ${activeTypeFilter} UTXOs found`;
-      tableBody.innerHTML = `<tr><td colspan="7" class="text-center py-8 text-gray-400">${message}</td></tr>`;
+      tableBody.innerHTML = `<tr><td colspan="8" class="text-center py-8 text-gray-400">${message}</td></tr>`;
       return;
     }
 
@@ -412,10 +434,10 @@ export function UtxoListComponent(container) {
         const utxo = utxoData.utxo;
         const spendInfo = utxoData.spendInfo;
         const txidShort = truncateTxid(utxo.txid);
-        const typeColor = getUtxoTypeColor(spendInfo.spendType);
         const txid = typeof utxo.txid === 'object' ? utxo.txid.value : utxo.txid;
         const scriptType = getScriptType(utxoData);
-        const scriptColor = getScriptTypeColor(scriptType);
+        const scriptClass = getScriptTypeClass(scriptType);
+        const typeClass = getUtxoTypeClass(spendInfo.spendType);
         const spendTypeDisplay = getSpendTypeDisplay(spendInfo.spendType);
 
         return `
@@ -426,16 +448,19 @@ export function UtxoListComponent(container) {
           <td class="py-3 px-4 font-mono text-sm text-gray-300 cursor-pointer hover:text-primary hover:underline transition-colors" 
               onclick="openTxOnMempool('${txid}')">${txidShort}:${utxo.vout}</td>
           <td class="py-3 px-4">
-            <div class="text-green-400 font-mono">${formatSats(utxo.amount)}</div>
+            <div class="app-field-value">${formatSats(utxo.amount)}</div>
           </td>
-          <td class="py-3 px-4 text-gray-300 ${utxo.confirmations === 0 ? 'text-yellow-400' : ''}">${utxo.confirmations}</td>
+          <td class="py-3 px-4 text-gray-300">
+            ${utxo.confirmations === 0 ? '<span class="app-badge warning">Pending</span>' : utxo.confirmations}
+          </td>
           <td class="py-3 px-4">
-            <span class="px-2 py-1 rounded text-xs font-semibold text-lg bg-${scriptColor}-500/20 text-${scriptColor}-400 border border-${scriptColor}-500/30">
+            <span class="app-badge ${scriptClass}">
               ${getScriptTypeDisplay(scriptType)}
             </span>
           </td>
-          <td class="py-3 px-4 text-${typeColor}-400">${spendTypeDisplay}</td>
+          <td class="py-3 px-4"><span class="app-badge ${typeClass}">${spendTypeDisplay}</span></td>
           <td class="py-3 px-4 font-mono text-sm text-gray-300">${utxo.address ? utxo.address.substring(0, 8) + '...' + utxo.address.substring(utxo.address.length - 4) : '--'}</td>
+          <td class="py-3 px-4">${getReportSourceHtml(utxoData)}</td>
         </tr>
       `;
       })
@@ -447,6 +472,17 @@ export function UtxoListComponent(container) {
       if (checkbox) {
         checkbox.addEventListener('change', () => toggleUtxoSelection(index));
       }
+    });
+
+    content.querySelectorAll('[data-report-swap-id]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        openSwapReport(container, button.dataset.reportSwapId, {
+          backTarget: 'wallet',
+          messageTarget: content,
+        });
+      });
     });
   }
 
@@ -476,15 +512,15 @@ export function UtxoListComponent(container) {
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Value</p>
-                <p id="total-value" class="text-2xl font-mono text-green-400">-- ${SATS_SYMBOL}</p>
+                <p id="total-value" class="text-2xl font-mono app-field-value primary">-- ${SATS_SYMBOL}</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Confirmed</p>
-                <p id="confirmed-count" class="text-2xl font-mono text-blue-400">--</p>
+                <p id="confirmed-count" class="text-2xl font-mono app-field-value primary">--</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Unconfirmed</p>
-                <p id="unconfirmed-count" class="text-2xl font-mono text-yellow-400">--</p>
+                <p id="unconfirmed-count" class="text-2xl font-mono app-field-value">--</p>
             </div>
         </div>
 
@@ -528,10 +564,10 @@ export function UtxoListComponent(container) {
                     <span class="text-sm text-gray-400">
                         <span id="selection-count">0</span> selected • <span id="selected-value">0 ${SATS_SYMBOL}</span>
                     </span>
-                    <button id="send-selected" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="send-selected" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
                         Send Selected
                     </button>
-                    <button id="swap-selected" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold text-lg transition-colors">
+                    <button id="swap-selected" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
                         Swap Selected
                     </button>
                 </div>
@@ -550,10 +586,11 @@ export function UtxoListComponent(container) {
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Script Type</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Type</th>
                             <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Address</th>
+                            <th class="text-left py-3 px-4 text-gray-400 font-semibold text-lg">Source</th>
                         </tr>
                     </thead>
                     <tbody id="utxo-table-body">
-                        <tr><td colspan="7" class="text-center py-8 text-gray-400">Loading UTXOs...</td></tr>
+                        <tr><td colspan="8" class="text-center py-8 text-gray-400">Loading UTXOs...</td></tr>
                     </tbody>
                 </table>
             </div>

@@ -268,6 +268,35 @@ export async function loadSwapHistory() {
   return swapHistory;
 }
 
+export async function openSwapReport(container, swapId, options = {}) {
+  try {
+    const result = await window.api.swapReports.get(swapId);
+
+    if (result.success && result.report) {
+      const module = await import('./SwapReport.js');
+      container.innerHTML = '';
+      const fullReport = {
+        ...result.report,
+        ...result.report.report,
+        protocol: result.report.protocol ?? 'v1',
+        isTaproot: result.report.isTaproot ?? false,
+        protocolVersion: result.report.protocolVersion ?? 1,
+      };
+      module.SwapReportComponent(container, fullReport, {
+        backTarget: options.backTarget || 'swapReports',
+        trackerInfo: result.trackerInfo || null,
+      });
+      return true;
+    }
+
+    throw new Error(result.error || 'Swap report not found');
+  } catch (error) {
+    console.error('Failed to load swap report:', error);
+    alert('Failed to load swap report: ' + error.message);
+    return false;
+  }
+}
+
 export function summarizeSwapHistory(history) {
   const totalSwaps = history.length;
   const completedSwaps = history.filter(
@@ -393,34 +422,11 @@ export async function SwapHistoryComponent(container) {
   const content = document.createElement('div');
   content.id = 'swap-history-content';
 
-  async function viewSwapReport(swapId) {
-    try {
-      const result = await window.api.swapReports.get(swapId);
-
-      if (result.success && result.report) {
-        import('./SwapReport.js').then((module) => {
-          container.innerHTML = '';
-          const fullReport = {
-            ...result.report,
-            ...result.report.report,
-            protocol: result.report.protocol ?? 'v1',
-            isTaproot: result.report.isTaproot ?? false,
-            protocolVersion: result.report.protocolVersion ?? 1,
-          };
-          module.SwapReportComponent(container, fullReport, {
-            backTarget: 'swapReports',
-            trackerInfo: result.trackerInfo || null,
-          });
-        });
-      } else {
-        console.error('Swap report not found for ID:', swapId);
-        alert('Swap report not found');
-      }
-    } catch (error) {
-      console.error('Failed to load swap report:', error);
-      alert('Failed to load swap report: ' + error.message);
-    }
-  }
+  const viewSwapReport = (swapId) =>
+    openSwapReport(container, swapId, {
+      backTarget: 'swapReports',
+      messageTarget: content,
+    });
 
   // Calculate stats
   const totalSwaps = swapHistory.length;

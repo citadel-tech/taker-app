@@ -170,7 +170,7 @@ export function TransactionsListComponent(container) {
 
   function formatAmount(sats) {
     const prefix = sats >= 0 ? '+' : '';
-    const colorClass = sats >= 0 ? 'text-green-400' : 'text-red-400';
+    const colorClass = sats >= 0 ? 'app-field-value primary' : 'app-field-value danger';
     return {
       text: `${prefix}${formatSats(Math.abs(sats))}`,
       colorClass,
@@ -181,17 +181,17 @@ export function TransactionsListComponent(container) {
     if (confirmations === 0) {
       return {
         text: 'Unconfirmed',
-        class: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30',
+        class: 'app-badge warning',
       };
     } else if (confirmations >= 6) {
       return {
         text: 'Confirmed',
-        class: 'bg-green-500/20 text-green-400 border border-green-500/30',
+        class: 'app-badge primary',
       };
     } else {
       return {
         text: `${confirmations}/6 conf`,
-        class: 'bg-blue-500/20 text-blue-400 border border-blue-500/30',
+        class: 'app-badge primary',
       };
     }
   }
@@ -335,8 +335,8 @@ export function TransactionsListComponent(container) {
       console.error('❌ Failed to load transactions:', error);
       transactionContainer.innerHTML = `
         <div class="text-center py-12">
-          <div class="text-red-400 mb-4 flex justify-center">${icons.xCircle(48)}</div>
-          <p class="text-red-400">Failed to load transactions</p>
+          <div class="text-danger mb-4 flex justify-center">${icons.xCircle(48)}</div>
+          <p class="text-danger">Failed to load transactions</p>
           <p class="text-gray-500 text-sm mt-2">${error.message}</p>
           <button onclick="location.reload()" class="mt-4 bg-primary text-white px-4 py-2 rounded-lg">Retry</button>
         </div>
@@ -389,11 +389,11 @@ export function TransactionsListComponent(container) {
         <div class="grid grid-cols-3 gap-4 mb-6">
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Received</p>
-                <p id="total-received" class="text-2xl font-mono text-green-400">-- ${SATS_SYMBOL}</p>
+                <p id="total-received" class="text-2xl font-mono app-field-value primary">-- ${SATS_SYMBOL}</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Sent</p>
-                <p id="total-sent" class="text-2xl font-mono text-red-400">-- ${SATS_SYMBOL}</p>
+                <p id="total-sent" class="text-2xl font-mono app-field-value">-- ${SATS_SYMBOL}</p>
             </div>
             <div class="bg-surface rounded-lg p-6">
                 <p class="text-sm text-gray-400 mb-2">Total Swaps</p>

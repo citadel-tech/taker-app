@@ -202,7 +202,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 <svg class="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </button>
               <div id="rpc-test-result" class="setup-status hidden"></div>
-              <div id="node-setup-info" class="setup-info hidden bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+              <div id="node-setup-info" class="setup-info hidden app-infobox warning">
                 <strong>Info:</strong> Don't have a running Bitcoin Node?
                 <a href="https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer">Node setup instructions</a>
               </div>
@@ -238,7 +238,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 <svg class="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </button>
               <div id="tor-test-result" class="setup-status hidden"></div>
-              <div id="tor-setup-info" class="setup-info hidden bg-blue-500/10 border border-blue-500/30 text-blue-400">
+              <div id="tor-setup-info" class="setup-info hidden app-infobox primary">
                 <strong>Info:</strong> Don't have a running Tor instance?
                 <a href="https://github.com/citadel-tech/coinswap/blob/master/docs/tor.md" target="_blank" rel="noreferrer">Tor setup instructions</a>
               </div>
@@ -277,8 +277,8 @@ export function FirstTimeSetupModal(container, onComplete) {
               </div>
             </div>
 
-            <div id="choice-message" class="hidden bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-              <p class="text-xs text-blue-400 text-center">
+            <div id="choice-message" class="hidden app-infobox primary rounded-lg p-3">
+              <p class="text-xs text-center">
                 Please select an option above to continue
               </p>
             </div>
@@ -289,8 +289,8 @@ export function FirstTimeSetupModal(container, onComplete) {
          
         <div id="step-3b-create" class="setup-step hidden">
           <div class="space-y-4">
-            <div class="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3 text-xs text-yellow-400">
+            <div class="app-infobox warning rounded-lg p-4">
+              <div class="flex items-start gap-3 text-xs">
                 ${iconWarning}
                 <p>
                   <strong>Important:</strong> This password encrypts your wallet. If you forget it, you won't be able to access your funds. Make sure to store it safely!
@@ -314,7 +314,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                 </div>
 
                 <div>
-  <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
+  <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-danger">*</span></label>
   <div class="relative">
     <input 
       type="password" 
@@ -339,7 +339,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   </div>
 </div>
 <div>
-  <label class="block text-sm text-gray-400 mb-2">Confirm Password <span class="text-red-400">*</span></label>
+  <label class="block text-sm text-gray-400 mb-2">Confirm Password <span class="text-danger">*</span></label>
   <div class="relative">
     <input 
       type="password" 
@@ -367,15 +367,15 @@ export function FirstTimeSetupModal(container, onComplete) {
               </div>
             </div>
 
-            <div id="password-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p class="text-xs text-red-400"></p>
+            <div id="password-error" class="hidden app-infobox danger rounded-lg p-3">
+              <p class="text-xs"></p>
             </div>
 
-            <div class="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
-              <p class="text-xs text-green-400">
+            <div class="app-infobox primary rounded-lg p-4">
+              <p class="text-xs">
                 <strong>✓ Password Tips:</strong>
               </p>
-              <ul class="text-xs text-green-400 mt-2 space-y-1">
+              <ul class="text-xs mt-2 space-y-1">
                 <li>• Use at least 12 characters</li>
                 <li>• Mix uppercase, lowercase, numbers, and symbols</li>
                 <li>• Avoid common words or phrases</li>
@@ -414,7 +414,7 @@ export function FirstTimeSetupModal(container, onComplete) {
             </div>
 
             <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
-  <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
+  <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-danger">*</span></label>
   <div class="relative">
     <input 
       type="password" 
@@ -440,8 +440,8 @@ export function FirstTimeSetupModal(container, onComplete) {
   <p class="text-xs text-gray-500 mt-2">Required — all wallets must be password-protected</p>
 </div>
 
-            <div id="load-error" class="hidden bg-red-500/10 border border-red-500/30 rounded-lg p-3">
-              <p class="text-xs text-red-400"></p>
+            <div id="load-error" class="hidden app-infobox danger rounded-lg p-3">
+              <p class="text-xs"></p>
             </div>
           </div>
         </div>
@@ -484,7 +484,7 @@ export function FirstTimeSetupModal(container, onComplete) {
             </div>
 
             <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
-              <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-red-400">*</span></label>
+              <label class="block text-sm text-gray-400 mb-2">Wallet Password <span class="text-danger">*</span></label>
               <input 
                 type="password" 
                 id="restore-password"
@@ -497,8 +497,8 @@ export function FirstTimeSetupModal(container, onComplete) {
               <!-- Status will be shown here -->
             </div>
 
-            <div class="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
-              <div class="flex items-start gap-3 text-xs text-purple-400">
+            <div class="app-infobox primary rounded-lg p-4">
+              <div class="flex items-start gap-3 text-xs">
                 ${iconInfo}
                 <p>
                   <strong>Note:</strong> Restoring will re-sync the wallet from wallet-birthday. This can take some time.
@@ -914,12 +914,11 @@ export function FirstTimeSetupModal(container, onComplete) {
       } else {
         errorDiv.innerHTML = `
           <div class="flex items-center">
-            <span class="text-sm text-red-400">${icons.xCircle(14, 'mr-1')} ${message}</span>
+            <span class="text-sm">${icons.xCircle(14, 'mr-1')} ${message}</span>
           </div>
         `;
       }
-      errorDiv.className =
-        'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      errorDiv.className = 'app-infobox danger rounded-lg p-3';
       errorDiv.classList.remove('hidden');
     }
   }
@@ -1134,11 +1133,10 @@ export function FirstTimeSetupModal(container, onComplete) {
     const statusDiv = modal.querySelector('#restore-status');
 
     if (!backupPath) {
-      statusDiv.className =
-        'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      statusDiv.className = 'app-infobox danger rounded-lg p-3';
       statusDiv.innerHTML = `
         <div class="flex items-center">
-          <span class="text-sm text-red-400">${icons.xCircle(14, 'mr-1')} Please select a backup file</span>
+          <span class="text-sm">${icons.xCircle(14, 'mr-1')} Please select a backup file</span>
         </div>
       `;
       statusDiv.classList.remove('hidden');
@@ -1146,11 +1144,10 @@ export function FirstTimeSetupModal(container, onComplete) {
     }
 
     try {
-      statusDiv.className =
-        'bg-blue-500/10 border border-blue-500/30 rounded-lg p-3';
+      statusDiv.className = 'app-infobox primary rounded-lg p-3';
       statusDiv.innerHTML = `
         <div class="flex items-center">
-          <span class="text-sm text-blue-400">${icons.refreshCw(14, 'mr-1 animate-spin')} Restoring wallet from backup...</span>
+          <span class="text-sm">${icons.refreshCw(14, 'mr-1 animate-spin')} Restoring wallet from backup...</span>
         </div>
       `;
       statusDiv.classList.remove('hidden');
@@ -1163,11 +1160,10 @@ export function FirstTimeSetupModal(container, onComplete) {
       });
 
       if (result.success) {
-        statusDiv.className =
-          'bg-green-500/10 border border-green-500/30 rounded-lg p-3';
+        statusDiv.className = 'app-infobox success rounded-lg p-3';
         statusDiv.innerHTML = `
           <div class="flex items-center">
-            <span class="text-sm text-green-400">${icons.checkCircle(14, 'mr-1')} Wallet restored successfully!</span>
+            <span class="text-sm">${icons.checkCircle(14, 'mr-1')} Wallet restored successfully!</span>
           </div>
         `;
         return true;
@@ -1176,13 +1172,14 @@ export function FirstTimeSetupModal(container, onComplete) {
       }
     } catch (error) {
       console.error('Restore error:', error);
-      statusDiv.className =
-        'bg-red-500/10 border border-red-500/30 rounded-lg p-3';
+      statusDiv.className = 'app-infobox danger rounded-lg p-3';
       statusDiv.innerHTML = `
-        <div class="flex items-center">
-          <span class="text-sm text-red-400">${icons.xCircle(14, 'mr-1')} ${error.message}</span>
+        <div class="flex items-center gap-1.5">
+          <span class="flex-shrink-0">${icons.xCircle(14)}</span>
+          <span class="text-sm error-msg"></span>
         </div>
       `;
+      statusDiv.querySelector('.error-msg').textContent = error.message;
       statusDiv.classList.remove('hidden');
       return false;
     }

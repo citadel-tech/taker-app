@@ -37,7 +37,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     console.error('❌ Invalid swap report:', swapReport);
     content.innerHTML = `
       <div class="text-center py-20">
-        <p class="text-red-400 text-xl">Error: No swap report data available</p>
+        <p class="text-danger text-xl">Error: No swap report data available</p>
         <button id="back-btn" class="mt-4 bg-primary text-white px-6 py-3 rounded-lg">Back to Swaps</button>
       </div>
     `;
@@ -683,8 +683,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
 
   function showNotification(message) {
     const notification = document.createElement('div');
-    notification.className =
-      'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50';
+    notification.className = 'app-toast top';
     notification.textContent = message;
     document.body.appendChild(notification);
     setTimeout(() => notification.remove(), 2000);
