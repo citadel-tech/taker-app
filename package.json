@@ -1,6 +1,6 @@
 {
   "name": "coinswap-taker",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Staging area for the demo taker-app",
   "main": "main.js",
   "scripts": {
