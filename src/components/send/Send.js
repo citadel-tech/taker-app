@@ -10,7 +10,7 @@ import {
   getAmountUnitLabel as sharedGetAmountUnitLabel,
   getAmountConversionLabels as sharedGetAmountConversionLabels,
   sumSelectedUtxos,
-} from '../../js/coinswapHelpers.js';
+} from '../../js/openswapHelpers.js';
 
 const estimateTxSize = (numInputs, numOutputs) =>
   Math.ceil(10.5 + 68 * numInputs + 31 * numOutputs + 31);

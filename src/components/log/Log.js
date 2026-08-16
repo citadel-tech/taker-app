@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { escapeHtml } from '../../js/coinswapHelpers.js';
+import { escapeHtml } from '../../js/openswapHelpers.js';
 
 export function LogComponent(container) {
   const content = document.createElement('div');

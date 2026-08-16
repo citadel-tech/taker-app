@@ -1,24 +1,24 @@
 <div align="center">
 
-<img src="assets/coinswap.png" alt="Coinswap Maker Dashboard Logo" width="300" /> 
+<img src="assets/openswap.png" alt="Openswap Maker Dashboard Logo" width="300" /> 
 
-<h1 align='center'>Coinswap Taker App</h1> 
+<h1 align='center'>Openswap Taker App</h1> 
 
 </div>
 
 
-A desktop application for performing private Bitcoin swaps using the [Coinswap Protocol](https://github.com/citadel-tech/coinswap).
+A desktop application for performing private Bitcoin swaps using the [Openswap Protocol](https://github.com/citadel-foss/openswap).
 
 ## What is a Taker?
 
-In the Coinswap protocol, a **Taker** is a Bitcoin user who initiates atomic swaps to enhance their transaction privacy. The Taker app acts as a Bitcoin wallet with coinswap capabilities, allowing you to:
+In the Openswap protocol, a **Taker** is a Bitcoin user who initiates atomic swaps to enhance their transaction privacy. The Taker app acts as a Bitcoin wallet with openswap capabilities, allowing you to:
 
 - Swap your Bitcoin UTXOs with multiple makers simultaneously
 - Break transaction graph analysis through multi-hop routing
 - Maintain complete custody of your funds throughout the swap
 - Earn privacy without trusting any third party
 
-Unlike traditional Bitcoin transactions that create an on-chain trail, coinswaps mix your coins through multiple makers, making it significantly harder to trace the origin and destination of funds.
+Unlike traditional Bitcoin transactions that create an on-chain trail, openswaps mix your coins through multiple makers, making it significantly harder to trace the origin and destination of funds.
 
 ## Screenshots
 
@@ -47,10 +47,10 @@ Unlike traditional Bitcoin transactions that create an on-chain trail, coinswaps
 The Taker app requires the following components to operate:
 
 1. **Bitcoin Core (Mutinynet)** - A fully synced Mutinynet node with proper RPC, REST, and ZMQ configuration
-   - See the [Bitcoin Core setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoind.md) for detailed instructions
+   - See the [Bitcoin Core setup guide](https://github.com/citadel-foss/openswap/blob/master/docs/bitcoind.md) for detailed instructions
 
 2. **Tor** - Required for anonymous maker discovery and privacy
-   - See the [Tor setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/tor.md) for configuration instructions
+   - See the [Tor setup guide](https://github.com/citadel-foss/openswap/blob/master/docs/tor.md) for configuration instructions
 
 3. **Node.js** (v18 or higher) - Only required for building from source
 
@@ -74,12 +74,12 @@ The Taker app requires the following components to operate:
 
 If you prefer a pre-configured environment, you can use Docker Compose to spin up Tor, Bitcoin Core (Mutinynet), and maker services automatically.
 
-See the [Docker setup guide](https://github.com/citadel-tech/coinswap/blob/master/docs/docker.md) for instructions.
+See the [Docker setup guide](https://github.com/citadel-foss/openswap/blob/master/docs/docker.md) for instructions.
 
 ### Build from Source
 ```bash
 # Clone the repository
-git clone https://github.com/citadel-tech/taker-app.git
+git clone https://github.com/citadel-foss/taker-app.git
 cd taker-app
 
 # Install dependencies and setup native modules
@@ -92,19 +92,19 @@ npm run dev
 
 ## Architecture
 
-Built with Electron, Vanilla JavaScript, and Tailwind CSS. The app communicates with the Coinswap protocol through [coinswap-ffi](https://github.com/citadel-tech/coinswap-ffi), which provides native Rust performance for cryptographic operations and protocol handling.
+Built with Electron, Vanilla JavaScript, and Tailwind CSS. The app communicates with the Openswap protocol through [openswap-ffi](https://github.com/citadel-foss/openswap-ffi), which provides native Rust performance for cryptographic operations and protocol handling.
 
 ### Native Module Setup
 
-The app uses `coinswap-napi`, a Node.js native addon that wraps the Rust coinswap implementation. This is automatically built and linked during installation:
+The app uses `openswap-napi`, a Node.js native addon that wraps the Rust openswap implementation. This is automatically built and linked during installation:
 
 1. `npm install` triggers the `prepare` script
-2. `setup-coinswap.js` clones [coinswap-ffi](https://github.com/citadel-tech/coinswap-ffi)
-3. The native module is compiled and symlinked to `node_modules/coinswap-napi`
+2. `setup-openswap.js` clones [openswap-ffi](https://github.com/citadel-foss/openswap-ffi)
+3. The native module is compiled and symlinked to `node_modules/openswap-napi`
 
 If you encounter issues with the native module, manually run:
 ```bash
-npm run setup:coinswap
+npm run setup:openswap
 ```
 
 ## Usage
@@ -113,7 +113,7 @@ See the [Usage Guide](docs/usage.md) for detailed instructions on:
 
 - Wallet management and setup
 - Browsing the maker marketplace
-- Executing coinswaps
+- Executing openswaps
 - Sending and receiving Bitcoin
 - Recovery procedures
 
@@ -134,7 +134,7 @@ sudo snap install snapcraft --classic # only needed when building the snap packa
 
 This will automatically:
 - Install Node.js dependencies
-- Clone and build the coinswap native module (first build may take 2-3 minutes)
+- Clone and build the openswap native module (first build may take 2-3 minutes)
 - Build the bundled Tor manager
 - Build production CSS
 
@@ -144,30 +144,30 @@ npm run dist
 ```
 
 This creates production-ready packages in the `dist/` directory:
-- `CoinswapTaker-0.2.1.AppImage` - Portable executable for Linux distributions
-- `coinswaptaker_0.2.1_amd64.snap` - Optional snap package
+- `OpenswapTaker-0.2.1.AppImage` - Portable executable for Linux distributions
+- `openswaptaker_0.2.1_amd64.snap` - Optional snap package
 
 ### Using the AppImage
 ```bash
 # Make executable (one-time)
-chmod +x dist/CoinswapTaker-0.2.1.AppImage
+chmod +x dist/OpenswapTaker-0.2.1.AppImage
 
 # Run directly
-./dist/CoinswapTaker-0.2.1.AppImage
+./dist/OpenswapTaker-0.2.1.AppImage
 ```
 
 **Optional desktop integration:**
 ```bash
 # Integrate with application menu
-./dist/CoinswapTaker-0.2.1.AppImage --appimage-integrate
+./dist/OpenswapTaker-0.2.1.AppImage --appimage-integrate
 
 # Remove integration
-./dist/CoinswapTaker-0.2.1.AppImage --appimage-unintegrate
+./dist/OpenswapTaker-0.2.1.AppImage --appimage-unintegrate
 ```
 
 **Extract and inspect:**
 ```bash
-./dist/CoinswapTaker-0.2.1.AppImage --appimage-extract
+./dist/OpenswapTaker-0.2.1.AppImage --appimage-extract
 cd squashfs-root
 ./TakerApp
 ```
@@ -197,7 +197,7 @@ This runs:
 | ------------------------ | ------------------------------------------------- |
 | `npm install`            | Install dependencies and setup native modules     |
 | `npm run dev`            | Start app in development mode with hot-reload     |
-| `npm run setup:coinswap` | Clone/update and build the coinswap native module |
+| `npm run setup:openswap` | Clone/update and build the openswap native module |
 | `npm run build:css`      | Build Tailwind CSS for production                 |
 | `npm run dist`           | Create production build (AppImage + Snap)         |
 | `npm start`              | Start Electron without hot-reload                 |
@@ -213,11 +213,11 @@ which fusermount
 sudo apt install fuse libfuse2
 
 # Or extract and run directly
-./CoinswapTaker-0.2.1.AppImage --appimage-extract
-./squashfs-root/coinswap-taker
+./OpenswapTaker-0.2.1.AppImage --appimage-extract
+./squashfs-root/openswap-taker
 ```
 
-**Error: Cannot find module 'coinswap-napi'**
+**Error: Cannot find module 'openswap-napi'**
 ```bash
 npm install
 ```
@@ -225,10 +225,10 @@ npm install
 **Native module fails to load**
 ```bash
 # Rebuild the native module
-cd coinswap-ffi/coinswap-js
+cd openswap-ffi/openswap-js
 npm run build
 cd ../..
-npm run setup:coinswap
+npm run setup:openswap
 ```
 
 ## Contributing
@@ -243,7 +243,7 @@ Contributions are welcome! To contribute:
 
 - Test changes on both Signet and Regtest before submitting
 - Ensure `npm run dist` succeeds before submitting PRs
-- For protocol-level changes, contribute to the [core Coinswap library](https://github.com/citadel-tech/coinswap)
+- For protocol-level changes, contribute to the [core Openswap library](https://github.com/citadel-foss/openswap)
 
 **Questions?** Join our [Discord server](https://discord.gg/Wz42hVmrrK).
 
@@ -261,7 +261,7 @@ Licensed under Apache 2.0. See [LICENSE](LICENSE).
 
 - **Discord** - [Join our server](https://discord.gg/Wz42hVmrrK)
 - **GitHub Issues** - Report bugs and request features
-- **Core Library** - [Coinswap protocol implementation](https://github.com/citadel-tech/coinswap)
+- **Core Library** - [Openswap protocol implementation](https://github.com/citadel-foss/openswap)
 
 ---
 

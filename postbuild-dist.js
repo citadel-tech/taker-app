@@ -10,12 +10,12 @@ try {
   // Read package.json
   const packageJson = JSON.parse(fs.readFileSync(PACKAGE_JSON, 'utf8'));
   
-  // Check if coinswap-napi dependency exists
-  if (packageJson.dependencies && packageJson.dependencies['coinswap-napi']) {
-    console.log('➡️  Removing temporary coinswap-napi dependency...');
+  // Check if openswap-napi dependency exists
+  if (packageJson.dependencies && packageJson.dependencies['openswap-napi']) {
+    console.log('➡️  Removing temporary openswap-napi dependency...');
     
     // Remove the dependency
-    delete packageJson.dependencies['coinswap-napi'];
+    delete packageJson.dependencies['openswap-napi'];
     
     // Write back to package.json
     fs.writeFileSync(PACKAGE_JSON, JSON.stringify(packageJson, null, 2) + '\n');

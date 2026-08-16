@@ -1,13 +1,13 @@
-// setup-coinswap.js
+// setup-openswap.js
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-const FFI_DIR = path.join(__dirname, 'coinswap-ffi');
-const NAPI_SOURCE = path.join(FFI_DIR, 'coinswap-js');
-const NODE_MODULES_TARGET = path.join(__dirname, 'node_modules', 'coinswap-napi');
+const FFI_DIR = path.join(__dirname, 'openswap-ffi');
+const NAPI_SOURCE = path.join(FFI_DIR, 'openswap-js');
+const NODE_MODULES_TARGET = path.join(__dirname, 'node_modules', 'openswap-napi');
 
-console.log('\n=== Coinswap Native Module Auto Setup ===\n');
+console.log('\n=== Openswap Native Module Auto Setup ===\n');
 
 function runCommand(cmd, options = {}) {
   return execSync(cmd, {
@@ -17,29 +17,29 @@ function runCommand(cmd, options = {}) {
   });
 }
 
-// STEP 1 — Clone coinswap-ffi if missing
+// STEP 1 — Clone openswap-ffi if missing
 const BRANCH = 'main';
-const REPO_URL = 'https://github.com/citadel-tech/coinswap-ffi.git';
+const REPO_URL = 'https://github.com/citadel-foss/openswap-ffi.git';
 
 if (!fs.existsSync(FFI_DIR)) {
-  console.log(`➡️  Cloning coinswap-ffi (branch ${BRANCH})...`);
+  console.log(`➡️  Cloning openswap-ffi (branch ${BRANCH})...`);
   runCommand(`git clone -b ${BRANCH} ${REPO_URL}`);
 } else {
-  console.log(`➡️  Updating coinswap-ffi to branch ${BRANCH}...`);
+  console.log(`➡️  Updating openswap-ffi to branch ${BRANCH}...`);
   // Fetch all branches and checkout the desired one
   runCommand('git fetch --all', { cwd: FFI_DIR });
   runCommand(`git checkout ${BRANCH}`, { cwd: FFI_DIR });
   runCommand('git pull', { cwd: FFI_DIR });
 }
-// STEP 2 — Install deps & build coinswap-js
-console.log('➡️  Installing dependencies for coinswap-js...');
+// STEP 2 — Install deps & build openswap-js
+console.log('➡️  Installing dependencies for openswap-js...');
 runCommand('npm install', { cwd: NAPI_SOURCE });
 
-console.log('➡️  Building coinswap-js...');
+console.log('➡️  Building openswap-js...');
 runCommand('npm run build', { cwd: NAPI_SOURCE });
 
 // STEP 3 — Create symlink in node_modules
-console.log('➡️  Setting up coinswap-napi in node_modules...');
+console.log('➡️  Setting up openswap-napi in node_modules...');
 
 // Ensure node_modules exists
 const nodeModulesDir = path.join(__dirname, 'node_modules');
@@ -55,11 +55,11 @@ if (fs.existsSync(NODE_MODULES_TARGET)) {
 // Create symlink (works on Linux/Mac, falls back to copy on Windows)
 try {
   fs.symlinkSync(NAPI_SOURCE, NODE_MODULES_TARGET, 'dir');
-  console.log('✓ Symlinked coinswap-js → node_modules/coinswap-napi\n');
+  console.log('✓ Symlinked openswap-js → node_modules/openswap-napi\n');
 } catch (err) {
   console.log('⚠️  Symlink failed, copying instead...');
   fs.cpSync(NAPI_SOURCE, NODE_MODULES_TARGET, { recursive: true });
-  console.log('✓ Copied coinswap-js → node_modules/coinswap-napi\n');
+  console.log('✓ Copied openswap-js → node_modules/openswap-napi\n');
 }
 
 // STEP 4 — Verify
@@ -88,4 +88,4 @@ try {
 }
 
 console.log('\n✓ Module structure verified');
-console.log('🎉 Setup complete! Coinswap-NAPI is ready.\n');
+console.log('🎉 Setup complete! Openswap-NAPI is ready.\n');

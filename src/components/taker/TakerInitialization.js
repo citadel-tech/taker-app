@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { wirePasswordToggle } from '../../js/coinswapHelpers.js';
+import { wirePasswordToggle } from '../../js/openswapHelpers.js';
 
 export function TakerInitializationComponent(container, config, onInitialized) {
   const initDiv = document.createElement('div');
@@ -14,7 +14,7 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                 </div>
                 <span class="app-loader-kicker">Wallet runtime</span>
                 <h2>Initializing Taker</h2>
-                <p id="taker-status-text">Setting up coinswap functionality...</p>
+                <p id="taker-status-text">Setting up openswap functionality...</p>
             </div>
 
             <div class="app-loader-steps">
@@ -101,8 +101,8 @@ export function TakerInitializationComponent(container, config, onInitialized) {
                     ${icons.lightbulb(18)}
                     <div>
                         <strong>Tor not running</strong>
-                        <p>Start the Coinswap Tor service and try again.</p>
-                        <code>sudo systemctl start tor@coinswap</code>
+                        <p>Start the Openswap Tor service and try again.</p>
+                        <code>sudo systemctl start tor@openswap</code>
                     </div>
                 </div>
             </div>

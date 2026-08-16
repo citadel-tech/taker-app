@@ -1,6 +1,6 @@
 # Taker App Usage Guide
 
-This guide covers all features and functionality of the Coinswap Taker App.
+This guide covers all features and functionality of the Openswap Taker App.
 
 ## Table of Contents
 
@@ -30,7 +30,7 @@ The setup page allows you to review and update your configuration.
 Your main Bitcoin wallet interface displaying:
 
 - **Balance Overview** - Total spendable balance with real-time updates
-- **Transaction History** - Chronological list of sends, receives, and coinswaps
+- **Transaction History** - Chronological list of sends, receives, and openswaps
 - **UTXO Management** - View and select individual UTXOs for spending or swapping
 - **Quick Actions** - One-click access to send, receive, and swap functions
 
@@ -48,7 +48,7 @@ The market page helps you analyze available makers and their offerings. Makers w
 
 ## Swap Page
 
-Initiate and manage coinswaps:
+Initiate and manage openswaps:
 
 - **Amount Selection** - Choose swap amount in sats or BTC
 - **UTXO Selection** - Auto-select optimal UTXOs or manually choose specific coins
@@ -68,7 +68,7 @@ Standard Bitcoin send functionality:
 - **UTXO Selection** - Manual coin control for advanced users
 - **Transaction Preview** - Review details before broadcasting
 
-Standard sends bypass the coinswap protocol for faster transactions when privacy isn't required.
+Standard sends bypass the openswap protocol for faster transactions when privacy isn't required.
 
 ## Receive Page
 

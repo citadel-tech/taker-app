@@ -1,12 +1,12 @@
-name: Build against latest Coinswap
+name: Build against latest Openswap
 
 on:
   repository_dispatch:
-    types: [coinswap-updated]
+    types: [openswap-updated]
   workflow_dispatch:
     inputs:
-      coinswap_sha:
-        description: Coinswap commit SHA
+      openswap_sha:
+        description: Openswap commit SHA
         required: true
         type: string
 
@@ -15,7 +15,7 @@ permissions:
   issues: write
 
 concurrency:
-  group: coinswap-build-${{ github.event.client_payload.coinswap_sha || inputs.coinswap_sha }}
+  group: openswap-build-${{ github.event.client_payload.openswap_sha || inputs.openswap_sha }}
   cancel-in-progress: true
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      COINSWAP_SHA: ${{ github.event.client_payload.coinswap_sha || inputs.coinswap_sha }}
+      OPENSWAP_SHA: ${{ github.event.client_payload.openswap_sha || inputs.openswap_sha }}
     steps:
       - name: Checkout Taker App
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -31,12 +31,12 @@ jobs:
           path: taker-app
           persist-credentials: false
 
-      - name: Checkout Coinswap
+      - name: Checkout Openswap
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          repository: citadel-tech/coinswap
-          ref: ${{ env.COINSWAP_SHA }}
-          path: coinswap
+          repository: citadel-foss/openswap
+          ref: ${{ env.OPENSWAP_SHA }}
+          path: openswap
           persist-credentials: false
 
       - name: Set up Rust
@@ -54,14 +54,14 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential libssl-dev pkg-config protobuf-compiler
 
-      - name: Use dispatched Coinswap commit
+      - name: Use dispatched Openswap commit
         env:
-          COINSWAP_PATH: ${{ github.workspace }}/coinswap
+          OPENSWAP_PATH: ${{ github.workspace }}/openswap
         run: |
           mkdir -p "${HOME}/.cargo"
           {
-            echo '[patch."https://github.com/citadel-tech/coinswap.git"]'
-            printf 'coinswap = { path = "%s" }\n' "${COINSWAP_PATH}"
+            echo '[patch."https://github.com/citadel-foss/openswap.git"]'
+            printf 'openswap = { path = "%s" }\n' "${OPENSWAP_PATH}"
           } > "${HOME}/.cargo/config.toml"
 
       - name: Build Taker App
@@ -77,10 +77,10 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         with:
           script: |
-            const sha = process.env.COINSWAP_SHA
-            const marker = `<!-- coinswap-compatibility:${sha} -->`
-            const title = `Coinswap compatibility failed (${sha.slice(0, 12)})`
-            const body = `${marker}\n\nTaker App failed to build against [Coinswap commit \`${sha}\`](https://github.com/citadel-tech/coinswap/commit/${sha}).\n\n[View the failed workflow run](${process.env.RUN_URL}).`
+            const sha = process.env.OPENSWAP_SHA
+            const marker = `<!-- openswap-compatibility:${sha} -->`
+            const title = `Openswap compatibility failed (${sha.slice(0, 12)})`
+            const body = `${marker}\n\nTaker App failed to build against [Openswap commit \`${sha}\`](https://github.com/citadel-foss/openswap/commit/${sha}).\n\n[View the failed workflow run](${process.env.RUN_URL}).`
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               ...context.repo,
               state: 'open',
@@ -100,7 +100,7 @@ jobs:
                 ...context.repo,
                 name: 'upstream-breakage',
                 color: 'b60205',
-                description: 'Breakage caused by an upstream Coinswap change',
+                description: 'Breakage caused by an upstream Openswap change',
               })
             }
             if (existing) {

@@ -5,7 +5,7 @@ export async function AboutComponent(container) {
       <!-- Header -->
       <div class="flex items-start justify-between mb-8">
         <div>
-          <h2 class="text-3xl font-bold text-primary">Coinswap</h2>
+          <h2 class="text-3xl font-bold text-primary">Openswap</h2>
           <p class="text-gray-400 text-sm mt-1">Taker Wallet — Bitcoin Privacy Tool</p>
         </div>
         <div class="flex items-center gap-3 mt-1">
@@ -14,12 +14,12 @@ export async function AboutComponent(container) {
         </div>
       </div>
 
-      <!-- What is Coinswap -->
+      <!-- What is Openswap -->
       <div class="bg-surface rounded-lg p-8 max-w-3xl space-y-4">
-        <h3 class="text-xl font-semibold text-white">About Coinswap</h3>
+        <h3 class="text-xl font-semibold text-white">About Openswap</h3>
         <p class="text-gray-300 text-sm leading-relaxed">
-          Coinswap is a trustless, self-custodial atomic swap protocol built on Bitcoin. Unlike existing solutions
-          that rely on centralized servers, Coinswap's marketplace is seeded in the Bitcoin blockchain itself —
+          Openswap is a trustless, self-custodial atomic swap protocol built on Bitcoin. Unlike existing solutions
+          that rely on centralized servers, Openswap's marketplace is seeded in the Bitcoin blockchain itself —
           no central host required. Sybil resistance is achieved through
           <span class="text-white font-medium">Fidelity Bonds</span>: time-locked UTXOs that make Sybil attacks
           economically costly while bootstrapping the marketplace on-chain.

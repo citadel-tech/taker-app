@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { formatSats, SATS_SYMBOL } from '../../js/price.js';
-import { escapeHtml } from '../../js/coinswapHelpers.js';
+import { escapeHtml } from '../../js/openswapHelpers.js';
 
 function compactTxid(txid = '') {
   const text = String(txid || '');

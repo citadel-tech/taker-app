@@ -1,7 +1,7 @@
 import { formatSats } from '../../js/price.js';
 import { icons } from '../../js/icons.js';
 import { openSwapReport } from '../swap/SwapHistory.js';
-import { explorerTxUrl, detectAddressType, classifySpendType, formatRelativeTime, truncateMiddle } from '../../js/coinswapHelpers.js';
+import { explorerTxUrl, detectAddressType, classifySpendType, formatRelativeTime, truncateMiddle } from '../../js/openswapHelpers.js';
 
 export async function WalletComponent(container) {
   let allTransactions = [];
@@ -70,7 +70,7 @@ export async function WalletComponent(container) {
     if (
       label.includes('swap') ||
       label.includes('swapcoin') ||
-      label.includes('coinswap') ||
+      label.includes('openswap') ||
       label.includes('watchonly_swapcoin') ||
       label.includes('contract') ||
       label.includes('htlc') ||

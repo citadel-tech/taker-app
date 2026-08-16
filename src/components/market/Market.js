@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { formatSats, SATS_SYMBOL } from '../../js/price.js';
-import { explorerTxUrl, estimateMakerFee, formatTorEndpoint, showToast } from '../../js/coinswapHelpers.js';
+import { explorerTxUrl, estimateMakerFee, formatTorEndpoint, showToast } from '../../js/openswapHelpers.js';
 
 export function Market(container) {
   const content = document.createElement('div');
@@ -807,7 +807,7 @@ export function Market(container) {
       <div class="app-head">
         <div>
           <h2>Market</h2>
-          <p class="market-subtitle">Live view of coinswap makers routing through your Tor circuit.</p>
+          <p class="market-subtitle">Live view of openswap makers routing through your Tor circuit.</p>
           <div id="sync-status" class="market-sync-shell"></div>
         </div>
         <button id="refresh-market-btn" class="app-button primary">

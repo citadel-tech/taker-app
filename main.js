@@ -25,12 +25,12 @@ try {
 let torManager = null;
 
 function startManagedTor() {
-  if (process.env.COINSWAP_DISABLE_MANAGED_TOR === '1') {
+  if (process.env.OPENSWAP_DISABLE_MANAGED_TOR === '1') {
     console.log('[tor-manager] Managed Tor startup disabled by environment');
     return;
   }
 
-  const TOR_BINARY = process.platform === 'win32' ? 'coinswap-tor-manager.exe' : 'coinswap-tor-manager';
+  const TOR_BINARY = process.platform === 'win32' ? 'openswap-tor-manager.exe' : 'openswap-tor-manager';
   // Packaged app: binary is in bin/ (copied by prepare-dist.js)
   // Dev: binary is in tor-manager/target/debug/ (built by cargo)
   const torManagerPath = app.isPackaged
@@ -80,7 +80,7 @@ function createWindow() {
       enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js'),
     },
-    icon: path.join(__dirname, 'assets/coinswap.png'),
+    icon: path.join(__dirname, 'assets/openswap.png'),
   });
 
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {

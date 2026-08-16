@@ -2,15 +2,15 @@ import { SwapStateManager } from './SwapStateManager.js';
 import { icons } from '../../js/icons.js';
 import { formatSats, SATS_SYMBOL } from '../../js/price.js';
 import { createSwapProgressAnimation } from './SwapProgressAnimation.js';
-import { explorerTxUrl, normalizeSwapProtocol, escapeHtml, truncateMiddle } from '../../js/coinswapHelpers.js';
+import { explorerTxUrl, normalizeSwapProtocol, escapeHtml, truncateMiddle } from '../../js/openswapHelpers.js';
 
-export async function CoinswapComponent(container, swapConfig) {
-  if (typeof window !== 'undefined' && window.__coinswapProgressCleanup) {
-    window.__coinswapProgressCleanup();
+export async function OpenswapComponent(container, swapConfig) {
+  if (typeof window !== 'undefined' && window.__openswapProgressCleanup) {
+    window.__openswapProgressCleanup();
   }
 
   const content = document.createElement('div');
-  content.id = 'coinswap-content';
+  content.id = 'openswap-content';
 
   const existingSwap = await SwapStateManager.getActiveSwap();
   const storedProgress = await SwapStateManager.getSwapProgress();
@@ -45,14 +45,14 @@ export async function CoinswapComponent(container, swapConfig) {
     }
     if (
       typeof window !== 'undefined' &&
-      window.__coinswapProgressCleanup === cleanupProgressScreen
+      window.__openswapProgressCleanup === cleanupProgressScreen
     ) {
-      window.__coinswapProgressCleanup = null;
+      window.__openswapProgressCleanup = null;
     }
   }
 
   if (typeof window !== 'undefined') {
-    window.__coinswapProgressCleanup = cleanupProgressScreen;
+    window.__openswapProgressCleanup = cleanupProgressScreen;
   }
 
   function progressBelongsToSwap(progress, swap) {
@@ -473,7 +473,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
     const [, timestamp, level, module, message] = match;
 
-    if (!module.startsWith('coinswap::')) return;
+    if (!module.startsWith('openswap::')) return;
 
     const logKey = `${timestamp}:${message}`;
     if (processedLogs.has(logKey)) return;
@@ -485,7 +485,7 @@ export async function CoinswapComponent(container, swapConfig) {
 
   function startSwap() {
     if (shouldStartNew && currentStep === 0) {
-      console.log('🚀 Starting REAL coinswap polling');
+      console.log('🚀 Starting REAL openswap polling');
 
       const swapId = actualSwapConfig.swapId;
       if (!swapId) {
@@ -497,7 +497,7 @@ export async function CoinswapComponent(container, swapConfig) {
       actualSwapConfig.startTime = startTime;
       currentStep = 1;
       updateElapsedTime();
-      addLog('Coinswap started...', 'info');
+      addLog('Openswap started...', 'info');
       addLog(`Swap ID: ${swapId}`, 'info');
       if (actualSwapConfig.nativeSwapId) {
         addLog(`Backend Swap ID: ${actualSwapConfig.nativeSwapId}`, 'info');
@@ -553,8 +553,8 @@ export async function CoinswapComponent(container, swapConfig) {
 
     pollInterval = setInterval(async () => {
       try {
-        // IPC call to get coinswap status
-        const result = await window.api.coinswap.getStatus(swapId);
+        // IPC call to get openswap status
+        const result = await window.api.openswap.getStatus(swapId);
 
         if (!result.success) {
           console.error('Polling error:', result.error);
@@ -655,7 +655,7 @@ export async function CoinswapComponent(container, swapConfig) {
       </header>
 
       <p class="swap-failure-copy">
-        The coinswap could not be completed. Your funds are safe and recovery has been initiated. Check your wallet for returned funds.
+        The openswap could not be completed. Your funds are safe and recovery has been initiated. Check your wallet for returned funds.
       </p>
 
       <div class="app-status-row ok swap-failure-status">
@@ -807,9 +807,9 @@ export async function CoinswapComponent(container, swapConfig) {
       'fundingTxidsByHop',
       []
     );
-    const feePaidOrEarned = getValue(
-      'fee_paid_or_earned',
-      'feePaidOrEarned',
+    const feePaid = getValue(
+      'fee_paid',
+      'feePaid',
       NaN
     );
     const totalFee = getValue('total_fee', 'totalFee', NaN);
@@ -870,16 +870,16 @@ export async function CoinswapComponent(container, swapConfig) {
     });
 
     const componentTotalFee = totalMakerFees + Math.max(0, miningFee);
-    const netFeePaidOrEarned = Number.isFinite(feePaidOrEarned)
-      ? Math.abs(feePaidOrEarned)
+    const netFeePaid = Number.isFinite(feePaid)
+      ? Math.abs(feePaid)
       : NaN;
     const normalizedTotalFee =
       Number.isFinite(totalFee) && totalFee >= 0
         ? totalFee
         : componentTotalFee > 0
           ? componentTotalFee
-          : Number.isFinite(netFeePaidOrEarned)
-            ? netFeePaidOrEarned
+          : Number.isFinite(netFeePaid)
+            ? netFeePaid
             : 0;
     const calculatedMiningFee =
       Number.isFinite(miningFee) && miningFee >= 0

@@ -1,5 +1,5 @@
 import { SwapStateManager } from './swap/SwapStateManager.js';
-import { formatElapsedTime } from '../js/coinswapHelpers.js';
+import { formatElapsedTime } from '../js/openswapHelpers.js';
 
 function navIcon(name) {
   const paths = {
@@ -43,7 +43,7 @@ export async function NavComponent(container) {
     <div class="app-sidebar-brand">
       <div class="app-sidebar-logo">C</div>
       <div class="app-sidebar-title">
-        <h1>Coinswap</h1>
+        <h1>Openswap</h1>
         <p>Taker app</p>
       </div>
     </div>

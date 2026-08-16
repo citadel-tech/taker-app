@@ -1,5 +1,5 @@
 {
-  "name": "coinswap-taker",
+  "name": "openswap-taker",
   "version": "0.2.2",
   "description": "Staging area for the demo taker-app",
   "main": "main.js",
@@ -12,8 +12,8 @@
     "tailwind:watch": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css --watch",
     "build:css": "npx @tailwindcss/cli -i ./src/styles/input.css -o ./src/styles/output.css",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "setup:coinswap": "node setup-coinswap.js",
-    "prepare": "npm run setup:coinswap && npm run build:css",
+    "setup:openswap": "node setup-openswap.js",
+    "prepare": "npm run setup:openswap && npm run build:css",
     "build": "npm run build:css",
     "prebuild:electron": "node prepare-dist.js",
     "build:electron": "electron-builder",
@@ -21,8 +21,8 @@
     "dist": "npm run build:tor-manager && node prepare-dist.js && npm run build && npm run build:electron && node postbuild-dist.js"
   },
   "build": {
-    "appId": "com.citadel.coinswap-taker",
-    "productName": "coinswap-taker",
+    "appId": "com.citadel.openswap-taker",
+    "productName": "openswap-taker",
     "asar": false,
     "files": [
       "**/*",
@@ -37,7 +37,7 @@
       "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
       "!**/{appveyor.yml,.travis.yml,circle.yml}",
       "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
-      "!coinswap-ffi",
+      "!openswap-ffi",
       "!dist",
       "!**/*.map"
     ],
@@ -54,15 +54,15 @@
         "pacman"
       ],
       "category": "Finance",
-      "executableName": "coinswap-taker",
+      "executableName": "openswap-taker",
       "icon": "build/icons",
-      "maintainer": "Citadel Tech"
+      "maintainer": "Citadel FOSS"
     },
     "snap": {
       "confinement": "classic",
       "grade": "stable",
-      "summary": "Private Bitcoin swaps using the Coinswap Protocol",
-      "description": "A desktop application for performing private Bitcoin swaps. The Taker app acts as a Bitcoin wallet with coinswap capabilities.",
+      "summary": "Private Bitcoin swaps using the Openswap Protocol",
+      "description": "A desktop application for performing private Bitcoin swaps. The Taker app acts as a Bitcoin wallet with openswap capabilities.",
       "plugs": [
         "home",
         "network",
@@ -94,14 +94,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/citadel-tech/taker-app.git"
+    "url": "git+https://github.com/citadel-foss/taker-app.git"
   },
   "author": "",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/citadel-tech/taker-app/issues"
+    "url": "https://github.com/citadel-foss/taker-app/issues"
   },
-  "homepage": "https://github.com/citadel-tech/taker-app#readme",
+  "homepage": "https://github.com/citadel-foss/taker-app#readme",
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.14",
     "concurrently": "^9.2.1",

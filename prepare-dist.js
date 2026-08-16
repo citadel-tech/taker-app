@@ -2,15 +2,15 @@
 const fs = require('fs');
 const path = require('path');
 
-const NAPI_SOURCE = path.join(__dirname, 'coinswap-ffi', 'coinswap-js');
-const NAPI_TARGET = path.join(__dirname, 'node_modules', 'coinswap-napi');
+const NAPI_SOURCE = path.join(__dirname, 'openswap-ffi', 'openswap-js');
+const NAPI_TARGET = path.join(__dirname, 'node_modules', 'openswap-napi');
 const PACKAGE_JSON = path.join(__dirname, 'package.json');
 
 console.log('\n=== Preparing for distribution build ===\n');
 
-// Simple check: does coinswap-napi exist in node_modules?
+// Simple check: does openswap-napi exist in node_modules?
 if (!fs.existsSync(NAPI_TARGET)) {
-  console.error('❌ Error: coinswap-napi not found in node_modules!');
+  console.error('❌ Error: openswap-napi not found in node_modules!');
   console.error('\n📦 Please run: npm install\n');
   process.exit(1);
 }
@@ -27,22 +27,22 @@ if (stats.isSymbolicLink()) {
   // Copy actual files
   fs.cpSync(NAPI_SOURCE, NAPI_TARGET, { recursive: true });
   
-  console.log('✓ Copied coinswap-napi for distribution\n');
+  console.log('✓ Copied openswap-napi for distribution\n');
 } else {
-  console.log('✓ coinswap-napi already prepared\n');
+  console.log('✓ openswap-napi already prepared\n');
 }
 
-// IMPORTANT: Temporarily add coinswap-napi to dependencies for electron-builder
-console.log('➡️  Adding coinswap-napi to package.json dependencies...');
+// IMPORTANT: Temporarily add openswap-napi to dependencies for electron-builder
+console.log('➡️  Adding openswap-napi to package.json dependencies...');
 
 const packageJson = JSON.parse(fs.readFileSync(PACKAGE_JSON, 'utf8'));
 
 // Save original package.json
 fs.writeFileSync(PACKAGE_JSON + '.backup', JSON.stringify(packageJson, null, 2));
 
-// Add coinswap-napi as a file dependency
+// Add openswap-napi as a file dependency
 packageJson.dependencies = packageJson.dependencies || {};
-packageJson.dependencies['coinswap-napi'] = 'file:./node_modules/coinswap-napi';
+packageJson.dependencies['openswap-napi'] = 'file:./node_modules/openswap-napi';
 
 // Write modified package.json
 fs.writeFileSync(PACKAGE_JSON, JSON.stringify(packageJson, null, 2));
@@ -51,7 +51,7 @@ console.log('✓ Modified package.json for build\n');
 
 // Copy tor-manager binary to bin/ so electron-builder includes it
 // (tor-manager/target/ is gitignored and would otherwise be excluded)
-const TOR_BINARY = process.platform === 'win32' ? 'coinswap-tor-manager.exe' : 'coinswap-tor-manager';
+const TOR_BINARY = process.platform === 'win32' ? 'openswap-tor-manager.exe' : 'openswap-tor-manager';
 const torBinarySource = path.join(__dirname, 'tor-manager', 'target', 'debug', TOR_BINARY);
 const binDir = path.join(__dirname, 'bin');
 const torBinaryTarget = path.join(binDir, TOR_BINARY);

@@ -21,13 +21,13 @@ async function main() {
   try {
     const raw = await readStdin();
     const config = JSON.parse(raw);
-    const coinswapNapi = require('coinswap-napi');
-    const TakerClass = coinswapNapi.Taker;
+    const openswapNapi = require('openswap-napi');
+    const TakerClass = openswapNapi.Taker;
 
     if (!TakerClass) {
       reportAndExit({
         success: false,
-        error: 'Taker class not found. Rebuild coinswap-napi.',
+        error: 'Taker class not found. Rebuild openswap-napi.',
         walletLoadFailed: true,
         recoverable: true,
       });

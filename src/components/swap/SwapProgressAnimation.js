@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
-import { escapeHtml, formatTorEndpoint } from '../../js/coinswapHelpers.js';
+import { escapeHtml, formatTorEndpoint } from '../../js/openswapHelpers.js';
 
 function normalizeTone(color) {
   if (color === 'green' || color === 'success') return 'settled';

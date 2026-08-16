@@ -12,7 +12,7 @@ import {
   getAmountUnitLabel as sharedGetAmountUnitLabel,
   getAmountConversionLabels as sharedGetAmountConversionLabels,
   sumSelectedUtxos,
-} from '../../js/coinswapHelpers.js';
+} from '../../js/openswapHelpers.js';
 
 // ✅ ADD CACHE CONSTANTS
 const SWAP_DATA_CACHE_KEY = 'swap_data_cache';
@@ -76,7 +76,7 @@ export async function SwapComponent(container) {
 
   console.log('📊 Active swap check:', { activeSwap, hasActiveSwap });
 
-  // If there's an active swap in progress, redirect to coinswap progress
+  // If there's an active swap in progress, redirect to openswap progress
   if (activeSwap && hasActiveSwap) {
     if (activeSwap.status === 'configured') {
       const age = Date.now() - activeSwap.createdAt;
@@ -85,17 +85,17 @@ export async function SwapComponent(container) {
         await SwapStateManager.clearSwapData();
       } else {
         console.log('🔄 Configured swap detected, redirecting to progress view');
-        import('./Coinswap.js').then((module) => {
+        import('./Openswap.js').then((module) => {
           container.innerHTML = '';
-          module.CoinswapComponent(container, activeSwap);
+          module.OpenswapComponent(container, activeSwap);
         });
         return; // Exit early, don't render the config page
       }
     } else if (activeSwap.status === 'in_progress') {
       console.log('🔄 In-progress swap detected, redirecting to progress view');
-      import('./Coinswap.js').then((module) => {
+      import('./Openswap.js').then((module) => {
         container.innerHTML = '';
-        module.CoinswapComponent(container, activeSwap);
+        module.OpenswapComponent(container, activeSwap);
       });
       return; // Exit early, don't render the config page
     }
@@ -155,7 +155,7 @@ export async function SwapComponent(container) {
   }
 
   try {
-    const config = JSON.parse(localStorage.getItem('coinswap_config') || '{}');
+    const config = JSON.parse(localStorage.getItem('openswap_config') || '{}');
     currentNetwork = config.network || currentNetwork;
   } catch (error) {
     console.error('Failed to load swap config context:', error);
@@ -716,7 +716,7 @@ export async function SwapComponent(container) {
 
   function validateSwapConfig() {
     const warningEl = content.querySelector('#validation-warning');
-    const startBtn = content.querySelector('#start-coinswap-btn');
+    const startBtn = content.querySelector('#start-openswap-btn');
     if (!warningEl || !startBtn) return;
 
     let warnings = [];
@@ -1227,7 +1227,7 @@ export async function SwapComponent(container) {
           </div>
 
           <div id="validation-warning" class="hidden swap-validation"></div>
-          <button id="start-coinswap-btn" class="swap-start-btn">Start Swap</button>
+          <button id="start-openswap-btn" class="swap-start-btn">Start Swap</button>
         </section>
 
         <aside class="swap-summary-stack">
@@ -1404,9 +1404,9 @@ export async function SwapComponent(container) {
   });
 
   content
-    .querySelector('#start-coinswap-btn')
+    .querySelector('#start-openswap-btn')
     .addEventListener('click', async () => {
-      console.log('🚀 Start Coinswap button clicked');
+      console.log('🚀 Start Openswap button clicked');
 
       // Final validation
       if (swapAmount <= 0) {
@@ -1487,14 +1487,14 @@ export async function SwapComponent(container) {
 
       console.log('💾 Saving swap configuration:', swapConfig);
 
-      const startBtn = content.querySelector('#start-coinswap-btn');
+      const startBtn = content.querySelector('#start-openswap-btn');
       startBtn.disabled = true;
       startBtn.textContent = 'Starting...';
       startBtn.classList.add('opacity-50', 'cursor-not-allowed');
 
       try {
-        // IPC call to start coinswap
-        const result = await window.api.coinswap.start({
+        // IPC call to start openswap
+        const result = await window.api.openswap.start({
           amount: swapAmount,
           makerCount: swapConfig.makers,
           outpoints:
@@ -1509,8 +1509,8 @@ export async function SwapComponent(container) {
               ? selectedMakerAddresses
               : undefined,
           protocol: swapConfig.protocol,
-          password: localStorage.getItem('coinswap_config')
-            ? JSON.parse(localStorage.getItem('coinswap_config')).wallet
+          password: localStorage.getItem('openswap_config')
+            ? JSON.parse(localStorage.getItem('openswap_config')).wallet
                 ?.password || ''
             : '',
         });
@@ -1532,14 +1532,14 @@ export async function SwapComponent(container) {
           window.appManager.startBackgroundSwapManager();
         }
 
-        console.log('🔀 Navigating to Coinswap component');
-        import('./Coinswap.js').then((module) => {
+        console.log('🔀 Navigating to Openswap component');
+        import('./Openswap.js').then((module) => {
           container.innerHTML = '';
-          module.CoinswapComponent(container, swapConfig);
+          module.OpenswapComponent(container, swapConfig);
         });
       } catch (error) {
-        console.error('❌ Failed to start coinswap:', error);
-        alert('Failed to start coinswap: ' + error.message);
+        console.error('❌ Failed to start openswap:', error);
+        alert('Failed to start openswap: ' + error.message);
         startBtn.disabled = false;
         startBtn.textContent = 'Start Swap';
         startBtn.classList.remove('opacity-50', 'cursor-not-allowed');

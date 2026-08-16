@@ -1,4 +1,4 @@
-import { makeRPCCall } from '../../js/coinswapHelpers.js';
+import { makeRPCCall } from '../../js/openswapHelpers.js';
 
 /**
  * Bitcoin Core RPC Connection Manager
@@ -21,7 +21,7 @@ export class BitcoindConnection {
 
     getStoredConfig() {
         try {
-            const stored = localStorage.getItem('coinswap_config');
+            const stored = localStorage.getItem('openswap_config');
             return stored ? JSON.parse(stored) : null;
         } catch (error) {
             console.error('Error reading stored config:', error);

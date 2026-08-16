@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
-import { explorerAddressUrl, detectAddressType, classifySpendType, formatRelativeTime, copyToText, showToast } from '../../js/coinswapHelpers.js';
+import { explorerAddressUrl, detectAddressType, classifySpendType, formatRelativeTime, copyToText, showToast } from '../../js/openswapHelpers.js';
 
 export function AddressListComponent(container) {
   let currentFilter = 'all';
@@ -140,7 +140,7 @@ const result = await window.api.taker.getTransactions(200, 0);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `coinswap-addresses-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `openswap-addresses-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
 

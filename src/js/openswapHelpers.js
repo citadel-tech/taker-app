@@ -80,7 +80,7 @@ export function formatRelativeTime(timestampMs) {
 // Spend-type classification
 // ============================================================================
 
-// Buckets a coinswap-ffi spend_type string (SeedCoin, IncomingSwapCoin,
+// Buckets a openswap-ffi spend_type string (SeedCoin, IncomingSwapCoin,
 // TimelockContract, FidelityBondCoin, etc.) into Swap/Contract/Fidelity/Regular.
 export function classifySpendType(spendType = '') {
   const normalized = String(spendType || '').toLowerCase();

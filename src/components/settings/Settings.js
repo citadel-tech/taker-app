@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { getRestUrl, getZmqAddress, makeRPCCall, copyToText, wirePasswordToggle } from '../../js/coinswapHelpers.js';
+import { getRestUrl, getZmqAddress, makeRPCCall, copyToText, wirePasswordToggle } from '../../js/openswapHelpers.js';
 
 export function SettingsComponent(container) {
   const content = document.createElement('div');
@@ -29,11 +29,11 @@ export function SettingsComponent(container) {
             WALLET BACKUP
           </div>
           <p class="settings-section-desc">
-            Export your wallet to an encrypted backup file. This is useful for recovering the wallet or migrating it to other Coinswap clients.
+            Export your wallet to an encrypted backup file. This is useful for recovering the wallet or migrating it to other Openswap clients.
           </p>
           <ul class="settings-backup-info">
             <li>Wallet Backup is an encrypted JSON file that contains all wallet data and swap histories.</li>
-            <li>Use it to recover this wallet or migrate it to another Coinswap client.</li>
+            <li>Use it to recover this wallet or migrate it to another Openswap client.</li>
             <li>Recommended to use a strong password for the backup file.</li>
             <li>Use the same password while restoring wallet from backup.</li>
           </ul>
@@ -111,9 +111,9 @@ export function SettingsComponent(container) {
               </div>
               <div class="settings-code" id="zmq-config-preview">zmqpubrawblock=tcp://127.0.0.1:28332<br/>zmqpubrawtx=tcp://127.0.0.1:28332</div>
               <button id="copy-zmq-config-btn" class="app-button ghost sm settings-full-btn" style="margin-top:10px">${icons.clipboardCopy(13)} Copy ZMQ Config</button>
-              <a id="bitcoin-guide-link" href="https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer" class="settings-link" style="margin-top:10px">
+              <a id="bitcoin-guide-link" href="https://github.com/citadel-foss/openswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer" class="settings-link" style="margin-top:10px">
                 ${icons.externalLink(14)} Bitcoin Core setup guide
-                <span class="settings-link-kicker">coinswap docs →</span>
+                <span class="settings-link-kicker">openswap docs →</span>
               </a>
             </div>
           </div>
@@ -208,7 +208,7 @@ export function SettingsComponent(container) {
 
   function loadExistingConfig() {
     try {
-      const savedConfig = localStorage.getItem('coinswap_config');
+      const savedConfig = localStorage.getItem('openswap_config');
       if (!savedConfig) return;
       const config = JSON.parse(savedConfig);
 
@@ -257,7 +257,7 @@ export function SettingsComponent(container) {
   async function performBackup(password) {
     try {
       const saveResult = await window.api.saveFile({
-        defaultPath: `coinswap-wallet-backup-${new Date().toISOString().split('T')[0]}.json`,
+        defaultPath: `openswap-wallet-backup-${new Date().toISOString().split('T')[0]}.json`,
         filters: [
           { name: 'JSON Files', extensions: ['json'] },
           { name: 'All Files', extensions: ['*'] },
@@ -498,7 +498,7 @@ export function SettingsComponent(container) {
   function buildConfig() {
     let existingConfig = {};
     try {
-      const saved = localStorage.getItem('coinswap_config');
+      const saved = localStorage.getItem('openswap_config');
       if (saved) existingConfig = JSON.parse(saved);
     } catch (e) {
       console.error('Error loading existing config:', e);
@@ -536,7 +536,7 @@ export function SettingsComponent(container) {
   }
 
   content.querySelector('#save-settings-btn').addEventListener('click', () => {
-    localStorage.setItem('coinswap_config', JSON.stringify(buildConfig()));
+    localStorage.setItem('openswap_config', JSON.stringify(buildConfig()));
     const btn = content.querySelector('#save-settings-btn');
     const orig = btn.innerHTML;
     btn.innerHTML = icons.check(14) + ' Saved!';

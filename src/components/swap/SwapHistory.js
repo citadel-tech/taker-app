@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { formatSats, SATS_SYMBOL } from '../../js/price.js';
-import { escapeHtml, formatDuration, formatRelativeTime, normalizeSwapProtocol } from '../../js/coinswapHelpers.js';
+import { escapeHtml, formatDuration, formatRelativeTime, normalizeSwapProtocol } from '../../js/openswapHelpers.js';
 
 let swapHistory = [];
 let currentSort = 'newest';
@@ -108,11 +108,11 @@ function normalizeSwapReport(report) {
       report.mining_fee,
     0
   );
-  const feePaidOrEarned = toNumber(
-    nested.fee_paid_or_earned ??
-      nested.feePaidOrEarned ??
-      report.fee_paid_or_earned ??
-      report.feePaidOrEarned,
+  const feePaid = toNumber(
+    nested.fee_paid ??
+      nested.feePaid ??
+      report.fee_paid ??
+      report.feePaid,
     NaN
   );
   const providedTotalFee = toNumber(
@@ -122,8 +122,8 @@ function normalizeSwapReport(report) {
       report.total_fee,
     NaN
   );
-  const derivedTotalFee = Number.isFinite(feePaidOrEarned)
-    ? Math.abs(feePaidOrEarned)
+  const derivedTotalFee = Number.isFinite(feePaid)
+    ? Math.abs(feePaid)
     : totalMakerFees + miningFee;
   const totalFee =
     Number.isFinite(providedTotalFee) &&
@@ -397,7 +397,7 @@ export async function SwapHistoryComponent(container) {
       <header class="swap-reports-head">
         <div>
           <h2>Swap Reports</h2>
-          <p>Review completed and failed coinswap reports, makers, and fee details.</p>
+          <p>Review completed and failed openswap reports, makers, and fee details.</p>
         </div>
         <button id="back-to-swap" class="swap-reports-back" type="button">
           ${icons.arrowLeft(17)} Back

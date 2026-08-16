@@ -9,14 +9,14 @@ function requireWalletPassword(password) {
 }
 
 /**
- * Worker thread for running long-running coinswap operations
+ * Worker thread for running long-running openswap operations
  * This prevents blocking the main Electron process
  * Swap protocol is now a swap parameter on the unified Taker class.
  */
 
 (async () => {
   try {
-    const coinswapNapi = require('coinswap-napi');
+    const openswapNapi = require('openswap-napi');
 
     const { amount, makerCount, outpoints, selectedMakerAddresses, config } = workerData;
     const walletPassword = requireWalletPassword(config.password);
@@ -25,20 +25,20 @@ function requireWalletPassword(password) {
     const protocolName =
       normalizedProtocol === 'Taproot' ? 'Taproot (V2)' : 'P2WSH (V1)';
 
-    console.log(`🔧 Coinswap worker starting with ${protocolName} protocol`);
+    console.log(`🔧 Openswap worker starting with ${protocolName} protocol`);
 
-    const TakerClass = coinswapNapi.Taker;
+    const TakerClass = openswapNapi.Taker;
 
     if (!TakerClass) {
-      throw new Error('Taker class not found. Please rebuild coinswap-napi.');
+      throw new Error('Taker class not found. Please rebuild openswap-napi.');
     }
 
     // Setup logging if available
     try {
       if (TakerClass.setupLogging) {
         TakerClass.setupLogging(config.dataDir, config.logLevel || 'debug');
-      } else if (coinswapNapi.setupLogging) {
-        coinswapNapi.setupLogging(config.dataDir, config.logLevel || 'debug');
+      } else if (openswapNapi.setupLogging) {
+        openswapNapi.setupLogging(config.dataDir, config.logLevel || 'debug');
       }
     } catch (logError) {
       console.warn('⚠️ Worker could not setup logging:', logError.message);
@@ -73,8 +73,8 @@ function requireWalletPassword(password) {
     console.log(`🔄 Syncing offerbook in swap worker before prepare...`);
     taker.syncOfferbookAndWait();
 
-    console.log(`🚀 Preparing ${protocolName} coinswap...`);
-    const swapId = taker.prepareCoinswap(swapParams);
+    console.log(`🚀 Preparing ${protocolName} openswap...`);
+    const swapId = taker.prepareOpenswap(swapParams);
 
     parentPort.postMessage({
       type: 'status',
@@ -83,8 +83,8 @@ function requireWalletPassword(password) {
       nativeSwapId: swapId,
     });
 
-    console.log(`🚀 Starting ${protocolName} coinswap...`);
-    const report = taker.startCoinswap(swapId);
+    console.log(`🚀 Starting ${protocolName} openswap...`);
+    const report = taker.startOpenswap(swapId);
 
     // Send success message
     parentPort.postMessage({

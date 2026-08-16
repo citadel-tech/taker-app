@@ -42,10 +42,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('taker:verifyDeniability', swapId),
   },
 
-  // Coinswap operations
-  coinswap: {
-    start: (params) => ipcRenderer.invoke('coinswap:start', params),
-    getStatus: (swapId) => ipcRenderer.invoke('coinswap:getStatus', swapId),
+  // Openswap operations
+  openswap: {
+    start: (params) => ipcRenderer.invoke('openswap:start', params),
+    getStatus: (swapId) => ipcRenderer.invoke('openswap:getStatus', swapId),
   },
 
   // Logs

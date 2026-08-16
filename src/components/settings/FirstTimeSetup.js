@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { getRestUrl, getZmqAddress, makeRPCCall, wirePasswordToggle } from '../../js/coinswapHelpers.js';
+import { getRestUrl, getZmqAddress, makeRPCCall, wirePasswordToggle } from '../../js/openswapHelpers.js';
 
 export function FirstTimeSetupModal(container, onComplete) {
   const defaultWalletName = `taker-wallet-${Math.floor(100000 + Math.random() * 900000)}`;
@@ -138,7 +138,7 @@ export function FirstTimeSetupModal(container, onComplete) {
 
     <div class="setup-shell">
       <div class="setup-titlebar">
-        <div class="setup-titlebar-name">Coinswap · Taker</div>
+        <div class="setup-titlebar-name">Openswap · Taker</div>
         <div class="setup-titlebar-right"><span class="setup-dot"></span>Onboarding</div>
       </div>
 
@@ -200,7 +200,7 @@ export function FirstTimeSetupModal(container, onComplete) {
               <div id="rpc-test-result" class="setup-status hidden"></div>
               <div id="node-setup-info" class="setup-info hidden app-infobox warning">
                 <strong>Info:</strong> Don't have a running Bitcoin Node?
-                <a href="https://github.com/citadel-tech/coinswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer">Node setup instructions</a>
+                <a href="https://github.com/citadel-foss/openswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer">Node setup instructions</a>
               </div>
             </article>
 
@@ -236,7 +236,7 @@ export function FirstTimeSetupModal(container, onComplete) {
               <div id="tor-test-result" class="setup-status hidden"></div>
               <div id="tor-setup-info" class="setup-info hidden app-infobox primary">
                 <strong>Info:</strong> Don't have a running Tor instance?
-                <a href="https://github.com/citadel-tech/coinswap/blob/master/docs/tor.md" target="_blank" rel="noreferrer">Tor setup instructions</a>
+                <a href="https://github.com/citadel-foss/openswap/blob/master/docs/tor.md" target="_blank" rel="noreferrer">Tor setup instructions</a>
               </div>
             </article>
           </section>
@@ -406,7 +406,7 @@ export function FirstTimeSetupModal(container, onComplete) {
                   Browse
                 </button>
               </div>
-              <p class="text-xs text-gray-500 mt-2">Default location: ~/.coinswap/taker/wallets/</p>
+              <p class="text-xs text-gray-500 mt-2">Default location: ~/.openswap/taker/wallets/</p>
             </div>
 
             <div class="bg-app-bg rounded-lg p-4 border border-gray-700">
@@ -509,7 +509,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <div class="setup-help">
           <svg class="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 16h.01"/></svg>
           Need help?
-          <a href="https://github.com/citadel-tech/coinswap/tree/master/docs" target="_blank" rel="noreferrer">Setup guide</a>
+          <a href="https://github.com/citadel-foss/openswap/tree/master/docs" target="_blank" rel="noreferrer">Setup guide</a>
         </div>
         <div class="setup-footer-actions">
         <button id="setup-back-btn" class="setup-btn secondary hidden">

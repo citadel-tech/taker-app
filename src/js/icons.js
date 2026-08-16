@@ -74,7 +74,7 @@ export const icons = {
   xCircle:        (size = 16, cls = '') => toSvg(XCircle,        size, cls),
   /** ⚠️ warning */
   alertTriangle:  (size = 16, cls = '') => toSvg(AlertTriangle,  size, cls),
-  /** 🔄 refresh / sync / coinswap */
+  /** 🔄 refresh / sync / openswap */
   refreshCw:      (size = 16, cls = '') => toSvg(RefreshCw,      size, cls),
   /** ⟳ loading spinner — add animate-spin class */
   loader:         (size = 16, cls = '') => toSvg(Loader,         size, cls),

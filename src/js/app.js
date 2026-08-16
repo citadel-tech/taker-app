@@ -13,7 +13,7 @@ import { FirstTimeSetupModal } from '../components/settings/FirstTimeSetup.js';
 import { SwapStateManager } from '../components/swap/SwapStateManager.js';
 import { ConnectionStatusComponent } from '../components/connection/ConnectionStatus.js';
 import { bitcoindConnection } from '../components/connection/BitcoindConnection.js';
-import { showToast } from './coinswapHelpers.js';
+import { showToast } from './openswapHelpers.js';
 import { TakerInitializationComponent } from '../components/taker/TakerInitialization.js';
 import { refreshBtcPriceUsd } from './price.js';
 
@@ -92,8 +92,8 @@ async function renderComponent(name) {
       return;
     }
 
-    import('../components/swap/Coinswap.js').then((module) => {
-      module.CoinswapComponent(newContainer, activeSwap);
+    import('../components/swap/Openswap.js').then((module) => {
+      module.OpenswapComponent(newContainer, activeSwap);
     });
     return;
   }
@@ -162,7 +162,7 @@ function startTakerInitWithConfig(config) {
         'Wallet initialization failed, returning to setup:',
         result.error
       );
-      localStorage.removeItem('coinswap_config');
+      localStorage.removeItem('openswap_config');
       showSetupModal();
       return;
     }
@@ -187,12 +187,12 @@ function startTakerInitWithConfig(config) {
 async function startMainApp() {
   const activeSwap = await SwapStateManager.getActiveSwap();
   if (activeSwap && activeSwap.status === 'in_progress') {
-    console.log('Found active swap, redirecting to coinswap progress');
+    console.log('Found active swap, redirecting to openswap progress');
     startBackgroundSwapManager();
-    import('../components/swap/Coinswap.js').then((module) => {
+    import('../components/swap/Openswap.js').then((module) => {
       const contentContainer = document.querySelector('#content-area');
       if (contentContainer) {
-        module.CoinswapComponent(contentContainer, activeSwap);
+        module.OpenswapComponent(contentContainer, activeSwap);
       }
     });
     setTimeout(() => {
@@ -227,7 +227,7 @@ function showSetupModal() {
   FirstTimeSetupModal(appContainer, (config) => {
     console.log('Setup completed:', config);
 
-    localStorage.setItem('coinswap_config', JSON.stringify(config));
+    localStorage.setItem('openswap_config', JSON.stringify(config));
 
     initiateAppStart(config);
     showSetupSuccess();
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const appContainer = document.querySelector('body');
 
   // Load config if exists
-  const saved = localStorage.getItem('coinswap_config');
+  const saved = localStorage.getItem('openswap_config');
 
   if (!saved) {
     // First-time setup ONLY ONCE

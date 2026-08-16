@@ -103,9 +103,9 @@ fn main() {
 impl Config {
     fn from_env() -> Self {
         Self {
-            socks_port: env_u16("COINSWAP_TOR_SOCKS_PORT", DEFAULT_SOCKS_PORT),
-            control_port: env_u16("COINSWAP_TOR_CONTROL_PORT", DEFAULT_CONTROL_PORT),
-            config_dir: env::var_os("COINSWAP_TOR_CONFIG_DIR")
+            socks_port: env_u16("OPENSWAP_TOR_SOCKS_PORT", DEFAULT_SOCKS_PORT),
+            control_port: env_u16("OPENSWAP_TOR_CONTROL_PORT", DEFAULT_CONTROL_PORT),
+            config_dir: env::var_os("OPENSWAP_TOR_CONFIG_DIR")
                 .map(PathBuf::from)
                 .unwrap_or_else(default_config_dir),
         }
@@ -138,12 +138,12 @@ fn env_u16(name: &str, default: u16) -> u16 {
 fn default_config_dir() -> PathBuf {
     if let Some(home) = env::var_os("HOME") {
         return PathBuf::from(home)
-            .join(".coinswap")
+            .join(".openswap")
             .join("taker")
             .join("tor-manager");
     }
 
-    env::temp_dir().join("coinswap-taker").join("tor-manager")
+    env::temp_dir().join("openswap-taker").join("tor-manager")
 }
 
 fn tor_ports_reachable(config: &Config) -> bool {

@@ -11,12 +11,12 @@ const store = new Store();
 // SHARED STATE - Exported for main.js to access if needed
 // ============================================================================
 const api1State = {
-  coinswapNapi: null,
+  openswapNapi: null,
   takerInstance: null,
   storedTakerConfig: null,
   activeSwaps: new Map(),
   activeSyncs: new Map(),
-  DATA_DIR: `${process.env.HOME}/.coinswap/taker`,
+  DATA_DIR: `${process.env.HOME}/.openswap/taker`,
   DEFAULT_WALLET_NAME: 'taker-wallet',
   currentWalletName: 'taker-wallet',
   currentWalletPassword: '',
@@ -303,7 +303,7 @@ function classifyWalletInitializationError(error) {
     return {
       success: false,
       error:
-        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Coinswap wallet file.',
+        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Openswap wallet file.',
       walletLoadFailed: true,
       recoverable: true,
       details: message,
@@ -707,7 +707,7 @@ function preflightExistingWallet(walletPath, password) {
     return {
       success: false,
       error:
-        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Coinswap wallet file.',
+        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Openswap wallet file.',
       walletLoadFailed: true,
       recoverable: true,
       details: error.message,
@@ -741,7 +741,7 @@ function preflightExistingWallet(walletPath, password) {
     return {
       success: false,
       error:
-        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Coinswap wallet file.',
+        'Unable to open this wallet. It may be corrupted, incomplete, or not a valid Openswap wallet file.',
       walletLoadFailed: true,
       recoverable: true,
       details: 'Encrypted wallet payload is too short',
@@ -976,7 +976,7 @@ function readJsonFile(filePath) {
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 }
 
-// Mirrors src/js/coinswapHelpers.js's normalizeSwapProtocol(). Keep in sync —
+// Mirrors src/js/openswapHelpers.js's normalizeSwapProtocol(). Keep in sync —
 // this file is CommonJS, the renderer is ESM, no bundler links them.
 function normalizeSwapProtocol(value, fallbackIsTaproot = false) {
   switch (value) {
@@ -1232,14 +1232,14 @@ function getSwapLogProtocolMetadata() {
 
     lines.forEach((line) => {
       const prepareMatch = line.match(
-        /Preparing coinswap:\s+amount=.*protocol=(Taproot|Legacy)/i
+        /Preparing openswap:\s+amount=.*protocol=(Taproot|Legacy)/i
       );
       if (prepareMatch) {
         pendingProtocol = normalizeSwapProtocol(prepareMatch[1], false);
         return;
       }
 
-      const idMatch = line.match(/Preparing coinswap with id:\s+([a-f0-9]+)/i);
+      const idMatch = line.match(/Preparing openswap with id:\s+([a-f0-9]+)/i);
       if (!idMatch || !pendingProtocol) return;
 
       metadataById.set(idMatch[1], {
@@ -1554,11 +1554,11 @@ function normalizeBalancePayload(rawBalance = {}, rawUtxos = []) {
 
 async function initNAPI() {
   try {
-    api1State.coinswapNapi = require('coinswap-napi');
-    console.log('✅ coinswap-napi module loaded (wallet not initialized yet)');
+    api1State.openswapNapi = require('openswap-napi');
+    console.log('✅ openswap-napi module loaded (wallet not initialized yet)');
     return true;
   } catch (error) {
-    console.error('❌ Failed to load coinswap-napi:', error);
+    console.error('❌ Failed to load openswap-napi:', error);
     return false;
   }
 }
@@ -1629,10 +1629,10 @@ function registerTakerHandlers() {
       const protocolName = protocol === 'v2' ? 'Taproot (V2)' : 'P2WSH (V1)';
       console.log(`📦 Preparing ${protocolName} taker...`);
 
-      if (!api1State.coinswapNapi) {
+      if (!api1State.openswapNapi) {
         await initNAPI();
-        if (!api1State.coinswapNapi) {
-          return { success: false, error: 'Failed to load coinswap-napi' };
+        if (!api1State.openswapNapi) {
+          return { success: false, error: 'Failed to load openswap-napi' };
         }
       }
 
@@ -1648,12 +1648,12 @@ function registerTakerHandlers() {
       const controlPort = config.taker?.control_port || 9051;
 
       // Unified FFI now always exposes a single Taker class.
-      const TakerClass = api1State.coinswapNapi.Taker;
+      const TakerClass = api1State.openswapNapi.Taker;
 
       if (!TakerClass) {
         return {
           success: false,
-          error: 'Taker class not found. Rebuild coinswap-napi.',
+          error: 'Taker class not found. Rebuild openswap-napi.',
         };
       }
 
@@ -2297,10 +2297,10 @@ function registerTakerHandlers() {
     'taker:restore',
     async (event, { backupFilePath, password, walletName }) => {
       try {
-        if (!api1State.coinswapNapi) {
+        if (!api1State.openswapNapi) {
           await initNAPI();
-          if (!api1State.coinswapNapi) {
-            return { success: false, error: 'Failed to load coinswap-napi' };
+          if (!api1State.openswapNapi) {
+            return { success: false, error: 'Failed to load openswap-napi' };
           }
         }
 
@@ -2321,7 +2321,7 @@ function registerTakerHandlers() {
           walletName: restoredWalletName,
         };
 
-        api1State.coinswapNapi.Taker.restoreWalletGuiApp(
+        api1State.openswapNapi.Taker.restoreWalletGuiApp(
           api1State.DATA_DIR,
           restoredWalletName,
           rpcConfig,
@@ -2629,13 +2629,13 @@ function registerTakerHandlers() {
 }
 
 // ============================================================================
-// COINSWAP API HANDLERS
+// OPENSWAP API HANDLERS
 // ============================================================================
 
-function registerCoinswapHandlers() {
-  // Start coinswap
+function registerOpenswapHandlers() {
+  // Start openswap
   ipcMain.handle(
-    'coinswap:start',
+    'openswap:start',
     async (event, { amount, makerCount, outpoints, password, selectedMakerAddresses, protocol: requestedProtocol }) => {
       try {
         if (!api1State.takerInstance) {
@@ -2669,7 +2669,7 @@ function registerCoinswapHandlers() {
         const protocolName = protocol === 'v2' ? 'Taproot' : 'P2WSH';
         const swapId = `swap_${Date.now()}_${Math.random().toString(36).substring(7)}`;
         console.log(
-          `🚀 [${swapId}] Starting ${protocolName} coinswap: ${amount} sats, ${makerCount} makers`
+          `🚀 [${swapId}] Starting ${protocolName} openswap: ${amount} sats, ${makerCount} makers`
         );
 
         // WAIT FOR OFFERBOOK SYNC TO COMPLETE
@@ -2773,7 +2773,7 @@ function registerCoinswapHandlers() {
           appSwapId: swapId,
         });
 
-        const worker = new Worker(path.join(__dirname, 'coinswap-worker.js'), {
+        const worker = new Worker(path.join(__dirname, 'openswap-worker.js'), {
           workerData: { amount, makerCount, outpoints, selectedMakerAddresses, config },
         });
 
@@ -2842,14 +2842,14 @@ function registerCoinswapHandlers() {
 
         return { success: true, swapId };
       } catch (error) {
-        console.error('❌ Coinswap error:', error);
+        console.error('❌ Openswap error:', error);
         return { success: false, error: error.message };
       }
     }
   );
 
-  // Get coinswap status
-  ipcMain.handle('coinswap:getStatus', async (event, swapId) => {
+  // Get openswap status
+  ipcMain.handle('openswap:getStatus', async (event, swapId) => {
     const swap = api1State.activeSwaps.get(swapId);
     if (!swap) {
       return { success: false, error: 'Swap not found' };
@@ -3092,7 +3092,7 @@ function registerAppHandlers() {
       const appVersion = app.getVersion();
       let binaryVersion = 'unknown';
       try {
-        const napiPkgPath = require.resolve('coinswap-napi/package.json');
+        const napiPkgPath = require.resolve('openswap-napi/package.json');
         const napiPkg = JSON.parse(fs.readFileSync(napiPkgPath, 'utf8'));
         binaryVersion = napiPkg.version || 'unknown';
       } catch (_) {}
@@ -3107,7 +3107,7 @@ function registerAPI1() {
   console.log('📦 Registering API v1 handlers...');
 
   registerTakerHandlers();
-  registerCoinswapHandlers();
+  registerOpenswapHandlers();
   registerSwapReportsHandlers();
   registerSwapStateHandlers();
   registerLogsHandlers();

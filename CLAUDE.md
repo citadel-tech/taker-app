@@ -1,14 +1,14 @@
-# Coinswap Taker App
+# Openswap Taker App
 
 ## Project Overview
 
-This is an Electron-based desktop application for conducting Bitcoin coinswaps using the Teleport protocol. The app provides a user-friendly GUI for privacy-enhanced Bitcoin transactions through atomic swaps with maker nodes.
+This is an Electron-based desktop application for conducting Bitcoin openswaps using the Teleport protocol. The app provides a user-friendly GUI for privacy-enhanced Bitcoin transactions through atomic swaps with maker nodes.
 
 ## Architecture
 
 ### Technology Stack
 - **Framework**: Electron (Node.js + Chromium)
-- **Backend**: Rust (via N-API bindings through `coinswap-napi`)
+- **Backend**: Rust (via N-API bindings through `openswap-napi`)
 - **Frontend**: Vanilla JavaScript, HTML, CSS (Tailwind)
 - **IPC**: Electron's `ipcMain`/`ipcRenderer` for main-renderer communication
 
@@ -25,7 +25,7 @@ All UI components are modular JavaScript files that export functions to render t
 
 - **Wallet.js** - Main wallet view (balance, addresses, transactions)
 - **Market.js** - Offerbook viewer showing available makers
-- **Coinswap.js** - Swap execution interface
+- **Openswap.js** - Swap execution interface
 - **Send.js** / **Receive.js** - Bitcoin transaction management
 - **Settings.js** - Configuration management (RPC, Tor, wallets)
 - **FirstTimeSetup.js** - Initial configuration wizard
@@ -58,16 +58,16 @@ The app integrates with Bitcoin Core via:
 ## Key Files
 
 ### Configuration
-- **setup-coinswap.js** - Builds and links the Rust N-API module
+- **setup-openswap.js** - Builds and links the Rust N-API module
 - **preload.js** - Securely exposes IPC APIs to renderer
 - **package.json** - Dependencies and build scripts
 
 ### Workers
-- **coinswap-worker.js** - Runs swap execution in a separate thread
+- **openswap-worker.js** - Runs swap execution in a separate thread
 
 ### Data Directory Structure
 ```
-~/.coinswap/taker/
+~/.openswap/taker/
 ├── config.toml          # App configuration
 ├── wallets/             # Bitcoin wallets
 │   └── taker-wallet/
@@ -191,15 +191,15 @@ When reviewing code, pay special attention to:
 
 ## Build Process
 
-1. Clone `coinswap-ffi` repository (Rust backend)
-2. Build Rust N-API module via `setup-coinswap.js`
-3. Link module to `node_modules/coinswap-napi`
+1. Clone `openswap-ffi` repository (Rust backend)
+2. Build Rust N-API module via `setup-openswap.js`
+3. Link module to `node_modules/openswap-napi`
 4. Run Electron app with `npm start`
 
 ## Dependencies
 
 ### Critical Native Dependencies
-- **coinswap-napi** - Rust bindings for coinswap protocol
+- **openswap-napi** - Rust bindings for openswap protocol
 - **electron** - Desktop application framework
 
 ### Key Node Modules

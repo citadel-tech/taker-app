@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { SATS_SYMBOL } from '../../js/price.js';
-import { explorerTxUrl, normalizeSwapProtocol, escapeHtml, formatDuration, copyToText, truncateMiddle, formatTorEndpoint, showToast } from '../../js/coinswapHelpers.js';
+import { explorerTxUrl, normalizeSwapProtocol, escapeHtml, formatDuration, copyToText, truncateMiddle, formatTorEndpoint, showToast } from '../../js/openswapHelpers.js';
 
 function satsToBtc(sats) {
   const normalized = Number(sats || 0);
@@ -95,12 +95,11 @@ export function SwapReportComponent(container, swapReport, options = {}) {
       nestedReport.mining_fee,
     0
   );
-  const rawFeePaidOrEarned = toNumber(
-    swapReport.fee_paid_or_earned ??
-      swapReport.feePaidOrEarned ??
-      nestedReport.fee_paid_or_earned ??
-      nestedReport.feePaidOrEarned ??
-      nestedReport.feePaidOrEarned,
+  const rawFeePaid = toNumber(
+    swapReport.fee_paid ??
+      swapReport.feePaid ??
+      nestedReport.fee_paid ??
+      nestedReport.feePaid,
     NaN
   );
   const providedTotalFee = toNumber(
@@ -111,16 +110,16 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     NaN
   );
   const componentTotalFee = rawTotalMakerFees + Math.max(0, rawMiningFee);
-  const netFeePaidOrEarned = Number.isFinite(rawFeePaidOrEarned)
-    ? Math.abs(rawFeePaidOrEarned)
+  const netFeePaid = Number.isFinite(rawFeePaid)
+    ? Math.abs(rawFeePaid)
     : NaN;
   const rawTotalFee =
     Number.isFinite(providedTotalFee) && providedTotalFee >= 0
       ? providedTotalFee
       : componentTotalFee > 0
         ? componentTotalFee
-        : Number.isFinite(netFeePaidOrEarned)
-          ? netFeePaidOrEarned
+        : Number.isFinite(netFeePaid)
+          ? netFeePaid
           : 0;
   const normalizedMiningFee =
     rawMiningFee >= 0
@@ -998,7 +997,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
         </div>
         <p class="dp-desc">
           Proves you controlled the keys for this swap's contract outputs.
-          If a counterparty presents false transaction records, this proof establishes your actual participation in this coinswap.
+          If a counterparty presents false transaction records, this proof establishes your actual participation in this openswap.
         </p>
         ${proofBlocks}
         <div class="dp-verify-bar">
@@ -1204,7 +1203,7 @@ export function SwapReportComponent(container, swapReport, options = {}) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `coinswap-report-${report.swapId}.json`;
+    a.download = `openswap-report-${report.swapId}.json`;
     a.click();
     URL.revokeObjectURL(url);
     showNotification('Report exported!');

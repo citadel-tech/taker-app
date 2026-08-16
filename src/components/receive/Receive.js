@@ -1,6 +1,6 @@
 import { icons } from '../../js/icons.js';
 import { formatSats } from '../../js/price.js';
-import { explorerAddressUrl, detectAddressType, getDerivationPath, escapeHtml, copyToText } from '../../js/coinswapHelpers.js';
+import { explorerAddressUrl, detectAddressType, getDerivationPath, escapeHtml, copyToText } from '../../js/openswapHelpers.js';
 
 export function ReceiveComponent(container) {
   const content = document.createElement('div');
