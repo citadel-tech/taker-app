@@ -1,5 +1,5 @@
 import { icons } from '../../js/icons.js';
-import { getRestUrl, getZmqAddress, makeRPCCall, copyToText, wirePasswordToggle } from '../../js/openswapHelpers.js';
+import { makeRPCCall } from '../../js/openswapHelpers.js';
 
 export function SettingsComponent(container) {
   const content = document.createElement('div');
@@ -13,10 +13,6 @@ export function SettingsComponent(container) {
           <div class="app-meta">
             <span>Wallet &amp; Network</span>
           </div>
-        </div>
-        <div class="app-actions">
-          <button id="reset-settings-btn" class="app-button ghost">Reset to Defaults</button>
-          <button id="save-settings-btn" class="app-button primary">${icons.save(14)} Save Settings</button>
         </div>
       </header>
 
@@ -55,105 +51,21 @@ export function SettingsComponent(container) {
         </section>
 
         <!-- CONNECTION STATUS -->
-        <section class="settings-section">
+        <section class="settings-section settings-section-last">
           <div class="settings-section-label">
             <div id="connection-indicator" class="settings-status-dot"></div>
             CONNECTION STATUS
             <span id="rpc-status" class="settings-conn-status">Not Connected</span>
           </div>
-          <div class="settings-status-grid">
+          <div class="settings-status-grid" id="connection-status-grid">
             <div><span>Bitcoin Version</span><strong id="bitcoin-version">--</strong></div>
             <div><span>Network</span><strong id="bitcoin-network">--</strong></div>
             <div><span>Block Height</span><strong id="block-height">--</strong></div>
             <div><span>Sync Progress</span><strong id="sync-progress">--</strong></div>
           </div>
-        </section>
-
-        <!-- BITCOIN CORE RPC -->
-        <section class="settings-section">
-          <div class="settings-section-label">
-            <span class="settings-section-dot"></span>
-            BITCOIN CORE RPC
-          </div>
-          <div class="settings-inner-grid">
-            <div>
-              <div class="settings-fields" style="--cols:2">
-                <div class="settings-field">
-                  <label>RPC Host</label>
-                  <input type="text" id="rpc-host-input" value="127.0.0.1" />
-                </div>
-                <div class="settings-field">
-                  <label>RPC Port</label>
-                  <input type="number" id="rpc-port-input" value="38332" min="1" max="65535" />
-                </div>
-                <div class="settings-field">
-                  <label>RPC Username</label>
-                  <input type="text" id="rpc-username-input" value="user" />
-                </div>
-                <div class="settings-field">
-                  <label>RPC Password</label>
-                  <input type="password" id="rpc-password-input" placeholder="Enter RPC password" />
-                </div>
-              </div>
-              <div class="settings-field settings-zmq-field">
-                <label>ZMQ Port</label>
-                <input type="number" id="zmq-port-input" value="28332" min="1" max="65535" />
-              </div>
-              <div class="settings-test-bar">
-                <button id="test-connection-btn" class="app-button secondary sm">Test Bitcoind</button>
-                <div id="bitcoind-test-result" class="settings-test-result" style="display:none"></div>
-              </div>
-            </div>
-            <div>
-              <div class="settings-readonly-label">
-                bitcoin.conf snippet
-                <span>READ-ONLY</span>
-              </div>
-              <div class="settings-code" id="zmq-config-preview">zmqpubrawblock=tcp://127.0.0.1:28332<br/>zmqpubrawtx=tcp://127.0.0.1:28332</div>
-              <button id="copy-zmq-config-btn" class="app-button ghost sm settings-full-btn" style="margin-top:10px">${icons.clipboardCopy(13)} Copy ZMQ Config</button>
-              <a id="bitcoin-guide-link" href="https://github.com/citadel-foss/openswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer" class="settings-link" style="margin-top:10px">
-                ${icons.externalLink(14)} Bitcoin Core setup guide
-                <span class="settings-link-kicker">openswap docs →</span>
-              </a>
-            </div>
-          </div>
-        </section>
-
-        <!-- TOR -->
-        <section class="settings-section settings-section-last">
-          <div class="settings-section-label">
-            <span class="settings-section-dot purple"></span>
-            TOR
-          </div>
-          <div class="settings-fields" style="--cols:3">
-            <div class="settings-field">
-              <label>Control Port</label>
-              <input type="number" id="tor-control-port-input" value="9051" min="1024" max="65535" />
-            </div>
-            <div class="settings-field">
-              <label>SOCKS Port</label>
-              <input type="number" id="tor-socks-port-input" value="9050" min="1024" max="65535" />
-            </div>
-            <div class="settings-field">
-              <label>Auth Password</label>
-              <div class="settings-password">
-                <input type="password" id="tor-auth-password-input" placeholder="Optional" />
-                <button type="button" id="toggle-tor-password" class="settings-eye-btn" aria-label="Toggle password visibility">
-                  <svg data-eye="show" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                  </svg>
-                  <svg data-eye="hide" class="hidden" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"/>
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="settings-test-bar">
-            <button id="test-tor-btn" class="app-button secondary sm">Test Tor</button>
-            <div id="tor-test-result" class="settings-test-result" style="display:none"></div>
-          </div>
+          <p class="settings-section-desc" style="margin-top:12px">
+            The backend (Bitcoin Core or Electrum) is selected during first-time setup and can only be changed by restarting setup. Tor is managed automatically by the app.
+          </p>
         </section>
 
       </div>
@@ -163,90 +75,6 @@ export function SettingsComponent(container) {
   container.appendChild(content);
 
   // FUNCTIONS
-
-  function getRpcConfigFromInputs() {
-    return {
-      host: content.querySelector('#rpc-host-input').value,
-      port: content.querySelector('#rpc-port-input').value,
-      username: content.querySelector('#rpc-username-input').value,
-      password: content.querySelector('#rpc-password-input').value,
-    };
-  }
-
-  function extractPortFromAddress(address, fallback = '28332') {
-    if (!address) return fallback;
-    const match = String(address).match(/:(\d+)$/);
-    return match ? match[1] : fallback;
-  }
-
-  function renderConnectionResults(resultDiv, results) {
-    const hasFailure = results.some((r) => !r.ok);
-    resultDiv.className = `settings-test-result ${hasFailure ? 'error' : 'ok'}`;
-    resultDiv.style.display = 'block';
-
-    const wrap = document.createElement('div');
-    wrap.className = 'settings-test-rows';
-
-    results.forEach((result) => {
-      const row = document.createElement('div');
-      row.className = 'settings-test-row';
-
-      const label = document.createElement('span');
-      label.className = result.ok ? 'ok' : 'error';
-      label.innerHTML = `${result.ok ? icons.checkCircle(13) : icons.xCircle(13)} ${result.label}`;
-
-      const msg = document.createElement('span');
-      msg.className = 'settings-test-msg';
-      msg.textContent = result.message ?? '';
-
-      row.append(label, msg);
-      wrap.appendChild(row);
-    });
-
-    resultDiv.replaceChildren(wrap);
-  }
-
-  function loadExistingConfig() {
-    try {
-      const savedConfig = localStorage.getItem('openswap_config');
-      if (!savedConfig) return;
-      const config = JSON.parse(savedConfig);
-
-      if (config.rpc) {
-        if (config.rpc.host) content.querySelector('#rpc-host-input').value = config.rpc.host;
-        if (config.rpc.port) content.querySelector('#rpc-port-input').value = config.rpc.port;
-        if (config.rpc.username) content.querySelector('#rpc-username-input').value = config.rpc.username;
-        if (config.rpc.password) content.querySelector('#rpc-password-input').value = config.rpc.password;
-      }
-
-      if (config.taker) {
-        if (config.taker.control_port)
-          content.querySelector('#tor-control-port-input').value = config.taker.control_port;
-        if (config.taker.socks_port)
-          content.querySelector('#tor-socks-port-input').value = config.taker.socks_port;
-        if (config.taker.tor_auth_password)
-          content.querySelector('#tor-auth-password-input').value = config.taker.tor_auth_password;
-      }
-
-      if (config.zmq) {
-        const derivedPort =
-          config.zmq.port || extractPortFromAddress(config.zmq.rawblock || config.zmq.address);
-        content.querySelector('#zmq-port-input').value = derivedPort;
-      }
-
-      updateConfigPreviews();
-    } catch (error) {
-      console.error('Error loading existing config:', error);
-    }
-  }
-
-  function updateConfigPreviews() {
-    const zmqPort = content.querySelector('#zmq-port-input').value || '28332';
-    const zmqPreview = content.querySelector('#zmq-config-preview');
-    if (zmqPreview) {
-      zmqPreview.innerHTML = `zmqpubrawblock=${getZmqAddress(zmqPort)}<br/>zmqpubrawtx=${getZmqAddress(zmqPort)}`;
-    }
-  }
 
   function showBackupError(message) {
     const errorDiv = content.querySelector('#backup-password-error');
@@ -314,44 +142,6 @@ export function SettingsComponent(container) {
     await performBackup(password);
   });
 
-  // ZMQ preview: update on input changes
-  content.querySelector('#zmq-port-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#rpc-username-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#rpc-password-input').addEventListener('input', updateConfigPreviews);
-  content.querySelector('#rpc-port-input').addEventListener('input', updateConfigPreviews);
-
-  // Copy ZMQ config
-  content.querySelector('#copy-zmq-config-btn').addEventListener('click', async () => {
-    const zmqPort = content.querySelector('#zmq-port-input').value || '28332';
-    const configText = `zmqpubrawblock=${getZmqAddress(zmqPort)}\nzmqpubrawtx=${getZmqAddress(zmqPort)}`;
-    if (!(await copyToText(configText))) return;
-    const btn = content.querySelector('#copy-zmq-config-btn');
-    const orig = btn.innerHTML;
-    btn.innerHTML = icons.check(13) + ' Copied!';
-    setTimeout(() => { btn.innerHTML = orig; }, 2000);
-  });
-
-  // Bitcoin guide link (Electron-aware)
-  content.querySelector('#bitcoin-guide-link').addEventListener('click', (e) => {
-    e.preventDefault();
-    const url = e.currentTarget.href;
-    if (typeof require !== 'undefined') {
-      try {
-        const { shell } = require('electron');
-        shell.openExternal(url);
-        return;
-      } catch (err) {
-        console.warn('Falling back to window.open:', err);
-      }
-    }
-    window.open(url, '_blank');
-  });
-
-  wirePasswordToggle(
-    content.querySelector('#tor-auth-password-input'),
-    content.querySelector('#toggle-tor-password')
-  );
-
   function updateConnectionStatus(connected, info = {}) {
     const indicator = content.querySelector('#connection-indicator');
     const status = content.querySelector('#rpc-status');
@@ -378,197 +168,51 @@ export function SettingsComponent(container) {
     }
   }
 
-  async function testTorConnection() {
-    const btn = content.querySelector('#test-tor-btn');
-    const resultDiv = content.querySelector('#tor-test-result');
-    const orig = btn.innerHTML;
-    btn.innerHTML = 'Testing...';
-    btn.disabled = true;
-
-    const socksPort = parseInt(content.querySelector('#tor-socks-port-input').value, 10);
-    const controlPort = parseInt(content.querySelector('#tor-control-port-input').value, 10);
-
-    try {
-      const [socksResult, controlResult] = await Promise.all([
-        window.api.testTcpPort({ host: '127.0.0.1', port: socksPort }),
-        window.api.testTcpPort({ host: '127.0.0.1', port: controlPort }),
-      ]);
-
-      renderConnectionResults(resultDiv, [
-        {
-          label: 'SOCKS Port',
-          ok: Boolean(socksResult?.success),
-          message: socksResult?.success ? `Port ${socksPort} reachable` : socksResult?.error,
-        },
-        {
-          label: 'Control Port',
-          ok: Boolean(controlResult?.success),
-          message: controlResult?.success ? `Port ${controlPort} reachable` : controlResult?.error,
-        },
-      ]);
-    } catch (error) {
-      renderConnectionResults(resultDiv, [
-        { label: 'Tor Connection', ok: false, message: error.message || String(error) },
-      ]);
-    }
-
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  }
-
-  async function testBitcoindConnection() {
-    const btn = content.querySelector('#test-connection-btn');
-    const resultDiv = content.querySelector('#bitcoind-test-result');
-    const orig = btn.innerHTML;
-    btn.innerHTML = 'Testing...';
-    btn.disabled = true;
-
-    const host = content.querySelector('#rpc-host-input').value;
-    const port = content.querySelector('#rpc-port-input').value;
-    const zmqPort = parseInt(content.querySelector('#zmq-port-input').value, 10);
-
-    try {
-      const rpcConfig = getRpcConfigFromInputs();
-      const [blockchainInfo, networkInfo, restResponse, zmqResult] = await Promise.allSettled([
-        makeRPCCall(rpcConfig, 'getblockchaininfo'),
-        makeRPCCall(rpcConfig, 'getnetworkinfo'),
-        fetch(getRestUrl(host, port)),
-        window.api.testTcpPort({ host: '127.0.0.1', port: zmqPort }),
-      ]);
-
-      const rpcOk = blockchainInfo.status === 'fulfilled' && networkInfo.status === 'fulfilled';
-      const chain = rpcOk ? blockchainInfo.value?.chain || 'unknown' : null;
-      const blocks = rpcOk ? blockchainInfo.value?.blocks || 0 : null;
-      const version = rpcOk ? networkInfo.value?.subversion || 'Unknown' : null;
-      const restOk = restResponse.status === 'fulfilled' && restResponse.value.ok;
-      const zmqOk = zmqResult.status === 'fulfilled' && Boolean(zmqResult.value?.success);
-
-      renderConnectionResults(resultDiv, [
-        {
-          label: 'RPC',
-          ok: rpcOk,
-          message: rpcOk
-            ? `${version} • ${chain} • ${blocks.toLocaleString()} blocks`
-            : blockchainInfo.reason?.message || networkInfo.reason?.message,
-        },
-        {
-          label: 'REST',
-          ok: restOk,
-          message: restOk
-            ? `${getRestUrl(host, port)} reachable`
-            : restResponse.status === 'fulfilled'
-              ? `HTTP ${restResponse.value.status}: ${restResponse.value.statusText}`
-              : restResponse.reason?.message,
-        },
-        {
-          label: 'ZMQ',
-          ok: zmqOk,
-          message: zmqOk
-            ? `Port ${zmqPort} reachable`
-            : zmqResult.status === 'fulfilled'
-              ? zmqResult.value?.error
-              : zmqResult.reason?.message,
-        },
-      ]);
-
-      if (rpcOk) {
-        updateConnectionStatus(true, {
-          version,
-          network: chain,
-          blocks,
-          verificationprogress: blockchainInfo.value?.verificationprogress,
-        });
-      } else {
-        updateConnectionStatus(false);
-      }
-    } catch (error) {
-      updateConnectionStatus(false);
-      renderConnectionResults(resultDiv, [
-        { label: 'Bitcoind Test', ok: false, message: error.message || String(error) },
-      ]);
-    }
-
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  }
-
-  content.querySelector('#test-connection-btn').addEventListener('click', testBitcoindConnection);
-  content.querySelector('#test-tor-btn').addEventListener('click', testTorConnection);
-
-  function buildConfig() {
-    let existingConfig = {};
-    try {
-      const saved = localStorage.getItem('openswap_config');
-      if (saved) existingConfig = JSON.parse(saved);
-    } catch (e) {
-      console.error('Error loading existing config:', e);
-    }
-
-    const zmqPortInput = content.querySelector('#zmq-port-input').value.trim();
-    const zmqPort = parseInt(zmqPortInput, 10);
-    const hasValidZmqPort = Number.isInteger(zmqPort) && zmqPort > 0;
-
-    return {
-      ...existingConfig,
-      rpc: {
-        host: content.querySelector('#rpc-host-input').value,
-        port: parseInt(content.querySelector('#rpc-port-input').value),
-        username: content.querySelector('#rpc-username-input').value,
-        password: content.querySelector('#rpc-password-input').value,
-      },
-      taker: {
-        control_port: parseInt(content.querySelector('#tor-control-port-input').value),
-        socks_port: parseInt(content.querySelector('#tor-socks-port-input').value),
-        tor_auth_password: content.querySelector('#tor-auth-password-input').value || undefined,
-      },
-      zmq: hasValidZmqPort
-        ? {
-            port: zmqPort,
-            rawblock: getZmqAddress(zmqPort),
-            rawtx: getZmqAddress(zmqPort),
-            address: getZmqAddress(zmqPort),
-          }
-        : {},
-      setupComplete: true,
-      setupDate: existingConfig.setupDate || new Date().toISOString(),
-      lastModified: new Date().toISOString(),
-    };
-  }
-
-  content.querySelector('#save-settings-btn').addEventListener('click', () => {
-    localStorage.setItem('openswap_config', JSON.stringify(buildConfig()));
-    const btn = content.querySelector('#save-settings-btn');
-    const orig = btn.innerHTML;
-    btn.innerHTML = icons.check(14) + ' Saved!';
-    btn.classList.replace('primary', 'settings-saved');
-    setTimeout(() => {
-      btn.innerHTML = orig;
-      btn.classList.replace('settings-saved', 'primary');
-    }, 2000);
-  });
-
-  content.querySelector('#reset-settings-btn').addEventListener('click', () => {
-    if (!confirm('Reset all settings to defaults?')) return;
-    content.querySelector('#tor-control-port-input').value = '9051';
-    content.querySelector('#tor-socks-port-input').value = '9050';
-    content.querySelector('#tor-auth-password-input').value = '';
-    content.querySelector('#rpc-host-input').value = '127.0.0.1';
-    content.querySelector('#rpc-port-input').value = '38332';
-    content.querySelector('#rpc-username-input').value = 'user';
-    content.querySelector('#rpc-password-input').value = '';
-    content.querySelector('#zmq-port-input').value = '28332';
-    updateConfigPreviews();
-    updateConnectionStatus(false);
-    alert('Settings reset to defaults');
-  });
-
   // INITIALIZE
-  loadExistingConfig();
-  updateConfigPreviews();
 
   (async function checkInitialStatus() {
+    let savedConfig = null;
     try {
-      const rpcConfig = getRpcConfigFromInputs();
+      savedConfig = JSON.parse(localStorage.getItem('openswap_config') || 'null');
+    } catch (error) {
+      console.warn('Could not read saved config:', error.message);
+    }
+
+    // Electrum backend: there is no local node to poll — show the configured
+    // server instead of Bitcoin Core stats.
+    if (savedConfig?.backend?.type === 'electrum') {
+      const indicator = content.querySelector('#connection-indicator');
+      const status = content.querySelector('#rpc-status');
+      indicator.className = 'settings-status-dot ok';
+      status.textContent = 'Electrum';
+      status.style.color = 'var(--color-success)';
+
+      const grid = content.querySelector('#connection-status-grid');
+      const backendRow = document.createElement('div');
+      const backendLabel = document.createElement('span');
+      backendLabel.textContent = 'Backend';
+      const backendValue = document.createElement('strong');
+      backendValue.textContent = 'Electrum';
+      backendRow.append(backendLabel, backendValue);
+
+      const serverRow = document.createElement('div');
+      const serverLabel = document.createElement('span');
+      serverLabel.textContent = 'Server';
+      const serverValue = document.createElement('strong');
+      serverValue.textContent = savedConfig.backend.url || '--';
+      serverRow.append(serverLabel, serverValue);
+
+      grid.replaceChildren(backendRow, serverRow);
+      return;
+    }
+
+    try {
+      const rpcConfig = {
+        host: savedConfig?.rpc?.host || '127.0.0.1',
+        port: savedConfig?.rpc?.port || 38332,
+        username: savedConfig?.rpc?.username || 'user',
+        password: savedConfig?.rpc?.password || 'password',
+      };
       const info = await makeRPCCall(rpcConfig, 'getblockchaininfo');
       const networkInfo = await makeRPCCall(rpcConfig, 'getnetworkinfo');
       updateConnectionStatus(true, {

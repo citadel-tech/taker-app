@@ -41,7 +41,8 @@ async function main() {
       config.controlPort,
       config.torAuthPassword,
       config.zmqAddr,
-      config.password
+      config.password,
+      config.backendConfig || undefined
     );
 
     if (typeof taker.shutdown === 'function') {

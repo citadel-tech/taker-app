@@ -18,12 +18,12 @@ This guide covers all features and functionality of the Openswap Taker App.
 
 On launch, the app walks through setup and connection configuration:
 
-1. **Bitcoin Core Connection** - Configure RPC credentials and port
-2. **Tor Configuration** - Set control and SOCKS ports (defaults: 9051, 9050)
-3. **Wallet Loading** - Opens your existing encrypted wallet, prompts creation, or allows restoration from backup JSON
-4. **ZMQ Setup** - Configure real-time block and transaction notifications as part of the Bitcoin endpoint setup
+1. **Backend Selection** - Choose between an Electrum server (pre-filled with the Citadel FOSS server, or enter your own) or your own Bitcoin Core node (RPC credentials and port). The Electrum server is checked when you proceed.
+2. **Tor Check** - Tor is deployed automatically by the app; the setup screen verifies it is reachable (defaults: control 9051, SOCKS 9050)
+3. **Wallet Loading** - Create a new encrypted wallet (with password confirmation), load an existing one, or restore from backup JSON
+4. **ZMQ Setup** - For the Bitcoin Core backend, configure real-time block and transaction notifications as part of the endpoint setup
 
-The setup page allows you to review and update your configuration.
+The backend chosen here is fixed for the session and is passed to the taker at initialization; it can only be changed by re-running setup.
 
 ## Wallet Page
 
@@ -94,15 +94,12 @@ Recovery is automatic in most cases, but this page provides manual control when 
 
 ## Settings Page
 
-Configure app and Bitcoin Core connection:
+Wallet maintenance and status:
 
-- **RPC Configuration** - Bitcoin Core connection settings
-- **Tor Configuration** - Control port, SOCKS port, and authentication
-- **ZMQ Configuration** - Real-time notification endpoints
 - **Wallet Backup** - Create encrypted wallet backups
-- **Connection Testing** - Verify Bitcoin Core and Tor connectivity
+- **Connection Status** - Backend in use (Bitcoin Core or Electrum server) and, for Bitcoin Core, node version, network, block height, and sync progress
 
-Settings can be reviewed and updated from the app, though the current development build may require re-running setup on launch.
+Backend (Bitcoin Core/Electrum) and Tor settings are intentionally not editable here: Tor is deployed automatically by the app, and the backend can only be selected during first-time setup. Wallet password changes are not permitted.
 
 ## Log Page
 

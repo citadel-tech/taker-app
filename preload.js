@@ -78,4 +78,6 @@ contextBridge.exposeInMainWorld('api', {
   restoreWallet: (data) => ipcRenderer.invoke('taker:restore', data),
   backupWallet: (data) => ipcRenderer.invoke('taker:backup', data),
   testTcpPort: (config) => ipcRenderer.invoke('network:testTcpPort', config),
+  getTorBootstrapStatus: (config) =>
+    ipcRenderer.invoke('network:getTorBootstrapStatus', config),
 });

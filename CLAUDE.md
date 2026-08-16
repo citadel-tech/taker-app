@@ -27,8 +27,8 @@ All UI components are modular JavaScript files that export functions to render t
 - **Market.js** - Offerbook viewer showing available makers
 - **Openswap.js** - Swap execution interface
 - **Send.js** / **Receive.js** - Bitcoin transaction management
-- **Settings.js** - Configuration management (RPC, Tor, wallets)
-- **FirstTimeSetup.js** - Initial configuration wizard
+- **Settings.js** - Wallet backup and connection status (backend is chosen at setup; Tor is app-managed)
+- **FirstTimeSetup.js** - Initial configuration wizard (Tor check, Electrum/Bitcoin Core backend selection, wallet create/load/restore)
 - **SwapReport.js** - Post-swap analytics and visualization
 - **SwapHistory.js** - Historical swap records
 - **Nav.js** - Navigation component

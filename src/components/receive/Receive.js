@@ -285,7 +285,8 @@ export function ReceiveComponent(container) {
     generationTime.textContent = createdDate.toLocaleTimeString();
     derivationIndex.textContent = index === '-' ? '-' : `#${index}`;
     usageCount.textContent = addressData.used.toString();
-    totalReceived.textContent = formatSats(addressData.received);
+    // formatSats returns HTML (number + sats symbol markup), so set innerHTML.
+    totalReceived.innerHTML = formatSats(addressData.received);
 
     if (addressData.used === 0) {
       addressStatusText.textContent = 'Unused';

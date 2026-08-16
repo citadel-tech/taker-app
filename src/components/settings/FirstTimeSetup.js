@@ -1,6 +1,8 @@
 import { icons } from '../../js/icons.js';
 import { getRestUrl, getZmqAddress, makeRPCCall, wirePasswordToggle } from '../../js/openswapHelpers.js';
 
+const DEFAULT_ELECTRUM_URL = 'https://electrum.citadelfoss.xyz:50002/';
+
 export function FirstTimeSetupModal(container, onComplete) {
   const defaultWalletName = `taker-wallet-${Math.floor(100000 + Math.random() * 900000)}`;
   const iconClass = 'w-5 h-5 flex-shrink-0';
@@ -22,7 +24,8 @@ export function FirstTimeSetupModal(container, onComplete) {
   const totalSteps = 2;
   let walletAction = null; // 'create', 'load', or 'restore'
   let walletData = {};
-  const connectionPassed = { node: false, tor: false };
+  let backendType = 'electrum'; // 'electrum' (default) or 'rpc' (Bitcoin Core)
+  const connectionPassed = { node: false, tor: false, electrum: false };
   let protocolVersion = 'v2'; // Fixed app-local default until the rest of the flow stops expecting v1/v2.
 
   modal.innerHTML = `
@@ -38,6 +41,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         --setup-primary-hover: #6fa2ff;
         --setup-green: #2fbf71;
         --setup-red: #ff4d5a;
+        --setup-yellow: #f5c451;
         position: fixed;
         inset: 0;
         z-index: 50;
@@ -95,6 +99,9 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-spec input::-webkit-outer-spin-button, #setup-modal .setup-spec input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
       #setup-modal .setup-eye { color: var(--setup-text-3); background: transparent; border: 0; padding: 0; cursor: pointer; display: flex; align-items: center; }
       #setup-modal .setup-eye:hover { color: var(--setup-text); }
+      /* Placeholders are hints, not values: dim them and clear on focus. */
+      #setup-modal input::placeholder { color: var(--setup-text-3); opacity: 0.55; }
+      #setup-modal input:focus::placeholder { color: transparent; opacity: 0; }
       #setup-modal .setup-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; height: 46px; border-radius: 12px; border: 0; cursor: pointer; font-family: inherit; font-size: 13.5px; font-weight: 600; color: #fff; background: var(--setup-primary); transition: background 0.2s, transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
       #setup-modal .setup-btn:hover { background: #6fa2ff; transform: translateY(-2px); box-shadow: 0 10px 24px -12px rgba(81,141,239,0.9), 0 0 0 1px rgba(255,255,255,0.08) inset; }
       #setup-modal .setup-btn.is-success { background: var(--setup-green); box-shadow: 0 10px 24px -14px rgba(47,191,113,0.85); }
@@ -110,6 +117,10 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-status-row.ok .msg { color: var(--setup-green); }
       #setup-modal .setup-status-row.err .indicator { background: rgba(255,77,90,0.15); color: var(--setup-red); }
       #setup-modal .setup-status-row.err .msg { color: var(--setup-red); }
+      #setup-modal .setup-status-row.warn .indicator { background: rgba(245,196,81,0.15); color: var(--setup-yellow); }
+      #setup-modal .setup-status-row.warn .msg { color: var(--setup-yellow); }
+      #setup-modal .setup-status-row.warn .indicator svg { animation: setup-tor-pulse 1.6s ease-in-out infinite; }
+      @keyframes setup-tor-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
       #setup-modal .indicator { width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
       #setup-modal .setup-info { margin-top: 12px; border-radius: 10px; padding: 12px; font-size: 12px; line-height: 1.45; }
       #setup-modal .setup-info a { color: var(--setup-primary); text-decoration: none; border-bottom: 1px solid rgba(81,141,239,0.4); }
@@ -120,6 +131,11 @@ export function FirstTimeSetupModal(container, onComplete) {
       #setup-modal .setup-footer-actions .setup-btn { width: auto; min-width: 130px; padding: 0 22px; }
       #setup-modal .setup-footer-actions .setup-btn[disabled]:hover { background: var(--setup-primary); transform: none; }
       #setup-modal .setup-wallet-panel { padding: 0; }
+      #setup-modal .setup-toggle { display: flex; gap: 6px; margin-bottom: 16px; }
+      #setup-modal .setup-toggle-btn { flex: 1; height: 38px; border-radius: 10px; border: 1px solid var(--setup-border-strong); background: rgba(255,255,255,0.04); color: var(--setup-text-2); font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; transition: background 0.2s, color 0.2s, border-color 0.2s; }
+      #setup-modal .setup-toggle-btn:hover { color: var(--setup-text); border-color: var(--setup-primary); }
+      #setup-modal .setup-toggle-btn.is-active { background: var(--setup-primary); border-color: var(--setup-primary); color: #fff; }
+      #setup-modal .setup-electrum-hint { font-size: 11px; color: var(--setup-text-3); line-height: 1.5; margin: 0; }
       #setup-modal .hidden { display: none !important; }
       @media (max-width: 760px) {
         #setup-modal { padding: 16px; overflow-y: auto; align-items: flex-start; }
@@ -147,7 +163,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         <div class="setup-header">
           <div class="setup-eyebrow" id="setup-eyebrow"><span class="setup-pip"></span>Welcome · First-time setup</div>
           <h1 class="setup-title" id="setup-title">Let's get you <span class="accent">connected.</span></h1>
-          <p class="setup-subtitle" id="setup-subtitle">Two quick checks — your Bitcoin node and a Tor proxy. After this, you're ready to swap privately.</p>
+          <p class="setup-subtitle" id="setup-subtitle">Pick your backend — Electrum or your own Bitcoin Core node — and check the Tor proxy. After this, you're ready to swap privately.</p>
 
           <div class="setup-stepper">
             <span id="step-indicator">Step 1 of 2</span>
@@ -165,12 +181,32 @@ export function FirstTimeSetupModal(container, onComplete) {
               <div class="setup-card-head">
                 <div class="setup-num">1</div>
                 <div>
-                  <span class="setup-kicker">Bitcoin</span>
-                  <h3>Test your node</h3>
+                  <span class="setup-kicker">Backend</span>
+                  <h3>Choose your backend</h3>
                 </div>
               </div>
-              <p class="setup-desc">Checks RPC, REST, and ZMQ access to your local Bitcoin Core so your wallet and confirmations stay in sync without a third party.</p>
-              <div class="setup-spec-area">
+              <p class="setup-desc">Swap using an Electrum server — the default Citadel server works out of the box — or your own Bitcoin Core node via RPC, REST, and ZMQ.</p>
+              <div class="setup-toggle">
+                <button type="button" id="backend-toggle-electrum" class="setup-toggle-btn is-active">Electrum</button>
+                <button type="button" id="backend-toggle-rpc" class="setup-toggle-btn">Bitcoin Core</button>
+              </div>
+              <div id="backend-electrum-fields">
+                <div class="setup-spec-area">
+                  <div class="setup-specs nowrap">
+                    <div class="setup-spec" style="flex:1;">
+                      <label for="setup-electrum-url">URL</label>
+                      <input type="text" id="setup-electrum-url" value="${DEFAULT_ELECTRUM_URL}" style="--input-width: 100%; width: 100%;" />
+                    </div>
+                  </div>
+                  <p class="setup-electrum-hint">Pre-filled with the Citadel FOSS Electrum server — replace it with your own if you run one. The server is checked when you press Next.</p>
+                </div>
+                <div id="electrum-test-result" class="setup-status hidden"></div>
+                <div id="electrum-setup-info" class="setup-info hidden app-infobox warning">
+                  <strong>Info:</strong> Could not reach the Electrum server. Check the URL, or your network connection, and try again.
+                </div>
+              </div>
+              <div id="backend-rpc-fields" class="hidden">
+                <div class="setup-spec-area">
                 <div class="setup-specs nowrap">
                   <div class="setup-spec">
                     <label for="setup-rpc-port">RPC</label>
@@ -191,16 +227,17 @@ export function FirstTimeSetupModal(container, onComplete) {
                     <input type="password" id="setup-rpc-password" value="password" style="--input-width: 72px;" />
                   </div>
                 </div>
-              </div>
-              <input type="hidden" id="setup-rpc-host" value="127.0.0.1" />
-              <button id="test-rpc-setup" class="setup-btn">
-                <span>Test node connection</span>
-                <svg class="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-              </button>
-              <div id="rpc-test-result" class="setup-status hidden"></div>
-              <div id="node-setup-info" class="setup-info hidden app-infobox warning">
-                <strong>Info:</strong> Don't have a running Bitcoin Node?
-                <a href="https://github.com/citadel-foss/openswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer">Node setup instructions</a>
+                </div>
+                <input type="hidden" id="setup-rpc-host" value="127.0.0.1" />
+                <button id="test-rpc-setup" class="setup-btn">
+                  <span>Test node connection</span>
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                </button>
+                <div id="rpc-test-result" class="setup-status hidden"></div>
+                <div id="node-setup-info" class="setup-info hidden app-infobox warning">
+                  <strong>Info:</strong> Don't have a running Bitcoin Node?
+                  <a href="https://github.com/citadel-foss/openswap/blob/master/docs/bitcoind.md" target="_blank" rel="noreferrer">Node setup instructions</a>
+                </div>
               </div>
             </article>
 
@@ -209,35 +246,12 @@ export function FirstTimeSetupModal(container, onComplete) {
                 <div class="setup-num">2</div>
                 <div>
                   <span class="setup-kicker">Network</span>
-                  <h3>Test your Tor proxy</h3>
+                  <h3>Tor connection</h3>
                 </div>
               </div>
-              <p class="setup-desc">Routes all swap traffic through Tor so your IP and coin history stay private. You can test this before or after the Bitcoin node.</p>
-              <div class="setup-spec-area">
-                <div class="setup-specs nowrap">
-                  <div class="setup-spec">
-                    <label for="setup-tor-socks-port">SOCKS</label>
-                    <input type="number" id="setup-tor-socks-port" value="9050" min="1024" max="65535" />
-                  </div>
-                  <div class="setup-spec">
-                    <label for="setup-tor-control-port">CTRL</label>
-                    <input type="number" id="setup-tor-control-port" value="9051" min="1024" max="65535" />
-                  </div>
-                  <div class="setup-spec">
-                    <label for="setup-tor-auth-password">PASSWORD</label>
-                    <input type="password" id="setup-tor-auth-password" style="--input-width: 72px;" />
-                  </div>
-                </div>
-              </div>
-              <button id="test-tor-setup" class="setup-btn">
-                <span>Test Tor connection</span>
-                <svg class="w-4 h-4" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
-              </button>
-              <div id="tor-test-result" class="setup-status hidden"></div>
-              <div id="tor-setup-info" class="setup-info hidden app-infobox primary">
-                <strong>Info:</strong> Don't have a running Tor instance?
-                <a href="https://github.com/citadel-foss/openswap/blob/master/docs/tor.md" target="_blank" rel="noreferrer">Tor setup instructions</a>
-              </div>
+              <p class="setup-desc">Tor starts automatically with the app and routes all swap traffic so your IP and coin history stay private. Next unlocks once Tor has fully bootstrapped.</p>
+              <div class="setup-spec-area"></div>
+              <div id="tor-bootstrap-status" class="setup-status hidden"></div>
             </article>
           </section>
         </div>
@@ -549,7 +563,7 @@ export function FirstTimeSetupModal(container, onComplete) {
       if (title) title.innerHTML = "Let's get you <span class=\"accent\">connected.</span>";
       if (subtitle) {
         subtitle.textContent =
-          "Two quick checks — your Bitcoin node and a Tor proxy. After this, you're ready to swap privately.";
+          "Pick your backend — Electrum or your own Bitcoin Core node — and check the Tor proxy. After this, you're ready to swap privately.";
       }
     } else {
       if (eyebrow) eyebrow.innerHTML = '<span class="setup-pip"></span>Wallet · Final step';
@@ -596,7 +610,9 @@ export function FirstTimeSetupModal(container, onComplete) {
     if (!nextBtn) return;
 
     if (currentStep === 1) {
-      nextBtn.disabled = !(connectionPassed.node && connectionPassed.tor);
+      // Electrum is verified on Next; Bitcoin Core must pass its test first.
+      const backendReady = backendType === 'electrum' || connectionPassed.node;
+      nextBtn.disabled = !(backendReady && connectionPassed.tor);
     } else if (currentStep === 2) {
       nextBtn.disabled = !hasWalletStepRequirements();
     } else {
@@ -638,7 +654,7 @@ export function FirstTimeSetupModal(container, onComplete) {
   function resetConnectionCheck(which) {
     connectionPassed[which] = false;
     const card = modal.querySelector(`#card-${which}`);
-    const btn = modal.querySelector(which === 'node' ? '#test-rpc-setup' : '#test-tor-setup');
+    const btn = modal.querySelector('#test-rpc-setup');
     card?.classList.remove('is-success', 'is-fail');
     btn?.classList.remove('is-success');
     updateConnectionGate();
@@ -672,11 +688,11 @@ export function FirstTimeSetupModal(container, onComplete) {
       password: modal.querySelector('#restore-password')?.value || '',
     };
 
-    walletData.tor = {
-      controlPort: modal.querySelector('#setup-tor-control-port')?.value || '9051',
-      socksPort: modal.querySelector('#setup-tor-socks-port')?.value || '9050',
-      authPassword:
-        modal.querySelector('#setup-tor-auth-password')?.value || '',
+    walletData.backend = {
+      type: backendType,
+      electrumUrl:
+        modal.querySelector('#setup-electrum-url')?.value ||
+        DEFAULT_ELECTRUM_URL,
     };
   }
 
@@ -685,7 +701,6 @@ export function FirstTimeSetupModal(container, onComplete) {
     const createData = walletData.create || {};
     const loadData = walletData.load || {};
     const restoreData = walletData.restore || {};
-    const torData = walletData.tor || {};
 
     const setValue = (selector, value) => {
       const input = modal.querySelector(selector);
@@ -711,9 +726,103 @@ export function FirstTimeSetupModal(container, onComplete) {
     setValue('#restore-backup-path', restoreData.backupPath);
     setValue('#restore-password', restoreData.password);
 
-    setValue('#setup-tor-control-port', torData.controlPort);
-    setValue('#setup-tor-socks-port', torData.socksPort);
-    setValue('#setup-tor-auth-password', torData.authPassword);
+    const backendData = walletData.backend || {};
+    setValue(
+      '#setup-electrum-url',
+      backendData.electrumUrl || DEFAULT_ELECTRUM_URL
+    );
+    setBackendType(backendData.type || 'electrum');
+  }
+
+  function setBackendType(type) {
+    backendType = type === 'rpc' ? 'rpc' : 'electrum';
+    modal
+      .querySelector('#backend-toggle-electrum')
+      ?.classList.toggle('is-active', backendType === 'electrum');
+    modal
+      .querySelector('#backend-toggle-rpc')
+      ?.classList.toggle('is-active', backendType === 'rpc');
+    modal
+      .querySelector('#backend-electrum-fields')
+      ?.classList.toggle('hidden', backendType !== 'electrum');
+    modal
+      .querySelector('#backend-rpc-fields')
+      ?.classList.toggle('hidden', backendType !== 'rpc');
+    updateConnectionGate();
+  }
+
+  // Parses "scheme://host:port/" style Electrum URLs; port defaults to 50002.
+  function parseElectrumUrl(raw) {
+    if (!raw) return null;
+    const withoutScheme = raw.includes('://') ? raw.split('://')[1] : raw;
+    const hostPort = withoutScheme.replace(/\/+$/, '');
+    const match = hostPort.match(/^([^\s:/]+)(?::(\d+))?$/);
+    if (!match) return null;
+    const host = match[1];
+    const port = match[2] ? parseInt(match[2], 10) : 50002;
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+      return null;
+    }
+    return { host, port };
+  }
+
+  // Checks the Electrum server URL (TCP reachability) when Next is pressed.
+  async function checkElectrumBackend() {
+    const resultDiv = modal.querySelector('#electrum-test-result');
+    const infoDiv = modal.querySelector('#electrum-setup-info');
+    const nextBtn = modal.querySelector('#setup-next-btn');
+    const rawUrl = (modal.querySelector('#setup-electrum-url')?.value || '').trim();
+
+    connectionPassed.electrum = false;
+    if (infoDiv) infoDiv.classList.add('hidden');
+
+    const parsed = parseElectrumUrl(rawUrl);
+    if (!parsed) {
+      renderConnectionResults(resultDiv, [
+        {
+          label: 'Electrum',
+          ok: false,
+          message: 'Invalid URL — expected host:port (e.g. ssl://host:50002)',
+        },
+      ]);
+      if (infoDiv) infoDiv.classList.remove('hidden');
+      return false;
+    }
+
+    if (nextBtn) {
+      nextBtn.disabled = true;
+      nextBtn.textContent = 'Checking Electrum...';
+    }
+
+    let result;
+    try {
+      result = await window.api.testTcpPort({
+        host: parsed.host,
+        port: parsed.port,
+        timeout: 5000,
+      });
+    } catch (error) {
+      result = { success: false, error: error.message || String(error) };
+    }
+
+    const ok = Boolean(result?.success);
+    connectionPassed.electrum = ok;
+    renderConnectionResults(resultDiv, [
+      {
+        label: 'Electrum',
+        ok,
+        message: ok
+          ? `${parsed.host}:${parsed.port} reachable`
+          : result?.error || `Cannot reach ${parsed.host}:${parsed.port}`,
+      },
+    ]);
+    if (infoDiv) infoDiv.classList.toggle('hidden', ok);
+
+    if (nextBtn) {
+      nextBtn.disabled = false;
+      nextBtn.textContent = 'Next';
+    }
+    return ok;
   }
 
   function showStep(step) {
@@ -913,6 +1022,15 @@ export function FirstTimeSetupModal(container, onComplete) {
 
     const config = {
       protocol: protocolVersion, // 'v1' (P2WSH) or 'v2' (Taproot)
+      backend:
+        backendType === 'electrum'
+          ? {
+              type: 'electrum',
+              url: (
+                modal.querySelector('#setup-electrum-url')?.value || ''
+              ).trim(),
+            }
+          : { type: 'rpc' },
       rpc: {
         host: modal.querySelector('#setup-rpc-host').value,
         port: parseInt(modal.querySelector('#setup-rpc-port').value),
@@ -925,14 +1043,10 @@ export function FirstTimeSetupModal(container, onComplete) {
         address: zmqAddress,
       },
       taker: {
-        control_port: parseInt(
-          modal.querySelector('#setup-tor-control-port').value
-        ),
-        socks_port: parseInt(
-          modal.querySelector('#setup-tor-socks-port').value
-        ),
-        tor_auth_password:
-          modal.querySelector('#setup-tor-auth-password').value || undefined,
+        // Tor is managed by the app with fixed ports; not user-configurable.
+        control_port: 9051,
+        socks_port: 9050,
+        tor_auth_password: undefined,
       },
       wallet: {
         action: walletAction,
@@ -1130,77 +1244,81 @@ export function FirstTimeSetupModal(container, onComplete) {
     }
   }
 
-  // Test Tor connection
-  async function testTorConnection() {
-    const btn = modal.querySelector('#test-tor-setup');
-    const resultDiv = modal.querySelector('#tor-test-result');
-    const btnLabel = btn?.querySelector('span');
+  // Tor bootstrap monitor — polls the control port until bootstrap completes.
+  let torPollTimer = null;
 
-    if (!btn || !resultDiv) return;
+  function renderTorStatus(state) {
+    const statusDiv = modal.querySelector('#tor-bootstrap-status');
+    if (!statusDiv) return;
 
-    if (btnLabel) btnLabel.textContent = 'Probing circuit...';
-    btn.disabled = true;
-    connectionPassed.tor = false;
-    updateConnectionGate();
-    modal.querySelector('#card-tor')?.classList.remove('is-success', 'is-fail');
-    btn.classList.remove('is-success');
+    const iconsByKind = {
+      warn: '<svg viewBox="0 0 24 24" style="width:10px;height:10px" stroke="currentColor" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+      ok: '<svg viewBox="0 0 24 24" style="width:10px;height:10px" stroke="currentColor" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>',
+      err: '<svg viewBox="0 0 24 24" style="width:10px;height:10px" stroke="currentColor" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    };
 
-    const socksPort = parseInt(
-      modal.querySelector('#setup-tor-socks-port').value
-    );
-    const controlPort = parseInt(
-      modal.querySelector('#setup-tor-control-port').value
-    );
+    statusDiv.classList.remove('hidden');
+    statusDiv.innerHTML = `
+      <div class="setup-status-row ${state.kind}">
+        <div class="indicator">${iconsByKind[state.kind]}</div>
+        <div class="label">Tor</div>
+        <div class="msg">${state.message}</div>
+      </div>
+    `;
 
+    const card = modal.querySelector('#card-tor');
+    if (card) {
+      card.classList.remove('is-success', 'is-fail');
+      if (state.kind === 'ok') card.classList.add('is-success');
+      if (state.kind === 'err') card.classList.add('is-fail');
+    }
+  }
+
+  async function pollTorBootstrap() {
+    let result;
     try {
-      const [socksResult, controlResult] = await Promise.all([
-        window.api.testTcpPort({ host: '127.0.0.1', port: socksPort }),
-        window.api.testTcpPort({ host: '127.0.0.1', port: controlPort }),
-      ]);
-
-      const torFailed = !socksResult?.success || !controlResult?.success;
-      connectionPassed.tor = !torFailed;
-      btn.classList.toggle('is-success', !torFailed);
-      updateConnectionGate();
-      renderConnectionResults(resultDiv, [
-        {
-          label: 'SOCKS Port',
-          ok: Boolean(socksResult?.success),
-          message: socksResult?.success
-            ? `Port ${socksPort} reachable`
-            : socksResult?.error,
-        },
-        {
-          label: 'Control Port',
-          ok: Boolean(controlResult?.success),
-          message: controlResult?.success
-            ? `Port ${controlPort} reachable`
-            : controlResult?.error,
-        },
-      ]);
-      const infoDiv = modal.querySelector('#tor-setup-info');
-      if (infoDiv) infoDiv.classList.toggle('hidden', !torFailed);
+      result = await window.api.getTorBootstrapStatus();
     } catch (error) {
-      console.error('Tor test failed:', error);
+      result = { success: false, error: error.message || String(error) };
+    }
 
-      renderConnectionResults(resultDiv, [
-        {
-          label: 'Tor Connection',
-          ok: false,
-          message: error.message || String(error),
-        },
-      ]);
+    if (result?.success && result.progress >= 100) {
+      connectionPassed.tor = true;
+      renderTorStatus({
+        kind: 'ok',
+        message: 'Bootstrap complete — Tor is ready',
+      });
+      stopTorBootstrapMonitor();
+    } else if (result?.success) {
       connectionPassed.tor = false;
-      btn.classList.remove('is-success');
-      updateConnectionGate();
-      const infoDiv = modal.querySelector('#tor-setup-info');
-      if (infoDiv) infoDiv.classList.remove('hidden');
+      renderTorStatus({
+        kind: 'warn',
+        message: `Bootstrapping Tor… ${result.progress}%${
+          result.summary ? ` — ${result.summary}` : ''
+        }`,
+      });
+    } else {
+      connectionPassed.tor = false;
+      renderTorStatus({
+        kind: 'warn',
+        message: 'Waiting for Tor to start…',
+      });
     }
+    updateConnectionGate();
+  }
 
-    if (btnLabel) {
-      btnLabel.textContent = connectionPassed.tor ? 'Re-test Tor' : 'Test Tor connection';
+  function startTorBootstrapMonitor() {
+    stopTorBootstrapMonitor();
+    renderTorStatus({ kind: 'warn', message: 'Bootstrapping Tor…' });
+    pollTorBootstrap();
+    torPollTimer = setInterval(pollTorBootstrap, 2000);
+  }
+
+  function stopTorBootstrapMonitor() {
+    if (torPollTimer) {
+      clearInterval(torPollTimer);
+      torPollTimer = null;
     }
-    btn.disabled = false;
   }
 
   // ============================================================================
@@ -1331,16 +1449,6 @@ export function FirstTimeSetupModal(container, onComplete) {
   });
 
   [
-    '#setup-tor-socks-port',
-    '#setup-tor-control-port',
-    '#setup-tor-auth-password',
-  ].forEach((selector) => {
-    modal
-      .querySelector(selector)
-      ?.addEventListener('input', () => resetConnectionCheck('tor'));
-  });
-
-  [
     '#create-wallet-name',
     '#create-password',
     '#create-password-confirm',
@@ -1362,8 +1470,20 @@ export function FirstTimeSetupModal(container, onComplete) {
         walletAction
       );
 
-      if (currentStep === 1 && !(connectionPassed.node && connectionPassed.tor)) {
-        return;
+      if (currentStep === 1) {
+        const backendReady =
+          backendType === 'electrum' || connectionPassed.node;
+        if (!(backendReady && connectionPassed.tor)) {
+          return;
+        }
+
+        // Electrum servers are only checked now, on Next.
+        if (backendType === 'electrum') {
+          const electrumOk = await checkElectrumBackend();
+          if (!electrumOk) {
+            return;
+          }
+        }
       }
 
       if (currentStep === 2) {
@@ -1390,6 +1510,7 @@ export function FirstTimeSetupModal(container, onComplete) {
         // Complete setup
         console.log('Completing setup...');
         const config = buildConfiguration();
+        stopTorBootstrapMonitor();
         modal.remove();
         if (onComplete) onComplete(config);
       }
@@ -1426,17 +1547,25 @@ export function FirstTimeSetupModal(container, onComplete) {
     }
   });
 
+  // Backend toggle
+  modal
+    .querySelector('#backend-toggle-electrum')
+    .addEventListener('click', () => setBackendType('electrum'));
+  modal
+    .querySelector('#backend-toggle-rpc')
+    .addEventListener('click', () => setBackendType('rpc'));
+
   // Test RPC button
   modal
     .querySelector('#test-rpc-setup')
     .addEventListener('click', testRPCConnection);
 
-  modal
-    .querySelector('#test-tor-setup')
-    .addEventListener('click', testTorConnection);
-
   // Initialize
   showStep(currentStep);
+
+  // Tor is auto-deployed by the app — watch its bootstrap progress and only
+  // enable Next once it completes.
+  startTorBootstrapMonitor();
 
   return modal;
 }

@@ -122,6 +122,7 @@ function buildTakerConfig({
   protocol = api1State.protocolVersion || 'v1',
   logLevel = store.get('logLevel') || process.env.LOG_LEVEL || 'debug',
   appSwapId,
+  backendConfig,
 } = {}) {
   return {
     dataDir,
@@ -134,6 +135,38 @@ function buildTakerConfig({
     protocol,
     logLevel,
     appSwapId,
+    backendConfig,
+  };
+}
+
+// Normalizes user-facing Electrum URLs to the form the backend expects
+// ("ssl://host:port" or "tcp://host:port"). http(s) is treated as SSL.
+function normalizeElectrumUrl(raw) {
+  const trimmed = String(raw || '')
+    .trim()
+    .replace(/\/+$/, '');
+  if (!trimmed) return trimmed;
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/^https?:\/\//i, 'ssl://');
+  }
+  if (!trimmed.includes('://')) {
+    return `ssl://${trimmed}`;
+  }
+  return trimmed;
+}
+
+// Maps the runtime onboarding config to the napi BackendConfig passed as the
+// Taker constructor's last argument. Returns undefined for the default
+// Bitcoin Core RPC backend (the binding derives it from rpcConfig + zmqAddr).
+//
+// Electrum connects directly (no socks5): the onboarding check probes the
+// server over plain TCP, and routing through the managed Tor would stall
+// Taker::init whenever Tor cannot bootstrap circuits.
+function buildBackendConfig(config) {
+  if (config?.backend?.type !== 'electrum') return undefined;
+  return {
+    kind: 'electrum',
+    url: normalizeElectrumUrl(config.backend.url),
   };
 }
 
@@ -1646,6 +1679,11 @@ function registerTakerHandlers() {
       };
       const torAuthPassword = config.taker?.tor_auth_password;
       const controlPort = config.taker?.control_port || 9051;
+      const backendConfig = buildBackendConfig(config);
+
+      if (backendConfig) {
+        console.log(`⚡ Using Electrum backend: ${backendConfig.url}`);
+      }
 
       // Unified FFI now always exposes a single Taker class.
       const TakerClass = api1State.openswapNapi.Taker;
@@ -1680,6 +1718,7 @@ function registerTakerHandlers() {
           torAuthPassword,
           zmqAddr,
           password: finalPassword,
+          backendConfig,
         });
 
         if (!nativePreflight.success) {
@@ -1715,7 +1754,8 @@ function registerTakerHandlers() {
         controlPort,
         torAuthPassword,
         zmqAddr,
-        finalPassword
+        finalPassword,
+        backendConfig
       );
 
       // ✅ SAVE STATE
@@ -1731,6 +1771,7 @@ function registerTakerHandlers() {
         zmqAddr,
         password: finalPassword,
         protocol,
+        backendConfig,
       });
 
       console.log(`✅ ${protocolName} Taker initialized`);
@@ -3023,6 +3064,80 @@ function registerDialogHandlers() {
 // Add this function
 function registerTorHandlers() {
   const net = require('net');
+
+  ipcMain.handle('network:getTorBootstrapStatus', async (event, config) => {
+    const host = config?.host || '127.0.0.1';
+    const port = config?.port || 9051;
+    const timeout = config?.timeout || 3000;
+
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+      let settled = false;
+      let buffer = '';
+      // The control protocol answers AUTHENTICATE with its own "250 OK", so
+      // the GETINFO must only be sent (and parsed) after that first reply.
+      let stage = 'auth';
+
+      const finish = (result) => {
+        if (settled) return;
+        settled = true;
+        socket.destroy();
+        resolve(result);
+      };
+
+      socket.setTimeout(timeout);
+
+      socket.on('data', (chunk) => {
+        buffer += chunk.toString('utf8');
+
+        if (stage === 'auth') {
+          if (/^250 OK\r?$/m.test(buffer)) {
+            stage = 'getinfo';
+            buffer = '';
+            socket.write('GETINFO status/bootstrap-phase\r\n');
+          } else if (/^5\d\d /m.test(buffer)) {
+            finish({
+              success: false,
+              error: 'Tor control port authentication failed',
+            });
+          }
+          return;
+        }
+
+        if (!/^(250 OK|5\d\d .+)\r?$/m.test(buffer)) return;
+
+        const phase = buffer.match(
+          /BOOTSTRAP PROGRESS=(\d+)(?:\s+TAG=\S+)?(?:\s+SUMMARY="([^"]*)")?/
+        );
+        if (phase) {
+          finish({
+            success: true,
+            progress: parseInt(phase[1], 10),
+            summary: phase[2] || null,
+          });
+        } else {
+          finish({ success: false, error: 'Unexpected Tor control response' });
+        }
+      });
+
+      socket.on('error', () => {
+        finish({
+          success: false,
+          error: `Cannot connect to Tor control port ${host}:${port}`,
+        });
+      });
+
+      socket.on('timeout', () => {
+        finish({ success: false, error: 'Tor control port timed out' });
+      });
+
+      socket.connect(port, host, () => {
+        // tor-manager writes "CookieAuthentication 0", so an empty
+        // AUTHENTICATE is accepted.
+        socket.write('AUTHENTICATE\r\n');
+      });
+    });
+  });
 
   ipcMain.handle('network:testTcpPort', async (event, config) => {
     const host = config?.host || '127.0.0.1';

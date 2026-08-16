@@ -141,6 +141,14 @@ function setupNavigation() {
 
 // Check bitcoind connection and show connection status
 async function checkBitcoindConnection(config) {
+  // Electrum backend: server reachability was already verified during
+  // onboarding, so there is no local node to wait for.
+  if (config?.backend?.type === 'electrum') {
+    console.log('⚡ Electrum backend selected, skipping Bitcoin Core check');
+    startTakerInitWithConfig(config);
+    return;
+  }
+
   console.log('🔌 Checking Bitcoin Core connection...');
 
   if (config) {
@@ -252,18 +260,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const appContainer = document.querySelector('body');
 
-  // Load config if exists
-  const saved = localStorage.getItem('openswap_config');
-
-  if (!saved) {
-    // First-time setup ONLY ONCE
-    console.log('🔧 Showing setup modal...');
-    showSetupModal();
-  } else {
-    // Config exists → skip setup
-    const config = JSON.parse(saved);
-    initiateAppStart(config);
-  }
+  // Always run onboarding on startup: backend selection + Tor bootstrap,
+  // then create/load/restore wallet. A previous session's saved config is
+  // kept only as a reference for pages like Settings — it never auto-starts
+  // the app.
+  console.log('🔧 Showing setup modal...');
+  showSetupModal();
 });
 
 function showSetupSuccess() {

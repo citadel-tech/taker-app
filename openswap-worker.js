@@ -52,7 +52,8 @@ function requireWalletPassword(password) {
       config.controlPort || 9051,
       config.torAuthPassword || undefined,
       config.zmqAddr,
-      walletPassword
+      walletPassword,
+      config.backendConfig || undefined
     );
 
     // Notify that we're in progress
